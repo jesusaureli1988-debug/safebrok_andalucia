@@ -1,0 +1,22 @@
+
+[functions.enviar-tpv-recibo]
+enabled = true
+verify_jwt = false
+import_map = "./functions/enviar-tpv-recibo/deno.json"
+# Uncomment to specify a custom file path to the entrypoint.
+# Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx
+entrypoint = "./functions/enviar-tpv-recibo/index.ts"
+# Specifies static files to be bundled with the function. Supports glob patterns.
+# For example, if you want to serve static HTML pages in your function:
+# static_files = [ "./functions/enviar-tpv-recibo/*.html" ]
+
+[functions.safebrok-ia]
+enabled = true
+verify_jwt = false
+import_map = "./functions/safebrok-ia/deno.json"
+# Uncomment to specify a custom file path to the entrypoint.
+# Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx
+entrypoint = "./functions/safebrok-ia/index.ts"
+# Specifies static files to be bundled with the function. Supports glob patterns.
+# For example, if you want to serve static HTML pages in your function:
+# static_files = [ "./functions/safebrok-ia/*.html" ]
