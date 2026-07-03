@@ -26,10 +26,24 @@ workflows:
           cd ..
 
       - name: Set up code signing
-        script: xcode-project use-profiles
+        script: |
+          xcode-project use-profiles --project ios/Runner.xcodeproj
 
-      - name: Build IPA
-        script: flutter build ipa --release -t lib/main.dart
+      - name: Build iOS archive
+        script: |
+          flutter build ios --release --no-codesign -t lib/main.dart
+          xcodebuild archive \
+            -workspace ios/Runner.xcworkspace \
+            -scheme Runner \
+            -configuration Release \
+            -archivePath build/ios/archive/Runner.xcarchive
+
+      - name: Export IPA
+        script: |
+          xcode-project build-ipa \
+            --workspace ios/Runner.xcworkspace \
+            --scheme Runner \
+            --archive build/ios/archive/Runner.xcarchive
 
     artifacts:
       - build/ios/ipa/*.ipa
