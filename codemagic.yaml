@@ -45,7 +45,7 @@ workflows:
             <key>provisioningProfiles</key>
             <dict>
               <key>com.safebrok</key>
-              <string>safebrok_appstore_profile</string>
+              <string>Safebrok ios_app_store 1783073252</string>
             </dict>
             <key>uploadBitcode</key>
             <false/>
