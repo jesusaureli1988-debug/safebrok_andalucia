@@ -79,178 +79,180 @@ class _MejoraProduccionScreenState extends State<MejoraProduccionScreen> {
   }
 
   Future<void> cargarDatos() async {
-    try {
+  try {
+    setState(() {
+      cargando = true;
+      error = null;
+    });
+
+    final user = supabase.auth.currentUser;
+
+    if (user == null) {
       setState(() {
-        cargando = true;
-        error = null;
+        cargando = false;
+        error = 'No hay usuario iniciado.';
       });
+      return;
+    }
 
-      final user = supabase.auth.currentUser;
-      if (user == null) {
-        setState(() {
-          cargando = false;
-          error = 'No hay usuario iniciado.';
-        });
-        return;
-      }
+    final perfil = await supabase
+        .from('usuarios')
+        .select('id, auth_id, rol_usuario, email')
+        .eq('auth_id', user.id)
+        .maybeSingle();
 
-      final perfil = await supabase
-          .from('usuarios')
-          .select('id, rol_usuario')
-          .eq('auth_id', user.id)
-          .maybeSingle();
+    if (perfil == null) {
+      setState(() {
+        cargando = false;
+        error = 'Usuario no encontrado.';
+      });
+      return;
+    }
 
-      final userId = perfil?['id'];
-      final role = perfil?['rol_usuario'];
+    String limpiar(dynamic value) {
+      return (value ?? '').toString().trim();
+    }
 
-      double produccion = 0;
-      int referencias = 0;
-      double objetivoLocal = 12000;
-      List<Map<String, dynamic>> ventas = [];
+    final userId = limpiar(perfil['id']);
+    final userAuthId = limpiar(perfil['auth_id']);
+    final role = limpiar(perfil['rol_usuario']);
 
-      if (role == 'agente') {
-        objetivoLocal = 12000;
+    double produccion = 0;
+    int referencias = 0;
+    double objetivoLocal = 12000;
+    List<Map<String, dynamic>> ventas = [];
 
-        final nomina = await supabase
-            .from('nominas_mensuales')
-            .select()
-            .eq('auth_id', user.id)
-            .gte('created_at', inicioCiclo.toIso8601String())
-            .order('created_at', ascending: false)
-            .limit(1)
-            .maybeSingle();
+    if (role == 'director_nacional') {
+      setState(() {
+        produccionActual = 0;
+        objetivo = 0;
+        referenciasActivas = 0;
+        ventasPorProducto = {
+          'Decesos': 0,
+          'Hogar': 0,
+          'Vida': 0,
+          'Salud': 0,
+          'Auto': 0,
+        };
+        cargando = false;
+      });
+      return;
+    }
 
-        produccion = _toDouble(nomina?['prima_neta_total']);
+    if (role == 'jefe_equipo') {
+      objetivoLocal = 10000;
+    } else if (role == 'jefe_ventas') {
+      objetivoLocal = 12000;
+    } else if (role == 'director_zona') {
+      objetivoLocal = 15000;
+    } else {
+      objetivoLocal = 12000;
+    }
 
-        final refs = await supabase
-            .from('referencias_viables')
-            .select('id')
-            .eq('auth_id', user.id);
+    final usuariosData = await supabase
+        .from('usuarios')
+        .select('id, auth_id, parent_id, rol_usuario');
 
-        referencias = refs.length;
+    final usuariosTabla = List<Map<String, dynamic>>.from(usuariosData);
 
-        final ventasAgente = await supabase
-            .from('ventas')
-            .select('producto, created_at')
-            .eq('agente_auth_id', user.id)
-            .gte('created_at', inicioCiclo.toIso8601String())
-            .lte('created_at', finCiclo.toIso8601String());
+    final authIdsPermitidos = <String>{};
 
-        ventas = List<Map<String, dynamic>>.from(ventasAgente);
-      } else if (role == 'jefe_equipo') {
-        objetivoLocal = 10000;
+    if (role == 'agente') {
+      authIdsPermitidos.add(userAuthId);
+    } else {
+      final idsVisitados = <String>{userId};
 
-        final agentes = await supabase
-            .from('usuarios')
-            .select('auth_id')
-            .eq('parent_id', userId);
+      void buscarDescendientes(String parentId) {
+        for (final u in usuariosTabla) {
+          final idUsuario = limpiar(u['id']);
+          final parentUsuario = limpiar(u['parent_id']);
+          final authUsuario = limpiar(u['auth_id']);
 
-        final agentesIds = (agentes as List)
-            .map((e) => e['auth_id'])
-            .where((e) => e != null)
-            .map((e) => e.toString())
-            .toList();
+          if (parentUsuario == parentId &&
+              idUsuario.isNotEmpty &&
+              !idsVisitados.contains(idUsuario)) {
+            idsVisitados.add(idUsuario);
 
-        if (agentesIds.isNotEmpty) {
-          final ventasEquipo = await supabase
-              .from('ventas')
-              .select('prima_anual_neta, producto, created_at')
-              .inFilter('agente_auth_id', agentesIds)
-              .gte('created_at', inicioCiclo.toIso8601String())
-              .lte('created_at', finCiclo.toIso8601String());
-
-          ventas = List<Map<String, dynamic>>.from(ventasEquipo);
-
-          for (final v in ventas) {
-            produccion += _toDouble(v['prima_anual_neta']);
-          }
-
-          final refs = await supabase
-              .from('referencias_viables')
-              .select('id')
-              .inFilter('auth_id', agentesIds);
-
-          referencias = refs.length;
-        }
-      } else if (role == 'jefe_ventas') {
-        objetivoLocal = 11500;
-
-        final jefes = await supabase
-            .from('usuarios')
-            .select('id')
-            .eq('parent_id', userId);
-
-        final jefesIds = (jefes as List)
-            .map((e) => e['id'])
-            .where((e) => e != null)
-            .map((e) => e.toString())
-            .toList();
-
-        if (jefesIds.isNotEmpty) {
-          final agentes = await supabase
-              .from('usuarios')
-              .select('auth_id')
-              .inFilter('parent_id', jefesIds);
-
-          final agentesIds = (agentes as List)
-              .map((e) => e['auth_id'])
-              .where((e) => e != null)
-              .map((e) => e.toString())
-              .toList();
-
-          if (agentesIds.isNotEmpty) {
-            final ventasEquipo = await supabase
-                .from('ventas')
-                .select('prima_anual_neta, producto, created_at')
-                .inFilter('agente_auth_id', agentesIds)
-                .gte('created_at', inicioCiclo.toIso8601String())
-                .lte('created_at', finCiclo.toIso8601String());
-
-            ventas = List<Map<String, dynamic>>.from(ventasEquipo);
-
-            for (final v in ventas) {
-              produccion += _toDouble(v['prima_anual_neta']);
+            if (authUsuario.isNotEmpty && authUsuario != 'null') {
+              authIdsPermitidos.add(authUsuario);
             }
 
-            final refs = await supabase
-                .from('referencias_viables')
-                .select('id')
-                .inFilter('auth_id', agentesIds);
-
-            referencias = refs.length;
+            buscarDescendientes(idUsuario);
           }
         }
       }
 
-      final map = {
-        'Decesos': 0,
-        'Hogar': 0,
-        'Vida': 0,
-        'Salud': 0,
-        'Auto': 0,
-      };
-
-      for (final v in ventas) {
-        final producto = v['producto']?.toString().trim();
-        if (map.containsKey(producto)) {
-          map[producto!] = map[producto]! + 1;
-        }
+      if (userAuthId.isNotEmpty && userAuthId != 'null') {
+        authIdsPermitidos.add(userAuthId);
       }
 
-      setState(() {
-        produccionActual = produccion;
-        objetivo = objetivoLocal;
-        referenciasActivas = referencias;
-        ventasPorProducto = map;
-        cargando = false;
-      });
-    } catch (e) {
-      setState(() {
-        cargando = false;
-        error = e.toString();
-      });
+      buscarDescendientes(userId);
     }
+
+    if (authIdsPermitidos.isNotEmpty) {
+      final ventasData = await supabase
+          .from('ventas')
+          .select('prima_anual_neta, producto, created_at')
+          .inFilter('agente_auth_id', authIdsPermitidos.toList())
+          .gte('created_at', inicioCiclo.toIso8601String())
+          .lte('created_at', finCiclo.toIso8601String());
+
+      ventas = List<Map<String, dynamic>>.from(ventasData);
+
+      for (final v in ventas) {
+        produccion += _toDouble(v['prima_anual_neta']);
+      }
+
+      final refs = await supabase
+          .from('referencias_viables')
+          .select('id')
+          .inFilter('auth_id', authIdsPermitidos.toList());
+
+      referencias = refs.length;
+    }
+
+    final map = {
+      'Decesos': 0,
+      'Hogar': 0,
+      'Vida': 0,
+      'Salud': 0,
+      'Auto': 0,
+    };
+
+    for (final v in ventas) {
+      final producto = v['producto']?.toString().trim();
+
+      if (producto == null) continue;
+
+      final p = producto.toLowerCase();
+
+      if (p.contains('decesos')) {
+        map['Decesos'] = map['Decesos']! + 1;
+      } else if (p.contains('hogar')) {
+        map['Hogar'] = map['Hogar']! + 1;
+      } else if (p.contains('vida')) {
+        map['Vida'] = map['Vida']! + 1;
+      } else if (p.contains('salud')) {
+        map['Salud'] = map['Salud']! + 1;
+      } else if (p.contains('auto') || p.contains('coche')) {
+        map['Auto'] = map['Auto']! + 1;
+      }
+    }
+
+    setState(() {
+      produccionActual = produccion;
+      objetivo = objetivoLocal;
+      referenciasActivas = referencias;
+      ventasPorProducto = map;
+      cargando = false;
+    });
+  } catch (e) {
+    setState(() {
+      cargando = false;
+      error = e.toString();
+    });
   }
+}
 
   @override
   Widget build(BuildContext context) {

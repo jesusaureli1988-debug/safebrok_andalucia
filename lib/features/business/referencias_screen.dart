@@ -1,7 +1,7 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:safebrok_andalucia/utils/referencias_filter.dart';
-import 'dart:ui';
+
 
 class ReferenciasScreen extends StatefulWidget {
   const ReferenciasScreen({super.key});
@@ -14,10 +14,16 @@ class _ReferenciasScreenState extends State<ReferenciasScreen> {
   final supabase = Supabase.instance.client;
 
   List<Map<String, dynamic>> referencias = [];
+  List<String> authIdsPermitidos = [];
 
   bool cargando = true;
+
   String filtro = "Todas";
   String busqueda = "";
+
+  String? userRole;
+  String? userAuthId;
+ String? userInternalId;
 
   @override
   void initState() {
@@ -25,22 +31,96 @@ class _ReferenciasScreenState extends State<ReferenciasScreen> {
     loadReferencias();
   }
 
-  Future<void> loadReferencias() async {
-    final user = supabase.auth.currentUser;
-    if (user == null) return;
+ Future<void> loadReferencias() async {
+  final user = supabase.auth.currentUser;
 
-    setState(() => cargando = true);
+  print('================ REFERENCIAS DEBUG ================');
+  print('USER AUTH ACTUAL: ${user?.id}');
 
-    final data = await supabase
-        .from('referencias_viables')
-        .select()
-        .eq('auth_id', user.id);
+  if (user == null) {
+    print('NO HAY USUARIO LOGUEADO');
+    setState(() => cargando = false);
+    return;
+  }
 
-    final now = DateTime.now();
+  setState(() => cargando = true);
 
-    final filtradas = List<Map<String, dynamic>>.from(data)
-        .where((r) => esReferenciaActiva(r, now))
-        .toList();
+  try {
+    final perfil = await supabase
+        .from('usuarios')
+        .select('id, auth_id, rol_usuario, parent_id')
+        .eq('auth_id', user.id)
+        .maybeSingle();
+
+    print('PERFIL USUARIO: $perfil');
+
+    userRole = perfil?['rol_usuario']?.toString();
+    userAuthId = perfil?['auth_id']?.toString();
+    userInternalId = perfil?['id']?.toString();
+
+    print('ROLE: $userRole');
+    print('USER AUTH ID PERFIL: $userAuthId');
+    print('USER INTERNAL ID: $userInternalId');
+
+    authIdsPermitidos = await _getAuthIdsEstructura(
+      internalId: userInternalId,
+      authId: userAuthId ?? user.id,
+      role: userRole ?? 'agente',
+    );
+
+    print('AUTH IDS PERMITIDOS: $authIdsPermitidos');
+    print('VE TODO: ${_veTodo(userRole)}');
+
+    dynamic query = supabase.from('referencias_viables').select();
+
+    if (!_veTodo(userRole)) {
+      print('APLICANDO FILTRO POR ESTRUCTURA');
+      query = query.inFilter('auth_id', authIdsPermitidos);
+    } else {
+      print('NO APLICA FILTRO, VE TODO');
+    }
+
+    final data = await query;
+
+    final usuariosData = await supabase
+    .from('usuarios')
+    .select('auth_id, nombre');
+
+final usuariosPorAuthId = {
+  for (final u in List<Map<String, dynamic>>.from(usuariosData))
+    if (u['auth_id'] != null)
+      u['auth_id'].toString(): u['nombre']?.toString() ?? 'Sin agente',
+};
+
+    print('DATA RAW TIPO: ${data.runtimeType}');
+    print('DATA RAW TOTAL: ${data.length}');
+    print('DATA RAW PRIMEROS 3: ${List<Map<String, dynamic>>.from(data).take(3).toList()}');
+
+    final listaRaw = List<Map<String, dynamic>>.from(data).map((r) {
+  final authIdRef = r['auth_id']?.toString();
+
+  return {
+    ...r,
+    'nombre_agente_ref': usuariosPorAuthId[authIdRef] ?? 'Sin agente',
+  };
+}).toList();
+
+    final filtradas = listaRaw.where((r) {
+      final estado = r['estado']?.toString().toLowerCase().trim() ?? '';
+
+      final activa = estado != 'resuelto' &&
+          estado != 'cerrado' &&
+          estado != 'contratado' &&
+          estado != 'desechado';
+
+      print(
+        'REF ${r['id']} | auth_id=${r['auth_id']} | estado=$estado | activa=$activa | nombre=${r['nombre']}',
+      );
+
+      return activa;
+    }).toList();
+
+    print('TOTAL DESPUES FILTRO ACTIVAS: ${filtradas.length}');
 
     filtradas.sort((a, b) {
       final scoreA = _scoreReferencia(a);
@@ -48,13 +128,101 @@ class _ReferenciasScreenState extends State<ReferenciasScreen> {
       return scoreB.compareTo(scoreA);
     });
 
+    if (!mounted) return;
+
     setState(() {
       referencias = filtradas;
       cargando = false;
     });
+
+    print('TOTAL FINAL EN STATE: ${referencias.length}');
+    print('================ FIN REFERENCIAS DEBUG ================');
+  } catch (e) {
+    print('ERROR LOAD REFERENCIAS: $e');
+    print('================ FIN REFERENCIAS DEBUG CON ERROR ================');
+
+    if (!mounted) return;
+    setState(() => cargando = false);
+    _snack('Error cargando referencias: $e');
+  }
+}
+
+  bool _veTodo(String? role) {
+    return role == 'director_nacional' || role == 'administracion';
   }
 
+ Future<List<String>> _getAuthIdsEstructura({
+  required String? internalId,
+  required String authId,
+  required String role,
+}) async {
+  if (role == 'administracion' || role == 'director_nacional') {
+    return [];
+  }
+
+  if (role == 'agente') {
+    return [authId];
+  }
+
+  if (internalId == null || internalId.isEmpty) {
+    return [authId];
+  }
+
+  final usuarios = await supabase
+      .from('usuarios')
+      .select('id, auth_id, parent_id, rol_usuario');
+
+  final lista = List<Map<String, dynamic>>.from(usuarios);
+
+  final Set<String> idsPermitidos = {internalId};
+  final Set<String> authPermitidos = {};
+
+  bool added = true;
+
+  while (added) {
+    added = false;
+
+    for (final u in lista) {
+      final id = u['id']?.toString();
+      final parentId = u['parent_id']?.toString();
+
+      if (id != null &&
+          id.isNotEmpty &&
+          parentId != null &&
+          parentId.isNotEmpty &&
+          idsPermitidos.contains(parentId) &&
+          !idsPermitidos.contains(id)) {
+        idsPermitidos.add(id);
+        added = true;
+      }
+    }
+  }
+
+  for (final u in lista) {
+    final id = u['id']?.toString();
+    final auth = u['auth_id']?.toString();
+
+    if (id != null &&
+        idsPermitidos.contains(id) &&
+        auth != null &&
+        auth.isNotEmpty &&
+        auth != 'null') {
+      authPermitidos.add(auth);
+    }
+  }
+
+  authPermitidos.add(authId);
+
+  print('IDS INTERNOS PERMITIDOS: $idsPermitidos');
+  print('AUTH IDS FINALES PERMITIDOS: $authPermitidos');
+
+  return authPermitidos.toList();
+}
+
   List<Map<String, dynamic>> get referenciasFiltradas {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+
     return referencias.where((r) {
       final prioridad = r['prioridad']?.toString() ?? 'Media';
       final nombre = r['nombre']?.toString().toLowerCase() ?? '';
@@ -65,11 +233,27 @@ class _ReferenciasScreenState extends State<ReferenciasScreen> {
       final score = _scoreReferencia(r);
       final requiereVisita = r['requiere_visita'] == true;
 
+      final fechaVencimiento = _parseDate(r['fecha_vencimiento']);
+      final fechaRellamada = _parseDate(r['fecha_rellamada']);
+
+      final venceHoy = fechaVencimiento != null && _sameDay(fechaVencimiento, today);
+      final llamadaHoy = fechaRellamada != null && _sameDay(fechaRellamada, today);
+
+      final vence7Dias = fechaVencimiento != null &&
+          !fechaVencimiento.isBefore(today) &&
+          fechaVencimiento.difference(today).inDays <= 7;
+
+      final proximaLlamada = fechaRellamada != null &&
+          !fechaRellamada.isBefore(today);
+
       final cumpleFiltro =
           filtro == "Todas" ||
-          filtro == prioridad ||
-          filtro == "Con visita" && requiereVisita ||
-          filtro == "Urgentes" && score >= 75;
+          filtro == "Hoy" && (venceHoy || llamadaHoy) ||
+          filtro == "Próximas" && proximaLlamada ||
+          filtro == "Calientes" && score >= 75 ||
+          filtro == "Visitas" && requiereVisita ||
+          filtro == "Vencimientos" && vence7Dias ||
+          filtro == prioridad;
 
       final cumpleBusqueda = texto.isEmpty ||
           nombre.contains(texto) ||
@@ -80,6 +264,18 @@ class _ReferenciasScreenState extends State<ReferenciasScreen> {
     }).toList();
   }
 
+  int get totalHoy {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+
+    return referencias.where((r) {
+      final v = _parseDate(r['fecha_vencimiento']);
+      final rr = _parseDate(r['fecha_rellamada']);
+      return (v != null && _sameDay(v, today)) ||
+          (rr != null && _sameDay(rr, today));
+    }).length;
+  }
+
   int get totalAlta =>
       referencias.where((r) => r['prioridad'] == 'Alta').length;
 
@@ -88,6 +284,47 @@ class _ReferenciasScreenState extends State<ReferenciasScreen> {
 
   int get totalUrgentes =>
       referencias.where((r) => _scoreReferencia(r) >= 75).length;
+
+  int get totalVencen7 {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+
+    return referencias.where((r) {
+      final fecha = _parseDate(r['fecha_vencimiento']);
+      return fecha != null &&
+          !fecha.isBefore(today) &&
+          fecha.difference(today).inDays <= 7;
+    }).length;
+  }
+
+  int get totalCerradasMes {
+    final now = DateTime.now();
+
+    return referencias.where((r) {
+      final estado = r['estado']?.toString();
+      final fecha = _parseDate(r['updated_at']) ?? _parseDate(r['created_at']);
+      return estado == 'Resuelto' &&
+          fecha != null &&
+          fecha.month == now.month &&
+          fecha.year == now.year;
+    }).length;
+  }
+
+  double get conversionMes {
+    if (referencias.isEmpty) return 0;
+    return (totalCerradasMes / referencias.length) * 100;
+  }
+
+  DateTime? _parseDate(dynamic value) {
+    if (value == null || value.toString().isEmpty) return null;
+    return DateTime.tryParse(value.toString());
+  }
+
+  bool _sameDay(DateTime value, DateTime today) {
+    return value.year == today.year &&
+        value.month == today.month &&
+        value.day == today.day;
+  }
 
   int _scoreReferencia(Map<String, dynamic> r) {
     int score = 20;
@@ -104,9 +341,7 @@ class _ReferenciasScreenState extends State<ReferenciasScreen> {
     if (productos.length >= 2) score += 12;
     if (productos.length >= 3) score += 8;
 
-    final fecha = DateTime.tryParse(
-      r['fecha_vencimiento']?.toString() ?? '',
-    );
+    final fecha = _parseDate(r['fecha_vencimiento']);
 
     if (fecha != null) {
       final dias = fecha.difference(DateTime.now()).inDays;
@@ -114,6 +349,14 @@ class _ReferenciasScreenState extends State<ReferenciasScreen> {
       if (dias <= 7 && dias >= 0) score += 25;
       if (dias <= 15 && dias > 7) score += 15;
       if (dias < 0) score += 18;
+    }
+
+    final rellamada = _parseDate(r['fecha_rellamada']);
+
+    if (rellamada != null) {
+      final diasRellamada = rellamada.difference(DateTime.now()).inDays;
+      if (diasRellamada <= 0) score += 12;
+      if (diasRellamada > 0 && diasRellamada <= 3) score += 8;
     }
 
     return score.clamp(0, 100);
@@ -150,13 +393,26 @@ class _ReferenciasScreenState extends State<ReferenciasScreen> {
     final fecha = DateTime.tryParse(value.toString());
     if (fecha == null) return "Sin vencimiento";
 
-    final dias = fecha.difference(DateTime.now()).inDays;
+    final hoy = DateTime.now();
+    final today = DateTime(hoy.year, hoy.month, hoy.day);
+    final cleanFecha = DateTime(fecha.year, fecha.month, fecha.day);
+
+    final dias = cleanFecha.difference(today).inDays;
 
     if (dias < 0) return "Vencida hace ${dias.abs()} días";
     if (dias == 0) return "Vence hoy";
     if (dias == 1) return "Vence mañana";
 
     return "Vence en $dias días";
+  }
+
+  String _fechaBonita(dynamic value) {
+    if (value == null || value.toString().isEmpty) return "Sin fecha";
+
+    final fecha = DateTime.tryParse(value.toString());
+    if (fecha == null) return "Sin fecha";
+
+    return "${fecha.day.toString().padLeft(2, '0')}/${fecha.month.toString().padLeft(2, '0')}/${fecha.year}";
   }
 
   Color _prioridadColor(String prioridad) {
@@ -182,6 +438,17 @@ class _ReferenciasScreenState extends State<ReferenciasScreen> {
     if (score >= 75) return "Muy caliente";
     if (score >= 50) return "Interesante";
     return "Seguimiento";
+  }
+
+  void _snack(String text) {
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(text),
+        backgroundColor: const Color(0xFF0F172A),
+      ),
+    );
   }
 
   Future<void> crearReferencia() async {
@@ -229,12 +496,14 @@ class _ReferenciasScreenState extends State<ReferenciasScreen> {
                                 color: Colors.cyanAccent,
                               ),
                               SizedBox(width: 10),
-                              Text(
-                                "Nueva referencia",
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 22,
-                                  fontWeight: FontWeight.w900,
+                              Expanded(
+                                child: Text(
+                                  "Nueva referencia",
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 22,
+                                    fontWeight: FontWeight.w900,
+                                  ),
                                 ),
                               ),
                             ],
@@ -303,46 +572,38 @@ class _ReferenciasScreenState extends State<ReferenciasScreen> {
                               final selected = productos.contains(p);
 
                               return FilterChip(
-  label: Text(
-    p,
-    style: TextStyle(
-      color: selected
-          ? const Color(0xFF061018)
-          : Colors.white,
-      fontWeight: FontWeight.w800,
-    ),
-  ),
-
-  selected: selected,
-
-  selectedColor: Colors.cyanAccent,
-
-  backgroundColor: const Color(0xFF162033),
-
-  checkmarkColor: const Color(0xFF061018),
-
-  side: BorderSide(
-    color: selected
-        ? Colors.cyanAccent
-        : Colors.white.withOpacity(0.15),
-  ),
-
-  shape: RoundedRectangleBorder(
-    borderRadius: BorderRadius.circular(30),
-  ),
-
-  showCheckmark: false,
-
-  onSelected: (v) {
-    setDialogState(() {
-      if (v) {
-        productos.add(p);
-      } else {
-        productos.remove(p);
-      }
-    });
-  },
-);
+                                label: Text(
+                                  p,
+                                  style: TextStyle(
+                                    color: selected
+                                        ? const Color(0xFF061018)
+                                        : Colors.white,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                                selected: selected,
+                                selectedColor: Colors.cyanAccent,
+                                backgroundColor: const Color(0xFF162033),
+                                checkmarkColor: const Color(0xFF061018),
+                                side: BorderSide(
+                                  color: selected
+                                      ? Colors.cyanAccent
+                                      : Colors.white.withOpacity(0.15),
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(30),
+                                ),
+                                showCheckmark: false,
+                                onSelected: (v) {
+                                  setDialogState(() {
+                                    if (v) {
+                                      productos.add(p);
+                                    } else {
+                                      productos.remove(p);
+                                    }
+                                  });
+                                },
+                              );
                             }).toList(),
                           ),
 
@@ -474,11 +735,17 @@ class _ReferenciasScreenState extends State<ReferenciasScreen> {
                                 child: ElevatedButton.icon(
                                   onPressed: () async {
                                     final user = supabase.auth.currentUser;
+                                    if (user == null) return;
+
+                                    if (nombreController.text.trim().isEmpty) {
+                                      _snack('Introduce el nombre');
+                                      return;
+                                    }
 
                                     await supabase
                                         .from('referencias_viables')
                                         .insert({
-                                      'auth_id': user!.id,
+                                      'auth_id': user.id,
                                       'nombre': nombreController.text.trim(),
                                       'telefono':
                                           telefonoController.text.trim(),
@@ -493,6 +760,8 @@ class _ReferenciasScreenState extends State<ReferenciasScreen> {
                                       'created_at':
                                           DateTime.now().toIso8601String(),
                                     });
+
+                                    if (!mounted) return;
 
                                     Navigator.pop(context);
                                     loadReferencias();
@@ -524,6 +793,10 @@ class _ReferenciasScreenState extends State<ReferenciasScreen> {
         );
       },
     );
+
+    nombreController.dispose();
+    telefonoController.dispose();
+    notasController.dispose();
   }
 
   @override
@@ -545,7 +818,6 @@ class _ReferenciasScreenState extends State<ReferenciasScreen> {
       body: Stack(
         children: [
           const _FondoReferencias(),
-
           SafeArea(
             child: RefreshIndicator(
               onRefresh: loadReferencias,
@@ -555,9 +827,7 @@ class _ReferenciasScreenState extends State<ReferenciasScreen> {
                 padding: const EdgeInsets.fromLTRB(18, 12, 18, 95),
                 children: [
                   _header(),
-
                   const SizedBox(height: 20),
-
                   if (cargando)
                     const Padding(
                       padding: EdgeInsets.only(top: 120),
@@ -569,13 +839,11 @@ class _ReferenciasScreenState extends State<ReferenciasScreen> {
                     )
                   else ...[
                     _kpis(),
-
                     const SizedBox(height: 16),
-
+                    _embudoCard(),
+                    const SizedBox(height: 16),
                     _buscadorFiltros(),
-
                     const SizedBox(height: 16),
-
                     if (lista.isEmpty)
                       _sinReferencias()
                     else
@@ -591,6 +859,10 @@ class _ReferenciasScreenState extends State<ReferenciasScreen> {
   }
 
   Widget _header() {
+    final subtitle = _veTodo(userRole)
+        ? "CRM completo de toda la red"
+        : "CRM de tu estructura comercial";
+
     return Row(
       children: [
         InkWell(
@@ -619,12 +891,12 @@ class _ReferenciasScreenState extends State<ReferenciasScreen> {
           ),
         ),
         const SizedBox(width: 14),
-        const Expanded(
+        Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                "Referencias",
+              const Text(
+                "Referencias CRM",
                 style: TextStyle(
                   color: Colors.white,
                   fontSize: 27,
@@ -632,10 +904,10 @@ class _ReferenciasScreenState extends State<ReferenciasScreen> {
                   letterSpacing: -0.8,
                 ),
               ),
-              SizedBox(height: 3),
+              const SizedBox(height: 3),
               Text(
-                "CRM de oportunidades activas",
-                style: TextStyle(
+                subtitle,
+                style: const TextStyle(
                   color: Colors.white60,
                   fontSize: 13,
                 ),
@@ -670,17 +942,17 @@ class _ReferenciasScreenState extends State<ReferenciasScreen> {
             children: [
               Expanded(
                 child: _kpiBox(
-                  title: "Total",
-                  value: referencias.length.toString(),
-                  icon: Icons.groups_rounded,
+                  title: "Hoy",
+                  value: totalHoy.toString(),
+                  icon: Icons.today_rounded,
                   color: Colors.cyanAccent,
                 ),
               ),
               const SizedBox(width: 10),
               Expanded(
                 child: _kpiBox(
-                  title: "Alta",
-                  value: totalAlta.toString(),
+                  title: "Calientes",
+                  value: totalUrgentes.toString(),
                   icon: Icons.local_fire_department_rounded,
                   color: Colors.redAccent,
                 ),
@@ -701,9 +973,9 @@ class _ReferenciasScreenState extends State<ReferenciasScreen> {
               const SizedBox(width: 10),
               Expanded(
                 child: _kpiBox(
-                  title: "Urgentes",
-                  value: totalUrgentes.toString(),
-                  icon: Icons.bolt_rounded,
+                  title: "Vencen 7d",
+                  value: totalVencen7.toString(),
+                  icon: Icons.warning_rounded,
                   color: Colors.greenAccent,
                 ),
               ),
@@ -714,7 +986,106 @@ class _ReferenciasScreenState extends State<ReferenciasScreen> {
     );
   }
 
+  Widget _embudoCard() {
+    final total = referencias.length;
+    final calientes = totalUrgentes;
+    final visitas = totalVisita;
+    final cerradas = totalCerradasMes;
+
+    return _glassCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            "Embudo comercial",
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 19,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: 14),
+          _funnelLine("Referencias activas", total, total, Colors.cyanAccent),
+          _funnelLine("Muy calientes", calientes, total, Colors.redAccent),
+          _funnelLine("Con visita", visitas, total, Colors.orangeAccent),
+          _funnelLine("Cerradas mes", cerradas, total, Colors.greenAccent),
+          const SizedBox(height: 12),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.06),
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: Colors.cyanAccent.withOpacity(0.20)),
+            ),
+            child: Text(
+              "Conversión estimada del mes: ${conversionMes.toStringAsFixed(1)}%",
+              style: const TextStyle(
+                color: Colors.cyanAccent,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _funnelLine(String title, int value, int total, Color color) {
+    final percent = total == 0 ? 0.0 : value / total;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 11),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 115,
+            child: Text(
+              title,
+              style: const TextStyle(
+                color: Colors.white70,
+                fontWeight: FontWeight.w700,
+                fontSize: 12,
+              ),
+            ),
+          ),
+          Expanded(
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(999),
+              child: LinearProgressIndicator(
+                minHeight: 10,
+                value: percent.clamp(0.0, 1.0),
+                backgroundColor: Colors.white.withOpacity(0.10),
+                valueColor: AlwaysStoppedAnimation(color),
+              ),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Text(
+            value.toString(),
+            style: TextStyle(
+              color: color,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buscadorFiltros() {
+    final filtros = [
+      "Hoy",
+      "Próximas",
+      "Calientes",
+      "Visitas",
+      "Vencimientos",
+      "Todas",
+      "Alta",
+      "Media",
+      "Baja",
+    ];
+
     return _glassCard(
       padding: const EdgeInsets.all(14),
       child: Column(
@@ -737,20 +1108,11 @@ class _ReferenciasScreenState extends State<ReferenciasScreen> {
               ),
             ),
           ),
-
           const SizedBox(height: 12),
-
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             child: Row(
-              children: [
-                "Todas",
-                "Alta",
-                "Media",
-                "Baja",
-                "Con visita",
-                "Urgentes",
-              ].map((f) {
+              children: filtros.map((f) {
                 final selected = filtro == f;
                 final color = f == "Alta"
                     ? Colors.redAccent
@@ -758,84 +1120,53 @@ class _ReferenciasScreenState extends State<ReferenciasScreen> {
                         ? Colors.orangeAccent
                         : f == "Baja"
                             ? Colors.greenAccent
-                            : f == "Urgentes"
-                                ? Colors.purpleAccent
-                                : Colors.cyanAccent;
+                            : f == "Calientes"
+                                ? Colors.redAccent
+                                : f == "Visitas"
+                                    ? Colors.orangeAccent
+                                    : f == "Vencimientos"
+                                        ? Colors.purpleAccent
+                                        : Colors.cyanAccent;
 
                 return Padding(
-  padding: const EdgeInsets.only(right: 8),
-  child: AnimatedContainer(
-    duration: const Duration(milliseconds: 220),
-    curve: Curves.easeOut,
-    decoration: BoxDecoration(
-      borderRadius: BorderRadius.circular(30),
-      boxShadow: selected
-          ? [
-              BoxShadow(
-                color: color.withOpacity(0.25),
-                blurRadius: 18,
-                offset: const Offset(0, 8),
-              ),
-            ]
-          : [],
-    ),
-    child: ChoiceChip(
-      label: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            f == "Alta"
-                ? Icons.local_fire_department_rounded
-                : f == "Media"
-                    ? Icons.trending_up_rounded
-                    : f == "Baja"
-                        ? Icons.check_circle_rounded
-                        : f == "Con visita"
-                            ? Icons.home_work_rounded
-                            : f == "Urgentes"
-                                ? Icons.bolt_rounded
-                                : Icons.dashboard_rounded,
-            size: 16,
-            color: selected ? const Color(0xFF061018) : Colors.white,
-          ),
-          const SizedBox(width: 6),
-          Text(
-            f,
-            style: TextStyle(
-              color: selected ? const Color(0xFF061018) : Colors.white,
-              fontWeight: FontWeight.w900,
-              fontSize: 13,
+                  padding: const EdgeInsets.only(right: 8),
+                  child: ChoiceChip(
+                    label: Text(
+                      f,
+                      style: TextStyle(
+                        color: selected
+                            ? const Color(0xFF061018)
+                            : Colors.white,
+                        fontWeight: FontWeight.w900,
+                        fontSize: 13,
+                      ),
+                    ),
+                    selected: selected,
+                    selectedColor: color,
+                    backgroundColor: const Color(0xFF162033),
+                    side: BorderSide(
+                      color: selected ? color : Colors.white.withOpacity(0.12),
+                    ),
+                    showCheckmark: false,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(30),
+                    ),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 10,
+                    ),
+                    onSelected: (_) {
+                      setState(() => filtro = f);
+                    },
+                  ),
+                );
+              }).toList(),
             ),
           ),
         ],
       ),
-      selected: selected,
-      selectedColor: color,
-      backgroundColor: const Color(0xFF162033),
-      side: BorderSide(
-        color: selected ? color : Colors.white.withOpacity(0.12),
-      ),
-      showCheckmark: false,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(30),
-      ),
-      padding: const EdgeInsets.symmetric(
-        horizontal: 14,
-        vertical: 10,
-      ),
-      onSelected: (_) {
-        setState(() => filtro = f);
-      },
-    ),
-  ),
-);
-}).toList(),
-),
-),
-],
-),
-);
-}
+    );
+  }
 
   Widget _tarjetaReferencia(Map<String, dynamic> r) {
     final prioridad = r['prioridad']?.toString() ?? "Media";
@@ -844,6 +1175,8 @@ class _ReferenciasScreenState extends State<ReferenciasScreen> {
     final score = _scoreReferencia(r);
     final scoreColor = _scoreColor(score);
     final nombre = r['nombre']?.toString() ?? "Sin nombre";
+    final telefono = r['telefono']?.toString() ?? "";
+    final rellamada = r['fecha_rellamada'];
 
     return InkWell(
       borderRadius: BorderRadius.circular(26),
@@ -881,7 +1214,6 @@ class _ReferenciasScreenState extends State<ReferenciasScreen> {
               children: [
                 _avatar(nombre),
                 const SizedBox(width: 12),
-
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -907,7 +1239,6 @@ class _ReferenciasScreenState extends State<ReferenciasScreen> {
                     ],
                   ),
                 ),
-
                 _pill(
                   prioridad,
                   color,
@@ -920,7 +1251,7 @@ class _ReferenciasScreenState extends State<ReferenciasScreen> {
 
             _infoMini(
               Icons.phone_rounded,
-              r['telefono']?.toString() ?? "",
+              telefono.isEmpty ? "Sin teléfono" : telefono,
               Colors.white70,
             ),
 
@@ -934,11 +1265,28 @@ class _ReferenciasScreenState extends State<ReferenciasScreen> {
 
             const SizedBox(height: 7),
 
+_infoMini(
+  Icons.person_rounded,
+  r['nombre_agente_ref']?.toString() ?? "Sin agente",
+  Colors.amberAccent,
+),
+
+            const SizedBox(height: 7),
+
             _infoMini(
               Icons.event_rounded,
               _fechaTexto(r['fecha_vencimiento']),
               scoreColor,
             ),
+
+            if (rellamada != null && rellamada.toString().isNotEmpty) ...[
+              const SizedBox(height: 7),
+              _infoMini(
+                Icons.phone_callback_rounded,
+                "Rellamada: ${_fechaBonita(rellamada)}",
+                Colors.greenAccent,
+              ),
+            ],
 
             const SizedBox(height: 15),
 
@@ -969,44 +1317,44 @@ class _ReferenciasScreenState extends State<ReferenciasScreen> {
             if (productos.isNotEmpty) ...[
               const SizedBox(height: 14),
               Wrap(
-  spacing: 7,
-  runSpacing: 7,
-  children: productos.map<Widget>((p) {
-    return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: 12,
-        vertical: 8,
-      ),
-      decoration: BoxDecoration(
-        color: const Color(0xFF142235),
-        borderRadius: BorderRadius.circular(30),
-        border: Border.all(
-          color: Colors.cyanAccent.withOpacity(0.45),
-          width: 1.1,
-        ),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(
-            Icons.sell_rounded,
-            color: Colors.cyanAccent,
-            size: 16,
-          ),
-          const SizedBox(width: 6),
-          Text(
-            p,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 12,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-        ],
-      ),
-    );
-  }).toList(),
-),
+                spacing: 7,
+                runSpacing: 7,
+                children: productos.map<Widget>((p) {
+                  return Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 8,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF142235),
+                      borderRadius: BorderRadius.circular(30),
+                      border: Border.all(
+                        color: Colors.cyanAccent.withOpacity(0.45),
+                        width: 1.1,
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          Icons.sell_rounded,
+                          color: Colors.cyanAccent,
+                          size: 16,
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          p,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }).toList(),
+              ),
             ],
 
             if ((r['notas']?.toString() ?? '').trim().isNotEmpty) ...[
@@ -1022,6 +1370,28 @@ class _ReferenciasScreenState extends State<ReferenciasScreen> {
               ),
             ],
 
+            const SizedBox(height: 14),
+
+            Row(
+              children: [
+                Expanded(
+                  child: _actionButton(
+                    "Gestionar",
+                    Icons.settings_suggest_rounded,
+                    Colors.cyanAccent,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _actionButton(
+                    "Programar",
+                    Icons.phone_callback_rounded,
+                    Colors.orangeAccent,
+                  ),
+                ),
+              ],
+            ),
+
             if (r['requiere_visita'] == true) ...[
               const SizedBox(height: 14),
               _pill(
@@ -1032,6 +1402,32 @@ class _ReferenciasScreenState extends State<ReferenciasScreen> {
             ],
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _actionButton(String text, IconData icon, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 11),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.11),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: color.withOpacity(0.26)),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(icon, color: color, size: 17),
+          const SizedBox(width: 6),
+          Text(
+            text,
+            style: TextStyle(
+              color: color,
+              fontWeight: FontWeight.w900,
+              fontSize: 12,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -1180,7 +1576,7 @@ class _ReferenciasScreenState extends State<ReferenciasScreen> {
           ),
           SizedBox(height: 6),
           Text(
-            "Pulsa en Nueva para crear la primera oportunidad.",
+            "No hay referencias para este filtro.",
             textAlign: TextAlign.center,
             style: TextStyle(color: Colors.white54),
           ),
@@ -1365,6 +1761,18 @@ class _ReferenciaDetailScreenState extends State<ReferenciaDetailScreen> {
 
   DateTime? fechaRellamada;
 
+  DateTime? _parseDate(dynamic value) {
+    if (value == null || value.toString().isEmpty) return null;
+    return DateTime.tryParse(value.toString());
+  }
+
+  String _fechaBonita(dynamic value) {
+    final fecha = _parseDate(value);
+    if (fecha == null) return "Sin fecha";
+
+    return "${fecha.day.toString().padLeft(2, '0')}/${fecha.month.toString().padLeft(2, '0')}/${fecha.year}";
+  }
+
   List<String> _productos(dynamic value) {
     if (value == null) return [];
 
@@ -1405,9 +1813,7 @@ class _ReferenciaDetailScreenState extends State<ReferenciaDetailScreen> {
     if (productos.length >= 2) score += 12;
     if (productos.length >= 3) score += 8;
 
-    final fecha = DateTime.tryParse(
-      r['fecha_vencimiento']?.toString() ?? '',
-    );
+    final fecha = _parseDate(r['fecha_vencimiento']);
 
     if (fecha != null) {
       final dias = fecha.difference(DateTime.now()).inDays;
@@ -1415,6 +1821,14 @@ class _ReferenciaDetailScreenState extends State<ReferenciaDetailScreen> {
       if (dias <= 7 && dias >= 0) score += 25;
       if (dias <= 15 && dias > 7) score += 15;
       if (dias < 0) score += 18;
+    }
+
+    final rellamada = _parseDate(r['fecha_rellamada']);
+
+    if (rellamada != null) {
+      final diasRellamada = rellamada.difference(DateTime.now()).inDays;
+      if (diasRellamada <= 0) score += 12;
+      if (diasRellamada > 0 && diasRellamada <= 3) score += 8;
     }
 
     return score.clamp(0, 100);
@@ -1445,22 +1859,15 @@ class _ReferenciaDetailScreenState extends State<ReferenciaDetailScreen> {
     }
   }
 
-  String _fechaBonita(dynamic value) {
-    if (value == null || value.toString().isEmpty) return "Sin fecha";
-
-    final fecha = DateTime.tryParse(value.toString());
-    if (fecha == null) return "Sin fecha";
-
-    return "${fecha.day.toString().padLeft(2, '0')}/${fecha.month.toString().padLeft(2, '0')}/${fecha.year}";
-  }
-
   String _fechaTexto(dynamic value) {
-    if (value == null || value.toString().isEmpty) return "Sin vencimiento";
-
-    final fecha = DateTime.tryParse(value.toString());
+    final fecha = _parseDate(value);
     if (fecha == null) return "Sin vencimiento";
 
-    final dias = fecha.difference(DateTime.now()).inDays;
+    final hoy = DateTime.now();
+    final today = DateTime(hoy.year, hoy.month, hoy.day);
+    final cleanFecha = DateTime(fecha.year, fecha.month, fecha.day);
+
+    final dias = cleanFecha.difference(today).inDays;
 
     if (dias < 0) return "Vencida hace ${dias.abs()} días";
     if (dias == 0) return "Vence hoy";
@@ -1537,8 +1944,12 @@ class _ReferenciaDetailScreenState extends State<ReferenciaDetailScreen> {
   Future<void> gestionarReferencia() async {
     final notaController = TextEditingController();
 
-    String estado = "En curso";
-    String resultado = "Contratado";
+    String estado = widget.referencia['estado']?.toString() ?? "En curso";
+    if (estado == "Pendiente") estado = "En curso";
+
+    String resultado = widget.referencia['resultado']?.toString() ?? "Contratado";
+
+    fechaRellamada = _parseDate(widget.referencia['fecha_rellamada']);
 
     await showDialog(
       context: context,
@@ -1561,12 +1972,6 @@ class _ReferenciaDetailScreenState extends State<ReferenciaDetailScreen> {
                       border: Border.all(
                         color: Colors.cyanAccent.withOpacity(0.35),
                       ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.cyanAccent.withOpacity(0.12),
-                          blurRadius: 36,
-                        ),
-                      ],
                     ),
                     child: SingleChildScrollView(
                       child: Column(
@@ -1788,13 +2193,16 @@ class _ReferenciaDetailScreenState extends State<ReferenciaDetailScreen> {
                                         .from('referencias_viables')
                                         .update({
                                       'estado': estado,
-                                      'resultado':
-                                          estado == "Resuelto" ? resultado : null,
+                                      'resultado': estado == "Resuelto"
+                                          ? resultado
+                                          : null,
                                       'nota_seguimiento':
                                           notaController.text.trim(),
                                       'fecha_rellamada': estado == "En curso"
                                           ? fechaRellamada?.toIso8601String()
                                           : null,
+                                      'updated_at':
+                                          DateTime.now().toIso8601String(),
                                     }).eq('id', widget.referencia['id']);
 
                                     if (!mounted) return;
@@ -1856,15 +2264,12 @@ class _ReferenciaDetailScreenState extends State<ReferenciaDetailScreen> {
       body: Stack(
         children: [
           const _FondoReferencias(),
-
           SafeArea(
             child: ListView(
               padding: const EdgeInsets.fromLTRB(18, 12, 18, 30),
               children: [
                 _header(),
-
                 const SizedBox(height: 22),
-
                 _heroCliente(
                   nombre: nombre,
                   compania: compania,
@@ -1873,13 +2278,9 @@ class _ReferenciaDetailScreenState extends State<ReferenciaDetailScreen> {
                   score: score,
                   scoreColor: scoreColor,
                 ),
-
                 const SizedBox(height: 16),
-
                 _alertaVencimiento(r['fecha_vencimiento'], scoreColor),
-
                 const SizedBox(height: 16),
-
                 _datosCard(
                   telefono: telefono,
                   compania: compania,
@@ -1888,22 +2289,15 @@ class _ReferenciaDetailScreenState extends State<ReferenciaDetailScreen> {
                   estado: estado,
                   resultado: resultado,
                 ),
-
                 const SizedBox(height: 16),
-
                 if (productos.isNotEmpty) _productosCard(productos),
-
                 if (productos.isNotEmpty) const SizedBox(height: 16),
-
                 _notasCard(
                   titulo: "Notas de la referencia",
-                  texto: notas.trim().isEmpty
-                      ? "Sin notas registradas."
-                      : notas,
+                  texto: notas.trim().isEmpty ? "Sin notas registradas." : notas,
                   icon: Icons.notes_rounded,
                   color: Colors.cyanAccent,
                 ),
-
                 if (notaSeguimiento.trim().isNotEmpty) ...[
                   const SizedBox(height: 16),
                   _notasCard(
@@ -1913,13 +2307,9 @@ class _ReferenciaDetailScreenState extends State<ReferenciaDetailScreen> {
                     color: Colors.orangeAccent,
                   ),
                 ],
-
                 const SizedBox(height: 16),
-
                 _timelineCard(r),
-
                 const SizedBox(height: 24),
-
                 if (estado != "Resuelto")
                   SizedBox(
                     width: double.infinity,
@@ -1966,12 +2356,6 @@ class _ReferenciaDetailScreenState extends State<ReferenciaDetailScreen> {
               border: Border.all(
                 color: Colors.cyanAccent.withOpacity(0.45),
               ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.cyanAccent.withOpacity(0.18),
-                  blurRadius: 24,
-                ),
-              ],
             ),
             child: const Icon(
               Icons.arrow_back_rounded,
@@ -2035,12 +2419,6 @@ class _ReferenciaDetailScreenState extends State<ReferenciaDetailScreen> {
                 color: Colors.cyanAccent.withOpacity(0.45),
                 width: 1.4,
               ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.cyanAccent.withOpacity(0.20),
-                  blurRadius: 26,
-                ),
-              ],
             ),
             child: Center(
               child: Text(
@@ -2053,9 +2431,7 @@ class _ReferenciaDetailScreenState extends State<ReferenciaDetailScreen> {
               ),
             ),
           ),
-
           const SizedBox(height: 14),
-
           Text(
             nombre,
             textAlign: TextAlign.center,
@@ -2066,9 +2442,7 @@ class _ReferenciaDetailScreenState extends State<ReferenciaDetailScreen> {
               letterSpacing: -0.5,
             ),
           ),
-
           const SizedBox(height: 5),
-
           Text(
             compania,
             style: const TextStyle(
@@ -2077,18 +2451,17 @@ class _ReferenciaDetailScreenState extends State<ReferenciaDetailScreen> {
               fontWeight: FontWeight.w800,
             ),
           ),
-
           const SizedBox(height: 16),
-
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
+          Wrap(
+            alignment: WrapAlignment.center,
+            spacing: 8,
+            runSpacing: 8,
             children: [
               _pill(
                 prioridad,
                 prioridadColor,
                 Icons.flag_rounded,
               ),
-              const SizedBox(width: 8),
               _pill(
                 _scoreTexto(score),
                 scoreColor,
@@ -2096,9 +2469,7 @@ class _ReferenciaDetailScreenState extends State<ReferenciaDetailScreen> {
               ),
             ],
           ),
-
           const SizedBox(height: 20),
-
           Row(
             children: [
               Expanded(
@@ -2123,9 +2494,7 @@ class _ReferenciaDetailScreenState extends State<ReferenciaDetailScreen> {
               ),
             ],
           ),
-
           const SizedBox(height: 6),
-
           const Align(
             alignment: Alignment.centerLeft,
             child: Text(
@@ -2206,37 +2575,31 @@ class _ReferenciaDetailScreenState extends State<ReferenciaDetailScreen> {
               fontWeight: FontWeight.w900,
             ),
           ),
-
           const SizedBox(height: 16),
-
           _infoLine(
             Icons.phone_rounded,
             "Teléfono",
             telefono.isEmpty ? "Sin teléfono" : telefono,
             Colors.white70,
           ),
-
           _infoLine(
             Icons.apartment_rounded,
             "Compañía",
             compania,
             Colors.cyanAccent,
           ),
-
           _infoLine(
             Icons.flag_rounded,
             "Prioridad",
             prioridad,
             prioridadColor,
           ),
-
           _infoLine(
             Icons.track_changes_rounded,
             "Estado",
             estado,
             estado == "Resuelto" ? Colors.greenAccent : Colors.orangeAccent,
           ),
-
           if (resultado.trim().isNotEmpty)
             _infoLine(
               Icons.verified_rounded,
@@ -2246,7 +2609,6 @@ class _ReferenciaDetailScreenState extends State<ReferenciaDetailScreen> {
                   ? Colors.greenAccent
                   : Colors.redAccent,
             ),
-
           if (widget.referencia['requiere_visita'] == true)
             Container(
               margin: const EdgeInsets.only(top: 8),
@@ -2280,73 +2642,66 @@ class _ReferenciaDetailScreenState extends State<ReferenciaDetailScreen> {
     );
   }
 
- Widget _productosCard(List<String> productos) {
-  return _glassCard(
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          "Productos actuales",
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: 19,
-            fontWeight: FontWeight.w900,
+  Widget _productosCard(List<String> productos) {
+    return _glassCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            "Productos actuales",
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 19,
+              fontWeight: FontWeight.w900,
+            ),
           ),
-        ),
+          const SizedBox(height: 14),
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: productos.map<Widget>((p) {
+              final color = _colorProducto(p);
 
-        const SizedBox(height: 14),
-
-        Wrap(
-          spacing: 10,
-          runSpacing: 10,
-          children: productos.map<Widget>((p) {
-            final color = _colorProducto(p);
-
-            return Container(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 14,
-                vertical: 10,
-              ),
-              decoration: BoxDecoration(
-                color: const Color(0xFF142235),
-                borderRadius: BorderRadius.circular(30),
-                border: Border.all(
-                  color: color.withOpacity(0.45),
-                  width: 1.2,
+              return Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 10,
                 ),
-                boxShadow: [
-                  BoxShadow(
-                    color: color.withOpacity(0.15),
-                    blurRadius: 10,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF142235),
+                  borderRadius: BorderRadius.circular(30),
+                  border: Border.all(
+                    color: color.withOpacity(0.45),
+                    width: 1.2,
                   ),
-                ],
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    _iconoProducto(p),
-                    color: color,
-                    size: 18,
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    p,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 13,
-                      fontWeight: FontWeight.w900,
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      _iconoProducto(p),
+                      color: color,
+                      size: 18,
                     ),
-                  ),
-                ],
-              ),
-            );
-          }).toList(),
-        ),
-      ],
-    ),
-  );
-}
+                    const SizedBox(width: 8),
+                    Text(
+                      p,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }).toList(),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _notasCard({
     required String titulo,
     required String texto,
@@ -2361,19 +2716,19 @@ class _ReferenciaDetailScreenState extends State<ReferenciaDetailScreen> {
             children: [
               Icon(icon, color: color),
               const SizedBox(width: 8),
-              Text(
-                titulo,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 19,
-                  fontWeight: FontWeight.w900,
+              Expanded(
+                child: Text(
+                  titulo,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 19,
+                    fontWeight: FontWeight.w900,
+                  ),
                 ),
               ),
             ],
           ),
-
           const SizedBox(height: 12),
-
           Text(
             texto,
             style: const TextStyle(
@@ -2404,16 +2759,13 @@ class _ReferenciaDetailScreenState extends State<ReferenciaDetailScreen> {
               fontWeight: FontWeight.w900,
             ),
           ),
-
           const SizedBox(height: 16),
-
           _timelineItem(
             icon: Icons.add_circle_rounded,
             color: Colors.cyanAccent,
             title: "Referencia creada",
             subtitle: _fechaBonita(createdAt),
           ),
-
           _timelineItem(
             icon: estado == "Resuelto"
                 ? Icons.check_circle_rounded
@@ -2424,7 +2776,6 @@ class _ReferenciaDetailScreenState extends State<ReferenciaDetailScreen> {
             title: "Estado actual",
             subtitle: estado,
           ),
-
           if (rellamada != null && rellamada.toString().isNotEmpty)
             _timelineItem(
               icon: Icons.phone_callback_rounded,
@@ -2432,7 +2783,6 @@ class _ReferenciaDetailScreenState extends State<ReferenciaDetailScreen> {
               title: "Próxima llamada",
               subtitle: _fechaBonita(rellamada),
             ),
-
           if ((r['nota_seguimiento']?.toString() ?? '').trim().isNotEmpty)
             _timelineItem(
               icon: Icons.notes_rounded,
@@ -2484,9 +2834,7 @@ class _ReferenciaDetailScreenState extends State<ReferenciaDetailScreen> {
               ),
           ],
         ),
-
         const SizedBox(width: 12),
-
         Expanded(
           child: Padding(
             padding: const EdgeInsets.only(top: 4, bottom: 16),

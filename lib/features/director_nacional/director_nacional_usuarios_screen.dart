@@ -38,33 +38,123 @@ class _DirectorNacionalUsuariosScreenState
   }
 
   Future<void> cargarUsuarios() async {
-    try {
-      setState(() => loading = true);
+  try {
+    if (!mounted) return;
+    setState(() => loading = true);
 
-      final data = await supabase
-          .from('usuarios')
-          .select('id, auth_id, parent_id, rol_usuario, nombre, apellidos, email, telefono')
-          .order('rol_usuario', ascending: true);
+    final authUser = supabase.auth.currentUser;
 
-      usuarios = List<Map<String, dynamic>>.from(data);
-
-      debugPrint('USUARIOS CARGADOS: ${usuarios.length}');
-for (final u in usuarios) {
-  debugPrint('ROL USUARIO: ${u['rol_usuario']}');
-}
-
+    if (authUser == null) {
       if (!mounted) return;
-      setState(() => loading = false);
-    } catch (e) {
-      debugPrint('ERROR USUARIOS DIRECTOR NACIONAL: $e');
+      setState(() {
+        usuarios = [];
+        loading = false;
+      });
+      return;
+    }
+
+    final todosUsuarios = List<Map<String, dynamic>>.from(
+      await supabase
+          .from('usuarios')
+          .select('id, auth_id, parent_id, rol_usuario, nombre, apellidos, email')
+          .order('rol_usuario', ascending: true),
+    );
+
+    String limpiar(dynamic value) {
+      return (value ?? '').toString().trim().toLowerCase();
+    }
+
+    String limpiarRol(dynamic value) {
+      return limpiar(value)
+          .replaceAll(' ', '_')
+          .replaceAll('-', '_');
+    }
+
+    final authIdLogin = limpiar(authUser.id);
+    final emailLogin = limpiar(authUser.email);
+
+    final miUsuario = todosUsuarios.firstWhere(
+      (u) =>
+          limpiar(u['auth_id']) == authIdLogin ||
+          limpiar(u['email']) == emailLogin,
+      orElse: () => {},
+    );
+
+    if (miUsuario.isEmpty) {
+      debugPrint('NO ENCUENTRO USUARIO LOGUEADO');
+      debugPrint('AUTH LOGIN: $authIdLogin');
+      debugPrint('EMAIL LOGIN: $emailLogin');
 
       if (!mounted) return;
       setState(() {
         usuarios = [];
         loading = false;
       });
+      return;
     }
+
+    final miRol = limpiarRol(miUsuario['rol_usuario']);
+    final miId = limpiar(miUsuario['id']);
+
+    List<Map<String, dynamic>> visibles = [];
+
+    if (miRol == 'director_nacional') {
+      visibles = todosUsuarios;
+    } else {
+      final idsPermitidos = <String>{miId};
+
+      void buscarDescendientes(String parentId) {
+        for (final u in todosUsuarios) {
+          final idUsuario = limpiar(u['id']);
+          final parentUsuario = limpiar(u['parent_id']);
+
+          if (parentUsuario == parentId &&
+              idUsuario.isNotEmpty &&
+              !idsPermitidos.contains(idUsuario)) {
+            idsPermitidos.add(idUsuario);
+            buscarDescendientes(idUsuario);
+          }
+        }
+      }
+
+      buscarDescendientes(miId);
+
+      visibles = todosUsuarios.where((u) {
+        final idUsuario = limpiar(u['id']);
+        return idsPermitidos.contains(idUsuario);
+      }).toList();
+
+      visibles.removeWhere((u) {
+        final rol = limpiarRol(u['rol_usuario']);
+        final id = limpiar(u['id']);
+
+        return id != miId &&
+            (rol == 'director_nacional' || rol == 'director_zona');
+      });
+    }
+
+    debugPrint('========== DEBUG USUARIOS ==========');
+    debugPrint('MI ID: $miId');
+    debugPrint('MI ROL: $miRol');
+    debugPrint('TOTAL TABLA: ${todosUsuarios.length}');
+    debugPrint('TOTAL VISIBLES: ${visibles.length}');
+    debugPrint('===================================');
+
+    if (!mounted) return;
+    setState(() {
+      usuarios = visibles;
+      loading = false;
+    });
+  } catch (e) {
+    debugPrint('ERROR CARGAR USUARIOS: $e');
+
+    if (!mounted) return;
+    setState(() {
+      usuarios = [];
+      loading = false;
+    });
   }
+}
 
   List<Map<String, dynamic>> get usuariosFiltrados {
   return usuarios.where((u) {

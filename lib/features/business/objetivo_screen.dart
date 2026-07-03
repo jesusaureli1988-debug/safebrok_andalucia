@@ -32,174 +32,177 @@ class _ObjetivoScreenState extends State<ObjetivoScreen> {
     loadData();
   }
 
-  Future<void> loadData() async {
-    try {
-      final user = supabase.auth.currentUser;
+ Future<void> loadData() async {
+  try {
+    final user = supabase.auth.currentUser;
 
-      if (user == null) {
-        if (mounted) {
-          setState(() => loading = false);
-        }
-        return;
+    if (user == null) {
+      if (mounted) setState(() => loading = false);
+      return;
+    }
+
+    final now = DateTime.now();
+
+    final start = now.day >= 25
+        ? DateTime(now.year, now.month, 25)
+        : DateTime(now.year, now.month - 1, 25);
+
+    final end = now.day >= 25
+        ? DateTime(now.year, now.month + 1, 25)
+        : DateTime(now.year, now.month, 25);
+
+    final usuariosData = await supabase
+        .from('usuarios')
+        .select('id, auth_id, parent_id, rol_usuario, email');
+
+    final usuariosTabla = List<Map<String, dynamic>>.from(usuariosData);
+
+    String limpiar(dynamic v) => (v ?? '').toString().trim().toLowerCase();
+
+    final miUsuario = usuariosTabla.firstWhere(
+      (u) =>
+          limpiar(u['auth_id']) == limpiar(user.id) ||
+          limpiar(u['email']) == limpiar(user.email),
+      orElse: () => {},
+    );
+
+    if (miUsuario.isEmpty) {
+      debugPrint('NO SE ENCUENTRA USUARIO LOGUEADO EN TABLA usuarios');
+
+      if (mounted) {
+        setState(() {
+          loading = false;
+          primaNeta = 0;
+          primasTotales = 0;
+          primasPropias = 0;
+          primasEquipo = 0;
+          porcentajeDV = 0;
+        });
       }
+      return;
+    }
 
-      final role = widget.role;
+    final miId = limpiar(miUsuario['id']);
+    final miAuthId = limpiar(miUsuario['auth_id']);
+    final role = limpiar(widget.role);
 
-      final now = DateTime.now();
+    final idsUsuariosEstructura = <String>{miId};
+    final authIdsEstructura = <String>{};
 
-final start = now.day >= 25
-    ? DateTime(now.year, now.month, 25)
-    : DateTime(now.year, now.month - 1, 25);
+    void buscarDescendientes(String parentId) {
+      for (final u in usuariosTabla) {
+        final idUsuario = limpiar(u['id']);
+        final parentUsuario = limpiar(u['parent_id']);
 
-final end = now.day >= 25
-    ? DateTime(now.year, now.month + 1, 25)
-    : DateTime(now.year, now.month, 25);
+        if (parentUsuario == parentId &&
+            idUsuario.isNotEmpty &&
+            !idsUsuariosEstructura.contains(idUsuario)) {
+          idsUsuariosEstructura.add(idUsuario);
+          buscarDescendientes(idUsuario);
+        }
+      }
+    }
 
-      final perfil = await supabase
-          .from('usuarios')
-          .select('id')
-          .eq('auth_id', user.id)
-          .maybeSingle();
+    if (role == 'director_nacional') {
+      for (final u in usuariosTabla) {
+        final authId = limpiar(u['auth_id']);
+        if (authId.isNotEmpty) authIdsEstructura.add(authId);
+      }
+    } else if (role == 'agente') {
+      authIdsEstructura.add(miAuthId);
+    } else {
+      buscarDescendientes(miId);
 
-      final jefeId = perfil?['id'];
+      for (final u in usuariosTabla) {
+        final idUsuario = limpiar(u['id']);
+        final authId = limpiar(u['auth_id']);
 
-      double primas = 0;
-      double decesosVida = 0;
-      double propias = 0;
-      double equipo = 0;
+        if (idsUsuariosEstructura.contains(idUsuario) && authId.isNotEmpty) {
+          authIdsEstructura.add(authId);
+        }
+      }
+    }
 
-     final ventasPropias = await supabase
-    .from('ventas')
-    .select('prima_anual_neta, producto')
-    .eq('agente_auth_id', user.id)
-    .gte('fecha_efecto', start.toIso8601String())
-    .lt('fecha_efecto', end.toIso8601String());
+    double primas = 0;
+    double decesosVida = 0;
+    double propias = 0;
+    double equipo = 0;
 
-      for (final v in ventasPropias) {
-        final prima = (v['prima_anual_neta'] ?? 0).toDouble();
+    if (authIdsEstructura.isNotEmpty) {
+      final ventas = await supabase
+          .from('ventas')
+          .select('prima_anual_neta, producto, agente_auth_id')
+          .inFilter('agente_auth_id', authIdsEstructura.toList())
+          .gte('fecha_efecto', start.toIso8601String())
+          .lt('fecha_efecto', end.toIso8601String());
+
+      for (final v in ventas) {
+        final primaRaw = v['prima_anual_neta'];
+        final prima = primaRaw is num
+            ? primaRaw.toDouble()
+            : double.tryParse(primaRaw?.toString() ?? '0') ?? 0;
+
+        final agenteAuthId = limpiar(v['agente_auth_id']);
 
         primas += prima;
-        propias += prima;
 
-        final producto = (v['producto'] ?? '').toString().toLowerCase();
+        if (agenteAuthId == miAuthId) {
+          propias += prima;
+        } else {
+          equipo += prima;
+        }
+
+        final producto = limpiar(v['producto']);
 
         if (producto.contains('decesos') || producto.contains('vida')) {
           decesosVida += prima;
         }
       }
+    }
 
-      if (jefeId != null) {
-        if (role == 'jefe_equipo') {
-          final agentes = await supabase
-              .from('usuarios')
-              .select('auth_id')
-              .eq('parent_id', jefeId);
+    final porcentaje = primas > 0 ? (decesosVida / primas) * 100 : 0.0;
 
-          final ids = (agentes as List)
-              .map((e) => e['auth_id'])
-              .where((e) => e != null)
-              .toList();
+    if (!mounted) return;
 
-          if (ids.isNotEmpty) {
-            final ventasEquipo = await supabase
-    .from('ventas')
-    .select('prima_anual_neta, producto')
-    .inFilter('agente_auth_id', ids)
-    .gte('fecha_efecto', start.toIso8601String())
-    .lt('fecha_efecto', end.toIso8601String());
+    setState(() {
+      primaNeta = primas;
+      porcentajeDV = porcentaje;
+      primasPropias = propias;
+      primasEquipo = equipo;
+      primasTotales = primas;
+      loading = false;
+    });
+  } catch (e, s) {
+    debugPrint("ERROR OBJETIVOS: $e");
+    debugPrint("$s");
 
-            for (final v in ventasEquipo) {
-              final prima = (v['prima_anual_neta'] ?? 0).toDouble();
-
-              primas += prima;
-              equipo += prima;
-
-              final producto = (v['producto'] ?? '').toString().toLowerCase();
-
-              if (producto.contains('decesos') || producto.contains('vida')) {
-                decesosVida += prima;
-              }
-            }
-          }
-        } else if (role == 'jefe_ventas') {
-          final jefesEquipo = await supabase
-              .from('usuarios')
-              .select('id')
-              .eq('parent_id', jefeId);
-
-          final jefesEquipoIds =
-              (jefesEquipo as List).map((e) => e['id']).toList();
-
-          if (jefesEquipoIds.isNotEmpty) {
-            final agentes = await supabase
-                .from('usuarios')
-                .select('auth_id')
-                .inFilter('parent_id', jefesEquipoIds);
-
-            final agentesIds = (agentes as List)
-                .map((e) => e['auth_id'])
-                .where((e) => e != null)
-                .toList();
-
-            if (agentesIds.isNotEmpty) {
-              final ventasEquipo = await supabase
-    .from('ventas')
-    .select('prima_anual_neta, producto')
-    .inFilter('agente_auth_id', agentesIds)
-    .gte('fecha_efecto', start.toIso8601String())
-    .lt('fecha_efecto', end.toIso8601String());
-
-              for (final v in ventasEquipo) {
-                final prima = (v['prima_anual_neta'] ?? 0).toDouble();
-
-                primas += prima;
-                equipo += prima;
-
-                final producto =
-                    (v['producto'] ?? '').toString().toLowerCase();
-
-                if (producto.contains('decesos') || producto.contains('vida')) {
-                  decesosVida += prima;
-                }
-              }
-            }
-          }
-        }
-      }
-
-      final porcentaje = primas > 0 ? (decesosVida / primas) * 100 : 0.0;
-
-      if (!mounted) return;
-
-      setState(() {
-        primaNeta = primas;
-        porcentajeDV = porcentaje;
-        primasPropias = propias;
-        primasEquipo = equipo;
-        primasTotales = primas;
-        loading = false;
-      });
-    } catch (e, s) {
-      debugPrint("ERROR OBJETIVOS: $e");
-      debugPrint("$s");
-
-      if (mounted) {
-        setState(() => loading = false);
-      }
+    if (mounted) {
+      setState(() => loading = false);
     }
   }
+}
 
   double get objetivoPrimas {
-    if (widget.role == 'jefe_equipo') return 10000;
-    if (widget.role == 'jefe_ventas') return 11500;
-    return 12000;
-  }
+  final role = widget.role.toLowerCase().trim();
 
-  String get roleLabel {
-    if (widget.role == 'jefe_equipo') return "Jefe de Equipo";
-    if (widget.role == 'jefe_ventas') return "Jefe de Ventas";
-    return "Agente";
-  }
+  if (role == 'jefe_equipo') return 10000;
+  if (role == 'jefe_ventas') return 12000;
+  if (role == 'director_zona') return 15000;
+  if (role == 'director_nacional') return 25000;
+
+  return 12000;
+}
+
+ String get roleLabel {
+  final role = widget.role.toLowerCase().trim();
+
+  if (role == 'director_nacional') return "Director Nacional";
+  if (role == 'director_zona') return "Director de Zona";
+  if (role == 'jefe_ventas') return "Jefe de Ventas";
+  if (role == 'jefe_equipo') return "Jefe de Equipo";
+
+  return "Agente";
+}
 
   @override
   Widget build(BuildContext context) {

@@ -163,14 +163,62 @@ final previousEnd = start;
                 .limit(2);
           }
         }
-      } else {
-        ultimasVentasRaw = await supabase
-            .from('ventas')
-            .select('producto, precio, cliente_id')
-            .eq('agente_auth_id', user.id)
-            .order('fecha_efecto', ascending: false)
-            .limit(2);
+      } else if (role == 'director_zona') {
+  final usuariosData = await supabase
+      .from('usuarios')
+      .select('id, auth_id, parent_id');
+
+  final usuariosTabla = List<Map<String, dynamic>>.from(usuariosData);
+
+  String limpiar(dynamic value) {
+    return (value ?? '').toString().trim();
+  }
+
+  final idsPermitidos = <String>{userId.toString()};
+  final authIdsPermitidos = <String>{user.id};
+
+  void buscarDescendientes(String parentId) {
+    for (final u in usuariosTabla) {
+      final idUsuario = limpiar(u['id']);
+      final parentUsuario = limpiar(u['parent_id']);
+      final authIdUsuario = limpiar(u['auth_id']);
+
+      if (parentUsuario == parentId &&
+          idUsuario.isNotEmpty &&
+          !idsPermitidos.contains(idUsuario)) {
+        idsPermitidos.add(idUsuario);
+
+        if (authIdUsuario.isNotEmpty) {
+          authIdsPermitidos.add(authIdUsuario);
+        }
+
+        buscarDescendientes(idUsuario);
       }
+    }
+  }
+
+  buscarDescendientes(userId.toString());
+
+  ultimasVentasRaw = await supabase
+      .from('ventas')
+      .select('producto, precio, cliente_id')
+      .inFilter('agente_auth_id', authIdsPermitidos.toList())
+      .order('fecha_efecto', ascending: false)
+      .limit(2);
+} else if (role == 'director_nacional') {
+  ultimasVentasRaw = await supabase
+      .from('ventas')
+      .select('producto, precio, cliente_id')
+      .order('fecha_efecto', ascending: false)
+      .limit(2);
+} else {
+  ultimasVentasRaw = await supabase
+      .from('ventas')
+      .select('producto, precio, cliente_id')
+      .eq('agente_auth_id', user.id)
+      .order('fecha_efecto', ascending: false)
+      .limit(2);
+}
 
       final clientes = await supabase.from('clientes').select('id, nombre');
 
@@ -178,10 +226,12 @@ final previousEnd = start;
         for (final c in clientes) c['id']: c['nombre'],
       };
 
-      double primasEquipo = 0;
+     double primasEquipo = 0;
 
-      if (role == 'jefe_equipo' || role == 'jefe_ventas') {
-        primasEquipo = await getPrimasEquipo(userId, role, start, end);
+if (role == 'jefe_equipo' ||
+    role == 'jefe_ventas' ||
+    role == 'director_zona') {
+  primasEquipo = await getPrimasEquipo(userId.toString(), role, start, end);
 
         if (role == 'jefe_equipo') {
           final agentes = await supabase
@@ -335,11 +385,15 @@ final variacion = primasPeriodoAnterior > 0
 
       if (!mounted) return;
 
-      setState(() {
+    setState(() {
   if (role == 'jefe_equipo') {
     saldoTotal = comisionesPropiasJefe + rappelJefe;
   } else if (role == 'jefe_ventas') {
     saldoTotal = comisionesPropiasJefe + rappelJefeVentas;
+  } else if (role == 'director_zona') {
+    saldoTotal = calcularRappelDirectorZona(primasTotales);
+  } else if (role == 'director_nacional') {
+    saldoTotal = 0;
   } else {
     saldoTotal = comisionesPropiasJefe;
   }
@@ -394,62 +448,87 @@ final variacion = primasPeriodoAnterior > 0
     return 0;
   }
 
+  double calcularRappelDirectorZona(double primasTotales) {
+  if (primasTotales < 15000) return 0;
+
+  double sueldo = 2500;
+
+  if (primasTotales <= 20000) {
+    sueldo += (primasTotales - 15000) * 0.04;
+  } else {
+    sueldo += 200; // 4% de los 5.000 € entre 15.000 y 20.000
+    sueldo += (primasTotales - 20000) * 0.05;
+  }
+
+  return sueldo;
+}
+
   Future<double> getPrimasEquipo(
-    String jefeId,
-    String role,
-    DateTime start,
-    DateTime end,
-  ) async {
-    final List<String> agentesIds = [];
+  String jefeId,
+  String role,
+  DateTime start,
+  DateTime end,
+) async {
+  final usuariosData = await supabase
+      .from('usuarios')
+      .select('id, auth_id, parent_id, rol_usuario');
 
-    if (role == 'jefe_equipo') {
-      final agentes = await supabase
-          .from('usuarios')
-          .select('auth_id')
-          .eq('parent_id', jefeId);
+  final usuariosTabla = List<Map<String, dynamic>>.from(usuariosData);
 
-      agentesIds.addAll(
-        (agentes as List).map((e) => e['auth_id'] as String).toList(),
-      );
-    } else if (role == 'jefe_ventas') {
-      final jefesEquipo = await supabase
-          .from('usuarios')
-          .select('id')
-          .eq('parent_id', jefeId);
+  String limpiar(dynamic value) {
+    return (value ?? '').toString().trim();
+  }
 
-      final jefesEquipoIds = (jefesEquipo as List)
-          .map((e) => e['id'] as String)
-          .toList();
+  final idsPermitidos = <String>{};
 
-      if (jefesEquipoIds.isNotEmpty) {
-        final agentes = await supabase
-            .from('usuarios')
-            .select('auth_id')
-            .inFilter('parent_id', jefesEquipoIds);
+  void buscarDescendientes(String parentId) {
+    for (final u in usuariosTabla) {
+      final idUsuario = limpiar(u['id']);
+      final parentUsuario = limpiar(u['parent_id']);
 
-        agentesIds.addAll(
-          (agentes as List).map((e) => e['auth_id'] as String).toList(),
-        );
+      if (parentUsuario == parentId &&
+          idUsuario.isNotEmpty &&
+          !idsPermitidos.contains(idUsuario)) {
+        idsPermitidos.add(idUsuario);
+        buscarDescendientes(idUsuario);
       }
     }
-
-    if (agentesIds.isEmpty) return 0;
-
-    final ventasEquipo = await supabase
-        .from('ventas')
-        .select('prima_anual_neta')
-        .inFilter('agente_auth_id', agentesIds)
-        .gte('fecha_efecto', start.toIso8601String())
-        .lt('fecha_efecto', end.toIso8601String());
-
-    double total = 0;
-
-    for (final v in ventasEquipo) {
-      total += (v['prima_anual_neta'] ?? 0).toDouble();
-    }
-
-    return total;
   }
+
+  buscarDescendientes(jefeId);
+
+  final agentesAuthIds = usuariosTabla.where((u) {
+    final idUsuario = limpiar(u['id']);
+    final authId = limpiar(u['auth_id']);
+
+    return idsPermitidos.contains(idUsuario) && authId.isNotEmpty;
+  }).map((u) {
+    return limpiar(u['auth_id']);
+  }).toList();
+
+  if (agentesAuthIds.isEmpty) return 0;
+
+  final ventasEquipo = await supabase
+      .from('ventas')
+      .select('prima_anual_neta')
+      .inFilter('agente_auth_id', agentesAuthIds)
+      .gte('fecha_efecto', start.toIso8601String())
+      .lt('fecha_efecto', end.toIso8601String());
+
+  double total = 0;
+
+  for (final v in ventasEquipo) {
+    final primaRaw = v['prima_anual_neta'];
+
+    final prima = primaRaw is num
+        ? primaRaw.toDouble()
+        : double.tryParse(primaRaw?.toString() ?? '0') ?? 0;
+
+    total += prima;
+  }
+
+  return total;
+}
     @override
   Widget build(BuildContext context) {
     final progresoObjetivo = (objetivo / 100).clamp(0.0, 1.0);

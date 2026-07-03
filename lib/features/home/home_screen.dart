@@ -23,6 +23,8 @@ import 'package:safebrok_andalucia/features/recibos/recibos_agente_screen.dart';
 import 'package:safebrok_andalucia/features/ia/safebrok_ai_screen.dart';
 import 'package:safebrok_andalucia/features/director_nacional/director_nacional_kpis_screen.dart';
 import 'package:safebrok_andalucia/features/director_nacional/director_nacional_usuarios_screen.dart';
+import 'package:safebrok_andalucia/features/business/ranking_comercial_screen.dart';
+import 'package:safebrok_andalucia/features/business/cuadro_mandos_screen.dart';
 
 
 class DashboardItem {
@@ -186,29 +188,142 @@ int misPolizasTotales = 0;
 int systemUnreadCount = 0;
 Timer? chatTimer;
 
-  @override
-  void initState() {
-    super.initState();
+final List<List<String>> frasesMotivadoras = [
 
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      loadKpis();
-      checkForUpdate();
-     loadChatUnreadCount();
-comprobarAlertasSeguimientoJefe().then((_) {
-  loadSystemUnreadCount();
-});
+  [
+    "Hoy es un gran día",
+    "para cerrar ventas."
+  ],
 
-chatTimer = Timer.periodic(
-  const Duration(seconds: 5),
-  (_) async {
-    await loadChatUnreadCount();
-    await comprobarAlertasSeguimientoJefe();
-    await loadSystemUnreadCount();
-  },
-);
+  [
+    "Cada puerta",
+    "es una oportunidad."
+  ],
+
+  [
+    "No vendes seguros,",
+    "proteges familias."
+  ],
+
+  [
+    "El éxito empieza",
+    "con una visita más."
+  ],
+
+  [
+    "Cada conversación",
+    "puede cambiar tu mes."
+  ],
+
+  [
+    "Hoy puede ser",
+    "tu mejor día del año."
+  ],
+
+  [
+    "La disciplina",
+    "vence al talento."
+  ],
+
+  [
+    "Nunca sabes",
+    "dónde está la siguiente venta."
+  ],
+
+  [
+    "La confianza",
+    "es tu mejor argumento."
+  ],
+
+  [
+    "Cada cliente",
+    "merece la mejor protección."
+  ],
+
+  [
+    "El mejor comercial",
+    "nunca deja de aprender."
+  ],
+
+  [
+    "Hoy toca",
+    "crear oportunidades."
+  ],
+
+  [
+    "No esperes",
+    "haz que ocurra."
+  ],
+
+  [
+    "Cada visita",
+    "te acerca al objetivo."
+  ],
+
+  [
+    "Construye relaciones,",
+    "las ventas llegarán."
+  ],
+
+  [
+    "El esfuerzo de hoy",
+    "es la comisión de mañana."
+  ],
+
+  [
+    "Haz una llamada más.",
+    "Puede cambiar tu semana."
+  ],
+
+  [
+    "La constancia",
+    "siempre gana."
+  ],
+
+  [
+    "Cada sí",
+    "empieza con muchos no."
+  ],
+
+  [
+    "Hoy es un buen día",
+    "para crecer."
+  ],
+
+];
+late List<String> fraseDelDia;
+
+ @override
+void initState() {
+  super.initState();
+
+  final hoy = DateTime.now();
+
+  final indice =
+      (hoy.year * 1000 + hoy.month * 100 + hoy.day) %
+          frasesMotivadoras.length;
+
+  fraseDelDia = frasesMotivadoras[indice];
+
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    loadKpis();
+    checkForUpdate();
+    loadChatUnreadCount();
+
+    comprobarAlertasSeguimientoJefe().then((_) {
+      loadSystemUnreadCount();
     });
-  }
 
+    chatTimer = Timer.periodic(
+      const Duration(seconds: 5),
+      (_) async {
+        await loadChatUnreadCount();
+        await comprobarAlertasSeguimientoJefe();
+        await loadSystemUnreadCount();
+      },
+    );
+  });
+}
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -624,123 +739,95 @@ Widget _notificationItem({
 }
 
 
- Future<List<String>> getTeamAuthIds(String myAuthId) async {
+Future<List<String>> getTeamAuthIds(String myAuthId) async {
   final users = await supabase
       .from('usuarios')
       .select('id, auth_id, parent_id, rol_usuario');
 
-  final List<Map<String, String?>> normalized = users.map((u) {
+  String rolNorm(dynamic r) {
+    return r.toString().trim().toLowerCase().replaceAll(' ', '_');
+  }
+
+  final lista = users.map<Map<String, dynamic>>((u) {
     return {
       'id': u['id']?.toString(),
       'auth_id': u['auth_id']?.toString(),
       'parent_id': u['parent_id']?.toString(),
-      'rol_usuario': u['rol_usuario']?.toString(),
+      'rol': rolNorm(u['rol_usuario']),
     };
   }).toList();
 
-  final me = normalized.firstWhere(
+  final yo = lista.firstWhere(
     (u) => u['auth_id'] == myAuthId,
     orElse: () => {},
   );
 
-  final myUserId = me['id'];
-  final myRole = me['rol_usuario'];
+  if (yo.isEmpty) return [myAuthId];
 
-  if (myUserId == null) {
-    return [myAuthId];
+  final resultado = <String>{};
+
+  void addAuth(Map<String, dynamic> u) {
+    final auth = u['auth_id']?.toString();
+    if (auth != null && auth.isNotEmpty && auth != 'null') {
+      resultado.add(auth);
+    }
   }
 
-  final Set<String> resultAuthIds = {};
-  resultAuthIds.add(myAuthId);
-
-  if (myRole == 'agente') {
-    return resultAuthIds.toList();
+  bool esHijoDe(Map<String, dynamic> hijo, Map<String, dynamic> padre) {
+    final parent = hijo['parent_id']?.toString();
+    return parent == padre['id']?.toString() ||
+        parent == padre['auth_id']?.toString();
   }
 
-  if (myRole == 'jefe_equipo') {
-    for (final u in normalized) {
-      if (u['parent_id'] == myUserId && u['rol_usuario'] == 'agente') {
-        final authId = u['auth_id'];
-        if (authId != null && authId.isNotEmpty && authId != 'null') {
-          resultAuthIds.add(authId);
-        }
+  void recorrer(Map<String, dynamic> padre) {
+    addAuth(padre);
+
+    for (final hijo in lista) {
+      if (esHijoDe(hijo, padre)) {
+        recorrer(hijo);
       }
     }
-
-    return resultAuthIds.toList();
   }
 
-  if (myRole == 'jefe_ventas') {
-    final Set<String> jefeEquipoIds = {};
+  final rol = yo['rol'];
 
-    for (final u in normalized) {
-      if (u['parent_id'] == myUserId && u['rol_usuario'] == 'jefe_equipo') {
-        final jefeEquipoId = u['id'];
-        final authId = u['auth_id'];
-
-        if (jefeEquipoId != null) {
-          jefeEquipoIds.add(jefeEquipoId);
-        }
-
-        if (authId != null && authId.isNotEmpty && authId != 'null') {
-          resultAuthIds.add(authId);
-        }
-      }
+  if (rol == 'director_nacional' || rol == 'administracion') {
+    for (final u in lista) {
+      addAuth(u);
     }
+  } else if (rol == 'director_zona') {
+    final jefesVentasDirectos = lista.where((u) {
+      return u['rol'] == 'jefe_ventas' && esHijoDe(u, yo);
+    }).toList();
 
-    for (final u in normalized) {
-      if (jefeEquipoIds.contains(u['parent_id']) &&
-          u['rol_usuario'] == 'agente') {
-        final authId = u['auth_id'];
-        if (authId != null && authId.isNotEmpty && authId != 'null') {
-          resultAuthIds.add(authId);
-        }
-      }
-    }
+    if (jefesVentasDirectos.isEmpty) {
+      debugPrint('DIRECTOR ZONA SIN HIJOS DIRECTOS -> CARGANDO TODOS LOS JEFES DE VENTAS');
 
-    return resultAuthIds.toList();
-  }
+      final todosJefesVentas = lista.where((u) {
+        return u['rol'] == 'jefe_ventas';
+      }).toList();
 
-  if (myRole == 'director_zona' ||
-      myRole == 'director_nacional' ||
-      myRole == 'administracion') {
-    final Set<String> visited = {};
-
-    void findChildren(String parentId) {
-      if (visited.contains(parentId)) return;
-      visited.add(parentId);
-
-      for (final u in normalized) {
-        if (u['parent_id'] == parentId) {
-          final childId = u['id'];
-          final authId = u['auth_id'];
-
-          if (authId != null && authId.isNotEmpty && authId != 'null') {
-            resultAuthIds.add(authId);
-          }
-
-          if (childId != null && childId.isNotEmpty && childId != parentId) {
-            findChildren(childId);
-          }
-        }
-      }
-    }
-
-    if (myRole == 'director_nacional') {
-      for (final u in normalized) {
-        final authId = u['auth_id'];
-        if (authId != null && authId.isNotEmpty && authId != 'null') {
-          resultAuthIds.add(authId);
-        }
+      for (final jv in todosJefesVentas) {
+        recorrer(jv);
       }
     } else {
-      findChildren(myUserId);
+      for (final jv in jefesVentasDirectos) {
+        recorrer(jv);
+      }
     }
 
-    return resultAuthIds.toList();
+    addAuth(yo);
+  } else {
+    recorrer(yo);
   }
 
-  return resultAuthIds.toList();
+  debugPrint('======= HOME AUTH IDS =======');
+  debugPrint('ROL: $rol');
+  debugPrint('TOTAL AUTH IDS: ${resultado.length}');
+  debugPrint(resultado.join(', '));
+  debugPrint('=============================');
+
+  return resultado.toList();
 }
 
   Future<void> loadKpis() async {
@@ -864,7 +951,7 @@ debugPrint("PRIMERO: $primero");
 } else if (widget.role == 'director_zona') {
   objetivoSemana = 50;
 } else if (widget.role == 'director_nacional') {
-  objetivoSemana = 50;
+  objetivoSemana = 100;
 } else if (widget.role == 'administracion') {
   objetivoSemana = 50;
 } else {
@@ -1331,8 +1418,8 @@ floatingActionButton: widget.role == 'director_nacional' ||
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  "Hoy es un gran día",
+                 Text(
+   fraseDelDia[0],
                   style: TextStyle(
                     color: Colors.white,
                     fontSize: 31,
@@ -1341,8 +1428,8 @@ floatingActionButton: widget.role == 'director_nacional' ||
                   ),
                 ),
                 const SizedBox(height: 3),
-                const Text(
-                  "para cerrar ventas 🚀",
+                 Text(
+  "${fraseDelDia[1]} 🚀",
                   style: TextStyle(
                     color: Color(0xFF22D3EE),
                     fontSize: 29,
@@ -2115,6 +2202,20 @@ subtitle: "nuevos esta semana",
 },
     ),
     DashboardItem(
+  title: "Cuadro de mandos",
+  subtitle: "Gobierno comercial",
+  icon: Icons.admin_panel_settings_rounded,
+  color: const Color(0xFF0284C7),
+  onTap: () {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const CuadroMandosScreen(),
+      ),
+    );
+  },
+),
+    DashboardItem(
       title: "Ventas Totales",
       subtitle: "Producción global",
       icon: Icons.euro_rounded,
@@ -2193,20 +2294,48 @@ case 'administracion':
   ];
       case 'director_zona':
         return [
-          DashboardItem(
-            title: "KPIs Globales",
-            subtitle: "Ver métricas",
-            icon: Icons.bar_chart_rounded,
-            color: const Color(0xFF22D3EE),
-            onTap: () {},
-          ),
-          DashboardItem(
-            title: "Equipos",
-            subtitle: "Gestionar zona",
-            icon: Icons.groups_rounded,
-            color: const Color(0xFF14B8A6),
-            onTap: () {},
-          ),
+         DashboardItem(
+  title: "KPIs Globales",
+  subtitle: "Ver métricas",
+  icon: Icons.bar_chart_rounded,
+  color: const Color(0xFF22D3EE),
+  onTap: () {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const DirectorNacionalKpisScreen(),
+      ),
+    );
+  },
+),
+         DashboardItem(
+  title: "Equipos",
+  subtitle: "Gestionar zona",
+  icon: Icons.groups_rounded,
+  color: const Color(0xFF14B8A6),
+  onTap: () {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const DirectorNacionalUsuariosScreen(),
+      ),
+    );
+  },
+),
+DashboardItem(
+  title: "Cuadro de mandos",
+  subtitle: "Gobierno de zona",
+  icon: Icons.admin_panel_settings_rounded,
+  color: const Color(0xFF0284C7),
+  onTap: () {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const CuadroMandosScreen(),
+      ),
+    );
+  },
+),
           DashboardItem(
             title: "Ventas Totales",
             subtitle: "Ver producción",
@@ -2219,13 +2348,21 @@ case 'administracion':
               );
             },
           ),
-          DashboardItem(
-            title: "Ranking",
-            subtitle: "Clasificación",
-            icon: Icons.emoji_events_rounded,
-            color: const Color(0xFFFFB020),
-            onTap: () {},
-          ),
+          
+           DashboardItem(
+  title: "Ranking",
+  subtitle: "Clasificación",
+  icon: Icons.emoji_events_rounded,
+  color: const Color(0xFFFFB020),
+  onTap: () {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const RankingComercialScreen(),
+      ),
+    );
+  },
+),
         ];
 
       case 'jefe_ventas':
@@ -2258,6 +2395,20 @@ case 'administracion':
               );
             },
           ),
+          DashboardItem(
+  title: "Cuadro de mandos",
+  subtitle: "Gobierno equipos",
+  icon: Icons.admin_panel_settings_rounded,
+  color: const Color(0xFF0284C7),
+  onTap: () {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const CuadroMandosScreen(),
+      ),
+    );
+  },
+),
           DashboardItem(
             title: "Rendimiento",
             subtitle: "Seguimiento",

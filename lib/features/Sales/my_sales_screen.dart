@@ -126,69 +126,68 @@ clientes (
   String authId,
   String role,
 ) async {
-  if (role == 'administracion') {
+  final rol = role.toLowerCase().trim();
+
+  if (rol == 'administracion') {
     return [];
   }
 
-  if (role == 'agente') {
+  if (rol == 'agente') {
     return [authId];
-  }
-
-  if (role == 'director_nacional') {
-    final usuarios = await supabase
-        .from('usuarios')
-        .select('auth_id')
-        .not('auth_id', 'is', null);
-
-    return usuarios
-        .map<String>((e) => e['auth_id']?.toString() ?? '')
-        .where((e) => e.isNotEmpty && e != 'null')
-        .toList();
   }
 
   final usuarios = await supabase
       .from('usuarios')
       .select('id, auth_id, parent_id, rol_usuario');
 
-  final List<Map<String, String?>> normalized = usuarios.map((u) {
-    return {
-      'id': u['id']?.toString(),
-      'auth_id': u['auth_id']?.toString(),
-      'parent_id': u['parent_id']?.toString(),
-      'rol_usuario': u['rol_usuario']?.toString(),
-    };
-  }).toList();
+  String limpiar(dynamic value) {
+    return (value ?? '').toString().trim();
+  }
 
-  final Set<String> resultAuthIds = {};
-  resultAuthIds.add(authId);
+  final usuariosTabla = List<Map<String, dynamic>>.from(usuarios);
 
-  void buscarHijos(String parentId) {
-    for (final u in normalized) {
-      if (u['parent_id'] == parentId) {
-        final childId = u['id'];
-        final childAuthId = u['auth_id'];
+  if (rol == 'director_nacional') {
+    return usuariosTabla
+        .map((u) => limpiar(u['auth_id']))
+        .where((id) => id.isNotEmpty && id != 'null')
+        .toSet()
+        .toList();
+  }
 
-        if (childAuthId != null &&
-            childAuthId.isNotEmpty &&
-            childAuthId != 'null') {
-          resultAuthIds.add(childAuthId);
+  final Set<String> authIdsPermitidos = {};
+  final Set<String> idsVisitados = {};
+
+  authIdsPermitidos.add(authId);
+  idsVisitados.add(internalId);
+
+  void buscarDescendientes(String parentId) {
+    for (final u in usuariosTabla) {
+      final idUsuario = limpiar(u['id']);
+      final parentUsuario = limpiar(u['parent_id']);
+      final authUsuario = limpiar(u['auth_id']);
+
+      if (parentUsuario == parentId &&
+          idUsuario.isNotEmpty &&
+          !idsVisitados.contains(idUsuario)) {
+        idsVisitados.add(idUsuario);
+
+        if (authUsuario.isNotEmpty && authUsuario != 'null') {
+          authIdsPermitidos.add(authUsuario);
         }
 
-        if (childId != null && childId.isNotEmpty && childId != parentId) {
-          buscarHijos(childId);
-        }
+        buscarDescendientes(idUsuario);
       }
     }
   }
 
-  if (role == 'director_zona' ||
-      role == 'jefe_ventas' ||
-      role == 'jefe_equipo') {
-    buscarHijos(internalId);
-    return resultAuthIds.toList();
+  if (rol == 'director_zona' ||
+      rol == 'jefe_ventas' ||
+      rol == 'jefe_equipo') {
+    buscarDescendientes(internalId);
+    return authIdsPermitidos.toList();
   }
 
-  return [];
+  return [authId];
 }
 
   void _buildFilters() {
