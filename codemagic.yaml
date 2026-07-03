@@ -11,7 +11,6 @@ workflows:
       flutter: stable
       xcode: latest
       cocoapods: default
-
       ios_signing:
         distribution_type: app_store
         bundle_identifier: com.safebrok
@@ -38,4 +37,3 @@ workflows:
     publishing:
       app_store_connect:
         auth: integration
-        submit_to_testflight: true
