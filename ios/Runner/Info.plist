@@ -66,10 +66,19 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
-	<key>NSAppTransportSecurity</key>
-    <dict>
-      <key>NSAllowsArbitraryLoads</key>
-      <true/>
-    </dict>
+		<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsArbitraryLoads</key>
+		<true/>
+	</dict>
+
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Necesitamos acceder a la galería para permitir adjuntar imágenes o documentos dentro de la aplicación.</string>
+
+	<key>NSCameraUsageDescription</key>
+	<string>Necesitamos acceder a la cámara para permitir hacer fotos y adjuntarlas dentro de la aplicación.</string>
+
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Necesitamos acceder a la ubicación para registrar visitas, actividad comercial o información relacionada con clientes.</string>
 </dict>
 </plist>
