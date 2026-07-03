@@ -20,12 +20,6 @@ workflows:
       - name: Get Flutter packages
         script: flutter pub get
 
-      - name: Fetch signing files
-        script: |
-          app-store-connect fetch-signing-files com.safebrok \
-            --type IOS_APP_STORE \
-            --create
-
       - name: Install pods
         script: |
           cd ios
@@ -40,16 +34,6 @@ workflows:
 
     artifacts:
       - build/ios/ipa/*.ipa
-
-    publishing:
-      app_store_connect:
-        auth: integration
-        submit_to_testflight: true
-
-    publishing:
-      app_store_connect:
-        auth: integration
-        submit_to_testflight: true
 
     publishing:
       app_store_connect:
