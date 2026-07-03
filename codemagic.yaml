@@ -4,26 +4,16 @@ workflows:
     instance_type: mac_mini_m2
     max_build_duration: 60
 
-    integrations:
-      app_store_connect: Codemagic Safebrok
-
     environment:
       flutter: stable
       xcode: latest
       cocoapods: default
-      vars:
+
+      ios_signing:
+        distribution_type: app_store
         bundle_identifier: com.safebrok
 
     scripts:
-      - name: Fetch signing files
-        script: app-store-connect fetch-signing-files "$BUNDLE_ID" --type IOS_APP_STORE --create
-
-      - name: Add signing certificate to keychain
-        script: keychain add-certificates
-
-      - name: Set up code signing
-        script: xcode-project use-profiles
-
       - name: Get Flutter packages
         script: flutter pub get
 
@@ -33,8 +23,11 @@ workflows:
           pod install
           cd ..
 
+      - name: Set up code signing
+        script: xcode-project use-profiles
+
       - name: Build IPA
-        script: flutter build ipa --release -t lib/main.dart --export-options-plist=/Users/builder/export_options.plist
+        script: flutter build ipa --release -t lib/main.dart
 
     artifacts:
       - build/ios/ipa/*.ipa
