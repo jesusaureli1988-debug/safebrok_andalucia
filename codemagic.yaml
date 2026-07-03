@@ -5,7 +5,7 @@ workflows:
     max_build_duration: 60
 
     integrations:
-      app_store_connect: codemagic
+      app_store_connect: "Codemagic Safebrok"
 
     environment:
       flutter: stable
