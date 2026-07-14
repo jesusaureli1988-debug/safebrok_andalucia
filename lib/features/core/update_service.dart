@@ -1,7 +1,6 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:package_info_plus/package_info_plus.dart';
-import 'package:pub_semver/pub_semver.dart';
 
 class UpdateService {
   static final supabase = Supabase.instance.client;
@@ -20,23 +19,26 @@ class UpdateService {
   }
 
   // 2. Comparar versiones
-static Future<bool> isUpdateAvailable(String remoteVersion) async {
-  final info = await PackageInfo.fromPlatform();
+  static Future<bool> isUpdateAvailable(String remoteVersion) async {
+    final info = await PackageInfo.fromPlatform();
 
-  final localVersion =
-      "${info.version}+${info.buildNumber}";
+    final localVersion = '${info.version}+${info.buildNumber}';
 
-  print("REMOTE: [$remoteVersion]");
-  print("LOCAL : [$localVersion]");
+    print('REMOTE: [$remoteVersion]');
+    print('LOCAL : [$localVersion]');
 
-  return remoteVersion.trim() != localVersion.trim();
-}
-  // 3. Descargar APK (Drive)
+    return remoteVersion.trim() != localVersion.trim();
+  }
+
+  // 3. Abrir enlace externo de actualización
   static Future<void> downloadAndInstall(String url) async {
     final uri = Uri.parse(url);
 
-    if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
-      throw "No se pudo abrir el enlace de actualización";
+    if (!await launchUrl(
+      uri,
+      mode: LaunchMode.externalApplication,
+    )) {
+      throw 'No se pudo abrir el enlace de actualización';
     }
   }
 }

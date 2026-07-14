@@ -2,9 +2,9 @@ import 'dart:async';
 import 'dart:ui';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
-import '../auth/login_screen.dart';
+import 'package:safebrok_andalucia/core/auth/login_screen.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import '../auth/role_router.dart';
+import 'package:safebrok_andalucia/core/auth/role_router.dart';
 
 final AudioPlayer player = AudioPlayer();
 

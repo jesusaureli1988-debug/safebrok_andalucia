@@ -1,12 +1,12 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:safebrok_andalucia/features/auth/login_screen.dart';
+
 
 import 'register_screen.dart';
 import 'user_service.dart';
 import 'role_router.dart';
-import 'package:safebrok_andalucia/features/auth/forgot_password_screen.dart';
+import 'package:safebrok_andalucia/core/auth/forgot_password_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});

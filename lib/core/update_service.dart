@@ -1,9 +1,11 @@
 import 'dart:convert';
-import 'dart:io';
+
 import 'package:dio/dio.dart';
+import 'package:open_filex/open_filex.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:open_file/open_file.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+
 
 class UpdateService {
 
@@ -31,12 +33,11 @@ class UpdateService {
   }
 
   static Future<void> downloadAndInstall(String url) async {
+  final dir = await getTemporaryDirectory();
+  final filePath = '${dir.path}/update.apk';
 
-    final dir = await getTemporaryDirectory();
-    final filePath = "${dir.path}/update.apk";
+  await Dio().download(url, filePath);
 
-    await Dio().download(url, filePath);
-
-    await OpenFile.open(filePath);
-  }
+  await OpenFilex.open(filePath);
+}
 }

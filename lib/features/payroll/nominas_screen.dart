@@ -145,6 +145,110 @@ void _sumarVentaEnNomina({
   }
 }
 
+void _sumarBajaEnNomina({
+  required Map<String, Map<String, dynamic>> grouped,
+  required Map<String, dynamic> baja,
+  required String tipo,
+  required bool restaComision,
+}) {
+  final fecha = DateTime.tryParse(
+    baja['fecha_anulacion']?.toString() ?? '',
+  );
+
+  if (fecha == null) return;
+
+  final key = _keyMes(fecha);
+
+  grouped.putIfAbsent(key, () {
+    return {
+      'mes': fecha.month,
+      'anio': fecha.year,
+      'prima_neta_total': 0.0,
+      'comisiones': 0.0,
+      'rappel': 0.0,
+      'sueldo_fijo': 0.0,
+      'total_cobrar': 0.0,
+      'tipo': tipo,
+      'bajas_primas': 0.0,
+      'bajas_comisiones': 0.0,
+    };
+  });
+
+  final primaExtornada = _money(baja['prima_extornada']);
+  final comisionExtornada = _money(baja['comision_extornada']);
+
+  grouped[key]!['prima_neta_total'] =
+      _money(grouped[key]!['prima_neta_total']) - primaExtornada;
+
+  grouped[key]!['bajas_primas'] =
+      _money(grouped[key]!['bajas_primas']) + primaExtornada;
+
+  if (restaComision) {
+    grouped[key]!['comisiones'] =
+        _money(grouped[key]!['comisiones']) - comisionExtornada;
+
+    grouped[key]!['bajas_comisiones'] =
+        _money(grouped[key]!['bajas_comisiones']) + comisionExtornada;
+  }
+}
+
+Future<void> _aplicarBajasEnNominas({
+  required Map<String, Map<String, dynamic>> grouped,
+  required List<String> authIds,
+  required String tipo,
+  required String? authIdComision,
+}) async {
+  if (authIds.isEmpty) return;
+
+  final anulacionesData = await supabase
+      .from('anulaciones_polizas')
+      .select()
+      .eq('estado', 'ANULADA');
+
+  final anulaciones = List<Map<String, dynamic>>.from(anulacionesData);
+
+  if (anulaciones.isEmpty) return;
+
+  final ventaIds = anulaciones
+      .map((a) => a['venta_id']?.toString())
+      .where((id) => id != null && id.isNotEmpty && id != 'null')
+      .cast<String>()
+      .toSet()
+      .toList();
+
+  if (ventaIds.isEmpty) return;
+
+  final ventasData = await supabase
+      .from('ventas')
+      .select('id, agente_auth_id')
+      .inFilter('id', ventaIds);
+
+  final ventasMap = {
+    for (final v in List<Map<String, dynamic>>.from(ventasData))
+      v['id'].toString(): v,
+  };
+
+  for (final baja in anulaciones) {
+    final ventaId = baja['venta_id']?.toString();
+    final venta = ventasMap[ventaId];
+
+    if (venta == null) continue;
+
+    final agenteAuthId = venta['agente_auth_id']?.toString();
+
+    if (agenteAuthId == null || !authIds.contains(agenteAuthId)) {
+      continue;
+    }
+
+    _sumarBajaEnNomina(
+      grouped: grouped,
+      baja: baja,
+      tipo: tipo,
+      restaComision: authIdComision != null && agenteAuthId == authIdComision,
+    );
+  }
+}
+
 Future<void> loadNominas() async {
   final user = supabase.auth.currentUser;
 
@@ -181,6 +285,13 @@ Future<void> loadNominas() async {
           sumaComision: true,
         );
       }
+
+      await _aplicarBajasEnNominas(
+  grouped: grouped,
+  authIds: [user.id],
+  tipo: 'Agente comercial',
+  authIdComision: user.id,
+);
 
       for (final n in grouped.values) {
         n['total_cobrar'] = _money(n['comisiones']);
@@ -269,6 +380,13 @@ Future<void> _loadJefeEquipo(String authId, dynamic userId) async {
         sumaComision: true,
       );
     }
+
+    await _aplicarBajasEnNominas(
+  grouped: grouped,
+  authIds: [...agentesIds, authId],
+  tipo: 'Jefe de equipo',
+  authIdComision: authId,
+);
 
     for (final n in grouped.values) {
       final primasTotales = _money(n['prima_neta_total']);
@@ -371,6 +489,13 @@ Future<void> _loadJefeVentas(String authId, dynamic userId) async {
       );
     }
 
+    await _aplicarBajasEnNominas(
+  grouped: grouped,
+  authIds: [...estructuraAuthIds, authId],
+  tipo: 'Jefe de ventas',
+  authIdComision: authId,
+);
+
     for (final n in grouped.values) {
       final primasTotales = _money(n['prima_neta_total']);
       final comisiones = _money(n['comisiones']);
@@ -425,6 +550,13 @@ Future<void> _loadDirector(String authId, dynamic userId) async {
         );
       }
     }
+
+    await _aplicarBajasEnNominas(
+  grouped: grouped,
+  authIds: authIds,
+  tipo: 'Factura estructura',
+  authIdComision: null,
+);
 
     for (final n in grouped.values) {
       final primasTotales = _money(n['prima_neta_total']);
@@ -1125,10 +1257,13 @@ double _totalSueldoNode(_FacturaNode node) {
   }
 
   String _nombreUsuario(Map<String, dynamic> u) {
-  return (u['nombre'] ??
-          u['email'] ??
-          'Usuario sin nombre')
-      .toString();
+  final nombre = u['nombre']?.toString().trim() ?? '';
+  final apellidos = u['apellidos']?.toString().trim() ?? '';
+  final completo = '$nombre $apellidos'.trim();
+
+  if (completo.isNotEmpty) return completo;
+
+  return (u['email'] ?? 'Usuario sin nombre').toString();
 }
 
   String _nombreCliente(Map<String, dynamic> venta) {
@@ -1197,8 +1332,39 @@ double _totalSueldoNode(_FacturaNode node) {
   }
 
   bool get puedeVerPolizas {
-    return currentRole == 'director_zona' ||
-        currentRole == 'director_nacional';
+    final rol = _rolCanonico(currentRole);
+    return rol == 'director_nacional' ||
+        rol == 'director_zona' ||
+        rol == 'jefe_ventas' ||
+        rol == 'jefe_equipo' ||
+        rol == 'agente';
+  }
+
+  String _rolCanonico(dynamic value) {
+    final raw = value
+        .toString()
+        .trim()
+        .toLowerCase()
+        .replaceAll('-', '_')
+        .replaceAll(' ', '_');
+
+    if (raw.contains('director') && raw.contains('nacional')) {
+      return 'director_nacional';
+    }
+    if (raw.contains('director') && raw.contains('zona')) {
+      return 'director_zona';
+    }
+    if (raw.contains('jefe') && raw.contains('ventas')) {
+      return 'jefe_ventas';
+    }
+    if (raw.contains('jefe') && raw.contains('equipo')) {
+      return 'jefe_equipo';
+    }
+    if (raw == 'agente' || raw.contains('comercial')) {
+      return 'agente';
+    }
+
+    return raw;
   }
 
   Future<void> cargarEstructuraFactura() async {
@@ -1222,7 +1388,7 @@ double _totalSueldoNode(_FacturaNode node) {
 
       final usuarios = await supabase
     .from('usuarios')
-    .select('id, auth_id, parent_id, rol_usuario, nombre, email');
+    .select('id, auth_id, parent_id, rol_usuario, nombre, apellidos, email');
 
       final listaUsuarios =
           (usuarios as List).map((e) => Map<String, dynamic>.from(e)).toList();
@@ -1257,6 +1423,60 @@ double _totalSueldoNode(_FacturaNode node) {
           ventasMes.add(venta);
         }
       }
+      final anulacionesData = await supabase
+    .from('anulaciones_polizas')
+    .select()
+    .eq('estado', 'ANULADA')
+    .gte('fecha_anulacion', inicio.toIso8601String())
+    .lt('fecha_anulacion', fin.toIso8601String());
+
+final anulaciones = List<Map<String, dynamic>>.from(anulacionesData);
+
+final ventaIdsBajas = anulaciones
+    .map((a) => a['venta_id']?.toString())
+    .where((id) => id != null && id.isNotEmpty && id != 'null')
+    .cast<String>()
+    .toSet()
+    .toList();
+
+if (ventaIdsBajas.isNotEmpty) {
+  final ventasBajaData = await supabase
+      .from('ventas')
+      .select()
+      .inFilter('id', ventaIdsBajas);
+
+  final ventasBajaMap = {
+    for (final v in List<Map<String, dynamic>>.from(ventasBajaData))
+      v['id'].toString(): v,
+  };
+
+  for (final baja in anulaciones) {
+    final ventaOriginal = ventasBajaMap[baja['venta_id']?.toString()];
+
+    if (ventaOriginal == null) continue;
+
+    final ventaBaja = Map<String, dynamic>.from(ventaOriginal);
+
+    ventaBaja['id'] = 'baja_${baja['id']}';
+    ventaBaja['tipo_movimiento'] = 'BAJA';
+    ventaBaja['anulacion_id'] = baja['id'];
+    ventaBaja['fecha_efecto'] = baja['fecha_anulacion'];
+    ventaBaja['prima_anual_neta'] = -_money(baja['prima_extornada']);
+    ventaBaja['comision'] = -_money(baja['comision_extornada']);
+    ventaBaja['numero_poliza'] = baja['numero_poliza'];
+    ventaBaja['nombre_cliente'] = baja['nombre_cliente'];
+    ventaBaja['revision_nomina'] = {
+      'incluida': true,
+      'poliza_verificada': true,
+      'verificada_zona': false,
+      'verificada_nacional': false,
+      'emitida': false,
+    };
+
+    ventasMes.add(ventaBaja);
+  }
+}
+
       final clienteIds = ventasMes
     .map((v) => _clienteIdVenta(v)?.toString())
     .where((id) => id != null && id.isNotEmpty && id != 'null')
@@ -1425,105 +1645,149 @@ debugPrint('VENTAS MES: ${ventasMes.length}');
   }
 
   List<_FacturaNode> _crearArbol(
-  List<Map<String, dynamic>> usuarios,
-  List<Map<String, dynamic>> ventasMes,
-) {
-  String rolNormalizado(dynamic rol) {
-    return rol
-        .toString()
-        .trim()
-        .toLowerCase()
-        .replaceAll(' ', '_');
-  }
+    List<Map<String, dynamic>> usuarios,
+    List<Map<String, dynamic>> ventasMes,
+  ) {
+    String clean(dynamic value) => value?.toString().trim() ?? '';
 
-  final rolActual = rolNormalizado(currentRole);
+    List<Map<String, dynamic>> ventasDe(dynamic authId) {
+      final auth = clean(authId);
+      if (auth.isEmpty || auth == 'null') return [];
 
-  List<Map<String, dynamic>> hijosDe(Map<String, dynamic> padre, String rol) {
-    final padreId = padre['id']?.toString();
-    final padreAuthId = padre['auth_id']?.toString();
+      final result = ventasMes
+          .where((v) => clean(v['agente_auth_id']) == auth)
+          .map((v) => Map<String, dynamic>.from(v))
+          .toList();
 
-    return usuarios.where((u) {
-      final parent = u['parent_id']?.toString();
-      final rolUsuario = rolNormalizado(u['rol_usuario']);
+      result.sort((a, b) {
+        final fechaA = _fechaEfecto(a) ?? DateTime(1900);
+        final fechaB = _fechaEfecto(b) ?? DateTime(1900);
+        return fechaB.compareTo(fechaA);
+      });
 
-      return rolUsuario == rol &&
-          (parent == padreId || parent == padreAuthId);
-    }).toList();
-  }
+      return result;
+    }
 
-  List<Map<String, dynamic>> ventasDe(String? authId) {
-    if (authId == null || authId.isEmpty || authId == 'null') return [];
+    Map<String, dynamic> buscarUsuarioConectado() {
+      final authActual = clean(supabase.auth.currentUser?.id);
 
-    return ventasMes
-        .where((v) => v['agente_auth_id']?.toString() == authId)
-        .toList();
-  }
+      for (final usuario in usuarios) {
+        if (clean(usuario['auth_id']) == authActual) {
+          return usuario;
+        }
+      }
 
-  final miUsuario = usuarios.firstWhere(
-    (u) => u['id']?.toString() == currentUserId?.toString(),
-    orElse: () => {},
-  );
+      for (final usuario in usuarios) {
+        if (clean(usuario['id']) == clean(currentUserId)) {
+          return usuario;
+        }
+      }
 
-  List<Map<String, dynamic>> jefesVentas = [];
+      return <String, dynamic>{};
+    }
 
-  if (rolActual == 'director_zona') {
-  jefesVentas = hijosDe(miUsuario, 'jefe_ventas');
+    List<Map<String, dynamic>> hijosDirectos(
+      Map<String, dynamic> padre,
+      String rolEsperado,
+    ) {
+      final padreId = clean(padre['id']);
+      if (padreId.isEmpty) return [];
 
-  debugPrint('DIRECTOR ZONA');
-  debugPrint('JEFES DE VENTAS DIRECTOS: ${jefesVentas.length}');
+      final hijos = usuarios.where((usuario) {
+        return clean(usuario['parent_id']) == padreId &&
+            _rolCanonico(usuario['rol_usuario']) == rolEsperado;
+      }).map((u) => Map<String, dynamic>.from(u)).toList();
 
-  if (jefesVentas.isEmpty) {
-    debugPrint('NO ENCUENTRA POR PARENT_ID -> CARGANDO TODOS LOS JEFES DE VENTAS');
+      hijos.sort((a, b) {
+        return _nombreUsuario(a)
+            .toLowerCase()
+            .compareTo(_nombreUsuario(b).toLowerCase());
+      });
 
-    jefesVentas = usuarios.where((u) {
-      final rol = rolNormalizado(u['rol_usuario']);
-      return rol == 'jefe_ventas';
-    }).toList();
+      return hijos;
+    }
 
-    debugPrint('JEFES DE VENTAS TOTALES: ${jefesVentas.length}');
-  }
-} else if (rolActual == 'director_nacional') {
-    jefesVentas = usuarios
-        .where((u) => rolNormalizado(u['rol_usuario']) == 'jefe_ventas')
-        .toList();
+    _FacturaNode construirNodo(Map<String, dynamic> usuario) {
+      final rol = _rolCanonico(usuario['rol_usuario']);
+      String? siguienteRol;
 
-    debugPrint('DIRECTOR NACIONAL');
-    debugPrint('JEFES DE VENTAS TOTALES: ${jefesVentas.length}');
-  } else {
-    return [
-      _FacturaNode(
-        usuario: miUsuario,
-        rol: rolActual,
-        polizas: ventasDe(miUsuario['auth_id']?.toString()),
-      ),
-    ];
-  }
+      switch (rol) {
+        case 'director_nacional':
+          siguienteRol = 'director_zona';
+          break;
+        case 'director_zona':
+          siguienteRol = 'jefe_ventas';
+          break;
+        case 'jefe_ventas':
+          siguienteRol = 'jefe_equipo';
+          break;
+        case 'jefe_equipo':
+          siguienteRol = 'agente';
+          break;
+        case 'agente':
+          siguienteRol = null;
+          break;
+        default:
+          siguienteRol = null;
+      }
 
-  return jefesVentas.map((jv) {
-    final jefesEquipo = hijosDe(jv, 'jefe_equipo');
+      final hijos = siguienteRol == null
+          ? <Map<String, dynamic>>[]
+          : hijosDirectos(usuario, siguienteRol);
 
-    return _FacturaNode(
-  usuario: jv,
-  rol: 'jefe_ventas',
-  polizas: ventasDe(jv['auth_id']?.toString()),
-  hijos: jefesEquipo.map((je) {
-   final agentes = hijosDe(je, 'agente');
-        return _FacturaNode(
-  usuario: je,
-  rol: 'jefe_equipo',
-  polizas: ventasDe(je['auth_id']?.toString()),
-  hijos: agentes.map((agente) {
-            return _FacturaNode(
-              usuario: agente,
-              rol: 'agente',
-              polizas: ventasDe(agente['auth_id']?.toString()),
-            );
-          }).toList(),
+      return _FacturaNode(
+        usuario: usuario,
+        rol: rol,
+        polizas: ventasDe(usuario['auth_id']),
+        hijos: hijos.map(construirNodo).toList(),
+      );
+    }
+
+    final miUsuario = buscarUsuarioConectado();
+
+    if (miUsuario.isEmpty) {
+      debugPrint(
+        'NÓMINAS: no se encontró el usuario conectado en la tabla usuarios.',
+      );
+      return [];
+    }
+
+    final rolActual = _rolCanonico(miUsuario['rol_usuario']);
+
+    debugPrint('--------------------------------');
+    debugPrint('CREANDO ÁRBOL PARA: ${_nombreUsuario(miUsuario)}');
+    debugPrint('ROL CONECTADO: $rolActual');
+    debugPrint('ID CONECTADO: ${clean(miUsuario['id'])}');
+    debugPrint('AUTH CONECTADO: ${clean(miUsuario['auth_id'])}');
+
+    if (rolActual == 'director_nacional') {
+      final directoresZona =
+          hijosDirectos(miUsuario, 'director_zona');
+
+      debugPrint(
+        'DIRECTORES DE ZONA DIRECTOS ENCONTRADOS: ${directoresZona.length}',
+      );
+
+      for (final dz in directoresZona) {
+        debugPrint(
+          '  DZ: ${_nombreUsuario(dz)} | ID: ${clean(dz['id'])} '
+          '| PARENT: ${clean(dz['parent_id'])}',
         );
-      }).toList(),
-    );
-  }).toList();
-}
+      }
+
+      return directoresZona.map(construirNodo).toList();
+    }
+
+    if (rolActual == 'director_zona' ||
+        rolActual == 'jefe_ventas' ||
+        rolActual == 'jefe_equipo' ||
+        rolActual == 'agente') {
+      return [construirNodo(miUsuario)];
+    }
+
+    debugPrint('NÓMINAS: rol no admitido para el árbol: $rolActual');
+    return [];
+  }
 
   double _primasNode(_FacturaNode node) {
     double total = 0;
@@ -1684,26 +1948,118 @@ debugPrint('VENTAS MES: ${ventasMes.length}');
   }
 
   Future<void> marcarEmitida(_FacturaNode node) async {
-    final polizas = _todasPolizas(node);
+  final user = supabase.auth.currentUser;
+  if (user == null) return;
 
-    for (final p in polizas) {
-      final agenteAuthId = p['agente_auth_id']?.toString();
-      if (agenteAuthId == null) continue;
+  final polizas = _todasPolizas(node);
 
-      await supabase
-          .from('nominas_polizas_revision')
-          .update({
-            'emitida': true,
-            'actualizado_en': DateTime.now().toIso8601String(),
-          })
-          .eq('venta_id', p['id'].toString())
-          .eq('nomina_auth_id', agenteAuthId)
-          .eq('mes', widget.nomina['mes'])
-          .eq('anio', widget.nomina['anio']);
-    }
+  for (final p in polizas) {
+    final agenteAuthId = p['agente_auth_id']?.toString();
+    if (agenteAuthId == null) continue;
 
-    await cargarEstructuraFactura();
+    await supabase
+        .from('nominas_polizas_revision')
+        .update({
+          'emitida': true,
+          'actualizado_en': DateTime.now().toIso8601String(),
+        })
+        .eq('venta_id', p['id'].toString())
+        .eq('nomina_auth_id', agenteAuthId)
+        .eq('mes', widget.nomina['mes'])
+        .eq('anio', widget.nomina['anio']);
   }
+
+  await _crearFacturaPendiente(node);
+
+  await cargarEstructuraFactura();
+}
+
+Future<void> _crearFacturaPendiente(_FacturaNode node) async {
+  final user = supabase.auth.currentUser;
+  if (user == null) return;
+
+  final usuarioAuthId = node.usuario['auth_id']?.toString();
+  final usuarioNombre = _nombreUsuario(node.usuario);
+  final usuarioEmail = node.usuario['email']?.toString() ?? '';
+  final usuarioRol = node.rol;
+
+  if (usuarioAuthId == null ||
+      usuarioAuthId.isEmpty ||
+      usuarioAuthId == 'null') {
+    return;
+  }
+
+  final mes = widget.nomina['mes'];
+  final anio = widget.nomina['anio'];
+
+  final existente = await supabase
+      .from('nominas_facturas')
+      .select('id')
+      .eq('usuario_auth_id', usuarioAuthId)
+      .eq('mes', mes)
+      .eq('anio', anio)
+      .maybeSingle();
+
+  if (existente != null) {
+    return;
+  }
+
+  final comisionesPropias = _comisionesPropiasNode(node);
+  final rappel = _rappelNode(node);
+  final fijo = _fijoNode(node);
+
+  final base = comisionesPropias + rappel + fijo;
+  final irpf = 15.0;
+  final importeIrpf = base * irpf / 100;
+  final total = base - importeIrpf;
+
+  final facturaCreada = await supabase
+      .from('nominas_facturas')
+      .insert({
+        'usuario_auth_id': usuarioAuthId,
+        'usuario_nombre': usuarioNombre,
+        'usuario_email': usuarioEmail,
+        'usuario_rol': usuarioRol,
+        'mes': mes,
+        'anio': anio,
+       'comisiones': comisionesPropias,
+'rappel': rappel,
+'fijo': fijo,
+'base_imponible': base,
+'irpf_porcentaje': irpf,
+        'importe_irpf': importeIrpf,
+        'total_factura': total,
+        'estado': 'pendiente_tramitar',
+        'aprobada_por': user.id,
+        'fecha_aprobacion': DateTime.now().toIso8601String(),
+      })
+      .select()
+      .single();
+
+  final facturaId = facturaCreada['id'];
+  final polizas = _todasPolizas(node);
+
+  final lineas = polizas.map((p) {
+  final esBaja = p['tipo_movimiento'] == 'BAJA';
+
+  return {
+    'factura_id': facturaId,
+    'venta_id': p['id'].toString().replaceFirst('baja_', ''),
+    'numero_poliza': _numeroPoliza(p),
+    'cliente_nombre': _nombreCliente(p),
+    'prima_neta': _primaNetaVenta(p),
+    'comision': _comisionVenta(p),
+    'tipo_movimiento': esBaja ? 'EXTORNO' : 'VENTA',
+    'anulacion_id': esBaja ? p['anulacion_id'] : null,
+    'prima_extornada': esBaja ? _primaNetaVenta(p).abs() : 0,
+    'comision_extornada': esBaja ? _comisionVenta(p).abs() : 0,
+  };
+}).toList();
+
+  if (lineas.isNotEmpty) {
+    await supabase.from('nominas_facturas_lineas').insert(lineas);
+  }
+}
 
   @override
   Widget build(BuildContext context) {
@@ -1714,6 +2070,25 @@ debugPrint('VENTAS MES: ${ventasMes.length}');
       backgroundColor: const Color(0xFF061018),
       extendBodyBehindAppBar: true,
       appBar: AppBar(
+        automaticallyImplyLeading: false,
+        leadingWidth: 66,
+        leading: Padding(
+          padding: const EdgeInsets.fromLTRB(10, 6, 6, 6),
+          child: Material(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            elevation: 4,
+            child: InkWell(
+              borderRadius: BorderRadius.circular(16),
+              onTap: () => Navigator.of(context).pop(),
+              child: const Icon(
+                Icons.arrow_back_rounded,
+                color: Color(0xFF061018),
+                size: 30,
+              ),
+            ),
+          ),
+        ),
         title: Text(
           'Factura $mes $anio',
           style: const TextStyle(
@@ -1821,21 +2196,24 @@ debugPrint('VENTAS MES: ${ventasMes.length}');
     final nombre = _nombreUsuario(node.usuario);
     final estado = _estadoNode(node);
     final color = _estadoColor(estado);
-    final primas = _primasNode(node);
-    final comisiones = _comisionesNode(node);
-    final polizas = _todasPolizas(node);
-
-    final bool esAgente = node.rol == 'agente';
+    final primasTotales = _primasNode(node);
+    final polizasTotales = _todasPolizas(node);
+    final polizasPropias = node.polizas;
+    final hijos = node.hijos;
 
     return Container(
       margin: EdgeInsets.only(
-        left: level * 10,
+        left: level == 0 ? 0 : 8,
         bottom: 12,
       ),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.055),
+        color: Colors.white.withOpacity(level == 0 ? 0.065 : 0.045),
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: Colors.white.withOpacity(0.09)),
+        border: Border.all(
+          color: level == 0
+              ? Colors.cyanAccent.withOpacity(0.22)
+              : Colors.white.withOpacity(0.09),
+        ),
       ),
       child: Theme(
         data: Theme.of(context).copyWith(
@@ -1846,10 +2224,27 @@ debugPrint('VENTAS MES: ${ventasMes.length}');
           ),
         ),
         child: ExpansionTile(
-          collapsedIconColor: Colors.white54,
+          initiallyExpanded: level == 0,
+          maintainState: true,
+          collapsedIconColor: Colors.white70,
           iconColor: Colors.cyanAccent,
-          tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          tilePadding: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 8,
+          ),
           childrenPadding: const EdgeInsets.fromLTRB(12, 0, 12, 14),
+          leading: Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: _colorRol(node.rol).withOpacity(0.15),
+              borderRadius: BorderRadius.circular(15),
+            ),
+            child: Icon(
+              _iconoRol(node.rol),
+              color: _colorRol(node.rol),
+            ),
+          ),
           title: Text(
             nombre,
             style: const TextStyle(
@@ -1860,32 +2255,67 @@ debugPrint('VENTAS MES: ${ventasMes.length}');
           subtitle: Padding(
             padding: const EdgeInsets.only(top: 8),
             child: Wrap(
-              spacing: 8,
-              runSpacing: 8,
+              spacing: 7,
+              runSpacing: 7,
               children: [
-                _miniPill(_rolTexto(node.rol), Colors.cyanAccent),
+                _miniPill(_rolTexto(node.rol), _colorRol(node.rol)),
                 _miniPill(estado, color),
-                _miniPill('${polizas.length} pólizas', Colors.white70),
-                _miniPill('${primas.toStringAsFixed(0)} € primas', Colors.greenAccent),
+                _miniPill(
+                  '${polizasPropias.length} propias',
+                  Colors.lightBlueAccent,
+                ),
+                _miniPill(
+                  '${polizasTotales.length} estructura',
+                  Colors.white70,
+                ),
+                _miniPill(
+                  '${primasTotales.toStringAsFixed(0)} € primas',
+                  Colors.greenAccent,
+                ),
               ],
             ),
           ),
           children: [
             _resumenNode(node, estado, color),
 
-            if (!esAgente)
-              ...node.hijos.map((h) => _nodeCard(h, level + 1)),
+            _tituloSeccionArbol(
+              icon: Icons.receipt_long_rounded,
+              title: 'Pólizas propias',
+              subtitle: polizasPropias.isEmpty
+                  ? 'Esta persona no tiene pólizas en el periodo'
+                  : '${polizasPropias.length} movimientos encontrados',
+              color: Colors.lightBlueAccent,
+            ),
 
-            if (esAgente) ...[
-              if (!puedeVerPolizas)
-                _bloqueSinPermiso()
-              else
-                ...node.polizas.map(_polizaItem),
+            if (polizasPropias.isEmpty)
+              _sinPolizasPropias()
+            else if (!puedeVerPolizas)
+              _bloqueSinPermiso()
+            else
+              ...polizasPropias.map(_polizaItem),
+
+            if (hijos.isNotEmpty) ...[
+              const SizedBox(height: 6),
+              _tituloSeccionArbol(
+                icon: Icons.account_tree_rounded,
+                title: _tituloDependencias(node.rol),
+                subtitle: '${hijos.length} personas asignadas directamente',
+                color: Colors.cyanAccent,
+              ),
+              ...hijos.map((h) => _nodeCard(h, level + 1)),
+            ] else if (node.rol != 'agente') ...[
+              const SizedBox(height: 6),
+              _tituloSeccionArbol(
+                icon: Icons.account_tree_outlined,
+                title: _tituloDependencias(node.rol),
+                subtitle: 'No hay personas asignadas directamente',
+                color: Colors.white54,
+              ),
             ],
 
             if (currentRole == 'director_zona')
               _botonAccionGrande(
-                'Factura verificada por Director Zona',
+                'Verificar esta persona y su estructura',
                 Icons.verified_rounded,
                 Colors.orangeAccent,
                 () => verificarTodasZona(node),
@@ -1893,14 +2323,14 @@ debugPrint('VENTAS MES: ${ventasMes.length}');
 
             if (currentRole == 'director_nacional') ...[
               _botonAccionGrande(
-                'Verificar por Director Nacional',
+                'Verificar esta persona y su estructura',
                 Icons.workspace_premium_rounded,
                 Colors.lightBlueAccent,
                 () => verificarTodasNacional(node),
               ),
               const SizedBox(height: 8),
               _botonAccionGrande(
-                'Marcar como emitida',
+                'Marcar esta persona y su estructura como emitida',
                 Icons.payments_rounded,
                 Colors.greenAccent,
                 () => marcarEmitida(node),
@@ -1912,8 +2342,124 @@ debugPrint('VENTAS MES: ${ventasMes.length}');
     );
   }
 
+  IconData _iconoRol(String rol) {
+    switch (rol) {
+      case 'director_zona':
+        return Icons.map_rounded;
+      case 'jefe_ventas':
+        return Icons.business_center_rounded;
+      case 'jefe_equipo':
+        return Icons.groups_rounded;
+      case 'agente':
+        return Icons.person_rounded;
+      default:
+        return Icons.account_tree_rounded;
+    }
+  }
+
+  Color _colorRol(String rol) {
+    switch (rol) {
+      case 'director_zona':
+        return Colors.purpleAccent;
+      case 'jefe_ventas':
+        return Colors.amberAccent;
+      case 'jefe_equipo':
+        return Colors.cyanAccent;
+      case 'agente':
+        return Colors.greenAccent;
+      default:
+        return Colors.white70;
+    }
+  }
+
+  String _tituloDependencias(String rol) {
+    switch (rol) {
+      case 'director_nacional':
+        return 'Directores de zona';
+      case 'director_zona':
+        return 'Jefes de ventas';
+      case 'jefe_ventas':
+        return 'Jefes de equipo';
+      case 'jefe_equipo':
+        return 'Agentes';
+      default:
+        return 'Personas asignadas';
+    }
+  }
+
+  Widget _tituloSeccionArbol({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required Color color,
+  }) {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(13),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(17),
+        border: Border.all(color: color.withOpacity(0.15)),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: color, size: 22),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  subtitle,
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.50),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _sinPolizasPropias() {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.025),
+        borderRadius: BorderRadius.circular(17),
+        border: Border.all(color: Colors.white.withOpacity(0.06)),
+      ),
+      child: Text(
+        'Sin pólizas propias en este periodo.',
+        style: TextStyle(
+          color: Colors.white.withOpacity(0.48),
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+    );
+  }
+
   String _rolTexto(String rol) {
     switch (rol) {
+      case 'director_nacional':
+        return 'Director nacional';
+      case 'director_zona':
+        return 'Director de zona';
       case 'jefe_ventas':
         return 'Jefe de ventas';
       case 'jefe_equipo':
@@ -2024,6 +2570,7 @@ debugPrint('VENTAS MES: ${ventasMes.length}');
 
     final prima = _money(venta['prima_anual_neta']);
     final comision = _money(venta['comision']);
+    final esBaja = venta['tipo_movimiento'] == 'BAJA';
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -2083,7 +2630,7 @@ debugPrint('VENTAS MES: ${ventasMes.length}');
           ),
           const SizedBox(height: 4),
           Text(
-            'Póliza: $numeroPoliza',
+            esBaja ? 'BAJA / EXTORNO · Póliza: $numeroPoliza' : 'Póliza: $numeroPoliza',
             style: TextStyle(
               color: Colors.cyanAccent.withOpacity(0.9),
               fontWeight: FontWeight.w800,

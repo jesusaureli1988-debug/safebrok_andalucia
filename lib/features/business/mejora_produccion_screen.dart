@@ -30,17 +30,18 @@ class _MejoraProduccionScreenState extends State<MejoraProduccionScreen> {
   };
 
   DateTime get inicioCiclo {
-    final now = DateTime.now();
-    if (now.day >= 25) {
-      return DateTime(now.year, now.month, 25);
-    }
-    return DateTime(now.year, now.month - 1, 25);
+  final now = DateTime.now();
+
+  if (now.day >= 24) {
+    return DateTime(now.year, now.month, 24);
   }
 
+  return DateTime(now.year, now.month - 1, 24);
+}
+
   DateTime get finCiclo {
-    final nextMonth = DateTime(inicioCiclo.year, inicioCiclo.month + 1, 25);
-    return nextMonth.subtract(const Duration(seconds: 1));
-  }
+  return DateTime(inicioCiclo.year, inicioCiclo.month + 1, 24);
+}
 
   double get porcentajeObjetivo {
     if (objetivo <= 0) return 0;
@@ -191,17 +192,75 @@ class _MejoraProduccionScreenState extends State<MejoraProduccionScreen> {
 
     if (authIdsPermitidos.isNotEmpty) {
       final ventasData = await supabase
-          .from('ventas')
-          .select('prima_anual_neta, producto, created_at')
-          .inFilter('agente_auth_id', authIdsPermitidos.toList())
-          .gte('created_at', inicioCiclo.toIso8601String())
-          .lte('created_at', finCiclo.toIso8601String());
+    .from('ventas')
+    .select('id, prima_anual_neta, producto, fecha_efecto, agente_auth_id')
+    .inFilter('agente_auth_id', authIdsPermitidos.toList())
+    .gte('fecha_efecto', inicioCiclo.toIso8601String())
+    .lt('fecha_efecto', finCiclo.toIso8601String());
 
       ventas = List<Map<String, dynamic>>.from(ventasData);
 
-      for (final v in ventas) {
-        produccion += _toDouble(v['prima_anual_neta']);
+for (final v in ventas) {
+  produccion += _toDouble(v['prima_anual_neta']);
+}
+
+final extornosData = await supabase
+    .from('anulaciones_polizas')
+    .select('venta_id, prima_extornada, fecha_anulacion')
+    .eq('estado', 'ANULADA')
+    .gte('fecha_anulacion', inicioCiclo.toIso8601String())
+    .lt('fecha_anulacion', finCiclo.toIso8601String());
+
+final extornos = List<Map<String, dynamic>>.from(extornosData);
+
+if (extornos.isNotEmpty) {
+  final ventaIdsExtorno = extornos
+      .map((e) => e['venta_id']?.toString())
+      .where((id) => id != null && id.isNotEmpty && id != 'null')
+      .cast<String>()
+      .toSet()
+      .toList();
+
+  if (ventaIdsExtorno.isNotEmpty) {
+    final ventasExtornadasData = await supabase
+        .from('ventas')
+        .select('id, agente_auth_id, producto')
+        .inFilter('id', ventaIdsExtorno);
+
+    final ventasExtornadasMap = {
+      for (final v in List<Map<String, dynamic>>.from(ventasExtornadasData))
+        v['id'].toString(): v,
+    };
+
+    for (final extorno in extornos) {
+      final ventaId = extorno['venta_id']?.toString();
+      final ventaOriginal = ventasExtornadasMap[ventaId];
+
+      if (ventaOriginal == null) continue;
+
+      final agenteAuthId = ventaOriginal['agente_auth_id']?.toString();
+
+      if (agenteAuthId == null || !authIdsPermitidos.contains(agenteAuthId)) {
+        continue;
       }
+
+      final primaExtornada = _toDouble(extorno['prima_extornada']);
+
+      produccion -= primaExtornada;
+
+      ventas.add({
+        'id': 'extorno_${extorno['venta_id']}',
+        'producto': ventaOriginal['producto'],
+        'prima_anual_neta': -primaExtornada,
+        'fecha_efecto': extorno['fecha_anulacion'],
+        'agente_auth_id': agenteAuthId,
+        'tipo_movimiento': 'EXTORNO',
+      });
+    }
+  }
+}
+
+if (produccion < 0) produccion = 0;
 
       final refs = await supabase
           .from('referencias_viables')
@@ -220,24 +279,27 @@ class _MejoraProduccionScreenState extends State<MejoraProduccionScreen> {
     };
 
     for (final v in ventas) {
-      final producto = v['producto']?.toString().trim();
+  final producto = v['producto']?.toString().trim();
 
-      if (producto == null) continue;
+  if (producto == null) continue;
 
-      final p = producto.toLowerCase();
+  final esExtorno = v['tipo_movimiento'] == 'EXTORNO';
+  final movimiento = esExtorno ? -1 : 1;
 
-      if (p.contains('decesos')) {
-        map['Decesos'] = map['Decesos']! + 1;
-      } else if (p.contains('hogar')) {
-        map['Hogar'] = map['Hogar']! + 1;
-      } else if (p.contains('vida')) {
-        map['Vida'] = map['Vida']! + 1;
-      } else if (p.contains('salud')) {
-        map['Salud'] = map['Salud']! + 1;
-      } else if (p.contains('auto') || p.contains('coche')) {
-        map['Auto'] = map['Auto']! + 1;
-      }
-    }
+  final p = producto.toLowerCase();
+
+  if (p.contains('decesos')) {
+    map['Decesos'] = math.max(0, map['Decesos']! + movimiento);
+  } else if (p.contains('hogar')) {
+    map['Hogar'] = math.max(0, map['Hogar']! + movimiento);
+  } else if (p.contains('vida')) {
+    map['Vida'] = math.max(0, map['Vida']! + movimiento);
+  } else if (p.contains('salud')) {
+    map['Salud'] = math.max(0, map['Salud']! + movimiento);
+  } else if (p.contains('auto') || p.contains('coche')) {
+    map['Auto'] = math.max(0, map['Auto']! + movimiento);
+  }
+}
 
     setState(() {
       produccionActual = produccion;

@@ -47,3 +47,10 @@ app.*.map.json
 .idea/
 build/
 .dart_tool/
+
+# Compilaciones manuales Windows
+windows/runner/SafeBrok_Windows_*/
+windows/runner/**/Release/
+
+# Archivo creado por error
+/flutter

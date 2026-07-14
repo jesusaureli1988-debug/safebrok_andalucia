@@ -26,8 +26,13 @@ class SettingsScreen extends StatelessWidget {
     final email = user?.email ?? '';
     final initial = email.isNotEmpty ? email[0].toUpperCase() : '?';
 
+    final normalizedRole = role.trim().toLowerCase();
+
     final bool showAdmin =
-        role == 'director_zona' || role == 'jefe_ventas';
+        normalizedRole == 'director_zona' ||
+        normalizedRole == 'jefe_ventas' ||
+        normalizedRole == 'director_nacional' ||
+        normalizedRole == 'administracion';
 
     return Scaffold(
       backgroundColor: const Color(0xFF050B12),

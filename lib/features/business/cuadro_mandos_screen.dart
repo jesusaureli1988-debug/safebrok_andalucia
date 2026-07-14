@@ -1,6 +1,16 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:safebrok_andalucia/features/business/reasignar_mediador_screen.dart';
+import 'package:safebrok_andalucia/features/business/reasignar_jefe_equipo_screen.dart';
+import 'package:safebrok_andalucia/features/business/control_referencias_screen.dart';
+import 'package:safebrok_andalucia/features/business/control_altas_screen.dart';
+import 'package:safebrok_andalucia/features/business/control_bajas_screen.dart';
+import 'package:safebrok_andalucia/features/business/cargar_gestiones_screen.dart';
+import 'package:safebrok_andalucia/features/admin/modificar_comisiones_screen.dart';
+import 'package:safebrok_andalucia/features/business/consultar_poliza_screen.dart';
+import 'package:safebrok_andalucia/features/admin/tramitar_facturas_screen.dart';
+import 'package:safebrok_andalucia/features/business/anular_poliza_screen.dart';
 
 class CuadroMandosScreen extends StatefulWidget {
   const CuadroMandosScreen({super.key});
@@ -30,9 +40,9 @@ class _CuadroMandosScreenState extends State<CuadroMandosScreen> {
       blockedFor: [],
     ),
     _ModuloMando(
-      title: 'Reasignar jefe de ventas',
+      title: 'Reasignar jefe de equipo',
       icon: Icons.manage_accounts_rounded,
-      description: 'Cambiar dependencia de jefes de ventas.',
+      description: 'Cambiar la dependencia de un jefe de equipo entre distintos jefes de ventas.',
       blockedFor: ['jefe_ventas'],
     ),
     _ModuloMando(
@@ -47,6 +57,23 @@ class _CuadroMandosScreenState extends State<CuadroMandosScreen> {
       description: 'Registro y control de gestiones comerciales.',
       blockedFor: [],
     ),
+    _ModuloMando(
+  title: 'Consultar póliza',
+  icon: Icons.policy_rounded,
+  description: 'Consulta rápida de pólizas, clientes, recibos y datos comerciales.',
+  blockedFor: [],
+),
+_ModuloMando(
+  title: 'Anular póliza',
+  icon: Icons.cancel_presentation_rounded,
+  description: 'Gestión y seguimiento de solicitudes de anulación de pólizas.',
+  blockedFor: [
+    'director_zona',
+    'jefe_ventas',
+    'jefe_equipo',
+    'agente',
+  ],
+),
     _ModuloMando(
       title: 'Tramitar facturas',
       icon: Icons.receipt_long_rounded,
@@ -312,7 +339,111 @@ class _CuadroMandosScreenState extends State<CuadroMandosScreen> {
         child: InkWell(
           borderRadius: BorderRadius.circular(19),
           onTap: () {
-            setState(() => selectedModule = modulo.title);
+            if (modulo.title == 'Reasignar mediador') {
+  Navigator.push(
+    context,
+    MaterialPageRoute(
+      builder: (_) => const ReasignarMediadorScreen(),
+    ),
+  );
+  return;
+}
+
+if (modulo.title == 'Reasignar jefe de equipo') {
+  Navigator.push(
+    context,
+    MaterialPageRoute(
+      builder: (_) => const ReasignarJefeEquipoScreen(),
+    ),
+  );
+  return;
+}
+
+if (modulo.title == 'Control referencias') {
+  Navigator.push(
+    context,
+    MaterialPageRoute(
+      builder: (_) => const ControlReferenciasScreen(),
+    ),
+  );
+  return;
+}
+
+if (modulo.title == 'Cargar gestiones') {
+  Navigator.push(
+    context,
+    MaterialPageRoute(
+      builder: (_) => const CargarGestionesScreen(),
+    ),
+  );
+  return;
+}
+
+if (modulo.title == 'Consultar póliza') {
+  Navigator.push(
+    context,
+    MaterialPageRoute(
+      builder: (_) => const ConsultarPolizaScreen(),
+    ),
+  );
+  return;
+}
+
+if (modulo.title == 'Anular póliza') {
+  Navigator.push(
+    context,
+    MaterialPageRoute(
+      builder: (_) => const AnularPolizaScreen(),
+    ),
+  );
+  return;
+}
+
+if (modulo.title == 'Altas') {
+  Navigator.push(
+    context,
+    MaterialPageRoute(
+      builder: (_) => const ControlAltasScreen(),
+    ),
+  );
+  return;
+}
+
+if (modulo.title == 'Modificar comisiones') {
+  Navigator.push(
+    context,
+    MaterialPageRoute(
+      builder: (_) => const ModificarComisionesScreen(),
+    ),
+  );
+  return;
+}
+
+if (modulo.title == 'Tramitar facturas') {
+  Navigator.push(
+    context,
+    MaterialPageRoute(
+      builder: (_) => const TramitarFacturasScreen(),
+    ),
+  );
+  return;
+}
+
+if (modulo.title == 'Bajas') {
+  Navigator.push(
+    context,
+    MaterialPageRoute(
+      builder: (_) => const ControlBajasScreen(),
+    ),
+  );
+  return;
+}
+
+
+
+setState(() => selectedModule = modulo.title);
+
+setState(() => selectedModule = modulo.title);
           },
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 220),
@@ -563,6 +694,8 @@ class _CuadroMandosScreenState extends State<CuadroMandosScreen> {
   }
 
   Widget _moduloGenerico(_ModuloMando modulo) {
+
+
     return _glassPanel(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

@@ -20,6 +20,7 @@ class _CreateSaleWizardState extends State<CreateSaleWizard> {
 
   int step = 0;
   bool saving = false;
+  double comisionPreview = 0;
 
   String? selectedProduct;
   String? selectedCompany;
@@ -295,14 +296,16 @@ class _CreateSaleWizardState extends State<CreateSaleWizard> {
               icon: Icons.inventory_2_rounded,
               value: selectedProduct,
               items: products,
-              onChanged: (v) {
-                setState(() {
-                  selectedProduct = v;
-                  if (selectedProduct != 'Decesos') {
-                    asegurados.clear();
-                  }
-                });
-              },
+              onChanged: (v) async {
+  setState(() {
+    selectedProduct = v;
+    if (selectedProduct != 'Decesos') {
+      asegurados.clear();
+    }
+  });
+
+  await actualizarComisionPreview();
+},
             ),
             if (selectedProduct == 'Decesos')
               _input(
@@ -326,11 +329,12 @@ class _CreateSaleWizardState extends State<CreateSaleWizard> {
               onChanged: (v) => setState(() => selectedPayment = v),
             ),
             _input(
-              precio,
-              "Precio",
-              icon: Icons.euro_rounded,
-              keyboard: const TextInputType.numberWithOptions(decimal: true),
-            ),
+  precio,
+  "Precio",
+  icon: Icons.euro_rounded,
+  keyboard: const TextInputType.numberWithOptions(decimal: true),
+  onChangedExtra: actualizarComisionPreview,
+),
             _datePicker(),
             const SizedBox(height: 10),
             _calculationPreview(),
@@ -368,6 +372,7 @@ class _CreateSaleWizardState extends State<CreateSaleWizard> {
             _sectionTitle("Cálculo"),
             _reviewCard("Prima anual estimada", "${_primaAnual().toStringAsFixed(2)} €"),
             _reviewCard("Prima neta estimada", "${(_primaAnual() * 0.87).toStringAsFixed(2)} €"),
+            _reviewCard("Comisión estimada", "${comisionPreview.toStringAsFixed(2)} €"),
           ],
         );
 
@@ -504,21 +509,27 @@ class _CreateSaleWizardState extends State<CreateSaleWizard> {
     );
   }
 
-  Widget _input(
-    TextEditingController controller,
-    String hint, {
-    IconData? icon,
-    TextInputType keyboard = TextInputType.text,
-    TextCapitalization textCapitalization = TextCapitalization.none,
-    String? Function(String?)? validator,
-  }) {
+ Widget _input(
+  TextEditingController controller,
+  String hint, {
+  IconData? icon,
+  TextInputType keyboard = TextInputType.text,
+  TextCapitalization textCapitalization = TextCapitalization.none,
+  String? Function(String?)? validator,
+  Future<void> Function()? onChangedExtra,
+}) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 14),
       child: TextFormField(
         controller: controller,
         keyboardType: keyboard,
         textCapitalization: textCapitalization,
-        onChanged: (_) => setState(() {}),
+        onChanged: (_) async {
+  setState(() {});
+  if (onChangedExtra != null) {
+    await onChangedExtra();
+  }
+},
         style: const TextStyle(
           color: Colors.white,
           fontWeight: FontWeight.w600,
@@ -683,7 +694,7 @@ class _CreateSaleWizardState extends State<CreateSaleWizard> {
           const SizedBox(height: 12),
           _miniLine("Prima anual", "${prima.toStringAsFixed(2)} €"),
           _miniLine("Prima neta estimada", "${neta.toStringAsFixed(2)} €"),
-          _miniLine("Comisión estimada", "${_comision().toStringAsFixed(2)} €"),
+          _miniLine("Comisión estimada", "${comisionPreview.toStringAsFixed(2)} €"),
         ],
       ),
     );
@@ -828,20 +839,47 @@ class _CreateSaleWizardState extends State<CreateSaleWizard> {
     }
   }
 
-  double _comision() {
-    final primaNeta = _primaAnual() * 0.87;
-
-    switch (selectedProduct) {
-      case 'Decesos':
-      case 'Vida':
-        return primaNeta * 0.50;
-      case 'Salud':
-      case 'Baja laboral':
-        return primaNeta * 0.15;
-      default:
-        return primaNeta * 0.09;
-    }
+  Future<void> actualizarComisionPreview() async {
+  if (selectedProduct == null) {
+    setState(() => comisionPreview = 0);
+    return;
   }
+
+  final primaNeta = _primaAnual() * 0.87;
+
+  final producto = await supabase
+      .from('comisiones_productos')
+      .select('porcentaje_comision')
+      .eq('producto', selectedProduct!)
+      .maybeSingle();
+
+  final porcentaje =
+      (producto?['porcentaje_comision'] as num?)?.toDouble() ?? 0;
+
+  setState(() {
+    comisionPreview = primaNeta * (porcentaje / 100);
+  });
+}
+
+  Future<double> _comision() async {
+
+  final primaNeta = _primaAnual() * 0.87;
+
+  final producto = await supabase
+      .from('comisiones_productos')
+      .select('porcentaje_comision')
+      .eq('producto', selectedProduct!)
+      .maybeSingle();
+
+  if (producto == null) {
+    return 0;
+  }
+
+  final porcentaje =
+      (producto['porcentaje_comision'] as num?)?.toDouble() ?? 0;
+
+  return primaNeta * (porcentaje / 100);
+}
 
   void _review() {
     if (!formKey.currentState!.validate()) return;
@@ -969,7 +1007,7 @@ class _CreateSaleWizardState extends State<CreateSaleWizard> {
       final primaAnual = _primaAnual();
       final primaBrutaAnual = primaAnual;
       final primaNetaAnual = primaBrutaAnual * 0.87;
-      final comision = _comision();
+      final comision = await _comision();
 
       await supabase.from('ventas').insert({
         'cliente_id': finalClientId,

@@ -3,7 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 
 
-import 'features/auth/login_screen.dart';
+import 'core/auth/login_screen.dart';
 import 'features/splash/splash_screen.dart';
 import 'features/Navigation/main_shell.dart';
 

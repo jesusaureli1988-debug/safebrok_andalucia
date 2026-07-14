@@ -25,6 +25,9 @@ import 'package:safebrok_andalucia/features/director_nacional/director_nacional_
 import 'package:safebrok_andalucia/features/director_nacional/director_nacional_usuarios_screen.dart';
 import 'package:safebrok_andalucia/features/business/ranking_comercial_screen.dart';
 import 'package:safebrok_andalucia/features/business/cuadro_mandos_screen.dart';
+import 'package:safebrok_andalucia/features/business/cargar_gestiones_screen.dart';
+import 'package:safebrok_andalucia/features/business/mis_gestiones_screen.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 
 class DashboardItem {
@@ -170,9 +173,9 @@ final supabase = Supabase.instance.client;
 int totalVentas = 0;
 int totalTareas = 0;
 
-int ventasSemana = 0;
+double primasSemana = 0.0;
 int clientesSemana = 0;
-int objetivoSemana = 4;
+double objetivoSemana = 1250.0;
 int rachaSemanas = 0;
 
 int rankingPosicion = 0;
@@ -364,16 +367,22 @@ Future<void> loadSystemUnreadCount() async {
   if (user == null) return;
 
   try {
-    final res = await supabase
+    final alertas = await supabase
         .from('alertas')
         .select('id')
         .eq('auth_id_destino', user.id)
         .eq('leida', false);
 
+    final notificaciones = await supabase
+    .from('notificaciones')
+    .select('id')
+    .eq('auth_id_destino', user.id)
+    .eq('leida', false);
+
     if (!mounted) return;
 
     setState(() {
-      systemUnreadCount = res.length;
+      systemUnreadCount = alertas.length + notificaciones.length;
     });
   } catch (e) {
     debugPrint('ERROR SYSTEM UNREAD HOME: $e');
@@ -471,18 +480,51 @@ Future<List<Map<String, dynamic>>> cargarAlertasSistema() async {
   if (user == null) return [];
 
   try {
-    final data = await supabase
+    final alertas = await supabase
         .from('alertas')
         .select()
         .eq('auth_id_destino', user.id)
         .eq('leida', false)
         .order('created_at', ascending: false);
 
-    return List<Map<String, dynamic>>.from(data);
+    final notificaciones = await supabase
+    .from('notificaciones')
+    .select()
+    .eq('auth_id_destino', user.id)
+    .eq('leida', false)
+    .order('created_at', ascending: false);
+
+    final lista = <Map<String, dynamic>>[
+      ...List<Map<String, dynamic>>.from(alertas).map((e) => {
+            ...e,
+            '_tabla': 'alertas',
+          }),
+      ...List<Map<String, dynamic>>.from(notificaciones).map((e) => {
+            ...e,
+            '_tabla': 'notificaciones',
+          }),
+    ];
+
+    lista.sort((a, b) {
+      final fa = DateTime.tryParse(a['created_at']?.toString() ?? '') ?? DateTime(2000);
+      final fb = DateTime.tryParse(b['created_at']?.toString() ?? '') ?? DateTime(2000);
+      return fb.compareTo(fa);
+    });
+
+    return lista;
   } catch (e) {
     debugPrint("ERROR CARGAR ALERTAS SISTEMA: $e");
     return [];
   }
+}
+
+Future<void> _abrirArchivoNotificacion(String? url) async {
+  if (url == null || url.trim().isEmpty) return;
+
+  final uri = Uri.tryParse(url.trim());
+  if (uri == null) return;
+
+  await launchUrl(uri, mode: LaunchMode.externalApplication);
 }
 
 Future<void> _openNotificationsPanel() async {
@@ -593,10 +635,12 @@ Future<void> _openNotificationsPanel() async {
                           subtitle: alerta['mensaje'] ?? '',
                           onTap: () async {
                             try {
-                              await supabase
-                                  .from('alertas')
-                                  .update({'leida': true})
-                                  .eq('id', alerta['id']);
+                             final tabla = alerta['_tabla']?.toString() ?? 'alertas';
+
+await supabase
+    .from(tabla)
+    .update({'leida': true})
+    .eq('id', alerta['id']);
 
                               await loadSystemUnreadCount();
 
@@ -604,6 +648,21 @@ Future<void> _openNotificationsPanel() async {
 
                               Navigator.pop(modalContext);
 
+                              if (alerta['_tabla'] == 'notificaciones') {
+  final archivoUrl = alerta['archivo_url']?.toString();
+
+  if (archivoUrl != null && archivoUrl.isNotEmpty) {
+    await _abrirArchivoNotificacion(archivoUrl);
+  } else if (alerta['pantalla_destino'] == 'mis_gestiones' ||
+      alerta['pantalla_destino'] == 'gestiones_asignadas') {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const MisGestionesScreen(),
+      ),
+    );
+  }
+}
                               ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(
                                   content: const Text(
@@ -740,95 +799,202 @@ Widget _notificationItem({
 
 
 Future<List<String>> getTeamAuthIds(String myAuthId) async {
-  final users = await supabase
+  final usersData = await supabase
       .from('usuarios')
-      .select('id, auth_id, parent_id, rol_usuario');
+      .select('id, auth_id, parent_id, rol_usuario, nombre, apellidos');
 
-  String rolNorm(dynamic r) {
-    return r.toString().trim().toLowerCase().replaceAll(' ', '_');
+  String rolNorm(dynamic value) {
+    return (value ?? '')
+        .toString()
+        .trim()
+        .toLowerCase()
+        .replaceAll('-', '_')
+        .replaceAll(' ', '_');
   }
 
-  final lista = users.map<Map<String, dynamic>>((u) {
-    return {
-      'id': u['id']?.toString(),
-      'auth_id': u['auth_id']?.toString(),
-      'parent_id': u['parent_id']?.toString(),
+  String? rolHijoEsperado(String rolPadre) {
+    switch (rolNorm(rolPadre)) {
+      case 'director_nacional':
+        return 'director_zona';
+      case 'director_zona':
+        return 'jefe_ventas';
+      case 'jefe_ventas':
+        return 'jefe_equipo';
+      case 'jefe_equipo':
+        return 'agente';
+      default:
+        return null;
+    }
+  }
+
+  final usuarios = List<Map<String, dynamic>>.from(usersData).map((u) {
+    return <String, dynamic>{
+      'id': u['id']?.toString().trim(),
+      'auth_id': u['auth_id']?.toString().trim(),
+      'parent_id': u['parent_id']?.toString().trim(),
       'rol': rolNorm(u['rol_usuario']),
+      'nombre': u['nombre']?.toString() ?? '',
+      'apellidos': u['apellidos']?.toString() ?? '',
     };
   }).toList();
 
-  final yo = lista.firstWhere(
+  final yo = usuarios.firstWhere(
     (u) => u['auth_id'] == myAuthId,
-    orElse: () => {},
+    orElse: () => <String, dynamic>{},
   );
 
-  if (yo.isEmpty) return [myAuthId];
+  if (yo.isEmpty) {
+    debugPrint('HOME PRIMAS: no se encontró el perfil conectado.');
+    return [myAuthId];
+  }
 
   final resultado = <String>{};
+  final idsVisitados = <String>{};
 
-  void addAuth(Map<String, dynamic> u) {
-    final auth = u['auth_id']?.toString();
-    if (auth != null && auth.isNotEmpty && auth != 'null') {
-      resultado.add(auth);
+  final hijosPorParentId = <String, List<Map<String, dynamic>>>{};
+
+  for (final usuario in usuarios) {
+    final parentId = usuario['parent_id']?.toString();
+
+    if (parentId == null ||
+        parentId.isEmpty ||
+        parentId.toLowerCase() == 'null') {
+      continue;
+    }
+
+    hijosPorParentId
+        .putIfAbsent(parentId, () => <Map<String, dynamic>>[])
+        .add(usuario);
+  }
+
+  void recorrerEstructura(Map<String, dynamic> usuario) {
+    final id = usuario['id']?.toString();
+    final authId = usuario['auth_id']?.toString();
+    final rolUsuario = rolNorm(usuario['rol']);
+
+    if (id == null || id.isEmpty || idsVisitados.contains(id)) return;
+
+    idsVisitados.add(id);
+
+    if (authId != null &&
+        authId.isNotEmpty &&
+        authId.toLowerCase() != 'null') {
+      resultado.add(authId);
+    }
+
+    final siguienteRol = rolHijoEsperado(rolUsuario);
+    if (siguienteRol == null) return;
+
+    final hijosValidos = (hijosPorParentId[id] ?? <Map<String, dynamic>>[])
+        .where((hijo) => rolNorm(hijo['rol']) == siguienteRol)
+        .toList();
+
+    for (final hijo in hijosValidos) {
+      recorrerEstructura(hijo);
     }
   }
 
-  bool esHijoDe(Map<String, dynamic> hijo, Map<String, dynamic> padre) {
-    final parent = hijo['parent_id']?.toString();
-    return parent == padre['id']?.toString() ||
-        parent == padre['auth_id']?.toString();
-  }
+  final rol = rolNorm(yo['rol']);
 
-  void recorrer(Map<String, dynamic> padre) {
-    addAuth(padre);
-
-    for (final hijo in lista) {
-      if (esHijoDe(hijo, padre)) {
-        recorrer(hijo);
+  if (rol == 'administracion') {
+    for (final usuario in usuarios) {
+      final authId = usuario['auth_id']?.toString();
+      if (authId != null &&
+          authId.isNotEmpty &&
+          authId.toLowerCase() != 'null') {
+        resultado.add(authId);
       }
     }
-  }
-
-  final rol = yo['rol'];
-
-  if (rol == 'director_nacional' || rol == 'administracion') {
-    for (final u in lista) {
-      addAuth(u);
-    }
-  } else if (rol == 'director_zona') {
-    final jefesVentasDirectos = lista.where((u) {
-      return u['rol'] == 'jefe_ventas' && esHijoDe(u, yo);
-    }).toList();
-
-    if (jefesVentasDirectos.isEmpty) {
-      debugPrint('DIRECTOR ZONA SIN HIJOS DIRECTOS -> CARGANDO TODOS LOS JEFES DE VENTAS');
-
-      final todosJefesVentas = lista.where((u) {
-        return u['rol'] == 'jefe_ventas';
-      }).toList();
-
-      for (final jv in todosJefesVentas) {
-        recorrer(jv);
-      }
-    } else {
-      for (final jv in jefesVentasDirectos) {
-        recorrer(jv);
-      }
-    }
-
-    addAuth(yo);
   } else {
-    recorrer(yo);
+    recorrerEstructura(yo);
   }
 
-  debugPrint('======= HOME AUTH IDS =======');
+  debugPrint('======= HOME PRIMAS ESTRUCTURA REAL =======');
+  debugPrint('USUARIO: ${yo['nombre']} ${yo['apellidos']}');
   debugPrint('ROL: $rol');
-  debugPrint('TOTAL AUTH IDS: ${resultado.length}');
-  debugPrint(resultado.join(', '));
-  debugPrint('=============================');
+  debugPrint('ID USUARIO: ${yo['id']}');
+  debugPrint('TOTAL PERSONAS INCLUIDAS: ${resultado.length}');
+
+  for (final usuario in usuarios.where(
+    (u) => resultado.contains(u['auth_id']?.toString()),
+  )) {
+    debugPrint(
+      '- ${usuario['nombre']} ${usuario['apellidos']} '
+      '| ${usuario['rol']} | parent_id=${usuario['parent_id']}',
+    );
+  }
+
+  debugPrint('===========================================');
 
   return resultado.toList();
 }
+
+  double _money(dynamic value) {
+    if (value == null) return 0.0;
+    if (value is num) return value.toDouble();
+
+    final texto = value.toString().trim();
+    if (texto.isEmpty) return 0.0;
+
+    final normalizado = texto.contains(',')
+        ? texto.replaceAll('.', '').replaceAll(',', '.')
+        : texto;
+
+    return double.tryParse(normalizado) ?? 0.0;
+  }
+
+  double _primaNetaVenta(Map<String, dynamic> venta) {
+    return _money(
+      venta['prima_anual_neta'] ??
+          venta['prima_neta'] ??
+          venta['PRIMA_ANUAL_NETA'] ??
+          venta['PRIMA NETA'],
+    );
+  }
+
+  double _objetivoPrimasSemanalPorRol(String role) {
+    switch (role.trim().toLowerCase()) {
+      case 'agente':
+        return 1250.0;
+      case 'jefe_equipo':
+        return 3125.0;
+      case 'jefe_ventas':
+        return 5208.0;
+      case 'director_zona':
+        return 10416.0;
+      case 'director_nacional':
+        return 25000.0;
+      case 'administracion':
+        return 25000.0;
+      default:
+        return 1250.0;
+    }
+  }
+
+  String _formatearEuros(double value, {bool decimales = false}) {
+    final absoluto = value.abs();
+    final textoBase = decimales
+        ? absoluto.toStringAsFixed(2)
+        : absoluto.round().toString();
+
+    final partes = textoBase.split('.');
+    final entero = partes.first;
+    final buffer = StringBuffer();
+
+    for (int i = 0; i < entero.length; i++) {
+      if (i > 0 && (entero.length - i) % 3 == 0) {
+        buffer.write('.');
+      }
+      buffer.write(entero[i]);
+    }
+
+    final signo = value < 0 ? '-' : '';
+    if (decimales) {
+      return '$signo${buffer.toString()},${partes.length > 1 ? partes[1] : '00'} €';
+    }
+
+    return '$signo${buffer.toString()} €';
+  }
 
   Future<void> loadKpis() async {
   final supabase = Supabase.instance.client;
@@ -867,7 +1033,16 @@ final ventas = await supabase
 
     final ventasSemanaData = ventas
         .where((v) => _esDeEstaSemana(Map<String, dynamic>.from(v)))
+        .map((v) => Map<String, dynamic>.from(v))
         .toList();
+
+    final primasNetasSemana = ventasSemanaData.fold<double>(
+      0.0,
+      (total, venta) => total + _primaNetaVenta(venta),
+    );
+
+    final objetivoPrimasSemana =
+        _objetivoPrimasSemanalPorRol(widget.role);
 
     final clientesSemanaData = clientes
         .where((c) => _esDeEstaSemana(Map<String, dynamic>.from(c)))
@@ -933,7 +1108,10 @@ debugPrint("RANKING TOTAL: ${rankingOrdenado.length}");
 debugPrint("MI POSICION: $posicion");
 debugPrint("MIS POLIZAS: $misPolizas");
 debugPrint("PRIMERO: $primero");
-    final racha = await calcularRachaSemanal(authIds);
+    final racha = await calcularRachaSemanal(
+      authIds,
+      objetivoPrimasSemana,
+    );
 
     if (!mounted) return;
 
@@ -942,23 +1120,8 @@ debugPrint("PRIMERO: $primero");
       totalVentas = ventas.length;
       totalTareas = tareasPendientes.length;
 
-      if (widget.role == 'agente') {
-  objetivoSemana = 4;
-} else if (widget.role == 'jefe_equipo') {
-  objetivoSemana = 15;
-} else if (widget.role == 'jefe_ventas') {
-  objetivoSemana = 35;
-} else if (widget.role == 'director_zona') {
-  objetivoSemana = 50;
-} else if (widget.role == 'director_nacional') {
-  objetivoSemana = 100;
-} else if (widget.role == 'administracion') {
-  objetivoSemana = 50;
-} else {
-  objetivoSemana = 50;
-}
-
-      ventasSemana = ventasSemanaData.length;
+      objetivoSemana = objetivoPrimasSemana;
+      primasSemana = primasNetasSemana;
       clientesSemana = clientesSemanaData.length;
 
       rankingPosicion = posicion;
@@ -980,16 +1143,10 @@ debugPrint("PRIMERO: $primero");
       totalVentas = 0;
       totalTareas = 0;
 
-      ventasSemana = 0;
-clientesSemana = 0;
-rachaSemanas = 0;
-objetivoSemana = widget.role == 'agente'
-    ? 4
-    : widget.role == 'jefe_equipo'
-        ? 15
-        : widget.role == 'jefe_ventas'
-            ? 35
-            : 50;
+      primasSemana = 0.0;
+      clientesSemana = 0;
+      rachaSemanas = 0;
+      objetivoSemana = _objetivoPrimasSemanalPorRol(widget.role);
 
       rankingPosicion = 0;
       rankingTotal = 0;
@@ -1000,12 +1157,15 @@ objetivoSemana = widget.role == 'agente'
     });
   }
 }
-Future<int> calcularRachaSemanal(List<String> authIds) async {
+Future<int> calcularRachaSemanal(
+  List<String> authIds,
+  double objetivoPrimas,
+) async {
   try {
     final ventas = await supabase
-    .from('ventas')
-    .select()
-    .inFilter('agente_auth_id', authIds);
+        .from('ventas')
+        .select()
+        .inFilter('agente_auth_id', authIds);
 
     int racha = 0;
     DateTime inicio = inicioSemanaActual;
@@ -1013,18 +1173,24 @@ Future<int> calcularRachaSemanal(List<String> authIds) async {
     while (true) {
       final fin = inicio.add(const Duration(days: 5));
 
-      final ventasSemanaCheck = ventas.where((v) {
-        final fecha = _parseFecha(Map<String, dynamic>.from(v));
+      double primasSemanaCheck = 0.0;
 
-        if (fecha == null) return false;
+      for (final item in ventas) {
+        final venta = Map<String, dynamic>.from(item);
+        final fecha = _parseFecha(venta);
+
+        if (fecha == null) continue;
 
         final limpia = DateTime(fecha.year, fecha.month, fecha.day);
-
-        return limpia.isAtSameMomentAs(inicio) ||
+        final perteneceSemana = limpia.isAtSameMomentAs(inicio) ||
             (limpia.isAfter(inicio) && limpia.isBefore(fin));
-      }).length;
 
-      if (ventasSemanaCheck >= objetivoSemana) {
+        if (perteneceSemana) {
+          primasSemanaCheck += _primaNetaVenta(venta);
+        }
+      }
+
+      if (primasSemanaCheck >= objetivoPrimas) {
         racha++;
         inicio = inicio.subtract(const Duration(days: 7));
       } else {
@@ -1034,7 +1200,7 @@ Future<int> calcularRachaSemanal(List<String> authIds) async {
 
     return racha;
   } catch (e) {
-    debugPrint("ERROR RACHA SEMANAL: $e");
+    debugPrint('ERROR RACHA SEMANAL POR PRIMAS: $e');
     return 0;
   }
 }
@@ -1090,7 +1256,7 @@ Future<int> calcularRachaSemanal(List<String> authIds) async {
  double get produccionPorcentaje {
   if (objetivoSemana == 0) return 0;
 
-  final value = ventasSemana / objetivoSemana;
+  final value = primasSemana / objetivoSemana;
 
   if (value.isNaN || value.isInfinite) return 0;
 
@@ -1208,10 +1374,15 @@ floatingActionButton: widget.role == 'director_nacional' ||
                     const SizedBox(height: 14),
                     _kpiGrid(isWide),
                     const SizedBox(height: 18),
-                    _goalAndStreak(),
-                    const SizedBox(height: 20),
-                    _rankingCard(),
-                    const SizedBox(height: 26),
+                    if (widget.role != 'director_nacional') ...[
+  _goalAndStreak(),
+  const SizedBox(height: 20),
+  _rankingCard(),
+  const SizedBox(height: 26),
+] else ...[
+  _dailyGoalCard(),
+  const SizedBox(height: 26),
+],
                     _sectionTitle(
                       "Accesos rápidos",
                       Icons.flash_on_rounded,
@@ -1487,10 +1658,10 @@ floatingActionButton: widget.role == 'director_nacional' ||
   Widget _kpiGrid(bool isWide) {
     final cards = [
       _metricCard(
-        title: "Ventas semana",
-value: "$ventasSemana",
-subtitle: "lunes a viernes",
-        icon: Icons.shopping_bag_rounded,
+        title: "Primas semana",
+        value: _formatearEuros(primasSemana),
+        subtitle: "prima neta · lunes a viernes",
+        icon: Icons.euro_rounded,
         color: const Color(0xFF2563EB),
       ),
       _metricCard(
@@ -1660,9 +1831,10 @@ subtitle: "nuevos esta semana",
 
   Widget _dailyGoalCard() {
   final conseguido =
-      ventasSemana > objetivoSemana ? objetivoSemana : ventasSemana;
+      primasSemana > objetivoSemana ? objetivoSemana : primasSemana;
 
-  final quedan = (objetivoSemana - conseguido).clamp(0, objetivoSemana);
+  final quedan =
+      (objetivoSemana - conseguido).clamp(0.0, objetivoSemana).toDouble();
 
   final progreso = objetivoSemana == 0 ? 0.0 : conseguido / objetivoSemana;
 
@@ -1689,7 +1861,7 @@ subtitle: "nuevos esta semana",
         ),
         const Spacer(),
         Text(
-          "$objetivoSemana ventas",
+          _formatearEuros(objetivoSemana),
           style: const TextStyle(
             color: Colors.white,
             fontSize: 22,
@@ -1711,7 +1883,7 @@ subtitle: "nuevos esta semana",
           children: [
             _goalMini(
               "Has conseguido",
-              "$ventasSemana",
+              _formatearEuros(primasSemana),
               const Color(0xFF2DD4BF),
             ),
             Container(
@@ -1719,7 +1891,11 @@ subtitle: "nuevos esta semana",
               height: 30,
               color: Colors.white.withOpacity(0.10),
             ),
-            _goalMini("Te quedan", "$quedan", Colors.white),
+            _goalMini(
+              "Te quedan",
+              _formatearEuros(quedan),
+              Colors.white,
+            ),
           ],
         ),
       ],
@@ -1971,6 +2147,21 @@ subtitle: "nuevos esta semana",
     },
   ),
 
+  DashboardItem(
+  title: "Mis gestiones",
+  icon: Icons.assignment_turned_in_rounded,
+  subtitle: "Gestiones asignadas",
+  color: const Color(0xFFFF7A00),
+  onTap: () {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const MisGestionesScreen(),
+      ),
+    );
+  },
+),
+
   ...items,
 ];
 
@@ -2196,7 +2387,7 @@ subtitle: "nuevos esta semana",
   Navigator.push(
     context,
     MaterialPageRoute(
-      builder: (_) => const DirectorNacionalUsuariosScreen(),
+      builder: (_) =>  const MisEquiposJefeVentasScreen(),
     ),
   );
 },
@@ -2317,7 +2508,7 @@ case 'administracion':
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => const DirectorNacionalUsuariosScreen(),
+        builder: (_) => const MisEquiposJefeVentasScreen(),
       ),
     );
   },

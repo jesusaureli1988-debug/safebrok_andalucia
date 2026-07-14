@@ -41,6 +41,8 @@ bool variacionPositiva = true;
   double comisionesPropiasJefe = 0;
   double primasTotalesJefe = 0;
   double rappelJefeVentas = 0;
+  double extornoPrimasMes = 0;
+double extornoComisionesMes = 0;
 
   List<Map<String, dynamic>> ventas = [];
 
@@ -308,6 +310,30 @@ if (role == 'jefe_equipo' ||
         primasTotales = primasPropiasJefe + primasEquipo;
       }
 
+      final authIdsEstructura = await getAuthIdsEstructura(
+  userId.toString(),
+  role,
+  user.id,
+);
+
+final extornosActuales = await getExtornosPeriodo(
+  start: start,
+  end: end,
+  authIds: role == 'director_nacional' ? null : authIdsEstructura,
+  authIdSoloComision: user.id,
+);
+
+primasTotales -= extornosActuales['prima'] ?? 0;
+primasDV -= extornosActuales['prima_dv'] ?? 0;
+comisionesPropiasJefe -= extornosActuales['comision_propia'] ?? 0;
+
+extornoPrimasMes = extornosActuales['prima'] ?? 0;
+extornoComisionesMes = extornosActuales['comision_propia'] ?? 0;
+
+if (primasTotales < 0) primasTotales = 0;
+if (primasDV < 0) primasDV = 0;
+if (comisionesPropiasJefe < 0) comisionesPropiasJefe = 0;
+
       double primasPeriodoAnterior = 0;
 
 if (role == 'agente') {
@@ -339,6 +365,19 @@ if (role == 'agente') {
   for (final v in ventasPropiasAnterior) {
     primasPeriodoAnterior += (v['prima_anual_neta'] ?? 0).toDouble();
   }
+}
+
+final extornosAnteriores = await getExtornosPeriodo(
+  start: previousStart,
+  end: previousEnd,
+  authIds: role == 'director_nacional' ? null : authIdsEstructura,
+  authIdSoloComision: user.id,
+);
+
+primasPeriodoAnterior -= extornosAnteriores['prima'] ?? 0;
+
+if (primasPeriodoAnterior < 0) {
+  primasPeriodoAnterior = 0;
 }
 
 final variacion = primasPeriodoAnterior > 0
@@ -529,6 +568,149 @@ final variacion = primasPeriodoAnterior > 0
 
   return total;
 }
+
+Future<List<String>> getAuthIdsEstructura(
+  String userId,
+  String role,
+  String myAuthId,
+) async {
+  if (role == 'director_nacional') {
+    return [];
+  }
+
+  if (role == 'agente') {
+    return [myAuthId];
+  }
+
+  final usuariosData = await supabase
+      .from('usuarios')
+      .select('id, auth_id, parent_id');
+
+  final usuariosTabla = List<Map<String, dynamic>>.from(usuariosData);
+
+  String limpiar(dynamic value) {
+    return (value ?? '').toString().trim();
+  }
+
+  final idsPermitidos = <String>{userId};
+  final authIdsPermitidos = <String>{myAuthId};
+
+  void buscarDescendientes(String parentId) {
+    for (final u in usuariosTabla) {
+      final idUsuario = limpiar(u['id']);
+      final parentUsuario = limpiar(u['parent_id']);
+      final authIdUsuario = limpiar(u['auth_id']);
+
+      if (parentUsuario == parentId &&
+          idUsuario.isNotEmpty &&
+          !idsPermitidos.contains(idUsuario)) {
+        idsPermitidos.add(idUsuario);
+
+        if (authIdUsuario.isNotEmpty) {
+          authIdsPermitidos.add(authIdUsuario);
+        }
+
+        buscarDescendientes(idUsuario);
+      }
+    }
+  }
+
+  buscarDescendientes(userId);
+
+  return authIdsPermitidos.toList();
+}
+
+Future<Map<String, double>> getExtornosPeriodo({
+  required DateTime start,
+  required DateTime end,
+  required List<String>? authIds,
+  required String authIdSoloComision,
+}) async {
+  final anulacionesData = await supabase
+      .from('anulaciones_polizas')
+      .select('venta_id, prima_extornada, comision_extornada, fecha_anulacion')
+      .gte('fecha_anulacion', start.toIso8601String())
+      .lt('fecha_anulacion', end.toIso8601String());
+
+  final anulaciones = List<Map<String, dynamic>>.from(anulacionesData);
+
+  if (anulaciones.isEmpty) {
+    return {
+      'prima': 0,
+      'prima_dv': 0,
+      'comision_propia': 0,
+    };
+  }
+
+  final ventaIds = anulaciones
+      .map((a) => a['venta_id']?.toString())
+      .where((id) => id != null && id.isNotEmpty)
+      .cast<String>()
+      .toSet()
+      .toList();
+
+  if (ventaIds.isEmpty) {
+    return {
+      'prima': 0,
+      'prima_dv': 0,
+      'comision_propia': 0,
+    };
+  }
+
+  final ventasData = await supabase
+      .from('ventas')
+      .select('id, agente_auth_id, producto')
+      .inFilter('id', ventaIds);
+
+  final ventasMap = {
+    for (final v in List<Map<String, dynamic>>.from(ventasData))
+      v['id'].toString(): v,
+  };
+
+  double prima = 0;
+  double primaDV = 0;
+  double comisionPropia = 0;
+
+  for (final a in anulaciones) {
+    final ventaId = a['venta_id']?.toString();
+    final venta = ventasMap[ventaId];
+
+    if (venta == null) continue;
+
+    final agenteAuthId = venta['agente_auth_id']?.toString() ?? '';
+
+    if (authIds != null && !authIds.contains(agenteAuthId)) {
+      continue;
+    }
+
+    final primaExtornada = a['prima_extornada'] is num
+        ? (a['prima_extornada'] as num).toDouble()
+        : double.tryParse(a['prima_extornada']?.toString() ?? '0') ?? 0;
+
+    final comisionExtornada = a['comision_extornada'] is num
+        ? (a['comision_extornada'] as num).toDouble()
+        : double.tryParse(a['comision_extornada']?.toString() ?? '0') ?? 0;
+
+    prima += primaExtornada;
+
+    final producto = (venta['producto'] ?? '').toString().toLowerCase();
+
+    if (producto.contains('vida') || producto.contains('decesos')) {
+      primaDV += primaExtornada;
+    }
+
+    if (agenteAuthId == authIdSoloComision) {
+      comisionPropia += comisionExtornada;
+    }
+  }
+
+  return {
+    'prima': prima,
+    'prima_dv': primaDV,
+    'comision_propia': comisionPropia,
+  };
+}
+
     @override
   Widget build(BuildContext context) {
     final progresoObjetivo = (objetivo / 100).clamp(0.0, 1.0);

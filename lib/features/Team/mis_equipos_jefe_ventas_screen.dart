@@ -11,6 +11,54 @@ class MisEquiposJefeVentasScreen extends StatefulWidget {
       _MisEquiposJefeVentasScreenState();
 }
 
+class _EstructuraNode {
+  final Map<String, dynamic> usuario;
+  final String rol;
+  final int clientesPropios;
+  final int ventasPropias;
+  final List<_EstructuraNode> hijos;
+
+  const _EstructuraNode({
+    required this.usuario,
+    required this.rol,
+    required this.clientesPropios,
+    required this.ventasPropias,
+    required this.hijos,
+  });
+
+  int get totalPersonas {
+    int total = 1;
+    for (final hijo in hijos) {
+      total += hijo.totalPersonas;
+    }
+    return total;
+  }
+
+  int get totalClientes {
+    int total = clientesPropios;
+    for (final hijo in hijos) {
+      total += hijo.totalClientes;
+    }
+    return total;
+  }
+
+  int get totalVentas {
+    int total = ventasPropias;
+    for (final hijo in hijos) {
+      total += hijo.totalVentas;
+    }
+    return total;
+  }
+
+  int contarRol(String rolBuscado) {
+    int total = rol == rolBuscado ? 1 : 0;
+    for (final hijo in hijos) {
+      total += hijo.contarRol(rolBuscado);
+    }
+    return total;
+  }
+}
+
 class _MisEquiposJefeVentasScreenState
     extends State<MisEquiposJefeVentasScreen> {
   final supabase = Supabase.instance.client;
@@ -18,8 +66,8 @@ class _MisEquiposJefeVentasScreenState
   bool loading = true;
   String? error;
 
-  Map<String, dynamic>? jefeVentas;
-  List<Map<String, dynamic>> equipos = [];
+  Map<String, dynamic>? usuarioLogueado;
+  _EstructuraNode? raiz;
 
   @override
   void initState() {
@@ -27,96 +75,207 @@ class _MisEquiposJefeVentasScreenState
     cargarEquipos();
   }
 
+  String _normalizarRol(dynamic rol) {
+    return (rol ?? '')
+        .toString()
+        .trim()
+        .toLowerCase()
+        .replaceAll('-', '_')
+        .replaceAll(' ', '_');
+  }
+
+  String? _rolHijoEsperado(String rol) {
+    switch (_normalizarRol(rol)) {
+      case 'director_nacional':
+        return 'director_zona';
+      case 'director_zona':
+        return 'jefe_ventas';
+      case 'jefe_ventas':
+        return 'jefe_equipo';
+      case 'jefe_equipo':
+        return 'agente';
+      default:
+        return null;
+    }
+  }
+
   Future<void> cargarEquipos() async {
     try {
-      setState(() {
-        loading = true;
-        error = null;
-      });
+      if (mounted) {
+        setState(() {
+          loading = true;
+          error = null;
+        });
+      }
 
-      final user = supabase.auth.currentUser;
-      if (user == null) {
+      final authUser = supabase.auth.currentUser;
+
+      if (authUser == null) {
+        if (!mounted) return;
         setState(() {
           loading = false;
-          error = 'No hay usuario iniciado.';
+          error = 'No hay ningún usuario iniciado.';
         });
         return;
       }
 
-      final jefeVentasRes = await supabase
+      final perfilData = await supabase
           .from('usuarios')
-          .select()
-          .eq('auth_id', user.id)
-          .single();
+          .select(
+            'id, auth_id, parent_id, rol_usuario, nombre, apellidos, email, estado',
+          )
+          .eq('auth_id', authUser.id)
+          .maybeSingle();
 
-      final jefesEquipo = await supabase
-          .from('usuarios')
-          .select()
-          .eq('parent_id', jefeVentasRes['id'])
-          .eq('rol_usuario', 'jefe_equipo');
-
-      final List<Map<String, dynamic>> resultado = [];
-
-      for (final jefe in jefesEquipo) {
-        final agentes = await supabase
-            .from('usuarios')
-            .select()
-            .eq('parent_id', jefe['id'])
-            .eq('rol_usuario', 'agente');
-
-        int clientesEquipo = 0;
-        int ventasEquipo = 0;
-
-        final List<Map<String, dynamic>> agentesProcesados = [];
-
-        for (final agente in agentes) {
-          final clientes = await supabase
-              .from('clientes')
-              .select('id')
-              .eq('auth_id', agente['auth_id']);
-
-          final ventas = await supabase
-              .from('ventas')
-              .select('id')
-              .eq('agente_auth_id', agente['auth_id']);
-
-          clientesEquipo += clientes.length;
-          ventasEquipo += ventas.length;
-
-          agentesProcesados.add({
-            ...Map<String, dynamic>.from(agente),
-            'clientes': clientes.length,
-            'ventas': ventas.length,
-          });
-        }
-
-        agentesProcesados.sort((a, b) {
-          final ventasA = a['ventas'] ?? 0;
-          final ventasB = b['ventas'] ?? 0;
-          return ventasB.compareTo(ventasA);
+      if (perfilData == null) {
+        if (!mounted) return;
+        setState(() {
+          loading = false;
+          error = 'No se encontró el perfil del usuario conectado.';
         });
-
-        resultado.add({
-          'jefe': Map<String, dynamic>.from(jefe),
-          'agentes': agentesProcesados,
-          'clientesEquipo': clientesEquipo,
-          'ventasEquipo': ventasEquipo,
-        });
+        return;
       }
 
-      resultado.sort((a, b) {
-        final ventasA = a['ventasEquipo'] ?? 0;
-        final ventasB = b['ventasEquipo'] ?? 0;
-        return ventasB.compareTo(ventasA);
-      });
+      final perfil = Map<String, dynamic>.from(perfilData);
+
+      final usuariosData = await supabase
+          .from('usuarios')
+          .select(
+            'id, auth_id, parent_id, rol_usuario, nombre, apellidos, email, estado',
+          );
+
+      final usuarios = List<Map<String, dynamic>>.from(usuariosData);
+
+      final authIds = usuarios
+          .map((u) => u['auth_id']?.toString())
+          .where(
+            (id) =>
+                id != null &&
+                id.trim().isNotEmpty &&
+                id.toLowerCase() != 'null',
+          )
+          .cast<String>()
+          .toSet()
+          .toList();
+
+      final clientesPorAuth = <String, int>{};
+      final ventasPorAuth = <String, int>{};
+
+      if (authIds.isNotEmpty) {
+        final clientesData = await supabase
+            .from('clientes')
+            .select('auth_id')
+            .inFilter('auth_id', authIds);
+
+        for (final item in clientesData as List) {
+          final authId = item['auth_id']?.toString();
+          if (authId == null || authId.isEmpty) continue;
+          clientesPorAuth[authId] = (clientesPorAuth[authId] ?? 0) + 1;
+        }
+
+        final ventasData = await supabase
+            .from('ventas')
+            .select('agente_auth_id')
+            .inFilter('agente_auth_id', authIds);
+
+        for (final item in ventasData as List) {
+          final authId = item['agente_auth_id']?.toString();
+          if (authId == null || authId.isEmpty) continue;
+          ventasPorAuth[authId] = (ventasPorAuth[authId] ?? 0) + 1;
+        }
+      }
+
+      final usuariosPorParentId = <String, List<Map<String, dynamic>>>{};
+
+      for (final usuario in usuarios) {
+        final parentId = usuario['parent_id']?.toString().trim();
+
+        if (parentId == null ||
+            parentId.isEmpty ||
+            parentId.toLowerCase() == 'null') {
+          continue;
+        }
+
+        usuariosPorParentId
+            .putIfAbsent(parentId, () => <Map<String, dynamic>>[])
+            .add(usuario);
+      }
+
+      _EstructuraNode construirNodo(
+        Map<String, dynamic> usuario,
+        Set<String> visitados,
+      ) {
+        final id = usuario['id']?.toString() ?? '';
+        final authId = usuario['auth_id']?.toString() ?? '';
+        final rol = _normalizarRol(usuario['rol_usuario']);
+
+        if (id.isEmpty || visitados.contains(id)) {
+          return _EstructuraNode(
+            usuario: usuario,
+            rol: rol,
+            clientesPropios: clientesPorAuth[authId] ?? 0,
+            ventasPropias: ventasPorAuth[authId] ?? 0,
+            hijos: const [],
+          );
+        }
+
+        final nuevosVisitados = {...visitados, id};
+        final rolHijo = _rolHijoEsperado(rol);
+
+        final hijosDirectos = rolHijo == null
+            ? <Map<String, dynamic>>[]
+            : (usuariosPorParentId[id] ?? <Map<String, dynamic>>[])
+                .where(
+                  (u) => _normalizarRol(u['rol_usuario']) == rolHijo,
+                )
+                .toList();
+
+        final hijos = hijosDirectos
+            .map((u) => construirNodo(u, nuevosVisitados))
+            .toList();
+
+        hijos.sort((a, b) {
+          final ventas = b.totalVentas.compareTo(a.totalVentas);
+          if (ventas != 0) return ventas;
+
+          return _nombreCompleto(
+            a.usuario,
+          ).toLowerCase().compareTo(_nombreCompleto(b.usuario).toLowerCase());
+        });
+
+        return _EstructuraNode(
+          usuario: usuario,
+          rol: rol,
+          clientesPropios: clientesPorAuth[authId] ?? 0,
+          ventasPropias: ventasPorAuth[authId] ?? 0,
+          hijos: hijos,
+        );
+      }
+
+      final arbol = construirNodo(perfil, <String>{});
+
+      debugPrint('----------------------------------------');
+      debugPrint('MI ESTRUCTURA');
+      debugPrint('USUARIO: ${_nombreCompleto(perfil)}');
+      debugPrint('ROL: ${perfil['rol_usuario']}');
+      debugPrint('ID: ${perfil['id']}');
+      debugPrint('HIJOS DIRECTOS: ${arbol.hijos.length}');
+      debugPrint('PERSONAS TOTALES: ${arbol.totalPersonas}');
+      debugPrint('VENTAS TOTALES: ${arbol.totalVentas}');
+      debugPrint('CLIENTES TOTALES: ${arbol.totalClientes}');
+
+      if (!mounted) return;
 
       setState(() {
-        jefeVentas = Map<String, dynamic>.from(jefeVentasRes);
-        equipos = resultado;
+        usuarioLogueado = perfil;
+        raiz = arbol;
         loading = false;
       });
-    } catch (e) {
-      debugPrint("ERROR EQUIPOS: $e");
+    } catch (e, stackTrace) {
+      debugPrint('ERROR CARGANDO ESTRUCTURA: $e');
+      debugPrintStack(stackTrace: stackTrace);
+
+      if (!mounted) return;
 
       setState(() {
         loading = false;
@@ -125,58 +284,92 @@ class _MisEquiposJefeVentasScreenState
     }
   }
 
-  int get totalJefesEquipo => equipos.length;
+  String _nombreCompleto(Map<String, dynamic>? usuario) {
+    if (usuario == null) return 'Sin nombre';
 
-  int get totalAgentes {
-    return equipos.fold<int>(
-      0,
-      (total, e) => total + ((e['agentes'] as List?)?.length ?? 0),
-    );
-  }
-
-  int get totalClientes {
-    return equipos.fold<int>(
-      0,
-      (total, e) => total + ((e['clientesEquipo'] ?? 0) as int),
-    );
-  }
-
-  int get totalVentas {
-    return equipos.fold<int>(
-      0,
-      (total, e) => total + ((e['ventasEquipo'] ?? 0) as int),
-    );
-  }
-
-  String _nombreCompleto(Map<String, dynamic>? u) {
-    if (u == null) return 'Sin nombre';
-
-    final nombre = u['nombre']?.toString() ?? '';
-    final apellidos = u['apellidos']?.toString() ?? '';
-
+    final nombre = usuario['nombre']?.toString().trim() ?? '';
+    final apellidos = usuario['apellidos']?.toString().trim() ?? '';
     final completo = '$nombre $apellidos'.trim();
 
-    if (completo.isEmpty) return u['email']?.toString() ?? 'Sin nombre';
+    if (completo.isNotEmpty) return completo;
 
-    return completo;
+    return usuario['email']?.toString().trim().isNotEmpty == true
+        ? usuario['email'].toString()
+        : 'Sin nombre';
   }
 
   String _iniciales(String nombre) {
-    final partes = nombre.trim().split(' ').where((e) => e.isNotEmpty).toList();
+    final partes = nombre
+        .trim()
+        .split(RegExp(r'\s+'))
+        .where((parte) => parte.isNotEmpty)
+        .toList();
 
     if (partes.isEmpty) return '?';
     if (partes.length == 1) return partes.first[0].toUpperCase();
 
-    return '${partes[0][0]}${partes[1][0]}'.toUpperCase();
+    return '${partes.first[0]}${partes.last[0]}'.toUpperCase();
   }
 
-  double _rendimientoEquipo(Map<String, dynamic> equipo) {
-    final ventas = (equipo['ventasEquipo'] ?? 0) as int;
-    final agentes = (equipo['agentes'] as List?)?.length ?? 0;
+  String _rolTexto(String rol) {
+    switch (_normalizarRol(rol)) {
+      case 'director_nacional':
+        return 'Director nacional';
+      case 'director_zona':
+        return 'Director de zona';
+      case 'jefe_ventas':
+        return 'Jefe de ventas';
+      case 'jefe_equipo':
+        return 'Jefe de equipo';
+      case 'agente':
+        return 'Agente';
+      case 'administracion':
+        return 'Administración';
+      default:
+        return rol.replaceAll('_', ' ');
+    }
+  }
 
-    if (agentes == 0) return 0;
+  Color _rolColor(String rol) {
+    switch (_normalizarRol(rol)) {
+      case 'director_nacional':
+        return Colors.amberAccent;
+      case 'director_zona':
+        return Colors.deepPurpleAccent;
+      case 'jefe_ventas':
+        return Colors.purpleAccent;
+      case 'jefe_equipo':
+        return Colors.cyanAccent;
+      case 'agente':
+        return Colors.greenAccent;
+      default:
+        return Colors.blueAccent;
+    }
+  }
 
-    return (ventas / (agentes * 10)).clamp(0.0, 1.0);
+  IconData _rolIcono(String rol) {
+    switch (_normalizarRol(rol)) {
+      case 'director_nacional':
+        return Icons.public_rounded;
+      case 'director_zona':
+        return Icons.map_rounded;
+      case 'jefe_ventas':
+        return Icons.workspace_premium_rounded;
+      case 'jefe_equipo':
+        return Icons.supervisor_account_rounded;
+      case 'agente':
+        return Icons.person_rounded;
+      default:
+        return Icons.badge_rounded;
+    }
+  }
+
+  double _rendimientoNodo(_EstructuraNode node) {
+    final agentes = node.contarRol('agente');
+
+    final divisor = agentes > 0 ? agentes * 10 : 10;
+
+    return (node.totalVentas / divisor).clamp(0.0, 1.0);
   }
 
   Color _rendimientoColor(double value) {
@@ -186,10 +379,17 @@ class _MisEquiposJefeVentasScreenState
   }
 
   String _rendimientoTexto(double value) {
-    if (value >= 0.75) return 'Equipo fuerte';
+    if (value >= 0.75) return 'Estructura fuerte';
     if (value >= 0.45) return 'En crecimiento';
     return 'Necesita impulso';
   }
+
+  int get totalDirectoresZona => raiz?.contarRol('director_zona') ?? 0;
+  int get totalJefesVentas => raiz?.contarRol('jefe_ventas') ?? 0;
+  int get totalJefesEquipo => raiz?.contarRol('jefe_equipo') ?? 0;
+  int get totalAgentes => raiz?.contarRol('agente') ?? 0;
+  int get totalClientes => raiz?.totalClientes ?? 0;
+  int get totalVentas => raiz?.totalVentas ?? 0;
 
   @override
   Widget build(BuildContext context) {
@@ -210,25 +410,28 @@ class _MisEquiposJefeVentasScreenState
                     backgroundColor: const Color(0xFF0F172A),
                     onRefresh: cargarEquipos,
                     child: ListView(
-                      padding: const EdgeInsets.fromLTRB(18, 12, 18, 28),
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      padding: const EdgeInsets.fromLTRB(18, 12, 18, 40),
                       children: [
                         _header(),
                         const SizedBox(height: 20),
-
                         if (error != null)
                           _errorCard()
+                        else if (raiz == null)
+                          _emptyCard()
                         else ...[
-                          _directorCard(),
+                          _usuarioPrincipalCard(),
                           const SizedBox(height: 16),
                           _kpiResumen(),
                           const SizedBox(height: 20),
                           _sectionTitle(),
                           const SizedBox(height: 14),
-
-                          if (equipos.isEmpty)
-                            _emptyCard()
+                          if (raiz!.hijos.isEmpty)
+                            _sinDependenciasCard(raiz!)
                           else
-                            ...equipos.map(_equipoTreeCard),
+                            ...raiz!.hijos.map(
+                              (nodo) => _nodoTreeCard(nodo, 0),
+                            ),
                         ],
                       ],
                     ),
@@ -242,28 +445,22 @@ class _MisEquiposJefeVentasScreenState
   Widget _header() {
     return Row(
       children: [
-        InkWell(
+        Material(
+          color: Colors.white,
           borderRadius: BorderRadius.circular(18),
-          onTap: () => Navigator.pop(context),
-          child: Container(
-            height: 54,
-            width: 54,
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.08),
-              borderRadius: BorderRadius.circular(18),
-              border: Border.all(
-                color: Colors.cyanAccent.withOpacity(0.45),
+          elevation: 6,
+          shadowColor: Colors.black45,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(18),
+            onTap: () => Navigator.of(context).maybePop(),
+            child: const SizedBox(
+              height: 54,
+              width: 54,
+              child: Icon(
+                Icons.arrow_back_rounded,
+                color: Color(0xFF020617),
+                size: 30,
               ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.cyanAccent.withOpacity(0.16),
-                  blurRadius: 22,
-                ),
-              ],
-            ),
-            child: const Icon(
-              Icons.arrow_back_rounded,
-              color: Colors.white,
             ),
           ),
         ),
@@ -283,7 +480,7 @@ class _MisEquiposJefeVentasScreenState
               ),
               SizedBox(height: 3),
               Text(
-                'Organigrama comercial del jefe de ventas',
+                'Organigrama completo según el usuario conectado',
                 style: TextStyle(
                   color: Colors.white60,
                   fontSize: 13,
@@ -292,65 +489,41 @@ class _MisEquiposJefeVentasScreenState
             ],
           ),
         ),
-        Container(
-          height: 52,
-          width: 52,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: Colors.cyanAccent.withOpacity(0.12),
-            border: Border.all(
-              color: Colors.cyanAccent.withOpacity(0.38),
+        IconButton(
+          tooltip: 'Actualizar estructura',
+          onPressed: cargarEquipos,
+          icon: Container(
+            height: 50,
+            width: 50,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: Colors.cyanAccent.withOpacity(0.12),
+              border: Border.all(
+                color: Colors.cyanAccent.withOpacity(0.38),
+              ),
             ),
-          ),
-          child: const Icon(
-            Icons.account_tree_rounded,
-            color: Colors.cyanAccent,
+            child: const Icon(
+              Icons.refresh_rounded,
+              color: Colors.cyanAccent,
+            ),
           ),
         ),
       ],
     );
   }
 
-  Widget _directorCard() {
-    final nombre = _nombreCompleto(jefeVentas);
+  Widget _usuarioPrincipalCard() {
+    final usuario = usuarioLogueado;
+    final node = raiz!;
+    final nombre = _nombreCompleto(usuario);
+    final rol = _normalizarRol(usuario?['rol_usuario']);
+    final color = _rolColor(rol);
 
     return _glassCard(
       padding: const EdgeInsets.all(22),
       child: Column(
         children: [
-          Container(
-            width: 86,
-            height: 86,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: LinearGradient(
-                colors: [
-                  Colors.cyanAccent.withOpacity(0.38),
-                  Colors.purpleAccent.withOpacity(0.25),
-                ],
-              ),
-              border: Border.all(
-                color: Colors.cyanAccent.withOpacity(0.50),
-                width: 1.5,
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.cyanAccent.withOpacity(0.22),
-                  blurRadius: 28,
-                ),
-              ],
-            ),
-            child: Center(
-              child: Text(
-                _iniciales(nombre),
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 30,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-            ),
-          ),
+          _avatar(nombre, color, size: 88),
           const SizedBox(height: 14),
           Text(
             nombre,
@@ -362,41 +535,37 @@ class _MisEquiposJefeVentasScreenState
               letterSpacing: -0.4,
             ),
           ),
-          const SizedBox(height: 6),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-            decoration: BoxDecoration(
-              color: Colors.cyanAccent.withOpacity(0.13),
-              borderRadius: BorderRadius.circular(999),
-              border: Border.all(
-                color: Colors.cyanAccent.withOpacity(0.34),
+          const SizedBox(height: 8),
+          _rolPill(rol),
+          const SizedBox(height: 20),
+          Wrap(
+            alignment: WrapAlignment.center,
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              _miniPill(
+                Icons.people_alt_rounded,
+                '${node.clientesPropios} clientes propios',
+                Colors.cyanAccent,
               ),
-            ),
-            child: const Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  Icons.workspace_premium_rounded,
-                  color: Colors.cyanAccent,
-                  size: 17,
-                ),
-                SizedBox(width: 7),
-                Text(
-                  'Jefe de ventas',
-                  style: TextStyle(
-                    color: Colors.cyanAccent,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-              ],
-            ),
+              _miniPill(
+                Icons.trending_up_rounded,
+                '${node.ventasPropias} ventas propias',
+                Colors.greenAccent,
+              ),
+              _miniPill(
+                Icons.account_tree_rounded,
+                '${node.hijos.length} dependencias directas',
+                color,
+              ),
+            ],
           ),
           const SizedBox(height: 18),
           Container(
-            height: 42,
+            height: 40,
             width: 2,
             decoration: BoxDecoration(
-              color: Colors.cyanAccent.withOpacity(0.35),
+              color: color.withOpacity(0.40),
               borderRadius: BorderRadius.circular(999),
             ),
           ),
@@ -414,35 +583,66 @@ class _MisEquiposJefeVentasScreenState
   }
 
   Widget _kpiResumen() {
-    return Row(
-      children: [
-        Expanded(
-          child: _kpiBox(
-            title: 'Jefes',
-            value: totalJefesEquipo.toString(),
-            icon: Icons.supervisor_account_rounded,
-            color: Colors.purpleAccent,
-          ),
-        ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: _kpiBox(
-            title: 'Agentes',
-            value: totalAgentes.toString(),
-            icon: Icons.groups_rounded,
-            color: Colors.cyanAccent,
-          ),
-        ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: _kpiBox(
-            title: 'Ventas',
-            value: totalVentas.toString(),
-            icon: Icons.trending_up_rounded,
-            color: Colors.greenAccent,
-          ),
-        ),
-      ],
+    final items = <Widget>[
+      _kpiBox(
+        title: 'Zonas',
+        value: totalDirectoresZona.toString(),
+        icon: Icons.map_rounded,
+        color: Colors.deepPurpleAccent,
+      ),
+      _kpiBox(
+        title: 'J. ventas',
+        value: totalJefesVentas.toString(),
+        icon: Icons.workspace_premium_rounded,
+        color: Colors.purpleAccent,
+      ),
+      _kpiBox(
+        title: 'J. equipo',
+        value: totalJefesEquipo.toString(),
+        icon: Icons.supervisor_account_rounded,
+        color: Colors.cyanAccent,
+      ),
+      _kpiBox(
+        title: 'Agentes',
+        value: totalAgentes.toString(),
+        icon: Icons.groups_rounded,
+        color: Colors.greenAccent,
+      ),
+      _kpiBox(
+        title: 'Clientes',
+        value: totalClientes.toString(),
+        icon: Icons.people_alt_rounded,
+        color: Colors.lightBlueAccent,
+      ),
+      _kpiBox(
+        title: 'Ventas',
+        value: totalVentas.toString(),
+        icon: Icons.trending_up_rounded,
+        color: Colors.amberAccent,
+      ),
+    ];
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final ancho = constraints.maxWidth;
+        final columnas = ancho >= 900
+            ? 6
+            : ancho >= 600
+                ? 3
+                : 3;
+
+        final separacion = 10.0;
+        final itemWidth =
+            (ancho - (separacion * (columnas - 1))) / columnas;
+
+        return Wrap(
+          spacing: separacion,
+          runSpacing: separacion,
+          children: items
+              .map((item) => SizedBox(width: itemWidth, child: item))
+              .toList(),
+        );
+      },
     );
   }
 
@@ -453,10 +653,10 @@ class _MisEquiposJefeVentasScreenState
     required Color color,
   }) {
     return Container(
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 14),
       decoration: BoxDecoration(
         color: Colors.white.withOpacity(0.075),
-        borderRadius: BorderRadius.circular(22),
+        borderRadius: BorderRadius.circular(20),
         border: Border.all(color: color.withOpacity(0.25)),
         boxShadow: [
           BoxShadow(
@@ -468,22 +668,24 @@ class _MisEquiposJefeVentasScreenState
       ),
       child: Column(
         children: [
-          Icon(icon, color: color, size: 25),
+          Icon(icon, color: color, size: 23),
           const SizedBox(height: 7),
           Text(
             value,
             style: TextStyle(
               color: color,
-              fontSize: 23,
+              fontSize: 22,
               fontWeight: FontWeight.w900,
             ),
           ),
           const SizedBox(height: 2),
           Text(
             title,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
             style: const TextStyle(
               color: Colors.white60,
-              fontSize: 12,
+              fontSize: 11,
               fontWeight: FontWeight.w700,
             ),
           ),
@@ -502,7 +704,7 @@ class _MisEquiposJefeVentasScreenState
         const SizedBox(width: 8),
         const Expanded(
           child: Text(
-            'Árbol de equipos',
+            'Árbol de estructura',
             style: TextStyle(
               color: Colors.white,
               fontSize: 21,
@@ -511,7 +713,7 @@ class _MisEquiposJefeVentasScreenState
           ),
         ),
         Text(
-          '$totalClientes clientes',
+          '${(raiz?.totalPersonas ?? 1) - 1} personas',
           style: const TextStyle(
             color: Colors.white54,
             fontWeight: FontWeight.w700,
@@ -521,211 +723,251 @@ class _MisEquiposJefeVentasScreenState
     );
   }
 
-  Widget _equipoTreeCard(Map<String, dynamic> equipo) {
-    final jefe = equipo['jefe'] as Map<String, dynamic>;
-    final agentes = List<Map<String, dynamic>>.from(equipo['agentes']);
-    final nombreJefe = _nombreCompleto(jefe);
-
-    final rendimiento = _rendimientoEquipo(equipo);
+  Widget _nodoTreeCard(_EstructuraNode node, int level) {
+    final nombre = _nombreCompleto(node.usuario);
+    final color = _rolColor(node.rol);
+    final rendimiento = _rendimientoNodo(node);
     final rendimientoColor = _rendimientoColor(rendimiento);
 
-    return _glassCard(
-      margin: const EdgeInsets.only(bottom: 16),
-      padding: EdgeInsets.zero,
-      child: Theme(
-        data: Theme.of(context).copyWith(
-          dividerColor: Colors.transparent,
-          splashColor: Colors.transparent,
-          highlightColor: Colors.transparent,
-        ),
-        child: ExpansionTile(
-          tilePadding: const EdgeInsets.all(18),
-          childrenPadding: const EdgeInsets.fromLTRB(18, 0, 18, 18),
-          iconColor: Colors.cyanAccent,
-          collapsedIconColor: Colors.white70,
-          initiallyExpanded: true,
-          title: Row(
-            children: [
-              _avatar(
-                nombreJefe,
-                Colors.purpleAccent,
-                size: 54,
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      nombreJefe,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 17,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      '${agentes.length} agentes • ${equipo['clientesEquipo']} clientes • ${equipo['ventasEquipo']} ventas',
-                      style: const TextStyle(
-                        color: Colors.white60,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
+    return Container(
+      margin: EdgeInsets.only(
+        left: level == 0 ? 0 : 10,
+        bottom: 14,
+      ),
+      child: _glassCard(
+        padding: EdgeInsets.zero,
+        child: Theme(
+          data: Theme.of(context).copyWith(
+            dividerColor: Colors.transparent,
+            splashColor: Colors.transparent,
+            highlightColor: Colors.transparent,
           ),
-          subtitle: Padding(
-            padding: const EdgeInsets.only(top: 14),
-            child: Row(
+          child: ExpansionTile(
+            key: PageStorageKey<String>(
+              'estructura_${node.usuario['id']}_$level',
+            ),
+            initiallyExpanded: level == 0,
+            tilePadding: const EdgeInsets.all(17),
+            childrenPadding: const EdgeInsets.fromLTRB(14, 0, 14, 15),
+            iconColor: color,
+            collapsedIconColor: Colors.white70,
+            title: Row(
               children: [
+                _avatar(nombre, color, size: 54),
+                const SizedBox(width: 12),
                 Expanded(
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(999),
-                    child: LinearProgressIndicator(
-                      value: rendimiento,
-                      minHeight: 9,
-                      backgroundColor: Colors.white.withOpacity(0.12),
-                      valueColor: AlwaysStoppedAnimation(rendimientoColor),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Text(
-                  _rendimientoTexto(rendimiento),
-                  style: TextStyle(
-                    color: rendimientoColor,
-                    fontWeight: FontWeight.w900,
-                    fontSize: 12,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        nombre,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 17,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      const SizedBox(height: 5),
+                      _rolPill(node.rol, compact: true),
+                    ],
                   ),
                 ),
               ],
             ),
+            subtitle: Padding(
+              padding: const EdgeInsets.only(top: 13),
+              child: Column(
+                children: [
+                  Wrap(
+                    spacing: 7,
+                    runSpacing: 7,
+                    children: [
+                      _miniPill(
+                        Icons.people_alt_rounded,
+                        '${node.clientesPropios} clientes propios',
+                        Colors.cyanAccent,
+                      ),
+                      _miniPill(
+                        Icons.trending_up_rounded,
+                        '${node.ventasPropias} ventas propias',
+                        Colors.greenAccent,
+                      ),
+                      _miniPill(
+                        Icons.account_tree_rounded,
+                        '${node.hijos.length} directos',
+                        color,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(999),
+                          child: LinearProgressIndicator(
+                            value: rendimiento,
+                            minHeight: 8,
+                            backgroundColor: Colors.white.withOpacity(0.12),
+                            valueColor: AlwaysStoppedAnimation(
+                              rendimientoColor,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Text(
+                        _rendimientoTexto(rendimiento),
+                        style: TextStyle(
+                          color: rendimientoColor,
+                          fontWeight: FontWeight.w900,
+                          fontSize: 11,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            children: [
+              _resumenNodo(node),
+              if (node.hijos.isEmpty)
+                _sinDependenciasCard(node)
+              else ...[
+                _treeConnector(color),
+                ...node.hijos.map(
+                  (hijo) => _nodoTreeCard(hijo, level + 1),
+                ),
+              ],
+            ],
           ),
-          children: [
-            _treeConnector(),
-
-            if (agentes.isEmpty)
-              _emptyAgents()
-            else
-              ...agentes.map((a) => _agenteNode(a)),
-          ],
         ),
       ),
     );
   }
 
-  Widget _treeConnector() {
-    return Row(
-      children: [
-        const SizedBox(width: 27),
-        Container(
-          width: 2,
-          height: 24,
-          decoration: BoxDecoration(
-            color: Colors.cyanAccent.withOpacity(0.28),
-            borderRadius: BorderRadius.circular(999),
+  Widget _resumenNodo(_EstructuraNode node) {
+    final color = _rolColor(node.rol);
+
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0F1C2E),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: color.withOpacity(0.22)),
+      ),
+      child: Wrap(
+        spacing: 10,
+        runSpacing: 10,
+        alignment: WrapAlignment.spaceBetween,
+        children: [
+          _resumenDato(
+            'Clientes propios',
+            node.clientesPropios.toString(),
+            Colors.cyanAccent,
           ),
-        ),
-        const Expanded(
-          child: SizedBox(),
-        ),
-      ],
+          _resumenDato(
+            'Ventas propias',
+            node.ventasPropias.toString(),
+            Colors.greenAccent,
+          ),
+          _resumenDato(
+            'Clientes estructura',
+            node.totalClientes.toString(),
+            Colors.lightBlueAccent,
+          ),
+          _resumenDato(
+            'Ventas estructura',
+            node.totalVentas.toString(),
+            Colors.amberAccent,
+          ),
+          _resumenDato(
+            'Personas',
+            node.totalPersonas.toString(),
+            color,
+          ),
+        ],
+      ),
     );
   }
 
-  Widget _agenteNode(Map<String, dynamic> agente) {
-    final nombre = _nombreCompleto(agente);
-    final ventas = agente['ventas'] ?? 0;
-    final clientes = agente['clientes'] ?? 0;
-
-    final Color estadoColor = ventas >= 10
-        ? Colors.greenAccent
-        : ventas >= 4
-            ? Colors.orangeAccent
-            : Colors.redAccent;
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 11),
-      child: Row(
+  Widget _resumenDato(String label, String value, Color color) {
+    return SizedBox(
+      width: 118,
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Column(
-            children: [
-              Container(
-                width: 2,
-                height: 42,
-                decoration: BoxDecoration(
-                  color: Colors.cyanAccent.withOpacity(0.25),
-                  borderRadius: BorderRadius.circular(999),
-                ),
-              ),
-            ],
+          Text(
+            value,
+            style: TextStyle(
+              color: color,
+              fontSize: 20,
+              fontWeight: FontWeight.w900,
+            ),
           ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Container(
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: const Color(0xFF0F1C2E),
-                borderRadius: BorderRadius.circular(22),
-                border: Border.all(
-                  color: estadoColor.withOpacity(0.25),
-                ),
-              ),
-              child: Row(
-                children: [
-                  _avatar(nombre, Colors.cyanAccent, size: 46),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          nombre,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 15,
-                            fontWeight: FontWeight.w900,
-                          ),
-                        ),
-                        const SizedBox(height: 6),
-                        Wrap(
-                          spacing: 7,
-                          runSpacing: 7,
-                          children: [
-                            _miniPill(
-                              Icons.people_alt_rounded,
-                              '$clientes clientes',
-                              Colors.cyanAccent,
-                            ),
-                            _miniPill(
-                              Icons.trending_up_rounded,
-                              '$ventas ventas',
-                              estadoColor,
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Icon(
-                    ventas >= 10
-                        ? Icons.emoji_events_rounded
-                        : ventas >= 4
-                            ? Icons.bolt_rounded
-                            : Icons.priority_high_rounded,
-                    color: estadoColor,
-                  ),
-                ],
+          const SizedBox(height: 2),
+          Text(
+            label,
+            style: const TextStyle(
+              color: Colors.white54,
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _treeConnector(Color color) {
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: Container(
+        margin: const EdgeInsets.only(left: 26, bottom: 8),
+        width: 2,
+        height: 25,
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.35),
+          borderRadius: BorderRadius.circular(999),
+        ),
+      ),
+    );
+  }
+
+  Widget _rolPill(String rol, {bool compact = false}) {
+    final color = _rolColor(rol);
+
+    return Container(
+      padding: EdgeInsets.symmetric(
+        horizontal: compact ? 9 : 14,
+        vertical: compact ? 5 : 8,
+      ),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.13),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: color.withOpacity(0.34)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            _rolIcono(rol),
+            color: color,
+            size: compact ? 14 : 17,
+          ),
+          SizedBox(width: compact ? 5 : 7),
+          Flexible(
+            child: Text(
+              _rolTexto(rol),
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: color,
+                fontWeight: FontWeight.w900,
+                fontSize: compact ? 11 : 13,
               ),
             ),
           ),
@@ -746,9 +988,7 @@ class _MisEquiposJefeVentasScreenState
             Colors.blueAccent.withOpacity(0.16),
           ],
         ),
-        border: Border.all(
-          color: color.withOpacity(0.45),
-        ),
+        border: Border.all(color: color.withOpacity(0.45)),
         boxShadow: [
           BoxShadow(
             color: color.withOpacity(0.12),
@@ -775,9 +1015,7 @@ class _MisEquiposJefeVentasScreenState
       decoration: BoxDecoration(
         color: color.withOpacity(0.12),
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(
-          color: color.withOpacity(0.27),
-        ),
+        border: Border.all(color: color.withOpacity(0.27)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -797,25 +1035,31 @@ class _MisEquiposJefeVentasScreenState
     );
   }
 
-  Widget _emptyAgents() {
+  Widget _sinDependenciasCard(_EstructuraNode node) {
+    final siguienteRol = _rolHijoEsperado(node.rol);
+    final mensaje = siguienteRol == null
+        ? 'Este usuario no tiene niveles inferiores en la jerarquía.'
+        : 'No tiene ${_rolTexto(siguienteRol).toLowerCase()} asignados directamente.';
+
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(15),
       decoration: BoxDecoration(
         color: Colors.white.withOpacity(0.055),
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: Colors.white.withOpacity(0.10),
-        ),
+        border: Border.all(color: Colors.white.withOpacity(0.10)),
       ),
-      child: const Row(
+      child: Row(
         children: [
-          Icon(Icons.info_outline_rounded, color: Colors.white54),
-          SizedBox(width: 10),
+          const Icon(
+            Icons.info_outline_rounded,
+            color: Colors.white54,
+          ),
+          const SizedBox(width: 10),
           Expanded(
             child: Text(
-              'Este jefe de equipo todavía no tiene agentes asignados.',
-              style: TextStyle(
+              mensaje,
+              style: const TextStyle(
                 color: Colors.white60,
                 fontWeight: FontWeight.w700,
               ),
@@ -837,7 +1081,7 @@ class _MisEquiposJefeVentasScreenState
           ),
           SizedBox(height: 12),
           Text(
-            'Sin estructura asignada',
+            'Sin estructura disponible',
             style: TextStyle(
               color: Colors.white,
               fontSize: 20,
@@ -846,7 +1090,7 @@ class _MisEquiposJefeVentasScreenState
           ),
           SizedBox(height: 7),
           Text(
-            'Cuando tengas jefes de equipo y agentes asignados aparecerán aquí.',
+            'No se ha podido construir el árbol del usuario conectado.',
             textAlign: TextAlign.center,
             style: TextStyle(
               color: Colors.white54,
@@ -907,9 +1151,7 @@ class _MisEquiposJefeVentasScreenState
             decoration: BoxDecoration(
               color: Colors.white.withOpacity(0.075),
               borderRadius: BorderRadius.circular(28),
-              border: Border.all(
-                color: Colors.white.withOpacity(0.12),
-              ),
+              border: Border.all(color: Colors.white.withOpacity(0.12)),
               boxShadow: [
                 BoxShadow(
                   color: Colors.black.withOpacity(0.28),
