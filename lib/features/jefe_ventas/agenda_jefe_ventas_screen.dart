@@ -1192,27 +1192,72 @@ class _MeetingCreateDialogState extends State<MeetingCreateDialog> {
     }
 
     try {
+      final creadorAuthId =
+          widget.supabase.auth.currentUser?.id ?? '';
+      final invitadosAnteriores = widget.editData == null
+          ? <String>{}
+          : List<String>.from(
+              widget.editData!['invitados'] ?? const <String>[],
+            ).toSet();
+      final invitadosNuevos = invitados
+          .map((authId) => authId.trim())
+          .where(
+            (authId) =>
+                authId.isNotEmpty &&
+                authId != creadorAuthId &&
+                !invitadosAnteriores.contains(authId),
+          )
+          .toSet()
+          .toList();
+
+      late dynamic reunionId;
+      late String roomIdFinal;
+
       if (widget.editData == null) {
         final roomId = 'safebrok-${DateTime.now().millisecondsSinceEpoch}';
 
-        await widget.supabase.from('reuniones').insert({
-          'titulo': tituloCtrl.text.trim(),
-          'descripcion': descripcionCtrl.text.trim(),
-          'fecha_inicio': start.toIso8601String(),
-          'fecha_fin': end.toIso8601String(),
-          'room_id': roomId,
-          'creador_auth_id': widget.supabase.auth.currentUser!.id,
-          'invitados': invitados,
-        });
+        final reunionCreada = await widget.supabase
+            .from('reuniones')
+            .insert({
+              'titulo': tituloCtrl.text.trim(),
+              'descripcion': descripcionCtrl.text.trim(),
+              'fecha_inicio': start.toIso8601String(),
+              'fecha_fin': end.toIso8601String(),
+              'room_id': roomId,
+              'creador_auth_id': creadorAuthId,
+              'invitados': invitados.toSet().toList(),
+            })
+            .select('id, room_id')
+            .single();
+
+        reunionId = reunionCreada['id'];
+        roomIdFinal = reunionCreada['room_id']?.toString() ?? roomId;
       } else {
         await widget.supabase.from('reuniones').update({
           'titulo': tituloCtrl.text.trim(),
           'descripcion': descripcionCtrl.text.trim(),
           'fecha_inicio': start.toIso8601String(),
           'fecha_fin': end.toIso8601String(),
-          'invitados': invitados,
+          'invitados': invitados.toSet().toList(),
         }).eq('id', widget.editData!['id']);
+
+        reunionId = widget.editData!['id'];
+        roomIdFinal =
+            widget.editData!['room_id']?.toString() ?? '';
       }
+
+      // Se ejecuta después de guardar. Cualquier fallo del push se captura
+      // internamente y nunca deshace la reunión.
+      _notificarNuevosInvitados(
+        authIdsInvitados: invitadosNuevos,
+        creadorAuthId: creadorAuthId,
+        reunionId: reunionId,
+        roomId: roomIdFinal,
+        titulo: tituloCtrl.text.trim(),
+        descripcion: descripcionCtrl.text.trim(),
+        inicio: start,
+        fin: end,
+      );
 
       widget.onSaved();
 
@@ -1224,6 +1269,84 @@ class _MeetingCreateDialogState extends State<MeetingCreateDialog> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error al guardar: $e')),
       );
+    }
+  }
+
+  Future<void> _notificarNuevosInvitados({
+    required List<String> authIdsInvitados,
+    required String creadorAuthId,
+    required dynamic reunionId,
+    required String roomId,
+    required String titulo,
+    required String descripcion,
+    required DateTime inicio,
+    required DateTime fin,
+  }) async {
+    if (authIdsInvitados.isEmpty) return;
+
+    try {
+      final creador = usuarios.firstWhere(
+        (usuario) =>
+            usuario['auth_id']?.toString().trim() == creadorAuthId,
+        orElse: () => <String, dynamic>{},
+      );
+
+      final nombre = creador['nombre']?.toString().trim() ?? '';
+      final apellidos =
+          creador['apellidos']?.toString().trim() ?? '';
+      final nombreCreador = '$nombre $apellidos'.trim();
+      final organizador =
+          nombreCreador.isEmpty ? 'Tu responsable' : nombreCreador;
+
+      final fecha =
+          '${inicio.day.toString().padLeft(2, '0')}/'
+          '${inicio.month.toString().padLeft(2, '0')}/'
+          '${inicio.year}';
+      final hora =
+          '${inicio.hour.toString().padLeft(2, '0')}:'
+          '${inicio.minute.toString().padLeft(2, '0')}';
+
+      final mensaje =
+          '$organizador te ha invitado a "$titulo" '
+          'el $fecha a las $hora. Consulta tu agenda para ver los detalles.';
+
+      for (final authIdDestino in authIdsInvitados.toSet()) {
+        try {
+          final response = await widget.supabase.functions.invoke(
+            'enviar-push',
+            body: {
+              'auth_id_destino': authIdDestino,
+              'incluir_superiores': false,
+              'titulo': 'Nueva invitación a un evento',
+              'mensaje': mensaje,
+              'data': {
+                'tipo': 'invitacion_reunion',
+                'reunion_id': reunionId,
+                'room_id': roomId,
+                'titulo_evento': titulo,
+                'descripcion': descripcion,
+                'fecha_inicio': inicio.toIso8601String(),
+                'fecha_fin': fin.toIso8601String(),
+                'creador_auth_id': creadorAuthId,
+              },
+            },
+          );
+
+          if (response.status < 200 || response.status >= 300) {
+            debugPrint(
+              'PUSH INVITACIÓN NO ENVIADO A $authIdDestino. '
+              'HTTP ${response.status}: ${response.data}',
+            );
+          }
+        } catch (errorPush) {
+          debugPrint(
+            'ERROR PUSH INVITACIÓN A $authIdDestino: $errorPush',
+          );
+        }
+      }
+    } catch (error) {
+      // El evento ya está guardado y nunca debe revertirse por el push.
+      debugPrint('ERROR GENERAL NOTIFICANDO INVITADOS: $error');
     }
   }
 

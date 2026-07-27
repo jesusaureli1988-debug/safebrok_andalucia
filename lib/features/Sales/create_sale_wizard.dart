@@ -1,14 +1,14 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:safebrok_andalucia/core/production/production_period_service.dart';
 import '../../core/payroll/generate_nominas.dart';
 
 class CreateSaleWizard extends StatefulWidget {
   final String? clientId;
 
-  const CreateSaleWizard({
-    super.key,
-    this.clientId,
-  });
+  const CreateSaleWizard({super.key, this.clientId});
 
   @override
   State<CreateSaleWizard> createState() => _CreateSaleWizardState();
@@ -20,7 +20,12 @@ class _CreateSaleWizardState extends State<CreateSaleWizard> {
 
   int step = 0;
   bool saving = false;
+  bool loadingCalculation = false;
+
   double comisionPreview = 0;
+  double primaNetaPreview = 0;
+  double porcentajeComisionPreview = 0;
+  double porcentajeImpuestosPreview = 0;
 
   String? selectedProduct;
   String? selectedCompany;
@@ -65,6 +70,12 @@ class _CreateSaleWizardState extends State<CreateSaleWizard> {
     'Legal familiar',
     'Moto',
     'Vehiculos agricolas',
+
+    // NUEVOS RAMOS
+    'RC',
+    'Mascotas',
+    'Viajes',
+    'Prima única',
   ];
 
   final companies = [
@@ -88,12 +99,7 @@ class _CreateSaleWizardState extends State<CreateSaleWizard> {
     'Sanitas',
   ];
 
-  final payments = [
-    'Mensual',
-    'Trimestral',
-    'Semestral',
-    'Anual',
-  ];
+  final payments = ['Mensual', 'Trimestral', 'Semestral', 'Anual'];
 
   @override
   void dispose() {
@@ -162,12 +168,27 @@ class _CreateSaleWizardState extends State<CreateSaleWizard> {
       appBar: AppBar(
         elevation: 0,
         backgroundColor: bg,
+        leading: Padding(
+          padding: const EdgeInsets.all(8),
+          child: Material(
+            color: Colors.white.withOpacity(0.12),
+            shape: const CircleBorder(),
+            child: InkWell(
+              customBorder: const CircleBorder(),
+              onTap: () => Navigator.of(context).pop(),
+              child: const Center(
+                child: Icon(
+                  Icons.arrow_back_ios_new_rounded,
+                  color: Colors.white,
+                  size: 20,
+                ),
+              ),
+            ),
+          ),
+        ),
         title: const Text(
           "Nueva venta",
-          style: TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.w900,
-          ),
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900),
         ),
       ),
       body: SafeArea(
@@ -233,7 +254,8 @@ class _CreateSaleWizardState extends State<CreateSaleWizard> {
             _hero(
               icon: Icons.person_add_alt_1_rounded,
               title: "Datos del cliente",
-              subtitle: "Completa la ficha del cliente antes de crear la venta.",
+              subtitle:
+                  "Completa la ficha del cliente antes de crear la venta.",
             ),
             const SizedBox(height: 18),
             _sectionTitle("Identificación"),
@@ -269,7 +291,11 @@ class _CreateSaleWizardState extends State<CreateSaleWizard> {
             _input(provincia, "Provincia", icon: Icons.map_rounded),
             _input(poblacion, "Población", icon: Icons.location_city_rounded),
             _input(direccion, "Dirección", icon: Icons.home_rounded),
-            _input(numero, "Número / Piso / Portal", icon: Icons.pin_drop_rounded),
+            _input(
+              numero,
+              "Número / Piso / Portal",
+              icon: Icons.pin_drop_rounded,
+            ),
           ],
         );
 
@@ -297,15 +323,16 @@ class _CreateSaleWizardState extends State<CreateSaleWizard> {
               value: selectedProduct,
               items: products,
               onChanged: (v) async {
-  setState(() {
-    selectedProduct = v;
-    if (selectedProduct != 'Decesos') {
-      asegurados.clear();
-    }
-  });
+                setState(() {
+                  selectedProduct = v;
 
-  await actualizarComisionPreview();
-},
+                  if (selectedProduct != 'Decesos') {
+                    asegurados.clear();
+                  }
+                });
+
+                await actualizarCalculoPreview();
+              },
             ),
             if (selectedProduct == 'Decesos')
               _input(
@@ -326,15 +353,18 @@ class _CreateSaleWizardState extends State<CreateSaleWizard> {
               icon: Icons.payments_rounded,
               value: selectedPayment,
               items: payments,
-              onChanged: (v) => setState(() => selectedPayment = v),
+              onChanged: (v) async {
+                setState(() => selectedPayment = v);
+                await actualizarCalculoPreview();
+              },
             ),
             _input(
-  precio,
-  "Precio",
-  icon: Icons.euro_rounded,
-  keyboard: const TextInputType.numberWithOptions(decimal: true),
-  onChangedExtra: actualizarComisionPreview,
-),
+              precio,
+              "Precio",
+              icon: Icons.euro_rounded,
+              keyboard: const TextInputType.numberWithOptions(decimal: true),
+              onChangedExtra: actualizarCalculoPreview,
+            ),
             _datePicker(),
             const SizedBox(height: 10),
             _calculationPreview(),
@@ -370,9 +400,26 @@ class _CreateSaleWizardState extends State<CreateSaleWizard> {
             if (selectedProduct == 'Decesos')
               _reviewCard("Nº asegurados", asegurados.text),
             _sectionTitle("Cálculo"),
-            _reviewCard("Prima anual estimada", "${_primaAnual().toStringAsFixed(2)} €"),
-            _reviewCard("Prima neta estimada", "${(_primaAnual() * 0.87).toStringAsFixed(2)} €"),
-            _reviewCard("Comisión estimada", "${comisionPreview.toStringAsFixed(2)} €"),
+            _reviewCard(
+              "Prima anual bruta",
+              "${_primaAnual().toStringAsFixed(2)} €",
+            ),
+            _reviewCard(
+              "Impuestos aplicados",
+              "${porcentajeImpuestosPreview.toStringAsFixed(2)} %",
+            ),
+            _reviewCard(
+              "Prima anual neta",
+              "${primaNetaPreview.toStringAsFixed(2)} €",
+            ),
+            _reviewCard(
+              "Porcentaje de comisión",
+              "${porcentajeComisionPreview.toStringAsFixed(2)} %",
+            ),
+            _reviewCard(
+              "Comisión estimada",
+              "${comisionPreview.toStringAsFixed(2)} €",
+            ),
           ],
         );
 
@@ -386,9 +433,7 @@ class _CreateSaleWizardState extends State<CreateSaleWizard> {
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
       decoration: BoxDecoration(
         color: bg,
-        border: Border(
-          top: BorderSide(color: Colors.white.withOpacity(0.06)),
-        ),
+        border: Border(top: BorderSide(color: Colors.white.withOpacity(0.06))),
       ),
       child: Row(
         children: [
@@ -412,8 +457,8 @@ class _CreateSaleWizardState extends State<CreateSaleWizard> {
               onPressed: saving
                   ? null
                   : _validateStep()
-                      ? (step == 2 ? _review : next)
-                      : null,
+                  ? (step == 2 ? _review : next)
+                  : null,
               icon: saving
                   ? const SizedBox(
                       width: 18,
@@ -423,7 +468,11 @@ class _CreateSaleWizardState extends State<CreateSaleWizard> {
                         color: Colors.white,
                       ),
                     )
-                  : Icon(step == 2 ? Icons.check_rounded : Icons.arrow_forward_rounded),
+                  : Icon(
+                      step == 2
+                          ? Icons.check_rounded
+                          : Icons.arrow_forward_rounded,
+                    ),
               label: Text(step == 2 ? "Guardar venta" : "Siguiente"),
               style: ElevatedButton.styleFrom(
                 backgroundColor: blue,
@@ -451,10 +500,7 @@ class _CreateSaleWizardState extends State<CreateSaleWizard> {
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
-          colors: [
-            Color(0xFF102A43),
-            Color(0xFF0B1624),
-          ],
+          colors: [Color(0xFF102A43), Color(0xFF0B1624)],
         ),
         borderRadius: BorderRadius.circular(24),
         border: Border.all(color: Colors.white.withOpacity(0.08)),
@@ -509,15 +555,15 @@ class _CreateSaleWizardState extends State<CreateSaleWizard> {
     );
   }
 
- Widget _input(
-  TextEditingController controller,
-  String hint, {
-  IconData? icon,
-  TextInputType keyboard = TextInputType.text,
-  TextCapitalization textCapitalization = TextCapitalization.none,
-  String? Function(String?)? validator,
-  Future<void> Function()? onChangedExtra,
-}) {
+  Widget _input(
+    TextEditingController controller,
+    String hint, {
+    IconData? icon,
+    TextInputType keyboard = TextInputType.text,
+    TextCapitalization textCapitalization = TextCapitalization.none,
+    String? Function(String?)? validator,
+    Future<void> Function()? onChangedExtra,
+  }) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 14),
       child: TextFormField(
@@ -525,16 +571,17 @@ class _CreateSaleWizardState extends State<CreateSaleWizard> {
         keyboardType: keyboard,
         textCapitalization: textCapitalization,
         onChanged: (_) async {
-  setState(() {});
-  if (onChangedExtra != null) {
-    await onChangedExtra();
-  }
-},
+          setState(() {});
+          if (onChangedExtra != null) {
+            await onChangedExtra();
+          }
+        },
         style: const TextStyle(
           color: Colors.white,
           fontWeight: FontWeight.w600,
         ),
-        validator: validator ??
+        validator:
+            validator ??
             (value) {
               if (value == null || value.trim().isEmpty) {
                 return "Campo obligatorio";
@@ -566,12 +613,7 @@ class _CreateSaleWizardState extends State<CreateSaleWizard> {
         iconEnabledColor: cyan,
         decoration: _decoration(label, icon),
         items: items
-            .map(
-              (e) => DropdownMenuItem<String>(
-                value: e,
-                child: Text(e),
-              ),
-            )
+            .map((e) => DropdownMenuItem<String>(value: e, child: Text(e)))
             .toList(),
         onChanged: onChanged,
         validator: (value) {
@@ -634,7 +676,10 @@ class _CreateSaleWizardState extends State<CreateSaleWizard> {
                   ),
                 ),
               ),
-              const Icon(Icons.keyboard_arrow_down_rounded, color: Colors.white54),
+              const Icon(
+                Icons.keyboard_arrow_down_rounded,
+                color: Colors.white54,
+              ),
             ],
           ),
         ),
@@ -671,8 +716,7 @@ class _CreateSaleWizardState extends State<CreateSaleWizard> {
   }
 
   Widget _calculationPreview() {
-    final prima = _primaAnual();
-    final neta = prima * 0.87;
+    final primaBruta = _primaAnual();
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -684,17 +728,43 @@ class _CreateSaleWizardState extends State<CreateSaleWizard> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            "Vista previa económica",
-            style: TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.w900,
-            ),
+          Row(
+            children: [
+              const Expanded(
+                child: Text(
+                  "Vista previa económica",
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+              if (loadingCalculation)
+                const SizedBox(
+                  width: 17,
+                  height: 17,
+                  child: CircularProgressIndicator(strokeWidth: 2, color: cyan),
+                ),
+            ],
           ),
           const SizedBox(height: 12),
-          _miniLine("Prima anual", "${prima.toStringAsFixed(2)} €"),
-          _miniLine("Prima neta estimada", "${neta.toStringAsFixed(2)} €"),
-          _miniLine("Comisión estimada", "${comisionPreview.toStringAsFixed(2)} €"),
+          _miniLine("Prima anual bruta", "${primaBruta.toStringAsFixed(2)} €"),
+          _miniLine(
+            "Impuestos del producto",
+            "${porcentajeImpuestosPreview.toStringAsFixed(2)} %",
+          ),
+          _miniLine(
+            "Prima anual neta",
+            "${primaNetaPreview.toStringAsFixed(2)} €",
+          ),
+          _miniLine(
+            "Porcentaje de comisión",
+            "${porcentajeComisionPreview.toStringAsFixed(2)} %",
+          ),
+          _miniLine(
+            "Comisión estimada",
+            "${comisionPreview.toStringAsFixed(2)} €",
+          ),
         ],
       ),
     );
@@ -839,47 +909,115 @@ class _CreateSaleWizardState extends State<CreateSaleWizard> {
     }
   }
 
-  Future<void> actualizarComisionPreview() async {
-  if (selectedProduct == null) {
-    setState(() => comisionPreview = 0);
-    return;
+  double _porcentaje(dynamic value) {
+    if (value == null) return 0;
+    if (value is num) return value.toDouble();
+
+    return double.tryParse(value.toString().trim().replaceAll(',', '.')) ?? 0;
   }
 
-  final primaNeta = _primaAnual() * 0.87;
+  Future<Map<String, double>> _cargarConfiguracionProducto() async {
+    if (selectedProduct == null) {
+      throw Exception('Debes seleccionar un producto');
+    }
 
-  final producto = await supabase
-      .from('comisiones_productos')
-      .select('porcentaje_comision')
-      .eq('producto', selectedProduct!)
-      .maybeSingle();
+    final producto = await supabase
+        .from('comisiones_productos')
+        .select('porcentaje_comision, porcentaje_impuestos')
+        .eq('producto', selectedProduct!)
+        .maybeSingle();
 
-  final porcentaje =
-      (producto?['porcentaje_comision'] as num?)?.toDouble() ?? 0;
+    if (producto == null) {
+      throw Exception(
+        'No existe configuración de comisión e impuestos para '
+        '${selectedProduct!}',
+      );
+    }
 
-  setState(() {
-    comisionPreview = primaNeta * (porcentaje / 100);
-  });
-}
-
-  Future<double> _comision() async {
-
-  final primaNeta = _primaAnual() * 0.87;
-
-  final producto = await supabase
-      .from('comisiones_productos')
-      .select('porcentaje_comision')
-      .eq('producto', selectedProduct!)
-      .maybeSingle();
-
-  if (producto == null) {
-    return 0;
+    return {
+      'porcentaje_comision': _porcentaje(producto['porcentaje_comision']),
+      'porcentaje_impuestos': _porcentaje(producto['porcentaje_impuestos']),
+    };
   }
 
-  final porcentaje =
-      (producto['porcentaje_comision'] as num?)?.toDouble() ?? 0;
+  double _calcularPrimaNeta({
+    required double primaBruta,
+    required double porcentajeImpuestos,
+  }) {
+    final porcentajeValido = porcentajeImpuestos.clamp(0.0, 100.0).toDouble();
 
-  return primaNeta * (porcentaje / 100);
-}
+    return primaBruta * (1 - (porcentajeValido / 100));
+  }
+
+  double _calcularComision({
+    required double primaNeta,
+    required double porcentajeComision,
+  }) {
+    final porcentajeValido = porcentajeComision.clamp(0.0, 100.0).toDouble();
+
+    return primaNeta * (porcentajeValido / 100);
+  }
+
+  Future<void> actualizarCalculoPreview() async {
+    if (selectedProduct == null) {
+      if (!mounted) return;
+
+      setState(() {
+        comisionPreview = 0;
+        primaNetaPreview = 0;
+        porcentajeComisionPreview = 0;
+        porcentajeImpuestosPreview = 0;
+      });
+
+      return;
+    }
+
+    setState(() => loadingCalculation = true);
+
+    try {
+      final configuracion = await _cargarConfiguracionProducto();
+
+      final porcentajeComision = configuracion['porcentaje_comision'] ?? 0;
+
+      final porcentajeImpuestos = configuracion['porcentaje_impuestos'] ?? 0;
+
+      final primaBruta = _primaAnual();
+
+      final primaNeta = _calcularPrimaNeta(
+        primaBruta: primaBruta,
+        porcentajeImpuestos: porcentajeImpuestos,
+      );
+
+      final comision = _calcularComision(
+        primaNeta: primaNeta,
+        porcentajeComision: porcentajeComision,
+      );
+
+      if (!mounted) return;
+
+      setState(() {
+        porcentajeComisionPreview = porcentajeComision;
+        porcentajeImpuestosPreview = porcentajeImpuestos;
+        primaNetaPreview = primaNeta;
+        comisionPreview = comision;
+      });
+    } catch (e) {
+      debugPrint('ERROR PREVIEW ECONÓMICA: $e');
+
+      if (!mounted) return;
+
+      setState(() {
+        comisionPreview = 0;
+        primaNetaPreview = 0;
+        porcentajeComisionPreview = 0;
+        porcentajeImpuestosPreview = 0;
+      });
+    } finally {
+      if (mounted) {
+        setState(() => loadingCalculation = false);
+      }
+    }
+  }
 
   void _review() {
     if (!formKey.currentState!.validate()) return;
@@ -942,6 +1080,47 @@ class _CreateSaleWizardState extends State<CreateSaleWizard> {
     );
   }
 
+  Future<void> _notificarNuevaVenta({
+    required String ventaId,
+    required String agenteAuthId,
+    required double primaAnual,
+  }) async {
+    try {
+      final response = await supabase.functions.invoke(
+        'enviar-push',
+        body: {
+          'auth_id_destino': agenteAuthId,
+          'incluir_superiores': true,
+          'titulo': 'Nueva venta registrada',
+          'mensaje':
+              '${selectedProduct!} · ${selectedCompany!} · '
+              '${primaAnual.toStringAsFixed(2)} €',
+          'data': {
+            'tipo': 'nueva_venta',
+            'venta_id': ventaId,
+            'agente_auth_id': agenteAuthId,
+            'numero_poliza': numeroPoliza.text.trim(),
+            'producto': selectedProduct!,
+            'compania': selectedCompany!,
+            'forma_pago': selectedPayment!,
+            'prima_anual': primaAnual,
+          },
+        },
+      );
+
+      if (response.status < 200 || response.status >= 300) {
+        debugPrint(
+          'PUSH NUEVA VENTA NO ENVIADO: '
+          'HTTP ${response.status} - ${response.data}',
+        );
+      }
+    } catch (error, stackTrace) {
+      // El push es secundario: nunca debe hacer fallar el guardado.
+      debugPrint('ERROR PUSH NUEVA VENTA: $error');
+      debugPrintStack(stackTrace: stackTrace);
+    }
+  }
+
   Future<void> _save() async {
     if (saving) return;
 
@@ -958,18 +1137,21 @@ class _CreateSaleWizardState extends State<CreateSaleWizard> {
       if (widget.clientId != null) {
         finalClientId = widget.clientId!;
 
-        await supabase.from('clientes').update({
-          'dni': dni.text.trim(),
-          'nombre': nombre.text.trim(),
-          'apellidos': apellidos.text.trim(),
-          'telefono': telefono.text.trim(),
-          'email': email.text.trim(),
-          'codigo_postal': cp.text.trim(),
-          'provincia': provincia.text.trim(),
-          'poblacion': poblacion.text.trim(),
-          'direccion': direccion.text.trim(),
-          'numero': numero.text.trim(),
-        }).eq('id', finalClientId);
+        await supabase
+            .from('clientes')
+            .update({
+              'dni': dni.text.trim(),
+              'nombre': nombre.text.trim(),
+              'apellidos': apellidos.text.trim(),
+              'telefono': telefono.text.trim(),
+              'email': email.text.trim(),
+              'codigo_postal': cp.text.trim(),
+              'provincia': provincia.text.trim(),
+              'poblacion': poblacion.text.trim(),
+              'direccion': direccion.text.trim(),
+              'numero': numero.text.trim(),
+            })
+            .eq('id', finalClientId);
       } else {
         final clienteResponse = await supabase
             .from('clientes')
@@ -1006,35 +1188,65 @@ class _CreateSaleWizardState extends State<CreateSaleWizard> {
 
       final primaAnual = _primaAnual();
       final primaBrutaAnual = primaAnual;
-      final primaNetaAnual = primaBrutaAnual * 0.87;
-      final comision = await _comision();
 
-      await supabase.from('ventas').insert({
-        'cliente_id': finalClientId,
-        'agente_auth_id': user.id,
+      final configuracionProducto = await _cargarConfiguracionProducto();
 
-        'numero_poliza': numeroPoliza.text.trim(),
+      final porcentajeComision =
+          configuracionProducto['porcentaje_comision'] ?? 0;
 
-        'producto': selectedProduct,
-        'compania': selectedCompany,
-        'forma_pago': selectedPayment,
+      final porcentajeImpuestos =
+          configuracionProducto['porcentaje_impuestos'] ?? 0;
 
-        'precio': precioVenta,
+      final primaNetaAnual = _calcularPrimaNeta(
+        primaBruta: primaBrutaAnual,
+        porcentajeImpuestos: porcentajeImpuestos,
+      );
 
-        'prima_anual': primaAnual,
-        'prima_anual_bruta': primaBrutaAnual,
-        'prima_anual_neta': primaNetaAnual,
+      final comision = _calcularComision(
+        primaNeta: primaNetaAnual,
+        porcentajeComision: porcentajeComision,
+      );
 
-        'comision': comision,
+      final ventaResponse = await supabase
+          .from('ventas')
+          .insert({
+            'cliente_id': finalClientId,
+            'agente_auth_id': user.id,
 
-        'categoria_producto': selectedProduct,
+            'numero_poliza': numeroPoliza.text.trim(),
 
-        'numero_asegurados': selectedProduct == 'Decesos'
-            ? int.tryParse(asegurados.text.trim()) ?? 0
-            : null,
+            'producto': selectedProduct,
+            'compania': selectedCompany,
+            'forma_pago': selectedPayment,
 
-        'fecha_efecto': fechaEfecto!.toIso8601String(),
-      });
+            'precio': precioVenta,
+
+            'prima_anual': primaAnual,
+            'prima_anual_bruta': primaBrutaAnual,
+            'prima_anual_neta': primaNetaAnual,
+
+            'comision': comision,
+
+            'categoria_producto': selectedProduct,
+
+            'numero_asegurados': selectedProduct == 'Decesos'
+                ? int.tryParse(asegurados.text.trim()) ?? 0
+                : null,
+
+            'fecha_efecto': fechaEfecto!.toIso8601String(),
+          })
+          .select('id')
+          .single();
+
+      final ventaId = ventaResponse['id'].toString();
+
+      unawaited(
+        _notificarNuevaVenta(
+          ventaId: ventaId,
+          agenteAuthId: user.id,
+          primaAnual: primaAnual,
+        ),
+      );
 
       final seguimientos = [
         {
@@ -1097,15 +1309,16 @@ class _CreateSaleWizardState extends State<CreateSaleWizard> {
         });
       }
 
-      final now = DateTime.now();
-      final desde = DateTime(now.year, now.month, 24);
+      final productionPeriod = await ProductionPeriodService.instance.forDate(
+        fechaEfecto!,
+      );
 
       final payroll = PayrollService();
 
       await payroll.generateNomina(
         authId: user.id,
-        mes: desde.month,
-        anio: desde.year,
+        mes: productionPeriod.month,
+        anio: productionPeriod.year,
       );
 
       if (!mounted) return;
@@ -1120,9 +1333,9 @@ class _CreateSaleWizardState extends State<CreateSaleWizard> {
 
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Error: $e")),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text("Error: $e")));
     } finally {
       if (mounted) {
         setState(() => saving = false);

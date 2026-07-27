@@ -2,6 +2,11 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+enum TipoEdicionComision {
+  comisiones,
+  impuestos,
+}
+
 class ModificarComisionesScreen extends StatefulWidget {
   const ModificarComisionesScreen({super.key});
 
@@ -17,7 +22,33 @@ class _ModificarComisionesScreenState
   bool loading = true;
   bool saving = false;
 
+  TipoEdicionComision tipoEdicion = TipoEdicionComision.comisiones;
+
   List<Map<String, dynamic>> productos = [];
+  final Map<String, double> comisionesPorCompania = {};
+
+  static const List<String> companias = [
+    'Ocaso',
+    'Santalucía',
+    'DKV',
+    'Adeslas',
+    'Mapfre',
+    'Generali',
+    'Helvetia',
+    'Axa',
+    'Allianz',
+    'Zurich',
+    'Active',
+    'Aura',
+    'Occident',
+    'Fiact',
+    'Asisa',
+    'Pelayo',
+    'Reale Seguros',
+    'Sanitas',
+  ];
+
+  String companiaSeleccionada = companias.first;
 
   @override
   void initState() {
@@ -31,34 +62,104 @@ class _ModificarComisionesScreenState
     return double.tryParse(value.toString()) ?? 0;
   }
 
+
+
   Future<void> cargarComisiones() async {
     setState(() => loading = true);
 
-    final data = await supabase
-        .from('comisiones_productos')
-        .select()
-        .order('orden');
+    try {
+      final resultados = await Future.wait([
+        supabase.from('comisiones_productos').select().order('orden'),
+        supabase.from('comisiones_producto_compania').select(
+              'producto, compania, porcentaje_comision',
+            ),
+      ]);
+
+      final productosCargados =
+          List<Map<String, dynamic>>.from(resultados[0] as List);
+      final comisionesCargadas =
+          List<Map<String, dynamic>>.from(resultados[1] as List);
+
+      comisionesPorCompania.clear();
+      for (final fila in comisionesCargadas) {
+        final producto = fila['producto']?.toString().trim() ?? '';
+        final compania = fila['compania']?.toString().trim() ?? '';
+        if (producto.isEmpty || compania.isEmpty) continue;
+
+        comisionesPorCompania[_claveComision(producto, compania)] =
+            _num(fila['porcentaje_comision']);
+      }
+
+      if (!mounted) return;
+      setState(() {
+        productos = productosCargados;
+        loading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => loading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error cargando comisiones: $e')),
+      );
+    }
+  }
+
+  String _claveComision(String producto, String compania) {
+    return '${producto.trim()}|||${compania.trim()}';
+  }
+
+  double _comisionProducto(Map<String, dynamic> producto) {
+    final nombre = producto['producto']?.toString().trim() ?? '';
+    return comisionesPorCompania[
+            _claveComision(nombre, companiaSeleccionada)] ??
+        _num(producto['porcentaje_comision']);
+  }
+
+  void _cambiarComision(int index, double variacion) {
+    final nombre = productos[index]['producto']?.toString().trim() ?? '';
+    if (nombre.isEmpty) return;
+
+    final clave = _claveComision(nombre, companiaSeleccionada);
+    final nuevoValor = _limitarPorcentaje(
+      _comisionProducto(productos[index]) + variacion,
+    );
 
     setState(() {
-      productos = List<Map<String, dynamic>>.from(data);
-      loading = false;
+      // Evita residuos binarios y conserva exactamente dos decimales.
+      comisionesPorCompania[clave] =
+          double.parse(nuevoValor.toStringAsFixed(2));
     });
   }
 
-  void incrementar(int index) {
-    final valor = _num(productos[index]['porcentaje_comision']) + 0.5;
+  double _limitarPorcentaje(double value) {
+    if (value < 0) return 0;
+    if (value > 100) return 100;
+    return value;
+  }
+
+  void incrementarComision(int index) {
+    _cambiarComision(index, 0.05);
+  }
+
+  void disminuirComision(int index) {
+    _cambiarComision(index, -0.05);
+  }
+
+  void incrementarImpuestos(int index) {
+    final actual = _num(productos[index]['porcentaje_impuestos']);
 
     setState(() {
-      productos[index]['porcentaje_comision'] = valor;
+      productos[index]['porcentaje_impuestos'] =
+          _limitarPorcentaje(actual + 0.5);
     });
   }
 
-  void disminuir(int index) {
-    final actual = _num(productos[index]['porcentaje_comision']);
-    final valor = actual <= 0 ? 0 : actual - 0.5;
+  void disminuirImpuestos(int index) {
+    final actual = _num(productos[index]['porcentaje_impuestos']);
 
     setState(() {
-      productos[index]['porcentaje_comision'] = valor < 0 ? 0 : valor;
+      productos[index]['porcentaje_impuestos'] =
+          _limitarPorcentaje(actual - 0.5);
     });
   }
 
@@ -68,18 +169,47 @@ class _ModificarComisionesScreenState
     setState(() => saving = true);
 
     try {
-      for (final producto in productos) {
-        await supabase.from('comisiones_productos').update({
-          'porcentaje_comision': producto['porcentaje_comision'],
-          'actualizado_en': DateTime.now().toIso8601String(),
-        }).eq('id', producto['id']);
+      final actualizadoEn = DateTime.now().toIso8601String();
+
+      if (tipoEdicion == TipoEdicionComision.comisiones) {
+        final filas = productos.map((producto) {
+          final nombre = producto['producto']?.toString().trim() ?? '';
+          return {
+            'producto': nombre,
+            'compania': companiaSeleccionada,
+            'porcentaje_comision': _comisionProducto(producto),
+            'actualizado_en': actualizadoEn,
+          };
+        }).where((fila) {
+          return (fila['producto'] as String).isNotEmpty;
+        }).toList();
+
+        await supabase.from('comisiones_producto_compania').upsert(
+              filas,
+              onConflict: 'producto,compania',
+            );
+      } else {
+        for (final producto in productos) {
+          await supabase
+              .from('comisiones_productos')
+              .update({
+                'porcentaje_impuestos':
+                    _num(producto['porcentaje_impuestos']),
+                'actualizado_en': actualizadoEn,
+              })
+              .eq('id', producto['id']);
+        }
       }
 
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Comisiones actualizadas correctamente'),
+        SnackBar(
+          content: Text(
+            tipoEdicion == TipoEdicionComision.comisiones
+                ? 'Comisiones de $companiaSeleccionada actualizadas'
+                : 'Impuestos actualizados correctamente',
+          ),
         ),
       );
     } catch (e) {
@@ -97,7 +227,16 @@ class _ModificarComisionesScreenState
     if (productos.isEmpty) return 0;
     final total = productos.fold<double>(
       0,
-      (sum, p) => sum + _num(p['porcentaje_comision']),
+      (sum, p) => sum + _comisionProducto(p),
+    );
+    return total / productos.length;
+  }
+
+  double get mediaImpuestos {
+    if (productos.isEmpty) return 0;
+    final total = productos.fold<double>(
+      0,
+      (sum, p) => sum + _num(p['porcentaje_impuestos']),
     );
     return total / productos.length;
   }
@@ -108,8 +247,26 @@ class _ModificarComisionesScreenState
       backgroundColor: const Color(0xFF061018),
       extendBodyBehindAppBar: true,
       appBar: AppBar(
+      leading: Padding(
+  padding: const EdgeInsets.all(8),
+  child: Material(
+    color: Colors.white.withOpacity(0.10),
+    shape: const CircleBorder(),
+    child: InkWell(
+      customBorder: const CircleBorder(),
+      onTap: () => Navigator.of(context).pop(),
+      child: const Center(
+        child: Icon(
+          Icons.arrow_back_ios_new_rounded,
+          color: Colors.white,
+          size: 20,
+        ),
+      ),
+    ),
+  ),
+),
         title: const Text(
-          'Modificar comisiones',
+          'Comisiones e impuestos',
           style: TextStyle(
             color: Colors.white,
             fontWeight: FontWeight.w900,
@@ -143,19 +300,238 @@ class _ModificarComisionesScreenState
                       children: [
                         _header(),
                         const SizedBox(height: 16),
+                        _selectorEdicion(),
+                        if (tipoEdicion ==
+                            TipoEdicionComision.comisiones) ...[
+                          const SizedBox(height: 16),
+                          _selectorCompania(),
+                        ],
+                        const SizedBox(height: 16),
                         _resumenPanel(),
                         const SizedBox(height: 16),
                         ...productos.asMap().entries.map(
                               (entry) =>
                                   _productoCard(entry.value, entry.key),
                             ),
-                        const SizedBox(height: 18),
+                            Container(
+  padding: const EdgeInsets.all(16),
+  decoration: BoxDecoration(
+    color: Colors.amber.withOpacity(0.08),
+    borderRadius: BorderRadius.circular(18),
+    border: Border.all(
+      color: Colors.amber.withOpacity(0.35),
+    ),
+  ),
+  child: Row(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      const Icon(
+        Icons.info_outline_rounded,
+        color: Colors.amber,
+        size: 24,
+      ),
+      const SizedBox(width: 12),
+      Expanded(
+        child: Text(
+          tipoEdicion == TipoEdicionComision.comisiones
+              ? 'IMPORTANTE\n\n'
+                  'Los cambios realizados en las comisiones se aplicarán únicamente a las ventas que se registren a partir de este momento.\n\n'
+                  'Las ventas ya existentes conservarán la comisión con la que fueron creadas.'
+              : 'IMPORTANTE\n\n'
+                  'Los cambios realizados en los impuestos se aplicarán únicamente a las ventas que se registren a partir de este momento.\n\n'
+                  'La prima anual neta se calculará descontando de la prima anual bruta el porcentaje de impuestos configurado para cada producto.',
+          style: TextStyle(
+            color: Colors.white.withOpacity(0.90),
+            fontSize: 13,
+            height: 1.5,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ),
+    ],
+  ),
+),
+const SizedBox(height: 18),
                         _guardarButton(),
                       ],
                     ),
                   ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _selectorEdicion() {
+    return Container(
+      padding: const EdgeInsets.all(6),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.055),
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: Colors.white.withOpacity(0.09)),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: _selectorButton(
+              title: 'Comisiones',
+              icon: Icons.percent_rounded,
+              selected:
+                  tipoEdicion == TipoEdicionComision.comisiones,
+              color: Colors.greenAccent,
+              onTap: () {
+                setState(() {
+                  tipoEdicion = TipoEdicionComision.comisiones;
+                });
+              },
+            ),
+          ),
+          const SizedBox(width: 6),
+          Expanded(
+            child: _selectorButton(
+              title: 'Impuestos',
+              icon: Icons.receipt_long_rounded,
+              selected:
+                  tipoEdicion == TipoEdicionComision.impuestos,
+              color: Colors.cyanAccent,
+              onTap: () {
+                setState(() {
+                  tipoEdicion = TipoEdicionComision.impuestos;
+                });
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _selectorCompania() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.055),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: Colors.greenAccent.withOpacity(0.18)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Icon(
+                Icons.business_rounded,
+                color: Colors.greenAccent,
+                size: 22,
+              ),
+              SizedBox(width: 9),
+              Text(
+                'Elige una compañía',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 17,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Las comisiones mostradas pertenecen únicamente a esta compañía.',
+            style: TextStyle(
+              color: Colors.white.withOpacity(0.52),
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 14),
+          DropdownButtonFormField<String>(
+            value: companiaSeleccionada,
+            dropdownColor: const Color(0xFF102331),
+            iconEnabledColor: Colors.greenAccent,
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w800,
+            ),
+            decoration: InputDecoration(
+              filled: true,
+              fillColor: Colors.black.withOpacity(0.22),
+              prefixIcon: const Icon(
+                Icons.apartment_rounded,
+                color: Colors.greenAccent,
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(18),
+                borderSide: BorderSide(
+                  color: Colors.white.withOpacity(0.09),
+                ),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(18),
+                borderSide: const BorderSide(
+                  color: Colors.greenAccent,
+                ),
+              ),
+            ),
+            items: companias.map((compania) {
+              return DropdownMenuItem<String>(
+                value: compania,
+                child: Text(compania),
+              );
+            }).toList(),
+            onChanged: saving
+                ? null
+                : (value) {
+                    if (value == null) return;
+                    setState(() => companiaSeleccionada = value);
+                  },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _selectorButton({
+    required String title,
+    required IconData icon,
+    required bool selected,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return Material(
+      color: selected ? color.withOpacity(0.16) : Colors.transparent,
+      borderRadius: BorderRadius.circular(17),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(17),
+        onTap: saving ? null : onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: 10,
+            vertical: 13,
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                icon,
+                color: selected ? color : Colors.white38,
+                size: 20,
+              ),
+              const SizedBox(width: 7),
+              Flexible(
+                child: Text(
+                  title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: selected ? color : Colors.white54,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -205,23 +581,27 @@ class _ModificarComisionesScreenState
                 ),
               ),
               const SizedBox(width: 16),
-              const Expanded(
+              Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Panel de comisiones',
-                      style: TextStyle(
+                      tipoEdicion == TipoEdicionComision.comisiones
+                          ? 'Panel de comisiones'
+                          : 'Panel de impuestos',
+                      style: const TextStyle(
                         color: Colors.white,
                         fontSize: 23,
                         fontWeight: FontWeight.w900,
                         letterSpacing: -0.5,
                       ),
                     ),
-                    SizedBox(height: 5),
+                    const SizedBox(height: 5),
                     Text(
-                      'Actualiza el porcentaje que generará cada producto en las nuevas ventas.',
-                      style: TextStyle(
+                      tipoEdicion == TipoEdicionComision.comisiones
+                          ? 'Configura cada producto para $companiaSeleccionada con precisión de 0,05 puntos.'
+                          : 'Actualiza el porcentaje de impuestos que se descontará para calcular la prima anual neta.',
+                      style: const TextStyle(
                         color: Colors.white60,
                         fontWeight: FontWeight.w600,
                         height: 1.35,
@@ -251,10 +631,18 @@ class _ModificarComisionesScreenState
         const SizedBox(width: 12),
         Expanded(
           child: _kpiCard(
-            'Media',
-            '${mediaComision.toStringAsFixed(2)} %',
-            Icons.query_stats_rounded,
-            Colors.greenAccent,
+            tipoEdicion == TipoEdicionComision.comisiones
+                ? 'Media · $companiaSeleccionada'
+                : 'Media impuestos',
+            tipoEdicion == TipoEdicionComision.comisiones
+                ? '${mediaComision.toStringAsFixed(2)} %'
+                : '${mediaImpuestos.toStringAsFixed(2)} %',
+            tipoEdicion == TipoEdicionComision.comisiones
+                ? Icons.query_stats_rounded
+                : Icons.receipt_long_rounded,
+            tipoEdicion == TipoEdicionComision.comisiones
+                ? Colors.greenAccent
+                : Colors.cyanAccent,
           ),
         ),
       ],
@@ -317,14 +705,34 @@ class _ModificarComisionesScreenState
   }
 
   Widget _productoCard(Map<String, dynamic> producto, int index) {
+    final editandoComisiones =
+        tipoEdicion == TipoEdicionComision.comisiones;
+
     final nombre = producto['producto']?.toString() ?? 'Producto';
     final descripcion =
         producto['descripcion']?.toString() ?? 'Producto comercial';
-    final porcentaje = _num(producto['porcentaje_comision']);
+
+    final porcentajeComision = editandoComisiones
+        ? _comisionProducto(producto)
+        : _num(producto['porcentaje_comision']);
+    final porcentajeImpuestos =
+        _num(producto['porcentaje_impuestos']);
+
     final actualizado = producto['actualizado_en']?.toString();
 
-    final primaEjemplo = 1000.0;
-    final comisionEjemplo = primaEjemplo * (porcentaje / 100);
+    const primaBrutaEjemplo = 1000.0;
+    final primaNetaEjemplo =
+        primaBrutaEjemplo * (1 - (porcentajeImpuestos / 100));
+    final comisionEjemplo =
+        primaNetaEjemplo * (porcentajeComision / 100);
+
+    final porcentajeMostrado = editandoComisiones
+        ? porcentajeComision
+        : porcentajeImpuestos;
+
+    final colorPrincipal = editandoComisiones
+        ? Colors.greenAccent
+        : Colors.cyanAccent;
 
     return TweenAnimationBuilder<double>(
       tween: Tween(begin: 0, end: 1),
@@ -350,7 +758,7 @@ class _ModificarComisionesScreenState
           ),
           borderRadius: BorderRadius.circular(28),
           border: Border.all(
-            color: Colors.greenAccent.withOpacity(0.16),
+            color: colorPrincipal.withOpacity(0.16),
           ),
           boxShadow: [
             BoxShadow(
@@ -368,12 +776,14 @@ class _ModificarComisionesScreenState
                   width: 54,
                   height: 54,
                   decoration: BoxDecoration(
-                    color: Colors.cyanAccent.withOpacity(0.13),
+                    color: colorPrincipal.withOpacity(0.13),
                     borderRadius: BorderRadius.circular(20),
                   ),
-                  child: const Icon(
-                    Icons.euro_rounded,
-                    color: Colors.cyanAccent,
+                  child: Icon(
+                    editandoComisiones
+                        ? Icons.euro_rounded
+                        : Icons.receipt_long_rounded,
+                    color: colorPrincipal,
                     size: 28,
                   ),
                 ),
@@ -403,8 +813,8 @@ class _ModificarComisionesScreenState
                   ),
                 ),
                 _pill(
-                  'Actual',
-                  Colors.greenAccent,
+                  editandoComisiones ? 'Comisión' : 'Impuestos',
+                  colorPrincipal,
                 ),
               ],
             ),
@@ -415,12 +825,16 @@ class _ModificarComisionesScreenState
               decoration: BoxDecoration(
                 color: Colors.black.withOpacity(0.20),
                 borderRadius: BorderRadius.circular(22),
-                border: Border.all(color: Colors.white.withOpacity(0.06)),
+                border: Border.all(
+                  color: Colors.white.withOpacity(0.06),
+                ),
               ),
               child: Column(
                 children: [
                   Text(
-                    'Comisión actual',
+                    editandoComisiones
+                        ? 'Comisión actual'
+                        : 'Impuestos actuales',
                     style: TextStyle(
                       color: Colors.white.withOpacity(0.55),
                       fontWeight: FontWeight.w700,
@@ -428,9 +842,9 @@ class _ModificarComisionesScreenState
                   ),
                   const SizedBox(height: 5),
                   Text(
-                    '${porcentaje.toStringAsFixed(2)} %',
-                    style: const TextStyle(
-                      color: Colors.greenAccent,
+                    '${porcentajeMostrado.toStringAsFixed(2)} %',
+                    style: TextStyle(
+                      color: colorPrincipal,
                       fontSize: 38,
                       fontWeight: FontWeight.w900,
                       letterSpacing: -1,
@@ -441,19 +855,31 @@ class _ModificarComisionesScreenState
                     children: [
                       Expanded(
                         child: _stepButton(
-                          label: '- 0,50',
+                          label: editandoComisiones ? '- 0,05' : '- 0,50',
                           icon: Icons.remove_rounded,
                           color: Colors.redAccent,
-                          onTap: () => disminuir(index),
+                          onTap: () {
+                            if (editandoComisiones) {
+                              disminuirComision(index);
+                            } else {
+                              disminuirImpuestos(index);
+                            }
+                          },
                         ),
                       ),
                       const SizedBox(width: 10),
                       Expanded(
                         child: _stepButton(
-                          label: '+ 0,50',
+                          label: editandoComisiones ? '+ 0,05' : '+ 0,50',
                           icon: Icons.add_rounded,
-                          color: Colors.greenAccent,
-                          onTap: () => incrementar(index),
+                          color: colorPrincipal,
+                          onTap: () {
+                            if (editandoComisiones) {
+                              incrementarComision(index);
+                            } else {
+                              incrementarImpuestos(index);
+                            }
+                          },
                         ),
                       ),
                     ],
@@ -462,24 +888,91 @@ class _ModificarComisionesScreenState
               ),
             ),
             const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: _infoLine(
-                    'Ejemplo prima neta',
-                    '${primaEjemplo.toStringAsFixed(0)} €',
-                    Colors.cyanAccent,
+            if (editandoComisiones)
+              Row(
+                children: [
+                  Expanded(
+                    child: _infoLine(
+                      'Prima neta ejemplo',
+                      '${primaNetaEjemplo.toStringAsFixed(2)} €',
+                      Colors.cyanAccent,
+                    ),
                   ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: _infoLine(
-                    'Generaría',
-                    '${comisionEjemplo.toStringAsFixed(2)} €',
-                    Colors.greenAccent,
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: _infoLine(
+                      'Comisión generada',
+                      '${comisionEjemplo.toStringAsFixed(2)} €',
+                      Colors.greenAccent,
+                    ),
                   ),
+                ],
+              )
+            else
+              Row(
+                children: [
+                  Expanded(
+                    child: _infoLine(
+                      'Prima anual bruta',
+                      '${primaBrutaEjemplo.toStringAsFixed(2)} €',
+                      Colors.white70,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: _infoLine(
+                      'Prima anual neta',
+                      '${primaNetaEjemplo.toStringAsFixed(2)} €',
+                      Colors.cyanAccent,
+                    ),
+                  ),
+                ],
+              ),
+            const SizedBox(height: 10),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(
+                horizontal: 13,
+                vertical: 11,
+              ),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.045),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: Colors.white.withOpacity(0.06),
                 ),
-              ],
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'Comisión: ${porcentajeComision.toStringAsFixed(2)} %',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        color: Colors.greenAccent,
+                        fontWeight: FontWeight.w800,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
+                  Container(
+                    width: 1,
+                    height: 20,
+                    color: Colors.white12,
+                  ),
+                  Expanded(
+                    child: Text(
+                      'Impuestos: ${porcentajeImpuestos.toStringAsFixed(2)} %',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        color: Colors.cyanAccent,
+                        fontWeight: FontWeight.w800,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
             if (actualizado != null) ...[
               const SizedBox(height: 10),
@@ -512,7 +1005,7 @@ class _ModificarComisionesScreenState
       borderRadius: BorderRadius.circular(18),
       child: InkWell(
         borderRadius: BorderRadius.circular(18),
-        onTap: onTap,
+        onTap: saving ? null : onTap,
         child: Padding(
           padding: const EdgeInsets.symmetric(vertical: 13),
           child: Row(
@@ -600,16 +1093,27 @@ class _ModificarComisionesScreenState
               )
             : const Icon(Icons.save_rounded),
         label: Text(
-          saving ? 'GUARDANDO...' : 'GUARDAR CAMBIOS',
+          saving
+              ? 'GUARDANDO...'
+              : tipoEdicion == TipoEdicionComision.comisiones
+                  ? 'GUARDAR COMISIONES'
+                  : 'GUARDAR IMPUESTOS',
           style: const TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.w900,
           ),
         ),
         style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.greenAccent,
+          backgroundColor:
+              tipoEdicion == TipoEdicionComision.comisiones
+                  ? Colors.greenAccent
+                  : Colors.cyanAccent,
           foregroundColor: Colors.black,
-          disabledBackgroundColor: Colors.greenAccent.withOpacity(0.45),
+          disabledBackgroundColor:
+              (tipoEdicion == TipoEdicionComision.comisiones
+                      ? Colors.greenAccent
+                      : Colors.cyanAccent)
+                  .withOpacity(0.45),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(18),
           ),

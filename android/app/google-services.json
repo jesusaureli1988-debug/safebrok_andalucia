@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "343996601541",
+    "project_id": "maquinas-app-47f45",
+    "storage_bucket": "maquinas-app-47f45.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:343996601541:android:dc5b24a878a25a9f748cac",
+        "android_client_info": {
+          "package_name": "com.example.safebrok_andalucia"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyASEBDNbLM3fE8EtKpfv3SjQdBZzJI_L-w"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:343996601541:android:69fab780a6fb88dc748cac",
+        "android_client_info": {
+          "package_name": "com.maquinas.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyASEBDNbLM3fE8EtKpfv3SjQdBZzJI_L-w"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

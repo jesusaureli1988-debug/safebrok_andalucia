@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:typed_data';
 import 'dart:ui';
 import 'package:flutter/material.dart';
@@ -24,6 +25,14 @@ class _NuevoCandidatoScreenState extends State<NuevoCandidatoScreen> {
   String? cvFileName;
   String? origenSeleccionado;
 
+  bool loadingResponsables = true;
+  String? responsableAuthId;
+  String? responsableUsuarioId;
+  String? responsableNombre;
+  String? responsableRol;
+
+  List<Map<String, dynamic>> responsablesDisponibles = [];
+
   final nombreController = TextEditingController();
   final telefonoController = TextEditingController();
   final emailController = TextEditingController();
@@ -47,9 +56,215 @@ class _NuevoCandidatoScreenState extends State<NuevoCandidatoScreen> {
   bool get emailError => emailController.text.trim().isEmpty;
   bool get ciudadError => ciudadController.text.trim().isEmpty;
   bool get origenError => origenSeleccionado == null;
+  bool get responsableError => responsableAuthId == null;
 
   bool get formularioValido =>
-      !nombreError && !telefonoError && !emailError && !ciudadError && !origenError;
+      !nombreError &&
+      !telefonoError &&
+      !emailError &&
+      !ciudadError &&
+      !origenError &&
+      !responsableError;
+
+  @override
+  void initState() {
+    super.initState();
+    cargarResponsables();
+  }
+
+  String _normalizarRol(dynamic value) {
+    return (value ?? '')
+        .toString()
+        .trim()
+        .toLowerCase()
+        .replaceAll('-', '_')
+        .replaceAll(' ', '_');
+  }
+
+  String _rolTexto(String rol) {
+    switch (_normalizarRol(rol)) {
+      case 'director_nacional':
+        return 'Director nacional';
+      case 'director_zona':
+        return 'Director de zona';
+      case 'jefe_ventas':
+        return 'Jefe de ventas';
+      case 'jefe_equipo':
+        return 'Jefe de equipo';
+      default:
+        return rol;
+    }
+  }
+
+  int _nivelRol(String rol) {
+    switch (_normalizarRol(rol)) {
+      case 'director_nacional':
+        return 5;
+      case 'director_zona':
+        return 4;
+      case 'jefe_ventas':
+        return 3;
+      case 'jefe_equipo':
+        return 2;
+      case 'agente':
+        return 1;
+      default:
+        return 0;
+    }
+  }
+
+  Future<void> cargarResponsables() async {
+    try {
+      final authUser = supabase.auth.currentUser;
+
+      if (authUser == null) {
+        if (mounted) {
+          setState(() {
+            responsablesDisponibles = [];
+            loadingResponsables = false;
+          });
+        }
+        return;
+      }
+
+      final data = await supabase
+          .from('usuarios')
+          .select(
+            'id, auth_id, parent_id, rol_usuario, nombre, apellidos',
+          );
+
+      final usuarios = List<Map<String, dynamic>>.from(data).map((u) {
+        return <String, dynamic>{
+          'id': u['id']?.toString().trim() ?? '',
+          'auth_id': u['auth_id']?.toString().trim() ?? '',
+          'parent_id': u['parent_id']?.toString().trim() ?? '',
+          'rol': _normalizarRol(u['rol_usuario']),
+          'nombre': u['nombre']?.toString().trim() ?? '',
+          'apellidos': u['apellidos']?.toString().trim() ?? '',
+        };
+      }).toList();
+
+      final yo = usuarios.firstWhere(
+        (u) => u['auth_id'] == authUser.id,
+        orElse: () => <String, dynamic>{},
+      );
+
+      if (yo.isEmpty) {
+        if (mounted) {
+          setState(() {
+            responsablesDisponibles = [];
+            loadingResponsables = false;
+          });
+        }
+        return;
+      }
+
+      final hijosPorParentId = <String, List<Map<String, dynamic>>>{};
+
+      for (final usuario in usuarios) {
+        final parentId = usuario['parent_id']?.toString() ?? '';
+
+        if (parentId.isEmpty || parentId.toLowerCase() == 'null') {
+          continue;
+        }
+
+        hijosPorParentId
+            .putIfAbsent(parentId, () => <Map<String, dynamic>>[])
+            .add(usuario);
+      }
+
+      final permitidos = <Map<String, dynamic>>[];
+      final visitados = <String>{};
+
+      void recorrer(Map<String, dynamic> actual) {
+        final id = actual['id']?.toString() ?? '';
+        final rol = _normalizarRol(actual['rol']);
+
+        if (id.isEmpty || visitados.contains(id)) return;
+
+        visitados.add(id);
+
+        if (rol != 'agente' &&
+            rol != 'administracion' &&
+            rol != 'administrador' &&
+            rol != 'admin') {
+          permitidos.add(actual);
+        }
+
+        final nivelActual = _nivelRol(rol);
+        final hijos = hijosPorParentId[id] ?? <Map<String, dynamic>>[];
+
+        for (final hijo in hijos) {
+          final rolHijo = _normalizarRol(hijo['rol']);
+          final nivelHijo = _nivelRol(rolHijo);
+
+          if (nivelHijo <= 0 || nivelHijo >= nivelActual) {
+            continue;
+          }
+
+          recorrer(hijo);
+        }
+      }
+
+      final rolLogueado = _normalizarRol(yo['rol']);
+
+      if (rolLogueado == 'administracion' ||
+          rolLogueado == 'administrador' ||
+          rolLogueado == 'admin') {
+        permitidos.addAll(
+          usuarios.where((u) {
+            final rol = _normalizarRol(u['rol']);
+            return rol == 'director_nacional' ||
+                rol == 'director_zona' ||
+                rol == 'jefe_ventas' ||
+                rol == 'jefe_equipo';
+          }),
+        );
+      } else {
+        recorrer(yo);
+      }
+
+      final unicosPorAuthId = <String, Map<String, dynamic>>{};
+
+      for (final usuario in permitidos) {
+        final authId = usuario['auth_id']?.toString() ?? '';
+        if (authId.isEmpty || authId.toLowerCase() == 'null') continue;
+        unicosPorAuthId[authId] = usuario;
+      }
+
+      final lista = unicosPorAuthId.values.toList()
+        ..sort((a, b) {
+          final nivelA = _nivelRol(a['rol']?.toString() ?? '');
+          final nivelB = _nivelRol(b['rol']?.toString() ?? '');
+
+          final porNivel = nivelB.compareTo(nivelA);
+          if (porNivel != 0) return porNivel;
+
+          final nombreA =
+              '${a['nombre'] ?? ''} ${a['apellidos'] ?? ''}'.trim().toLowerCase();
+          final nombreB =
+              '${b['nombre'] ?? ''} ${b['apellidos'] ?? ''}'.trim().toLowerCase();
+
+          return nombreA.compareTo(nombreB);
+        });
+
+      if (!mounted) return;
+
+      setState(() {
+        responsablesDisponibles = lista;
+        loadingResponsables = false;
+      });
+    } catch (e) {
+      debugPrint('ERROR CARGANDO RESPONSABLES: $e');
+
+      if (!mounted) return;
+
+      setState(() {
+        responsablesDisponibles = [];
+        loadingResponsables = false;
+      });
+    }
+  }
 
   @override
   void dispose() {
@@ -166,6 +381,59 @@ class _NuevoCandidatoScreenState extends State<NuevoCandidatoScreen> {
     }
   }
 
+  Future<void> _notificarCandidatoAsignado({
+    required String candidatoId,
+    required String candidatoNombre,
+    required String remitenteAuthId,
+    required String destinatarioAuthId,
+  }) async {
+    try {
+      final usuarioRemitente = await supabase
+          .from('usuarios')
+          .select('nombre, apellidos')
+          .eq('auth_id', remitenteAuthId)
+          .maybeSingle();
+
+      final nombreRemitente = [
+        usuarioRemitente?['nombre']?.toString().trim() ?? '',
+        usuarioRemitente?['apellidos']?.toString().trim() ?? '',
+      ].where((parte) => parte.isNotEmpty).join(' ');
+
+      final remitenteVisible =
+          nombreRemitente.isEmpty ? 'Un responsable' : nombreRemitente;
+
+      final response = await supabase.functions.invoke(
+        'enviar-push',
+        body: {
+          'auth_id_destino': destinatarioAuthId,
+          'titulo': 'Nuevo candidato asignado',
+          'mensaje':
+              '$remitenteVisible te ha asignado a $candidatoNombre '
+              'para el proceso de selección. Entra en Candidatos '
+              'para revisar su perfil.',
+          'data': {
+            'tipo': 'candidato_asignado',
+            'pantalla_destino': 'candidatos',
+            'candidato_id': candidatoId,
+            'remitente_auth_id': remitenteAuthId,
+            'destinatario_auth_id': destinatarioAuthId,
+          },
+        },
+      );
+
+      if (response.status < 200 || response.status >= 300) {
+        debugPrint(
+          'PUSH CANDIDATO NO ENVIADO: '
+          'HTTP ${response.status} - ${response.data}',
+        );
+      }
+    } catch (error, stackTrace) {
+      // El push es secundario: nunca debe impedir guardar el candidato.
+      debugPrint('ERROR PUSH CANDIDATO ASIGNADO: $error');
+      debugPrintStack(stackTrace: stackTrace);
+    }
+  }
+
   Future<void> guardarCandidato() async {
     setState(() => showErrors = true);
 
@@ -188,18 +456,39 @@ class _NuevoCandidatoScreenState extends State<NuevoCandidatoScreen> {
         throw Exception("No hay usuario autenticado");
       }
 
-      await supabase.from('candidatos_captacion').insert({
-        'auth_id': user.id,
-        'nombre': nombreController.text.trim(),
-        'telefono': telefonoController.text.trim(),
-        'email': emailController.text.trim(),
-        'ciudad': ciudadController.text.trim(),
-        'origen': origenSeleccionado,
-        'observaciones': observacionesController.text.trim(),
-        'cv_url': cvUrl,
-        'estado': 'CV_RECIBIDO',
-        'asignado_por': user.id,
-      });
+      final candidatoNombre = nombreController.text.trim();
+      final destinatarioAuthId = responsableAuthId!;
+
+      final candidatoCreado = await supabase
+          .from('candidatos_captacion')
+          .insert({
+            'auth_id': user.id,
+            'nombre': candidatoNombre,
+            'telefono': telefonoController.text.trim(),
+            'email': emailController.text.trim(),
+            'ciudad': ciudadController.text.trim(),
+            'origen': origenSeleccionado,
+            'observaciones': observacionesController.text.trim(),
+            'cv_url': cvUrl,
+            'estado': 'CV_RECIBIDO',
+            'asignado_por': user.id,
+            'asignado_auth_id': destinatarioAuthId,
+            'asignado_usuario_id': responsableUsuarioId,
+            'asignado_nombre': responsableNombre,
+            'asignado_rol': responsableRol,
+            'fecha_asignacion': DateTime.now().toIso8601String(),
+          })
+          .select('id')
+          .single();
+
+      unawaited(
+        _notificarCandidatoAsignado(
+          candidatoId: candidatoCreado['id'].toString(),
+          candidatoNombre: candidatoNombre,
+          remitenteAuthId: user.id,
+          destinatarioAuthId: destinatarioAuthId,
+        ),
+      );
 
       if (mounted) Navigator.pop(context, true);
     } catch (e) {
@@ -267,10 +556,11 @@ class _NuevoCandidatoScreenState extends State<NuevoCandidatoScreen> {
       !emailError,
       !ciudadError,
       !origenError,
+      !responsableError,
       cvUrl != null,
     ].where((v) => v).length;
 
-    final progreso = completado / 6;
+    final progreso = completado / 7;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF4F6FB),
@@ -337,6 +627,13 @@ class _NuevoCandidatoScreenState extends State<NuevoCandidatoScreen> {
                           subtitle: "Indica desde dónde llega este perfil",
                           icon: Icons.campaign_rounded,
                           child: _origenSelector(),
+                        ),
+                        const SizedBox(height: 18),
+                        _sectionCard(
+                          title: "Asignar candidato",
+                          subtitle: "Selecciona quién será responsable del proceso",
+                          icon: Icons.assignment_ind_rounded,
+                          child: _responsableSelector(),
                         ),
                         const SizedBox(height: 18),
                         _sectionCard(
@@ -649,6 +946,179 @@ class _NuevoCandidatoScreenState extends State<NuevoCandidatoScreen> {
             );
           }).toList(),
         ),
+      ],
+    );
+  }
+
+  Widget _responsableSelector() {
+    if (loadingResponsables) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 14),
+        child: Center(
+          child: CircularProgressIndicator(
+            color: Color(0xFF2563EB),
+          ),
+        ),
+      );
+    }
+
+    if (responsablesDisponibles.isEmpty) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: const Color(0xFFEF4444).withOpacity(0.08),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: const Color(0xFFEF4444).withOpacity(0.18),
+          ),
+        ),
+        child: const Text(
+          "No se han encontrado responsables disponibles en tu estructura.",
+          style: TextStyle(
+            color: Color(0xFFEF4444),
+            fontSize: 12,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (showErrors && responsableError)
+          Container(
+            width: double.infinity,
+            margin: const EdgeInsets.only(bottom: 12),
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: const Color(0xFFEF4444).withOpacity(0.10),
+              borderRadius: BorderRadius.circular(18),
+            ),
+            child: const Text(
+              "Debes asignar el candidato a una persona",
+              style: TextStyle(
+                color: Color(0xFFEF4444),
+                fontWeight: FontWeight.w800,
+                fontSize: 12,
+              ),
+            ),
+          ),
+        ...responsablesDisponibles.map((responsable) {
+          final authId = responsable['auth_id']?.toString() ?? '';
+          final usuarioId = responsable['id']?.toString() ?? '';
+          final rol = _normalizarRol(responsable['rol']);
+          final nombre =
+              "${responsable['nombre'] ?? ''} ${responsable['apellidos'] ?? ''}"
+                  .trim();
+
+          final seleccionado = responsableAuthId == authId;
+
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: MouseRegion(
+              cursor: SystemMouseCursors.click,
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(22),
+                  onTap: () {
+                    setState(() {
+                      responsableAuthId = authId;
+                      responsableUsuarioId = usuarioId;
+                      responsableNombre =
+                          nombre.isEmpty ? 'Usuario sin nombre' : nombre;
+                      responsableRol = rol;
+                    });
+                  },
+                  child: Ink(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: seleccionado
+                          ? const Color(0xFF2563EB).withOpacity(0.10)
+                          : const Color(0xFFF8FAFC),
+                      borderRadius: BorderRadius.circular(22),
+                      border: Border.all(
+                        color: seleccionado
+                            ? const Color(0xFF2563EB)
+                            : Colors.black.withOpacity(0.05),
+                        width: seleccionado ? 1.5 : 1,
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 48,
+                          height: 48,
+                          decoration: BoxDecoration(
+                            color: seleccionado
+                                ? const Color(0xFF2563EB)
+                                : const Color(0xFF111827).withOpacity(0.08),
+                            borderRadius: BorderRadius.circular(17),
+                          ),
+                          child: Icon(
+                            seleccionado
+                                ? Icons.check_rounded
+                                : Icons.person_rounded,
+                            color: seleccionado
+                                ? Colors.white
+                                : const Color(0xFF111827),
+                          ),
+                        ),
+                        const SizedBox(width: 13),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                nombre.isEmpty
+                                    ? 'Usuario sin nombre'
+                                    : nombre,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  color: Color(0xFF111827),
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w900,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                _rolTexto(rol),
+                                style: TextStyle(
+                                  color: seleccionado
+                                      ? const Color(0xFF2563EB)
+                                      : Colors.black.withOpacity(0.45),
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Radio<String>(
+                          value: authId,
+                          groupValue: responsableAuthId,
+                          activeColor: const Color(0xFF2563EB),
+                          onChanged: (_) {
+                            setState(() {
+                              responsableAuthId = authId;
+                              responsableUsuarioId = usuarioId;
+                              responsableNombre =
+                                  nombre.isEmpty ? 'Usuario sin nombre' : nombre;
+                              responsableRol = rol;
+                            });
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          );
+        }),
       ],
     );
   }

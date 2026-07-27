@@ -54,3 +54,20 @@ windows/runner/**/Release/
 
 # Archivo creado por error
 /flutter
+firebase-secrets.env
+
+
+# Certificados y claves privadas
+/certificados/
+*.p8
+*.p12
+*.pfx
+*.key
+*.mobileprovision
+
+# Instaladores y herramientas locales
+/installer/
+/firebase-standalone-defectuoso.exe
+
+# Archivos con secretos
+firebase-secrets.env

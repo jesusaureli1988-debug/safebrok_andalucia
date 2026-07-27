@@ -84,20 +84,7 @@ class _MisEquiposJefeVentasScreenState
         .replaceAll(' ', '_');
   }
 
-  String? _rolHijoEsperado(String rol) {
-    switch (_normalizarRol(rol)) {
-      case 'director_nacional':
-        return 'director_zona';
-      case 'director_zona':
-        return 'jefe_ventas';
-      case 'jefe_ventas':
-        return 'jefe_equipo';
-      case 'jefe_equipo':
-        return 'agente';
-      default:
-        return null;
-    }
-  }
+  
 
   Future<void> cargarEquipos() async {
     try {
@@ -220,19 +207,33 @@ class _MisEquiposJefeVentasScreenState
         }
 
         final nuevosVisitados = {...visitados, id};
-        final rolHijo = _rolHijoEsperado(rol);
 
-        final hijosDirectos = rolHijo == null
-            ? <Map<String, dynamic>>[]
-            : (usuariosPorParentId[id] ?? <Map<String, dynamic>>[])
-                .where(
-                  (u) => _normalizarRol(u['rol_usuario']) == rolHijo,
-                )
-                .toList();
+final hijosDirectos = List<Map<String, dynamic>>.from(
+  usuariosPorParentId[id] ?? <Map<String, dynamic>>[],
+);
 
-        final hijos = hijosDirectos
-            .map((u) => construirNodo(u, nuevosVisitados))
-            .toList();
+debugPrint(
+  '➡️ ${_nombreCompleto(usuario)} '
+  '| rol=$rol '
+  '| hijos directos=${hijosDirectos.length}',
+);
+
+for (final hijo in hijosDirectos) {
+  debugPrint(
+    '   ✔ ${_nombreCompleto(hijo)} '
+    '| rol=${hijo['rol_usuario']} '
+    '| parent_id=${hijo['parent_id']}',
+  );
+}
+
+final hijos = hijosDirectos
+    .map(
+      (hijo) => construirNodo(
+        hijo,
+        nuevosVisitados,
+      ),
+    )
+    .toList();
 
         hijos.sort((a, b) {
           final ventas = b.totalVentas.compareTo(a.totalVentas);
@@ -1036,39 +1037,36 @@ class _MisEquiposJefeVentasScreenState
   }
 
   Widget _sinDependenciasCard(_EstructuraNode node) {
-    final siguienteRol = _rolHijoEsperado(node.rol);
-    final mensaje = siguienteRol == null
-        ? 'Este usuario no tiene niveles inferiores en la jerarquía.'
-        : 'No tiene ${_rolTexto(siguienteRol).toLowerCase()} asignados directamente.';
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(15),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.055),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: Colors.white.withOpacity(0.10)),
+  return Container(
+    width: double.infinity,
+    padding: const EdgeInsets.all(15),
+    decoration: BoxDecoration(
+      color: Colors.white.withOpacity(0.055),
+      borderRadius: BorderRadius.circular(18),
+      border: Border.all(
+        color: Colors.white.withOpacity(0.10),
       ),
-      child: Row(
-        children: [
-          const Icon(
-            Icons.info_outline_rounded,
-            color: Colors.white54,
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              mensaje,
-              style: const TextStyle(
-                color: Colors.white60,
-                fontWeight: FontWeight.w700,
-              ),
+    ),
+    child: const Row(
+      children: [
+        Icon(
+          Icons.info_outline_rounded,
+          color: Colors.white54,
+        ),
+        SizedBox(width: 10),
+        Expanded(
+          child: Text(
+            'Este usuario no tiene personas asignadas directamente.',
+            style: TextStyle(
+              color: Colors.white60,
+              fontWeight: FontWeight.w700,
             ),
           ),
-        ],
-      ),
-    );
-  }
+        ),
+      ],
+    ),
+  );
+}
 
   Widget _emptyCard() {
     return _glassCard(

@@ -1,6 +1,7 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:safebrok_andalucia/core/production/production_period_service.dart';
 
 import 'package:safebrok_andalucia/features/payroll/nominas_screen.dart';
 import 'objetivo_screen.dart';
@@ -15,10 +16,7 @@ import 'package:safebrok_andalucia/features/team/team_dashboard_screen.dart';
 class BusinessScreen extends StatefulWidget {
   final String role;
 
-  const BusinessScreen({
-    super.key,
-    required this.role,
-  });
+  const BusinessScreen({super.key, required this.role});
 
   @override
   State<BusinessScreen> createState() => _BusinessScreenState();
@@ -35,14 +33,14 @@ class _BusinessScreenState extends State<BusinessScreen> {
   double objetivo = 0;
 
   double variacionMesAnterior = 0;
-bool variacionPositiva = true;
+  bool variacionPositiva = true;
 
   double primasPropiasJefe = 0;
   double comisionesPropiasJefe = 0;
   double primasTotalesJefe = 0;
   double rappelJefeVentas = 0;
   double extornoPrimasMes = 0;
-double extornoComisionesMes = 0;
+  double extornoComisionesMes = 0;
 
   List<Map<String, dynamic>> ventas = [];
 
@@ -52,408 +50,563 @@ double extornoComisionesMes = 0;
     loadData();
   }
 
-  Future<void> loadData() async {
-    final user = supabase.auth.currentUser;
+  String _idTexto(dynamic value) {
+    if (value == null) return '';
 
-    if (user == null) {
-      if (mounted) {
-        setState(() => loading = false);
+    final texto = value.toString().trim();
+
+    if (texto.isEmpty || texto.toLowerCase() == 'null') {
+      return '';
+    }
+
+    return texto;
+  }
+
+  String _normalizarRol(dynamic value) {
+    return (value ?? '')
+        .toString()
+        .trim()
+        .toLowerCase()
+        .replaceAll('-', '_')
+        .replaceAll(' ', '_');
+  }
+
+  double _numero(dynamic value) {
+    if (value == null) return 0;
+    if (value is num) return value.toDouble();
+
+    final texto = value.toString().trim();
+
+    if (texto.isEmpty) return 0;
+
+    final normalizado = texto.contains(',') && texto.contains('.')
+        ? texto.replaceAll('.', '').replaceAll(',', '.')
+        : texto.replaceAll(',', '.');
+
+    return double.tryParse(normalizado) ?? 0;
+  }
+
+  DateTime? _fechaVenta(Map<String, dynamic> venta) {
+    final valores = [
+      venta['fecha_efecto'],
+      venta['fecha'],
+      venta['created_at'],
+      venta['fecha_registro'],
+    ];
+
+    for (final valor in valores) {
+      if (valor == null) continue;
+
+      final fecha = DateTime.tryParse(valor.toString());
+
+      if (fecha != null) {
+        return fecha;
       }
+    }
+
+    return null;
+  }
+
+  int _nivelRol(dynamic rol) {
+    switch (_normalizarRol(rol)) {
+      case 'director_nacional':
+        return 5;
+      case 'director_zona':
+        return 4;
+      case 'jefe_ventas':
+        return 3;
+      case 'jefe_equipo':
+        return 2;
+      case 'agente':
+        return 1;
+      default:
+        return 0;
+    }
+  }
+
+  List<Map<String, dynamic>> _construirEstructuraValida({
+    required Map<String, dynamic> perfil,
+    required List<Map<String, dynamic>> todosUsuarios,
+  }) {
+    final rolRaiz = _normalizarRol(perfil['rol_usuario']);
+    final idRaiz = _idTexto(perfil['id']);
+    if (idRaiz.isEmpty) {
+      throw Exception(
+        'El usuario conectado no tiene un id válido en usuarios.',
+      );
+    }
+    if (rolRaiz == 'administracion' || rolRaiz == 'director_nacional') {
+      return todosUsuarios.where((usuario) {
+        return _idTexto(usuario['id']).isNotEmpty &&
+            _idTexto(usuario['auth_id']).isNotEmpty;
+      }).toList();
+    }
+    final hijosPorParent = <String, List<Map<String, dynamic>>>{};
+    for (final fila in todosUsuarios) {
+      final usuario = Map<String, dynamic>.from(fila);
+      final parentId = _idTexto(usuario['parent_id']);
+      if (parentId.isEmpty) continue;
+      hijosPorParent
+          .putIfAbsent(parentId, () => <Map<String, dynamic>>[])
+          .add(usuario);
+    }
+    final resultado = <Map<String, dynamic>>[Map<String, dynamic>.from(perfil)];
+    final visitados = <String>{idRaiz};
+    final pendientes = <Map<String, dynamic>>[
+      Map<String, dynamic>.from(perfil),
+    ];
+    while (pendientes.isNotEmpty) {
+      final padre = pendientes.removeAt(0);
+      final padreId = _idTexto(padre['id']);
+      final nivelPadre = _nivelRol(padre['rol_usuario']);
+      final hijos = hijosPorParent[padreId] ?? <Map<String, dynamic>>[];
+      for (final hijoOriginal in hijos) {
+        final hijo = Map<String, dynamic>.from(hijoOriginal);
+        final hijoId = _idTexto(hijo['id']);
+        final nivelHijo = _nivelRol(hijo['rol_usuario']);
+        if (hijoId.isEmpty || visitados.contains(hijoId)) continue;
+        if (nivelPadre <= 0 || nivelHijo <= 0 || nivelHijo >= nivelPadre)
+          continue;
+        visitados.add(hijoId);
+        resultado.add(hijo);
+        pendientes.add(hijo);
+      }
+    }
+    return resultado;
+  }
+
+  Future<void> loadData() async {
+    final authUser = supabase.auth.currentUser;
+
+    if (authUser == null) {
+      if (!mounted) return;
+
+      setState(() {
+        loading = false;
+      });
+
       return;
     }
 
     try {
-      final now = DateTime.now();
-
-      final start = now.day >= 24
-          ? DateTime(now.year, now.month, 24)
-          : DateTime(now.year, now.month - 1, 24);
-
-      final end = now.day >= 24
-          ? DateTime(now.year, now.month + 1, 24)
-          : DateTime(now.year, now.month, 24);
-
-          final previousStart = DateTime(start.year, start.month - 1, start.day);
-final previousEnd = start;
-
-      primasPropiasJefe = 0;
-      comisionesPropiasJefe = 0;
-      primasTotalesJefe = 0;
-      rappelJefeVentas = 0;
-
-      double primasDV = 0;
-      double primasTotales = 0;
-      double porcentajeDV = 0;
-
-      final ventasPropias = await supabase
-          .from('ventas')
-          .select('prima_anual_neta, comision, producto')
-          .eq('agente_auth_id', user.id)
-          .gte('fecha_efecto', start.toIso8601String())
-          .lt('fecha_efecto', end.toIso8601String());
-
-      for (final v in ventasPropias) {
-        final prima = (v['prima_anual_neta'] ?? 0).toDouble();
-
-        primasPropiasJefe += prima;
-        comisionesPropiasJefe += (v['comision'] ?? 0).toDouble();
-
-        final producto = (v['producto'] ?? '').toString().toLowerCase();
-
-        if (producto.contains('vida') || producto.contains('decesos')) {
-          primasDV += prima;
-        }
+      if (mounted) {
+        setState(() {
+          loading = true;
+        });
       }
 
-      final userProfile = await supabase
+      final perfilData = await supabase
           .from('usuarios')
-          .select('rol_usuario, id')
-          .eq('auth_id', user.id)
+          .select(
+            'id, auth_id, parent_id, rol_usuario, nombre, apellidos, email',
+          )
+          .eq('auth_id', authUser.id)
           .maybeSingle();
 
-      final role = userProfile?['rol_usuario'];
-      final userId = userProfile?['id'];
-
-      
-
-      List<Map<String, dynamic>> ultimasVentasRaw = [];
-
-      if (role == 'jefe_equipo') {
-        final agentes = await supabase
-            .from('usuarios')
-            .select('auth_id')
-            .eq('parent_id', userId);
-
-        final ids = (agentes as List)
-            .map((e) => e['auth_id'] as String)
-            .toList();
-
-        if (ids.isNotEmpty) {
-          ultimasVentasRaw = await supabase
-              .from('ventas')
-              .select('producto, precio, cliente_id')
-              .inFilter('agente_auth_id', ids)
-              .order('fecha_efecto', ascending: false)
-              .limit(2);
-        }
-      } else if (role == 'jefe_ventas') {
-        final jefesEquipo = await supabase
-            .from('usuarios')
-            .select('id')
-            .eq('parent_id', userId);
-
-        final jefesEquipoIds = (jefesEquipo as List)
-            .map((e) => e['id'] as String)
-            .toList();
-
-        if (jefesEquipoIds.isNotEmpty) {
-          final agentes = await supabase
-              .from('usuarios')
-              .select('auth_id')
-              .inFilter('parent_id', jefesEquipoIds);
-
-          final agentesIds = (agentes as List)
-              .map((e) => e['auth_id'] as String)
-              .toList();
-
-          if (agentesIds.isNotEmpty) {
-            ultimasVentasRaw = await supabase
-                .from('ventas')
-                .select('producto, precio, cliente_id')
-                .inFilter('agente_auth_id', agentesIds)
-                .order('fecha_efecto', ascending: false)
-                .limit(2);
-          }
-        }
-      } else if (role == 'director_zona') {
-  final usuariosData = await supabase
-      .from('usuarios')
-      .select('id, auth_id, parent_id');
-
-  final usuariosTabla = List<Map<String, dynamic>>.from(usuariosData);
-
-  String limpiar(dynamic value) {
-    return (value ?? '').toString().trim();
-  }
-
-  final idsPermitidos = <String>{userId.toString()};
-  final authIdsPermitidos = <String>{user.id};
-
-  void buscarDescendientes(String parentId) {
-    for (final u in usuariosTabla) {
-      final idUsuario = limpiar(u['id']);
-      final parentUsuario = limpiar(u['parent_id']);
-      final authIdUsuario = limpiar(u['auth_id']);
-
-      if (parentUsuario == parentId &&
-          idUsuario.isNotEmpty &&
-          !idsPermitidos.contains(idUsuario)) {
-        idsPermitidos.add(idUsuario);
-
-        if (authIdUsuario.isNotEmpty) {
-          authIdsPermitidos.add(authIdUsuario);
-        }
-
-        buscarDescendientes(idUsuario);
+      if (perfilData == null) {
+        throw Exception('No se encontró el perfil del usuario conectado.');
       }
-    }
-  }
 
-  buscarDescendientes(userId.toString());
+      final perfil = Map<String, dynamic>.from(perfilData);
 
-  ultimasVentasRaw = await supabase
-      .from('ventas')
-      .select('producto, precio, cliente_id')
-      .inFilter('agente_auth_id', authIdsPermitidos.toList())
-      .order('fecha_efecto', ascending: false)
-      .limit(2);
-} else if (role == 'director_nacional') {
-  ultimasVentasRaw = await supabase
-      .from('ventas')
-      .select('producto, precio, cliente_id')
-      .order('fecha_efecto', ascending: false)
-      .limit(2);
-} else {
-  ultimasVentasRaw = await supabase
-      .from('ventas')
-      .select('producto, precio, cliente_id')
-      .eq('agente_auth_id', user.id)
-      .order('fecha_efecto', ascending: false)
-      .limit(2);
-}
+      final usuariosData = await supabase
+          .from('usuarios')
+          .select(
+            'id, auth_id, parent_id, rol_usuario, nombre, apellidos, email',
+          );
 
-      final clientes = await supabase.from('clientes').select('id, nombre');
+      final todosUsuarios = List<Map<String, dynamic>>.from(usuariosData);
 
-      final clientesMap = {
-        for (final c in clientes) c['id']: c['nombre'],
-      };
+      final estructura = _construirEstructuraValida(
+        perfil: perfil,
+        todosUsuarios: todosUsuarios,
+      );
 
-     double primasEquipo = 0;
+      final authIdsEstructura = estructura
+          .map((usuario) => _idTexto(usuario['auth_id']))
+          .where((authId) => authId.isNotEmpty)
+          .toSet()
+          .toList();
 
-if (role == 'jefe_equipo' ||
-    role == 'jefe_ventas' ||
-    role == 'director_zona') {
-  primasEquipo = await getPrimasEquipo(userId.toString(), role, start, end);
+      if (authIdsEstructura.isEmpty) {
+        throw Exception('La estructura no contiene auth_id válidos.');
+      }
 
-        if (role == 'jefe_equipo') {
-          final agentes = await supabase
-              .from('usuarios')
-              .select('auth_id')
-              .eq('parent_id', userId);
+      final productionPeriod = await ProductionPeriodService.instance.current();
+      final inicioActual = productionPeriod.start;
+      final finActual = productionPeriod.endExclusive;
 
-          final ids = (agentes as List)
-              .map((e) => e['auth_id'] as String)
-              .toList();
+      final inicioAnterior = DateTime(
+        inicioActual.year,
+        inicioActual.month - 1,
+        24,
+      );
 
-          if (ids.isNotEmpty) {
-            final ventasDVEquipo = await supabase
-                .from('ventas')
-                .select('prima_anual_neta, producto')
-                .inFilter('agente_auth_id', ids)
-                .gte('fecha_efecto', start.toIso8601String())
-                .lt('fecha_efecto', end.toIso8601String());
+      final finAnterior = inicioActual;
 
-            for (final v in ventasDVEquipo) {
-              final producto =
-                  (v['producto'] ?? '').toString().toLowerCase();
+      final ventasActualData = await supabase
+          .from('ventas')
+          .select(
+            'id, agente_auth_id, prima_anual_neta, comision, producto, '
+            'precio, cliente_id, fecha_efecto, created_at',
+          )
+          .inFilter('agente_auth_id', authIdsEstructura)
+          .gte('fecha_efecto', inicioActual.toIso8601String())
+          .lt('fecha_efecto', finActual.toIso8601String());
 
-              if (producto.contains('vida') || producto.contains('decesos')) {
-                primasDV += (v['prima_anual_neta'] ?? 0).toDouble();
-              }
-            }
-          }
-        }
+      final ventasAnteriorData = await supabase
+          .from('ventas')
+          .select(
+            'id, agente_auth_id, prima_anual_neta, comision, producto, '
+            'fecha_efecto, created_at',
+          )
+          .inFilter('agente_auth_id', authIdsEstructura)
+          .gte('fecha_efecto', inicioAnterior.toIso8601String())
+          .lt('fecha_efecto', finAnterior.toIso8601String());
 
-        if (role == 'jefe_ventas') {
-          final jefes = await supabase
-              .from('usuarios')
-              .select('id')
-              .eq('parent_id', userId);
+      final ventasActuales = List<Map<String, dynamic>>.from(ventasActualData)
+          .where((venta) {
+            return authIdsEstructura.contains(
+              _idTexto(venta['agente_auth_id']),
+            );
+          })
+          .toList();
 
-          final jefesIds =
-              (jefes as List).map((e) => e['id'] as String).toList();
+      final ventasAnteriores =
+          List<Map<String, dynamic>>.from(ventasAnteriorData).where((venta) {
+            return authIdsEstructura.contains(
+              _idTexto(venta['agente_auth_id']),
+            );
+          }).toList();
 
-          if (jefesIds.isNotEmpty) {
-            final agentes = await supabase
-                .from('usuarios')
-                .select('auth_id')
-                .inFilter('parent_id', jefesIds);
+      final extornosActuales = await getExtornosPeriodo(
+        start: inicioActual,
+        end: finActual,
+        authIds: authIdsEstructura,
+        authIdSoloComision: authUser.id,
+      );
 
-            final agentesIds = (agentes as List)
-                .map((e) => e['auth_id'] as String)
-                .toList();
+      final extornosAnteriores = await getExtornosPeriodo(
+        start: inicioAnterior,
+        end: finAnterior,
+        authIds: authIdsEstructura,
+        authIdSoloComision: authUser.id,
+      );
 
-            if (agentesIds.isNotEmpty) {
-              final ventasDV = await supabase
-                  .from('ventas')
-                  .select('prima_anual_neta, producto')
-                  .inFilter('agente_auth_id', agentesIds)
-                  .gte('fecha_efecto', start.toIso8601String())
-                  .lt('fecha_efecto', end.toIso8601String());
+      final calculoActual = _calcularPeriodoEconomico(
+        role: _normalizarRol(perfil['rol_usuario']),
+        myAuthId: authUser.id,
+        ventasPeriodo: ventasActuales,
+        extornos: extornosActuales,
+      );
 
-              for (final v in ventasDV) {
-                final producto =
-                    (v['producto'] ?? '').toString().toLowerCase();
+      final calculoAnterior = _calcularPeriodoEconomico(
+        role: _normalizarRol(perfil['rol_usuario']),
+        myAuthId: authUser.id,
+        ventasPeriodo: ventasAnteriores,
+        extornos: extornosAnteriores,
+      );
 
-                if (producto.contains('vida') || producto.contains('decesos')) {
-                  primasDV += (v['prima_anual_neta'] ?? 0).toDouble();
-                }
-              }
-            }
-          }
+      final ultimasVentasData = await supabase
+          .from('ventas')
+          .select(
+            'producto, precio, cliente_id, agente_auth_id, '
+            'fecha_efecto, created_at',
+          )
+          .inFilter('agente_auth_id', authIdsEstructura)
+          .order('fecha_efecto', ascending: false)
+          .limit(2);
+
+      final ultimasVentasRaw =
+          List<Map<String, dynamic>>.from(ultimasVentasData).where((venta) {
+            return authIdsEstructura.contains(
+              _idTexto(venta['agente_auth_id']),
+            );
+          }).toList();
+
+      final clienteIds = ultimasVentasRaw
+          .map((venta) => _idTexto(venta['cliente_id']))
+          .where((id) => id.isNotEmpty)
+          .toSet()
+          .toList();
+
+      final clientesMap = <String, String>{};
+
+      if (clienteIds.isNotEmpty) {
+        final clientesData = await supabase
+            .from('clientes')
+            .select('id, nombre')
+            .inFilter('id', clienteIds);
+
+        for (final cliente in List<Map<String, dynamic>>.from(clientesData)) {
+          final id = _idTexto(cliente['id']);
+
+          if (id.isEmpty) continue;
+
+          clientesMap[id] =
+              cliente['nombre']?.toString().trim().isNotEmpty == true
+              ? cliente['nombre'].toString().trim()
+              : 'Sin cliente';
         }
       }
 
-      if (role == 'agente') {
-        primasTotales = primasPropiasJefe;
-      } else {
-        primasTotales = primasPropiasJefe + primasEquipo;
-      }
-
-      final authIdsEstructura = await getAuthIdsEstructura(
-  userId.toString(),
-  role,
-  user.id,
-);
-
-final extornosActuales = await getExtornosPeriodo(
-  start: start,
-  end: end,
-  authIds: role == 'director_nacional' ? null : authIdsEstructura,
-  authIdSoloComision: user.id,
-);
-
-primasTotales -= extornosActuales['prima'] ?? 0;
-primasDV -= extornosActuales['prima_dv'] ?? 0;
-comisionesPropiasJefe -= extornosActuales['comision_propia'] ?? 0;
-
-extornoPrimasMes = extornosActuales['prima'] ?? 0;
-extornoComisionesMes = extornosActuales['comision_propia'] ?? 0;
-
-if (primasTotales < 0) primasTotales = 0;
-if (primasDV < 0) primasDV = 0;
-if (comisionesPropiasJefe < 0) comisionesPropiasJefe = 0;
-
-      double primasPeriodoAnterior = 0;
-
-if (role == 'agente') {
-  final ventasAnterior = await supabase
-      .from('ventas')
-      .select('prima_anual_neta')
-      .eq('agente_auth_id', user.id)
-      .gte('fecha_efecto', previousStart.toIso8601String())
-      .lt('fecha_efecto', previousEnd.toIso8601String());
-
-  for (final v in ventasAnterior) {
-    primasPeriodoAnterior += (v['prima_anual_neta'] ?? 0).toDouble();
-  }
-} else if (role == 'jefe_equipo' || role == 'jefe_ventas') {
-  primasPeriodoAnterior = await getPrimasEquipo(
-    userId,
-    role,
-    previousStart,
-    previousEnd,
-  );
-
-  final ventasPropiasAnterior = await supabase
-      .from('ventas')
-      .select('prima_anual_neta')
-      .eq('agente_auth_id', user.id)
-      .gte('fecha_efecto', previousStart.toIso8601String())
-      .lt('fecha_efecto', previousEnd.toIso8601String());
-
-  for (final v in ventasPropiasAnterior) {
-    primasPeriodoAnterior += (v['prima_anual_neta'] ?? 0).toDouble();
-  }
-}
-
-final extornosAnteriores = await getExtornosPeriodo(
-  start: previousStart,
-  end: previousEnd,
-  authIds: role == 'director_nacional' ? null : authIdsEstructura,
-  authIdSoloComision: user.id,
-);
-
-primasPeriodoAnterior -= extornosAnteriores['prima'] ?? 0;
-
-if (primasPeriodoAnterior < 0) {
-  primasPeriodoAnterior = 0;
-}
-
-final variacion = primasPeriodoAnterior > 0
-    ? ((primasTotales - primasPeriodoAnterior) / primasPeriodoAnterior) * 100
-    : primasTotales > 0
-        ? 100.0
-        : 0.0;
-
-      double rappelJefe = 0;
-
-      if (role == 'jefe_equipo') {
-        rappelJefe = calcularRappelJefe(primasTotales);
-      }
-
-      if (role == 'jefe_ventas') {
-        rappelJefeVentas = calcularRappelJefeVentas(primasTotales);
-      }
-
-      double objetivoPrimas = 12000;
-
-      if (role == 'jefe_equipo') {
-        objetivoPrimas = 10000;
-      }
-
-      if (role == 'jefe_ventas') {
-        objetivoPrimas = 11500;
-      }
-
-      porcentajeDV = primasTotales > 0 ? (primasDV / primasTotales) * 100 : 0;
-
-      final objetivoCumplido =
-          primasTotales >= objetivoPrimas && porcentajeDV >= 30;
-
-      final progreso = (primasTotales / objetivoPrimas).clamp(0.0, 1.0);
-
-      final ultimasVentasConNombre = ultimasVentasRaw.map((v) {
-        final clienteId = v['cliente_id'];
+      final ultimasVentasConNombre = ultimasVentasRaw.map((venta) {
+        final clienteId = _idTexto(venta['cliente_id']);
 
         return {
-          ...v,
+          ...venta,
           'cliente_nombre': clientesMap[clienteId] ?? 'Sin cliente',
         };
       }).toList();
 
+      final sueldoActual = calculoActual['sueldo'] ?? 0;
+      final sueldoAnterior = calculoAnterior['sueldo'] ?? 0;
+
+      final variacion = sueldoAnterior > 0
+          ? ((sueldoActual - sueldoAnterior) / sueldoAnterior) * 100
+          : sueldoActual > 0
+          ? 100.0
+          : 0.0;
+
+      final primasNetasActuales = calculoActual['primas_netas'] ?? 0;
+
+      final primasDVActuales = calculoActual['primas_dv'] ?? 0;
+
+      final objetivoPrimas = _objetivoPrimasPorRol(perfil['rol_usuario']);
+
+      final porcentajeDV = primasNetasActuales > 0
+          ? (primasDVActuales / primasNetasActuales) * 100
+          : 0.0;
+
+      final objetivoCumplido =
+          primasNetasActuales >= objetivoPrimas && porcentajeDV >= 30;
+
+      final progreso = objetivoPrimas <= 0
+          ? 0.0
+          : (primasNetasActuales / objetivoPrimas).clamp(0.0, 1.0);
+
+      debugPrint('=========================================');
+      debugPrint('BUSINESS SCREEN');
+      debugPrint('ROL: ${perfil['rol_usuario']}');
+      debugPrint('PERSONAS EN ESTRUCTURA: ${estructura.length}');
+      debugPrint('AUTH IDS AUTORIZADOS: ${authIdsEstructura.length}');
+      debugPrint('VENTAS PERIODO ACTUAL: ${ventasActuales.length}');
+      debugPrint('PRIMAS NETAS: $primasNetasActuales');
+      debugPrint(
+        'COMISIÓN PROPIA NETA: '
+        '${calculoActual['comision_propia']}',
+      );
+      debugPrint('RAPPEL/SUELDO ROL: ${calculoActual['incentivo']}');
+      debugPrint('SUELDO GENERADO: $sueldoActual');
+      debugPrint('=========================================');
+
       if (!mounted) return;
 
-    setState(() {
-  if (role == 'jefe_equipo') {
-    saldoTotal = comisionesPropiasJefe + rappelJefe;
-  } else if (role == 'jefe_ventas') {
-    saldoTotal = comisionesPropiasJefe + rappelJefeVentas;
-  } else if (role == 'director_zona') {
-    saldoTotal = calcularRappelDirectorZona(primasTotales);
-  } else if (role == 'director_nacional') {
-    saldoTotal = 0;
-  } else {
-    saldoTotal = comisionesPropiasJefe;
+      setState(() {
+        primasPropiasJefe = calculoActual['primas_propias'] ?? 0;
+
+        comisionesPropiasJefe = calculoActual['comision_propia'] ?? 0;
+
+        primasTotalesJefe = primasNetasActuales;
+
+        rappelJefeVentas = calculoActual['incentivo'] ?? 0;
+
+        extornoPrimasMes = extornosActuales['prima'] ?? 0;
+
+        extornoComisionesMes = extornosActuales['comision_propia'] ?? 0;
+
+        /*
+         * Los dos bloques muestran exactamente el mismo sueldo generado.
+         */
+        saldoTotal = sueldoActual;
+        esteMes = sueldoActual;
+
+        objetivo = progreso * 100;
+        ventas = ultimasVentasConNombre;
+        _objetivoCumplido = objetivoCumplido;
+
+        variacionMesAnterior = variacion;
+        variacionPositiva = variacion >= 0;
+
+        loading = false;
+      });
+    } catch (e, stackTrace) {
+      debugPrint('ERROR BUSINESS SCREEN: $e');
+      debugPrintStack(stackTrace: stackTrace);
+
+      if (!mounted) return;
+
+      setState(() {
+        saldoTotal = 0;
+        esteMes = 0;
+        objetivo = 0;
+        ventas = [];
+        loading = false;
+      });
+    }
   }
 
-  esteMes = saldoTotal;
-  objetivo = progreso * 100;
-  ventas = ultimasVentasConNombre;
-  _objetivoCumplido = objetivoCumplido;
+  bool _esProductoDV(dynamic productoValue) {
+    final producto = (productoValue ?? '').toString().trim().toLowerCase();
 
-  variacionMesAnterior = variacion;
-  variacionPositiva = variacion >= 0;
+    return producto.contains('vida') ||
+        producto.contains('decesos') ||
+        producto.contains('prima única') ||
+        producto.contains('prima unica');
+  }
 
-  loading = false;
-});
-    } catch (e) {
-      debugPrint('ERROR BUSINESS SCREEN: $e');
+  Map<String, double> _calcularPeriodoEconomico({
+    required String role,
+    required String myAuthId,
+    required List<Map<String, dynamic>> ventasPeriodo,
+    required Map<String, double> extornos,
+  }) {
+    double primasTotales = 0;
+    double primasDV = 0;
+    double primasPropias = 0;
+    double comisionPropia = 0;
 
-      if (mounted) {
-        setState(() => loading = false);
+    for (final venta in ventasPeriodo) {
+      final prima = _numero(venta['prima_anual_neta']);
+
+      final authId = _idTexto(venta['agente_auth_id']);
+
+      final producto = (venta['producto'] ?? '').toString().toLowerCase();
+
+      primasTotales += prima;
+
+      if (_esProductoDV(producto)) {
+        primasDV += prima;
+      }
+
+      if (authId == myAuthId) {
+        primasPropias += prima;
+        comisionPropia += _numero(venta['comision']);
       }
     }
+
+    primasTotales -= extornos['prima'] ?? 0;
+    primasDV -= extornos['prima_dv'] ?? 0;
+    comisionPropia -= extornos['comision_propia'] ?? 0;
+
+    if (primasTotales < 0) primasTotales = 0;
+    if (primasDV < 0) primasDV = 0;
+    if (primasPropias < 0) primasPropias = 0;
+    if (comisionPropia < 0) comisionPropia = 0;
+
+    double incentivo = 0;
+    double sueldo = 0;
+
+    switch (_normalizarRol(role)) {
+      case 'agente':
+        incentivo = calcularRappelAgente(
+          primasTotales: primasTotales,
+          primasDV: primasDV,
+        );
+        sueldo = comisionPropia + incentivo;
+        break;
+
+      case 'jefe_equipo':
+        incentivo = calcularRappelJefe(primasTotales);
+        sueldo = comisionPropia + incentivo;
+        break;
+
+      case 'jefe_ventas':
+        incentivo = calcularRappelJefeVentas(primasTotales);
+        sueldo = comisionPropia + incentivo;
+        break;
+
+      case 'director_zona':
+        incentivo = primasTotales * 0.10;
+        sueldo = comisionPropia + incentivo;
+        break;
+
+      case 'director_nacional':
+        incentivo = primasTotales * 0.05;
+        sueldo = comisionPropia + incentivo;
+        break;
+
+      case 'administracion':
+        incentivo = 0;
+        sueldo = 0;
+        break;
+
+      default:
+        sueldo = comisionPropia;
+        break;
+    }
+
+    return {
+      'primas_netas': primasTotales,
+      'primas_dv': primasDV,
+      'primas_propias': primasPropias,
+      'comision_propia': comisionPropia,
+      'incentivo': incentivo,
+      'sueldo': sueldo,
+    };
+  }
+
+  double _objetivoPrimasPorRol(dynamic rol) {
+    switch (_normalizarRol(rol)) {
+      case 'jefe_equipo':
+        return 10000;
+      case 'jefe_ventas':
+        return 11500;
+      case 'director_zona':
+        return 15000;
+      case 'director_nacional':
+        return 25000;
+      case 'agente':
+      default:
+        return 12000;
+    }
+  }
+
+  double calcularRappelAgente({
+    required double primasTotales,
+    required double primasDV,
+  }) {
+    if (primasTotales <= 0) return 0;
+
+    final porcentajeDV = (primasDV / primasTotales) * 100;
+
+    /*
+     * Tramos de 1.500 € y 2.500 €:
+     * el 100% de la producción debe ser Vida o Decesos.
+     */
+    final cumpleCienPorCienDV = porcentajeDV >= 99.999;
+
+    /*
+     * Desde 4.000 €:
+     * al menos el 30% de la producción debe ser Vida o Decesos.
+     */
+    final cumpleTreintaPorCientoDV = porcentajeDV >= 30;
+
+    if (primasTotales >= 12000 && cumpleTreintaPorCientoDV) {
+      return 1500;
+    }
+
+    if (primasTotales >= 9000 && cumpleTreintaPorCientoDV) {
+      return 1200;
+    }
+
+    if (primasTotales >= 6000 && cumpleTreintaPorCientoDV) {
+      return 800;
+    }
+
+    if (primasTotales >= 4000 && cumpleTreintaPorCientoDV) {
+      return 600;
+    }
+
+    if (primasTotales >= 2500 && cumpleCienPorCienDV) {
+      return 400;
+    }
+
+    if (primasTotales >= 1500 && cumpleCienPorCienDV) {
+      return 200;
+    }
+
+    return 0;
   }
 
   double calcularRappelJefe(double primasTotales) {
@@ -487,231 +640,99 @@ final variacion = primasPeriodoAnterior > 0
     return 0;
   }
 
-  double calcularRappelDirectorZona(double primasTotales) {
-  if (primasTotales < 15000) return 0;
+  Future<Map<String, double>> getExtornosPeriodo({
+    required DateTime start,
+    required DateTime end,
+    required List<String> authIds,
+    required String authIdSoloComision,
+  }) async {
+    if (authIds.isEmpty) {
+      return {'prima': 0, 'prima_dv': 0, 'comision_propia': 0};
+    }
 
-  double sueldo = 2500;
+    final anulacionesData = await supabase
+        .from('anulaciones_polizas')
+        .select(
+          'venta_id, prima_extornada, comision_extornada, fecha_anulacion',
+        )
+        .gte('fecha_anulacion', start.toIso8601String())
+        .lt('fecha_anulacion', end.toIso8601String());
 
-  if (primasTotales <= 20000) {
-    sueldo += (primasTotales - 15000) * 0.04;
-  } else {
-    sueldo += 200; // 4% de los 5.000 € entre 15.000 y 20.000
-    sueldo += (primasTotales - 20000) * 0.05;
-  }
+    final anulaciones = List<Map<String, dynamic>>.from(anulacionesData);
 
-  return sueldo;
-}
+    if (anulaciones.isEmpty) {
+      return {'prima': 0, 'prima_dv': 0, 'comision_propia': 0};
+    }
 
-  Future<double> getPrimasEquipo(
-  String jefeId,
-  String role,
-  DateTime start,
-  DateTime end,
-) async {
-  final usuariosData = await supabase
-      .from('usuarios')
-      .select('id, auth_id, parent_id, rol_usuario');
+    final ventaIds = anulaciones
+        .map((anulacion) => _idTexto(anulacion['venta_id']))
+        .where((id) => id.isNotEmpty)
+        .toSet()
+        .toList();
 
-  final usuariosTabla = List<Map<String, dynamic>>.from(usuariosData);
+    if (ventaIds.isEmpty) {
+      return {'prima': 0, 'prima_dv': 0, 'comision_propia': 0};
+    }
 
-  String limpiar(dynamic value) {
-    return (value ?? '').toString().trim();
-  }
+    final ventasData = await supabase
+        .from('ventas')
+        .select('id, agente_auth_id, producto')
+        .inFilter('id', ventaIds);
 
-  final idsPermitidos = <String>{};
+    final ventasMap = <String, Map<String, dynamic>>{};
 
-  void buscarDescendientes(String parentId) {
-    for (final u in usuariosTabla) {
-      final idUsuario = limpiar(u['id']);
-      final parentUsuario = limpiar(u['parent_id']);
+    for (final venta in List<Map<String, dynamic>>.from(ventasData)) {
+      final id = _idTexto(venta['id']);
 
-      if (parentUsuario == parentId &&
-          idUsuario.isNotEmpty &&
-          !idsPermitidos.contains(idUsuario)) {
-        idsPermitidos.add(idUsuario);
-        buscarDescendientes(idUsuario);
+      if (id.isNotEmpty) {
+        ventasMap[id] = venta;
       }
     }
-  }
 
-  buscarDescendientes(jefeId);
+    final authIdsSet = authIds.toSet();
 
-  final agentesAuthIds = usuariosTabla.where((u) {
-    final idUsuario = limpiar(u['id']);
-    final authId = limpiar(u['auth_id']);
+    double prima = 0;
+    double primaDV = 0;
+    double comisionPropia = 0;
 
-    return idsPermitidos.contains(idUsuario) && authId.isNotEmpty;
-  }).map((u) {
-    return limpiar(u['auth_id']);
-  }).toList();
+    for (final anulacion in anulaciones) {
+      final ventaId = _idTexto(anulacion['venta_id']);
 
-  if (agentesAuthIds.isEmpty) return 0;
+      final venta = ventasMap[ventaId];
 
-  final ventasEquipo = await supabase
-      .from('ventas')
-      .select('prima_anual_neta')
-      .inFilter('agente_auth_id', agentesAuthIds)
-      .gte('fecha_efecto', start.toIso8601String())
-      .lt('fecha_efecto', end.toIso8601String());
+      if (venta == null) continue;
 
-  double total = 0;
+      final agenteAuthId = _idTexto(venta['agente_auth_id']);
 
-  for (final v in ventasEquipo) {
-    final primaRaw = v['prima_anual_neta'];
+      if (!authIdsSet.contains(agenteAuthId)) {
+        continue;
+      }
 
-    final prima = primaRaw is num
-        ? primaRaw.toDouble()
-        : double.tryParse(primaRaw?.toString() ?? '0') ?? 0;
+      final primaExtornada = _numero(anulacion['prima_extornada']);
 
-    total += prima;
-  }
+      final comisionExtornada = _numero(anulacion['comision_extornada']);
 
-  return total;
-}
+      prima += primaExtornada;
 
-Future<List<String>> getAuthIdsEstructura(
-  String userId,
-  String role,
-  String myAuthId,
-) async {
-  if (role == 'director_nacional') {
-    return [];
-  }
+      final producto = (venta['producto'] ?? '').toString().toLowerCase();
 
-  if (role == 'agente') {
-    return [myAuthId];
-  }
+      if (_esProductoDV(producto)) {
+        primaDV += primaExtornada;
+      }
 
-  final usuariosData = await supabase
-      .from('usuarios')
-      .select('id, auth_id, parent_id');
-
-  final usuariosTabla = List<Map<String, dynamic>>.from(usuariosData);
-
-  String limpiar(dynamic value) {
-    return (value ?? '').toString().trim();
-  }
-
-  final idsPermitidos = <String>{userId};
-  final authIdsPermitidos = <String>{myAuthId};
-
-  void buscarDescendientes(String parentId) {
-    for (final u in usuariosTabla) {
-      final idUsuario = limpiar(u['id']);
-      final parentUsuario = limpiar(u['parent_id']);
-      final authIdUsuario = limpiar(u['auth_id']);
-
-      if (parentUsuario == parentId &&
-          idUsuario.isNotEmpty &&
-          !idsPermitidos.contains(idUsuario)) {
-        idsPermitidos.add(idUsuario);
-
-        if (authIdUsuario.isNotEmpty) {
-          authIdsPermitidos.add(authIdUsuario);
-        }
-
-        buscarDescendientes(idUsuario);
+      if (agenteAuthId == authIdSoloComision) {
+        comisionPropia += comisionExtornada;
       }
     }
-  }
 
-  buscarDescendientes(userId);
-
-  return authIdsPermitidos.toList();
-}
-
-Future<Map<String, double>> getExtornosPeriodo({
-  required DateTime start,
-  required DateTime end,
-  required List<String>? authIds,
-  required String authIdSoloComision,
-}) async {
-  final anulacionesData = await supabase
-      .from('anulaciones_polizas')
-      .select('venta_id, prima_extornada, comision_extornada, fecha_anulacion')
-      .gte('fecha_anulacion', start.toIso8601String())
-      .lt('fecha_anulacion', end.toIso8601String());
-
-  final anulaciones = List<Map<String, dynamic>>.from(anulacionesData);
-
-  if (anulaciones.isEmpty) {
     return {
-      'prima': 0,
-      'prima_dv': 0,
-      'comision_propia': 0,
+      'prima': prima,
+      'prima_dv': primaDV,
+      'comision_propia': comisionPropia,
     };
   }
 
-  final ventaIds = anulaciones
-      .map((a) => a['venta_id']?.toString())
-      .where((id) => id != null && id.isNotEmpty)
-      .cast<String>()
-      .toSet()
-      .toList();
-
-  if (ventaIds.isEmpty) {
-    return {
-      'prima': 0,
-      'prima_dv': 0,
-      'comision_propia': 0,
-    };
-  }
-
-  final ventasData = await supabase
-      .from('ventas')
-      .select('id, agente_auth_id, producto')
-      .inFilter('id', ventaIds);
-
-  final ventasMap = {
-    for (final v in List<Map<String, dynamic>>.from(ventasData))
-      v['id'].toString(): v,
-  };
-
-  double prima = 0;
-  double primaDV = 0;
-  double comisionPropia = 0;
-
-  for (final a in anulaciones) {
-    final ventaId = a['venta_id']?.toString();
-    final venta = ventasMap[ventaId];
-
-    if (venta == null) continue;
-
-    final agenteAuthId = venta['agente_auth_id']?.toString() ?? '';
-
-    if (authIds != null && !authIds.contains(agenteAuthId)) {
-      continue;
-    }
-
-    final primaExtornada = a['prima_extornada'] is num
-        ? (a['prima_extornada'] as num).toDouble()
-        : double.tryParse(a['prima_extornada']?.toString() ?? '0') ?? 0;
-
-    final comisionExtornada = a['comision_extornada'] is num
-        ? (a['comision_extornada'] as num).toDouble()
-        : double.tryParse(a['comision_extornada']?.toString() ?? '0') ?? 0;
-
-    prima += primaExtornada;
-
-    final producto = (venta['producto'] ?? '').toString().toLowerCase();
-
-    if (producto.contains('vida') || producto.contains('decesos')) {
-      primaDV += primaExtornada;
-    }
-
-    if (agenteAuthId == authIdSoloComision) {
-      comisionPropia += comisionExtornada;
-    }
-  }
-
-  return {
-    'prima': prima,
-    'prima_dv': primaDV,
-    'comision_propia': comisionPropia,
-  };
-}
-
-    @override
+  @override
   Widget build(BuildContext context) {
     final progresoObjetivo = (objetivo / 100).clamp(0.0, 1.0);
 
@@ -724,9 +745,7 @@ Future<Map<String, double>> getExtornosPeriodo({
         onPressed: () {
           Navigator.push(
             context,
-            MaterialPageRoute(
-              builder: (_) => const CreateSaleWizard(),
-            ),
+            MaterialPageRoute(builder: (_) => const CreateSaleWizard()),
           );
         },
         child: Container(
@@ -735,11 +754,7 @@ Future<Map<String, double>> getExtornosPeriodo({
           decoration: BoxDecoration(
             shape: BoxShape.circle,
             gradient: const LinearGradient(
-              colors: [
-                Color(0xFF20E070),
-                Color(0xFF1D7CFF),
-                Color(0xFF7A3CFF),
-              ],
+              colors: [Color(0xFF20E070), Color(0xFF1D7CFF), Color(0xFF7A3CFF)],
             ),
             boxShadow: [
               BoxShadow(
@@ -749,11 +764,7 @@ Future<Map<String, double>> getExtornosPeriodo({
               ),
             ],
           ),
-          child: const Icon(
-            Icons.add_rounded,
-            color: Colors.white,
-            size: 38,
-          ),
+          child: const Icon(Icons.add_rounded, color: Colors.white, size: 38),
         ),
       ),
       body: Stack(
@@ -763,9 +774,7 @@ Future<Map<String, double>> getExtornosPeriodo({
           SafeArea(
             child: loading
                 ? const Center(
-                    child: CircularProgressIndicator(
-                      color: Colors.cyanAccent,
-                    ),
+                    child: CircularProgressIndicator(color: Colors.cyanAccent),
                   )
                 : ListView(
                     padding: const EdgeInsets.fromLTRB(20, 18, 20, 110),
@@ -852,11 +861,12 @@ Future<Map<String, double>> getExtornosPeriodo({
                                 children: ventas
                                     .map(
                                       (v) => _saleRow(
-                                        producto: v['producto']?.toString() ??
+                                        producto:
+                                            v['producto']?.toString() ??
                                             'Venta',
                                         cliente:
                                             v['cliente_nombre']?.toString() ??
-                                                'Sin cliente',
+                                            'Sin cliente',
                                         importe: "${v['precio']}€",
                                       ),
                                     )
@@ -950,9 +960,7 @@ Future<Map<String, double>> getExtornosPeriodo({
                 Colors.white.withOpacity(0.05),
               ],
             ),
-            border: Border.all(
-              color: Colors.white.withOpacity(0.18),
-            ),
+            border: Border.all(color: Colors.white.withOpacity(0.18)),
           ),
           child: const Icon(
             Icons.account_circle_rounded,
@@ -990,9 +998,7 @@ Future<Map<String, double>> getExtornosPeriodo({
           decoration: BoxDecoration(
             color: Colors.white.withOpacity(0.07),
             borderRadius: BorderRadius.circular(18),
-            border: Border.all(
-              color: Colors.white.withOpacity(0.10),
-            ),
+            border: Border.all(color: Colors.white.withOpacity(0.10)),
           ),
           child: Icon(
             _objetivoCumplido
@@ -1006,167 +1012,163 @@ Future<Map<String, double>> getExtornosPeriodo({
     );
   }
 
- Widget _saldoPrincipal() {
-  return Container(
-    width: double.infinity,
-    height: 238,
-    padding: const EdgeInsets.all(24),
-    decoration: BoxDecoration(
-      borderRadius: BorderRadius.circular(34),
-      gradient: const LinearGradient(
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-        colors: [
-          Color(0xFF062C68),
-          Color(0xFF071B3E),
-          Color(0xFF050B12),
+  Widget _saldoPrincipal() {
+    return Container(
+      width: double.infinity,
+      height: 238,
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(34),
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF062C68), Color(0xFF071B3E), Color(0xFF050B12)],
+        ),
+        border: Border.all(color: Colors.cyanAccent.withOpacity(0.28)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.blueAccent.withOpacity(0.22),
+            blurRadius: 35,
+            offset: const Offset(0, 18),
+          ),
         ],
       ),
-      border: Border.all(
-        color: Colors.cyanAccent.withOpacity(0.28),
-      ),
-      boxShadow: [
-        BoxShadow(
-          color: Colors.blueAccent.withOpacity(0.22),
-          blurRadius: 35,
-          offset: const Offset(0, 18),
-        ),
-      ],
-    ),
-    child: Stack(
-      clipBehavior: Clip.none,
-      children: [
-        Positioned(
-          left: 4,
-          right: -8,
-          top: 86,
-          child: CustomPaint(
-            size: const Size(double.infinity, 90),
-            painter: _MiniChartPainter(
-              positive: variacionPositiva,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Positioned(
+            left: 4,
+            right: -8,
+            top: 86,
+            child: CustomPaint(
+              size: const Size(double.infinity, 90),
+              painter: _MiniChartPainter(positive: variacionPositiva),
             ),
           ),
-        ),
 
-        Positioned(
-          right: -18,
-          top: 18,
-          child: Container(
-            padding: const EdgeInsets.symmetric(
-              horizontal: 11,
-              vertical: 8,
-            ),
-            decoration: BoxDecoration(
-              color: (variacionPositiva ? Colors.greenAccent : Colors.redAccent)
-                  .withOpacity(0.15),
-              borderRadius: BorderRadius.circular(40),
-              border: Border.all(
+          Positioned(
+            right: -18,
+            top: 18,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 8),
+              decoration: BoxDecoration(
                 color:
                     (variacionPositiva ? Colors.greenAccent : Colors.redAccent)
-                        .withOpacity(0.34),
-              ),
-              boxShadow: [
-                BoxShadow(
+                        .withOpacity(0.15),
+                borderRadius: BorderRadius.circular(40),
+                border: Border.all(
                   color:
-                      (variacionPositiva ? Colors.greenAccent : Colors.redAccent)
-                          .withOpacity(0.18),
-                  blurRadius: 18,
-                  spreadRadius: 1,
+                      (variacionPositiva
+                              ? Colors.greenAccent
+                              : Colors.redAccent)
+                          .withOpacity(0.34),
                 ),
-              ],
-            ),
-            child: Row(
-              children: [
-                Icon(
-                  variacionPositiva
-                      ? Icons.arrow_upward_rounded
-                      : Icons.arrow_downward_rounded,
-                  color:
-                      variacionPositiva ? Colors.greenAccent : Colors.redAccent,
-                  size: 17,
-                ),
-                const SizedBox(width: 5),
-                Text(
-                  "${variacionMesAnterior.abs().toStringAsFixed(1)}%",
-                  style: TextStyle(
+                boxShadow: [
+                  BoxShadow(
                     color:
-                        variacionPositiva ? Colors.greenAccent : Colors.redAccent,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w900,
+                        (variacionPositiva
+                                ? Colors.greenAccent
+                                : Colors.redAccent)
+                            .withOpacity(0.18),
+                    blurRadius: 18,
+                    spreadRadius: 1,
                   ),
-                ),
-              ],
-            ),
-          ),
-        ),
-
-        Positioned(
-          right: -30,
-          bottom: -34,
-          child: Icon(
-            variacionPositiva
-                ? Icons.trending_up_rounded
-                : Icons.trending_down_rounded,
-            size: 155,
-            color: (variacionPositiva ? Colors.greenAccent : Colors.redAccent)
-                .withOpacity(0.055),
-          ),
-        ),
-
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              "SALDO GENERADO",
-              style: TextStyle(
-                color: Colors.white.withOpacity(0.75),
-                fontSize: 13,
-                fontWeight: FontWeight.w900,
-                letterSpacing: 0.8,
+                ],
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    variacionPositiva
+                        ? Icons.arrow_upward_rounded
+                        : Icons.arrow_downward_rounded,
+                    color: variacionPositiva
+                        ? Colors.greenAccent
+                        : Colors.redAccent,
+                    size: 17,
+                  ),
+                  const SizedBox(width: 5),
+                  Text(
+                    "${variacionMesAnterior.abs().toStringAsFixed(1)}%",
+                    style: TextStyle(
+                      color: variacionPositiva
+                          ? Colors.greenAccent
+                          : Colors.redAccent,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ],
               ),
             ),
+          ),
 
-            const SizedBox(height: 10),
+          Positioned(
+            right: -30,
+            bottom: -34,
+            child: Icon(
+              variacionPositiva
+                  ? Icons.trending_up_rounded
+                  : Icons.trending_down_rounded,
+              size: 155,
+              color: (variacionPositiva ? Colors.greenAccent : Colors.redAccent)
+                  .withOpacity(0.055),
+            ),
+          ),
 
-            Text(
-              "${saldoTotal.toStringAsFixed(0)} €",
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 50,
-                fontWeight: FontWeight.w900,
-                letterSpacing: -2,
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                "SALDO GENERADO",
+                style: TextStyle(
+                  color: Colors.white.withOpacity(0.75),
+                  fontSize: 13,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 0.8,
+                ),
               ),
-            ),
 
-            const Spacer(),
+              const SizedBox(height: 10),
 
-            Row(
-              children: [
-                Text(
-                  "vs mes anterior",
-                  style: TextStyle(
-                    color: Colors.white.withOpacity(0.62),
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                  ),
+              Text(
+                "${saldoTotal.toStringAsFixed(0)} €",
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 50,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: -2,
                 ),
-                const Spacer(),
-                Text(
-                  "Periodo actual",
-                  style: TextStyle(
-                    color: Colors.white.withOpacity(0.42),
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
+              ),
+
+              const Spacer(),
+
+              Row(
+                children: [
+                  Text(
+                    "vs mes anterior",
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.62),
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ],
-    ),
-  );
-}
+                  const Spacer(),
+                  Text(
+                    "Periodo actual",
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.42),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
 
   Widget _metricCard({
     required String title,
@@ -1177,21 +1179,14 @@ Future<Map<String, double>> getExtornosPeriodo({
     double? circularValue,
   }) {
     return Container(
-  constraints: const BoxConstraints(
-    minHeight: 142,
-  ),
-  padding: const EdgeInsets.all(18),
+      constraints: const BoxConstraints(minHeight: 142),
+      padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(26),
         gradient: LinearGradient(
-          colors: [
-            color.withOpacity(0.18),
-            Colors.white.withOpacity(0.045),
-          ],
+          colors: [color.withOpacity(0.18), Colors.white.withOpacity(0.045)],
         ),
-        border: Border.all(
-          color: color.withOpacity(0.25),
-        ),
+        border: Border.all(color: color.withOpacity(0.25)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1250,246 +1245,233 @@ Future<Map<String, double>> getExtornosPeriodo({
   }
 
   Widget _objetivoCard(double progresoObjetivo) {
-  final bool objetivoOk = _objetivoCumplido || progresoObjetivo >= 1;
+    final bool objetivoOk = _objetivoCumplido || progresoObjetivo >= 1;
 
-  final Color colorBase = objetivoOk
-      ? Colors.amberAccent
-      : progresoObjetivo >= 0.80
-          ? Colors.purpleAccent
-          : Colors.cyanAccent;
+    final Color colorBase = objetivoOk
+        ? Colors.amberAccent
+        : progresoObjetivo >= 0.80
+        ? Colors.purpleAccent
+        : Colors.cyanAccent;
 
-  final IconData iconoCentro = objetivoOk
-      ? Icons.workspace_premium_rounded
-      : progresoObjetivo >= 0.80
-          ? Icons.emoji_events_rounded
-          : Icons.shield_rounded;
+    final IconData iconoCentro = objetivoOk
+        ? Icons.workspace_premium_rounded
+        : progresoObjetivo >= 0.80
+        ? Icons.emoji_events_rounded
+        : Icons.shield_rounded;
 
-  return Container(
-    height: 250,
-    padding: const EdgeInsets.all(24),
-    decoration: BoxDecoration(
-      borderRadius: BorderRadius.circular(34),
-      gradient: LinearGradient(
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-        colors: [
-          const Color(0xFF061B36),
-          colorBase.withOpacity(0.15),
-          const Color(0xFF080A18),
+    return Container(
+      height: 250,
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(34),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            const Color(0xFF061B36),
+            colorBase.withOpacity(0.15),
+            const Color(0xFF080A18),
+          ],
+        ),
+        border: Border.all(color: colorBase.withOpacity(0.34)),
+        boxShadow: [
+          BoxShadow(
+            color: colorBase.withOpacity(0.18),
+            blurRadius: 32,
+            offset: const Offset(0, 18),
+          ),
         ],
       ),
-      border: Border.all(
-        color: colorBase.withOpacity(0.34),
-      ),
-      boxShadow: [
-        BoxShadow(
-          color: colorBase.withOpacity(0.18),
-          blurRadius: 32,
-          offset: const Offset(0, 18),
-        ),
-      ],
-    ),
-    child: Stack(
-      clipBehavior: Clip.none,
-      children: [
-        Positioned(
-          right: -8,
-          top: 10,
-          bottom: 8,
-          child: _objetivoEscudoPremium(
-            color: colorBase,
-            icon: iconoCentro,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Positioned(
+            right: -8,
+            top: 10,
+            bottom: 8,
+            child: _objetivoEscudoPremium(color: colorBase, icon: iconoCentro),
           ),
-        ),
 
-        Positioned(
-          right: 8,
-          bottom: 10,
-          child: Container(
-            width: 130,
-            height: 22,
-            decoration: BoxDecoration(
-              shape: BoxShape.rectangle,
-              borderRadius: BorderRadius.circular(100),
-              color: colorBase.withOpacity(0.12),
-              boxShadow: [
-                BoxShadow(
-                  color: colorBase.withOpacity(0.26),
-                  blurRadius: 20,
-                  spreadRadius: 2,
-                ),
-              ],
-            ),
-          ),
-        ),
-
-        SizedBox(
-          width: MediaQuery.of(context).size.width * 0.48,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                "OBJETIVO DEL MES",
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 18,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: 0.8,
-                ),
-              ),
-
-              const SizedBox(height: 6),
-
-              Text(
-                "Tu progreso actual",
-                style: TextStyle(
-                  color: Colors.white.withOpacity(0.58),
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-
-              const SizedBox(height: 22),
-
-              ShaderMask(
-                shaderCallback: (bounds) {
-                  return LinearGradient(
-                    colors: [
-                      Colors.white,
-                      colorBase,
-                    ],
-                  ).createShader(bounds);
-                },
-                child: Text(
-                  "${objetivo.toStringAsFixed(1)}%",
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 47,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: -2,
+          Positioned(
+            right: 8,
+            bottom: 10,
+            child: Container(
+              width: 130,
+              height: 22,
+              decoration: BoxDecoration(
+                shape: BoxShape.rectangle,
+                borderRadius: BorderRadius.circular(100),
+                color: colorBase.withOpacity(0.12),
+                boxShadow: [
+                  BoxShadow(
+                    color: colorBase.withOpacity(0.26),
+                    blurRadius: 20,
+                    spreadRadius: 2,
                   ),
-                ),
-              ),
-
-              Text(
-                "del objetivo",
-                style: TextStyle(
-                  color: colorBase,
-                  fontSize: 18,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-
-              const SizedBox(height: 18),
-
-              ClipRRect(
-                borderRadius: BorderRadius.circular(40),
-                child: LinearProgressIndicator(
-                  value: progresoObjetivo,
-                  minHeight: 10,
-                  backgroundColor: Colors.white.withOpacity(0.12),
-                  valueColor: AlwaysStoppedAnimation<Color>(colorBase),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    ),
-  );
-}
-Widget _objetivoEscudoPremium({
-  required Color color,
-  required IconData icon,
-}) {
-  return SizedBox(
-    width: 155,
-    height: 190,
-    child: Stack(
-      alignment: Alignment.center,
-      children: [
-        Container(
-          width: 150,
-          height: 150,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            boxShadow: [
-              BoxShadow(
-                color: color.withOpacity(0.22),
-                blurRadius: 34,
-                spreadRadius: 5,
-              ),
-            ],
-          ),
-        ),
-
-        CustomPaint(
-          size: const Size(132, 155),
-          painter: _ShieldPainter(color),
-        ),
-
-        Positioned(
-          top: 47,
-          child: Container(
-            width: 76,
-            height: 76,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: RadialGradient(
-                colors: [
-                  Colors.white.withOpacity(0.22),
-                  color.withOpacity(0.42),
-                  color.withOpacity(0.10),
                 ],
               ),
-              border: Border.all(
-                color: Colors.white.withOpacity(0.30),
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: color.withOpacity(0.35),
-                  blurRadius: 24,
-                  spreadRadius: 2,
+            ),
+          ),
+
+          SizedBox(
+            width: MediaQuery.of(context).size.width * 0.48,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  "OBJETIVO DEL MES",
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 0.8,
+                  ),
+                ),
+
+                const SizedBox(height: 6),
+
+                Text(
+                  "Tu progreso actual",
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.58),
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+
+                const SizedBox(height: 22),
+
+                ShaderMask(
+                  shaderCallback: (bounds) {
+                    return LinearGradient(
+                      colors: [Colors.white, colorBase],
+                    ).createShader(bounds);
+                  },
+                  child: Text(
+                    "${objetivo.toStringAsFixed(1)}%",
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 47,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: -2,
+                    ),
+                  ),
+                ),
+
+                Text(
+                  "del objetivo",
+                  style: TextStyle(
+                    color: colorBase,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+
+                const SizedBox(height: 18),
+
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(40),
+                  child: LinearProgressIndicator(
+                    value: progresoObjetivo,
+                    minHeight: 10,
+                    backgroundColor: Colors.white.withOpacity(0.12),
+                    valueColor: AlwaysStoppedAnimation<Color>(colorBase),
+                  ),
                 ),
               ],
             ),
-            child: Icon(
-              icon,
-              color: Colors.white,
-              size: 42,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _objetivoEscudoPremium({
+    required Color color,
+    required IconData icon,
+  }) {
+    return SizedBox(
+      width: 155,
+      height: 190,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          Container(
+            width: 150,
+            height: 150,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: color.withOpacity(0.22),
+                  blurRadius: 34,
+                  spreadRadius: 5,
+                ),
+              ],
             ),
           ),
-        ),
 
-        Positioned(
-          left: 2,
-          bottom: 28,
-          child: Icon(
-            Icons.spa_rounded,
-            color: color.withOpacity(0.60),
-            size: 44,
+          CustomPaint(
+            size: const Size(132, 155),
+            painter: _ShieldPainter(color),
           ),
-        ),
 
-        Positioned(
-          right: 2,
-          bottom: 28,
-          child: Transform(
-            alignment: Alignment.center,
-            transform: Matrix4.rotationY(3.1416),
+          Positioned(
+            top: 47,
+            child: Container(
+              width: 76,
+              height: 76,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: RadialGradient(
+                  colors: [
+                    Colors.white.withOpacity(0.22),
+                    color.withOpacity(0.42),
+                    color.withOpacity(0.10),
+                  ],
+                ),
+                border: Border.all(color: Colors.white.withOpacity(0.30)),
+                boxShadow: [
+                  BoxShadow(
+                    color: color.withOpacity(0.35),
+                    blurRadius: 24,
+                    spreadRadius: 2,
+                  ),
+                ],
+              ),
+              child: Icon(icon, color: Colors.white, size: 42),
+            ),
+          ),
+
+          Positioned(
+            left: 2,
+            bottom: 28,
             child: Icon(
               Icons.spa_rounded,
               color: color.withOpacity(0.60),
               size: 44,
             ),
           ),
-        ),
-      ],
-    ),
-  );
-}
+
+          Positioned(
+            right: 2,
+            bottom: 28,
+            child: Transform(
+              alignment: Alignment.center,
+              transform: Matrix4.rotationY(3.1416),
+              child: Icon(
+                Icons.spa_rounded,
+                color: color.withOpacity(0.60),
+                size: 44,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
   Widget _quickActions() {
     return Row(
@@ -1502,9 +1484,7 @@ Widget _objetivoEscudoPremium({
             onTap: () {
               Navigator.push(
                 context,
-                MaterialPageRoute(
-                  builder: (_) => NominasScreen(),
-                ),
+                MaterialPageRoute(builder: (_) => NominasScreen()),
               );
             },
           ),
@@ -1568,9 +1548,7 @@ Widget _objetivoEscudoPremium({
                 Colors.white.withOpacity(0.045),
               ],
             ),
-            border: Border.all(
-              color: color.withOpacity(0.28),
-            ),
+            border: Border.all(color: color.withOpacity(0.28)),
           ),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -1604,9 +1582,7 @@ Widget _objetivoEscudoPremium({
       decoration: BoxDecoration(
         color: Colors.white.withOpacity(0.065),
         borderRadius: BorderRadius.circular(28),
-        border: Border.all(
-          color: Colors.white.withOpacity(0.09),
-        ),
+        border: Border.all(color: Colors.white.withOpacity(0.09)),
       ),
       child: Column(
         children: [
@@ -1641,9 +1617,7 @@ Widget _objetivoEscudoPremium({
       decoration: BoxDecoration(
         color: Colors.white.withOpacity(0.04),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: Colors.white.withOpacity(0.06),
-        ),
+        border: Border.all(color: Colors.white.withOpacity(0.06)),
       ),
       child: Text(
         "Sin ventas registradas todavía",
@@ -1675,9 +1649,7 @@ Widget _objetivoEscudoPremium({
       decoration: BoxDecoration(
         color: Colors.white.withOpacity(0.045),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: Colors.white.withOpacity(0.06),
-        ),
+        border: Border.all(color: Colors.white.withOpacity(0.06)),
       ),
       child: Row(
         children: [
@@ -1744,9 +1716,7 @@ Widget _objetivoEscudoPremium({
           decoration: BoxDecoration(
             color: Colors.white.withOpacity(0.045),
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(
-              color: Colors.white.withOpacity(0.06),
-            ),
+            border: Border.all(color: Colors.white.withOpacity(0.06)),
           ),
           child: Row(
             children: [
@@ -1787,9 +1757,7 @@ Widget _objetivoEscudoPremium({
             Colors.white.withOpacity(0.025),
           ],
         ),
-        border: Border.all(
-          color: color.withOpacity(0.35),
-        ),
+        border: Border.all(color: color.withOpacity(0.35)),
         boxShadow: [
           BoxShadow(
             color: color.withOpacity(0.18),
@@ -1798,11 +1766,7 @@ Widget _objetivoEscudoPremium({
           ),
         ],
       ),
-      child: Icon(
-        icon,
-        color: color,
-        size: size * 0.48,
-      ),
+      child: Icon(icon, color: color, size: size * 0.48),
     );
   }
 }
@@ -1819,11 +1783,7 @@ class _PremiumBackground extends StatelessWidget {
             gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
-              colors: [
-                Color(0xFF050B12),
-                Color(0xFF071A2E),
-                Color(0xFF050B12),
-              ],
+              colors: [Color(0xFF050B12), Color(0xFF071A2E), Color(0xFF050B12)],
             ),
           ),
         ),
@@ -1844,9 +1804,7 @@ class _PremiumBackground extends StatelessWidget {
         ),
         BackdropFilter(
           filter: ImageFilter.blur(sigmaX: 60, sigmaY: 60),
-          child: Container(
-            color: Colors.black.withOpacity(0.05),
-          ),
+          child: Container(color: Colors.black.withOpacity(0.05)),
         ),
       ],
     );
@@ -1873,9 +1831,7 @@ class MoreMenuSheet extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
       decoration: const BoxDecoration(
         color: Color(0xFF071421),
-        borderRadius: BorderRadius.vertical(
-          top: Radius.circular(32),
-        ),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -1915,15 +1871,10 @@ class MoreMenuSheet extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white.withOpacity(0.055),
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: Colors.white.withOpacity(0.07),
-        ),
+        border: Border.all(color: Colors.white.withOpacity(0.07)),
       ),
       child: ListTile(
-        leading: Icon(
-          icon,
-          color: Colors.cyanAccent,
-        ),
+        leading: Icon(icon, color: Colors.cyanAccent),
         title: Text(
           title,
           style: const TextStyle(
@@ -1941,12 +1892,11 @@ class MoreMenuSheet extends StatelessWidget {
     );
   }
 }
+
 class _MiniChartPainter extends CustomPainter {
   final bool positive;
 
-  _MiniChartPainter({
-    required this.positive,
-  });
+  _MiniChartPainter({required this.positive});
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -1959,11 +1909,7 @@ class _MiniChartPainter extends CustomPainter {
     for (int i = 1; i <= 3; i++) {
       final y = size.height * (i / 4);
 
-      canvas.drawLine(
-        Offset(0, y),
-        Offset(size.width, y),
-        gridPaint,
-      );
+      canvas.drawLine(Offset(0, y), Offset(size.width, y), gridPaint);
     }
 
     final linePaint = Paint()
@@ -1979,10 +1925,7 @@ class _MiniChartPainter extends CustomPainter {
       ..strokeCap = StrokeCap.round
       ..strokeJoin = StrokeJoin.round
       ..style = PaintingStyle.stroke
-      ..maskFilter = const MaskFilter.blur(
-        BlurStyle.normal,
-        8,
-      );
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8);
 
     final fillPaint = Paint()
       ..shader = LinearGradient(
@@ -1993,9 +1936,7 @@ class _MiniChartPainter extends CustomPainter {
           color.withOpacity(0.08),
           color.withOpacity(0.00),
         ],
-      ).createShader(
-        Rect.fromLTWH(0, 0, size.width, size.height),
-      );
+      ).createShader(Rect.fromLTWH(0, 0, size.width, size.height));
 
     final path = Path();
 
@@ -2105,6 +2046,7 @@ class _MiniChartPainter extends CustomPainter {
     return oldDelegate.positive != positive;
   }
 }
+
 class _ShieldPainter extends CustomPainter {
   final Color color;
 
@@ -2134,9 +2076,7 @@ class _ShieldPainter extends CustomPainter {
           color.withOpacity(0.45),
           color.withOpacity(0.12),
         ],
-      ).createShader(
-        Rect.fromLTWH(0, 0, size.width, size.height),
-      );
+      ).createShader(Rect.fromLTWH(0, 0, size.width, size.height));
 
     final borderPaint = Paint()
       ..color = Colors.white.withOpacity(0.75)
@@ -2147,10 +2087,7 @@ class _ShieldPainter extends CustomPainter {
       ..color = color.withOpacity(0.35)
       ..strokeWidth = 8
       ..style = PaintingStyle.stroke
-      ..maskFilter = const MaskFilter.blur(
-        BlurStyle.normal,
-        8,
-      );
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8);
 
     canvas.drawPath(path, fillPaint);
     canvas.drawPath(path, glowPaint);

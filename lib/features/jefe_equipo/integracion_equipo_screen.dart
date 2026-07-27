@@ -34,54 +34,331 @@ class _IntegracionEquipoScreenState extends State<IntegracionEquipoScreen> {
     super.dispose();
   }
 
-  Future<void> cargarDatos() async {
-    try {
-      setState(() => loading = true);
+  String _normalizarRol(dynamic rol) {
+    return (rol ?? '')
+        .toString()
+        .trim()
+        .toLowerCase()
+        .replaceAll('-', '_')
+        .replaceAll(' ', '_');
+  }
 
-      final user = supabase.auth.currentUser;
+  String _idTexto(dynamic value) {
+    final id = (value ?? '').toString().trim();
 
-      if (user == null) {
-        setState(() => loading = false);
+    if (id.isEmpty || id.toLowerCase() == 'null') {
+      return '';
+    }
+
+    return id;
+  }
+
+  String _nombreCompleto(Map<String, dynamic>? usuario) {
+    if (usuario == null) return 'Sin nombre';
+
+    final nombre =
+        usuario['nombre']?.toString().trim() ?? '';
+
+    final apellidos =
+        usuario['apellidos']?.toString().trim() ?? '';
+
+    final completo = '$nombre $apellidos'.trim();
+
+    if (completo.isNotEmpty) return completo;
+
+    final email =
+        usuario['email']?.toString().trim() ?? '';
+
+    return email.isNotEmpty ? email : 'Sin nombre';
+  }
+
+  bool _relacionPermitida({
+    required String rolPadre,
+    required String rolHijo,
+  }) {
+    final padre = _normalizarRol(rolPadre);
+    final hijo = _normalizarRol(rolHijo);
+
+    switch (padre) {
+      case 'director_nacional':
+        return hijo == 'director_zona' ||
+            hijo == 'jefe_ventas' ||
+            hijo == 'jefe_equipo' ||
+            hijo == 'agente';
+
+      case 'director_zona':
+        return hijo == 'jefe_ventas' ||
+            hijo == 'jefe_equipo' ||
+            hijo == 'agente';
+
+      case 'jefe_ventas':
+        return hijo == 'jefe_equipo' ||
+            hijo == 'agente';
+
+      case 'jefe_equipo':
+        return hijo == 'agente';
+
+      default:
+        return false;
+    }
+  }
+
+  List<Map<String, dynamic>> _construirEstructura({
+    required Map<String, dynamic> perfil,
+    required List<Map<String, dynamic>> todosUsuarios,
+  }) {
+    final rolPerfil =
+        _normalizarRol(perfil['rol_usuario']);
+
+    // Administración puede consultar toda la compañía.
+    if (rolPerfil == 'administracion' ||
+        rolPerfil == 'administrador' ||
+        rolPerfil == 'admin') {
+      return todosUsuarios.where((usuario) {
+        return _idTexto(usuario['id']).isNotEmpty &&
+            _idTexto(usuario['auth_id']).isNotEmpty;
+      }).toList();
+    }
+
+    final hijosPorParentId =
+        <String, List<Map<String, dynamic>>>{};
+
+    for (final usuario in todosUsuarios) {
+      final parentId =
+          _idTexto(usuario['parent_id']);
+
+      if (parentId.isEmpty) continue;
+
+      hijosPorParentId
+          .putIfAbsent(
+            parentId,
+            () => <Map<String, dynamic>>[],
+          )
+          .add(usuario);
+    }
+
+    final resultado = <Map<String, dynamic>>[];
+    final visitados = <String>{};
+
+    void recorrer(Map<String, dynamic> actual) {
+      final idActual = _idTexto(actual['id']);
+
+      if (idActual.isEmpty ||
+          visitados.contains(idActual)) {
         return;
       }
 
-      final jefe = await supabase
+      visitados.add(idActual);
+      resultado.add(actual);
+
+      final rolActual =
+          _normalizarRol(actual['rol_usuario']);
+
+      final hijos = hijosPorParentId[idActual] ??
+          const <Map<String, dynamic>>[];
+
+      for (final hijo in hijos) {
+        final rolHijo =
+            _normalizarRol(hijo['rol_usuario']);
+
+        if (!_relacionPermitida(
+          rolPadre: rolActual,
+          rolHijo: rolHijo,
+        )) {
+          debugPrint(
+            'INTEGRACIÓN: usuario bloqueado '
+            '${_nombreCompleto(hijo)} '
+            '| rol=$rolHijo '
+            '| parent=${hijo['parent_id']} '
+            '| padre=$rolActual',
+          );
+
+          continue;
+        }
+
+        recorrer(hijo);
+      }
+    }
+
+    // Único punto de inicio: el usuario autenticado.
+    recorrer(perfil);
+
+    return resultado;
+  }
+
+  Future<void> cargarDatos() async {
+    final user = supabase.auth.currentUser;
+
+    if (user == null) {
+      if (!mounted) return;
+
+      setState(() {
+        loading = false;
+        agentes = [];
+        integraciones = [];
+      });
+
+      return;
+    }
+
+    try {
+      if (mounted) {
+        setState(() {
+          loading = true;
+        });
+      }
+
+      final perfilData = await supabase
           .from('usuarios')
-          .select('id')
+          .select(
+            'id, auth_id, parent_id, rol_usuario, '
+            'nombre, apellidos, email',
+          )
           .eq('auth_id', user.id)
-          .single();
+          .maybeSingle();
 
-      final jefeId = jefe['id'];
+      if (perfilData == null) {
+        throw Exception(
+          'No se encontró el perfil del usuario conectado.',
+        );
+      }
 
-      final agentesData = await supabase
+      final perfil =
+          Map<String, dynamic>.from(perfilData);
+
+      final usuariosData = await supabase
           .from('usuarios')
-          .select()
-          .eq('parent_id', jefeId)
-          .eq('rol_usuario', 'agente')
-          .order('nombre', ascending: true);
+          .select(
+            'id, auth_id, parent_id, rol_usuario, '
+            'nombre, apellidos, email',
+          );
 
-      final integracionData = await supabase
-          .from('integracion_agentes')
-          .select();
+      final todosUsuarios =
+          List<Map<String, dynamic>>.from(
+        usuariosData,
+      );
+
+      final estructura = _construirEstructura(
+        perfil: perfil,
+        todosUsuarios: todosUsuarios,
+      );
+
+      /*
+       * La integración se gestiona sobre usuarios que ya son
+       * agentes. Solo se incluyen agentes pertenecientes a la
+       * rama del usuario conectado:
+       *
+       * - agentes directos;
+       * - agentes de sus jefes de equipo;
+       * - agentes de sus jefes de ventas;
+       * - agentes que dependan directamente de un director.
+       *
+       * Nunca se incluyen superiores, compañeros ni otras ramas.
+       */
+      final agentesPermitidos = estructura.where(
+        (usuario) =>
+            _normalizarRol(usuario['rol_usuario']) ==
+            'agente',
+      ).toList();
+
+      agentesPermitidos.sort((a, b) {
+        return _nombreCompleto(a)
+            .toLowerCase()
+            .compareTo(
+              _nombreCompleto(b).toLowerCase(),
+            );
+      });
+
+      final agentesIds = agentesPermitidos
+          .map((agente) => agente['id'])
+          .where((id) => id != null)
+          .toList();
+
+      List<Map<String, dynamic>> integracionData = [];
+
+      if (agentesIds.isNotEmpty) {
+        final response = await supabase
+            .from('integracion_agentes')
+            .select()
+            .inFilter('agente_id', agentesIds);
+
+        integracionData =
+            List<Map<String, dynamic>>.from(
+          response,
+        );
+      }
+
+      debugPrint(
+        '======= INTEGRACIÓN ESTRUCTURA REAL =======',
+      );
+      debugPrint(
+        'USUARIO: ${_nombreCompleto(perfil)}',
+      );
+      debugPrint(
+        'ROL: ${perfil['rol_usuario']}',
+      );
+      debugPrint(
+        'PERSONAS EN ESTRUCTURA: ${estructura.length}',
+      );
+      debugPrint(
+        'AGENTES PERMITIDOS: ${agentesPermitidos.length}',
+      );
+      debugPrint(
+        'INTEGRACIONES CARGADAS: ${integracionData.length}',
+      );
+
+      for (final agente in agentesPermitidos) {
+        debugPrint(
+          '- ${_nombreCompleto(agente)} '
+          '| id=${agente['id']} '
+          '| parent=${agente['parent_id']} '
+          '| auth_id=${agente['auth_id']}',
+        );
+      }
+
+      debugPrint(
+        '===========================================',
+      );
 
       if (!mounted) return;
 
       setState(() {
-        agentes = List<Map<String, dynamic>>.from(agentesData);
-        integraciones = List<Map<String, dynamic>>.from(integracionData);
+        agentes = agentesPermitidos;
+        integraciones = integracionData;
         loading = false;
       });
-    } catch (e) {
-      debugPrint("ERROR CARGANDO INTEGRACIÓN: $e");
+    } catch (e, stackTrace) {
+      debugPrint(
+        'ERROR CARGANDO INTEGRACIÓN: $e',
+      );
+      debugPrintStack(stackTrace: stackTrace);
 
       if (!mounted) return;
-      setState(() => loading = false);
+
+      setState(() {
+        agentes = [];
+        integraciones = [];
+        loading = false;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Error al cargar la integración: $e',
+          ),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
     }
   }
 
   Map<String, dynamic>? obtenerIntegracion(dynamic agenteId) {
     try {
-      return integraciones.firstWhere((x) => x['agente_id'] == agenteId);
+      return integraciones.firstWhere(
+        (x) =>
+            x['agente_id']?.toString() ==
+            agenteId?.toString(),
+      );
     } catch (_) {
       return null;
     }

@@ -21,6 +21,9 @@ class _IntegracionAgenteDetalleScreenState
 
   bool loading = true;
   bool saving = false;
+  bool agenteAutorizado = false;
+
+  String? error;
 
   Map<String, dynamic> data = {};
 
@@ -46,18 +49,233 @@ class _IntegracionAgenteDetalleScreenState
     super.dispose();
   }
 
+  String _normalizarRol(dynamic rol) {
+    return (rol ?? '')
+        .toString()
+        .trim()
+        .toLowerCase()
+        .replaceAll('-', '_')
+        .replaceAll(' ', '_');
+  }
+
+  String _idTexto(dynamic value) {
+    final id = (value ?? '').toString().trim();
+
+    if (id.isEmpty || id.toLowerCase() == 'null') {
+      return '';
+    }
+
+    return id;
+  }
+
+  String _nombreCompleto(
+    Map<String, dynamic>? usuario,
+  ) {
+    if (usuario == null) return 'Sin nombre';
+
+    final nombre =
+        usuario['nombre']?.toString().trim() ?? '';
+
+    final apellidos =
+        usuario['apellidos']?.toString().trim() ?? '';
+
+    final completo = '$nombre $apellidos'.trim();
+
+    if (completo.isNotEmpty) return completo;
+
+    final email =
+        usuario['email']?.toString().trim() ?? '';
+
+    return email.isNotEmpty ? email : 'Sin nombre';
+  }
+
+  bool _relacionPermitida({
+    required String rolPadre,
+    required String rolHijo,
+  }) {
+    final padre = _normalizarRol(rolPadre);
+    final hijo = _normalizarRol(rolHijo);
+
+    switch (padre) {
+      case 'director_nacional':
+        return hijo == 'director_zona' ||
+            hijo == 'jefe_ventas' ||
+            hijo == 'jefe_equipo' ||
+            hijo == 'agente';
+
+      case 'director_zona':
+        return hijo == 'jefe_ventas' ||
+            hijo == 'jefe_equipo' ||
+            hijo == 'agente';
+
+      case 'jefe_ventas':
+        return hijo == 'jefe_equipo' ||
+            hijo == 'agente';
+
+      case 'jefe_equipo':
+        return hijo == 'agente';
+
+      default:
+        return false;
+    }
+  }
+
+  List<Map<String, dynamic>> _construirEstructura({
+    required Map<String, dynamic> perfil,
+    required List<Map<String, dynamic>> todosUsuarios,
+  }) {
+    final rolPerfil =
+        _normalizarRol(perfil['rol_usuario']);
+
+    if (rolPerfil == 'administracion' ||
+        rolPerfil == 'administrador' ||
+        rolPerfil == 'admin') {
+      return todosUsuarios.where((usuario) {
+        return _idTexto(usuario['id']).isNotEmpty &&
+            _idTexto(usuario['auth_id']).isNotEmpty;
+      }).toList();
+    }
+
+    final hijosPorParentId =
+        <String, List<Map<String, dynamic>>>{};
+
+    for (final usuario in todosUsuarios) {
+      final parentId =
+          _idTexto(usuario['parent_id']);
+
+      if (parentId.isEmpty) continue;
+
+      hijosPorParentId
+          .putIfAbsent(
+            parentId,
+            () => <Map<String, dynamic>>[],
+          )
+          .add(usuario);
+    }
+
+    final resultado = <Map<String, dynamic>>[];
+    final visitados = <String>{};
+
+    void recorrer(Map<String, dynamic> actual) {
+      final idActual = _idTexto(actual['id']);
+
+      if (idActual.isEmpty ||
+          visitados.contains(idActual)) {
+        return;
+      }
+
+      visitados.add(idActual);
+      resultado.add(actual);
+
+      final rolActual =
+          _normalizarRol(actual['rol_usuario']);
+
+      final hijos = hijosPorParentId[idActual] ??
+          const <Map<String, dynamic>>[];
+
+      for (final hijo in hijos) {
+        final rolHijo =
+            _normalizarRol(hijo['rol_usuario']);
+
+        if (!_relacionPermitida(
+          rolPadre: rolActual,
+          rolHijo: rolHijo,
+        )) {
+          continue;
+        }
+
+        recorrer(hijo);
+      }
+    }
+
+    recorrer(perfil);
+
+    return resultado;
+  }
+
+  Future<bool> _validarAgenteAutorizado() async {
+    final authUser = supabase.auth.currentUser;
+
+    if (authUser == null) {
+      return false;
+    }
+
+    final perfilData = await supabase
+        .from('usuarios')
+        .select(
+          'id, auth_id, parent_id, rol_usuario, '
+          'nombre, apellidos, email',
+        )
+        .eq('auth_id', authUser.id)
+        .maybeSingle();
+
+    if (perfilData == null) {
+      return false;
+    }
+
+    final usuariosData = await supabase
+        .from('usuarios')
+        .select(
+          'id, auth_id, parent_id, rol_usuario, '
+          'nombre, apellidos, email',
+        );
+
+    final estructura = _construirEstructura(
+      perfil: Map<String, dynamic>.from(perfilData),
+      todosUsuarios:
+          List<Map<String, dynamic>>.from(usuariosData),
+    );
+
+    final agenteId =
+        _idTexto(widget.agente['id']);
+
+    final autorizado = estructura.any((usuario) {
+      return _idTexto(usuario['id']) == agenteId &&
+          _normalizarRol(usuario['rol_usuario']) ==
+              'agente';
+    });
+
+    debugPrint(
+      'INTEGRACIÓN DETALLE: agente=$agenteId '
+      '| autorizado=$autorizado',
+    );
+
+    return autorizado;
+  }
+
   Future<void> cargar() async {
     try {
-      final res = await supabase
+      if (mounted) {
+        setState(() {
+          loading = true;
+          error = null;
+        });
+      }
+
+      final autorizado =
+          await _validarAgenteAutorizado();
+
+      if (!autorizado) {
+        if (!mounted) return;
+
+        setState(() {
+          loading = false;
+          agenteAutorizado = false;
+          error =
+              'Este agente no pertenece a tu estructura.';
+        });
+
+        return;
+      }
+
+      final row = await supabase
           .from('integracion_agentes')
           .select()
           .eq('agente_id', widget.agente['id'])
-          .limit(1);
-
-      final row = res.isNotEmpty ? res.first : null;
+          .maybeSingle();
 
       data = row ??
-          {
+          <String, dynamic>{
             'agente_id': widget.agente['id'],
             'bienvenida': false,
             'alta_sistema': false,
@@ -70,22 +288,37 @@ class _IntegracionAgenteDetalleScreenState
             'polizas': 0,
           };
 
-      contactosController.text = "${data['contactos'] ?? 0}";
-      visitasController.text = "${data['visitas'] ?? 0}";
-      presupuestosController.text = "${data['presupuestos'] ?? 0}";
-      polizasController.text = "${data['polizas'] ?? 0}";
+      contactosController.text =
+          '${data['contactos'] ?? 0}';
+
+      visitasController.text =
+          '${data['visitas'] ?? 0}';
+
+      presupuestosController.text =
+          '${data['presupuestos'] ?? 0}';
+
+      polizasController.text =
+          '${data['polizas'] ?? 0}';
 
       if (!mounted) return;
-      setState(() => loading = false);
-    } catch (e) {
-      debugPrint("ERROR CARGA INTEGRACIÓN DETALLE: $e");
 
-      if (!mounted) return;
-      setState(() => loading = false);
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Error al cargar integración: $e")),
+      setState(() {
+        loading = false;
+        agenteAutorizado = true;
+      });
+    } catch (e, stackTrace) {
+      debugPrint(
+        'ERROR CARGA INTEGRACIÓN DETALLE: $e',
       );
+      debugPrintStack(stackTrace: stackTrace);
+
+      if (!mounted) return;
+
+      setState(() {
+        loading = false;
+        agenteAutorizado = false;
+        error = e.toString();
+      });
     }
   }
 
@@ -116,21 +349,61 @@ class _IntegracionAgenteDetalleScreenState
   }
 
   Future<void> guardar() async {
-    if (saving) return;
+    if (saving || !agenteAutorizado) return;
 
-    setState(() => saving = true);
+    setState(() {
+      saving = true;
+    });
 
     try {
-      data['contactos'] = int.tryParse(contactosController.text.trim()) ?? 0;
-      data['visitas'] = int.tryParse(visitasController.text.trim()) ?? 0;
-      data['presupuestos'] =
-          int.tryParse(presupuestosController.text.trim()) ?? 0;
-      data['polizas'] = int.tryParse(polizasController.text.trim()) ?? 0;
+      /*
+       * Se vuelve a comprobar la estructura antes de guardar.
+       * Así no se puede modificar un agente que haya sido
+       * reasignado mientras esta pantalla seguía abierta.
+       */
+      final autorizado =
+          await _validarAgenteAutorizado();
 
-      final payload = Map<String, dynamic>.from(data);
+      if (!autorizado) {
+        throw Exception(
+          'El agente ya no pertenece a tu estructura.',
+        );
+      }
+
+      data['agente_id'] = widget.agente['id'];
+
+      data['contactos'] =
+          int.tryParse(
+            contactosController.text.trim(),
+          ) ??
+          0;
+
+      data['visitas'] =
+          int.tryParse(
+            visitasController.text.trim(),
+          ) ??
+          0;
+
+      data['presupuestos'] =
+          int.tryParse(
+            presupuestosController.text.trim(),
+          ) ??
+          0;
+
+      data['polizas'] =
+          int.tryParse(
+            polizasController.text.trim(),
+          ) ??
+          0;
+
+      final payload =
+          Map<String, dynamic>.from(data);
+
       payload.remove('id');
 
-      await supabase.from('integracion_agentes').upsert(
+      await supabase
+          .from('integracion_agentes')
+          .upsert(
             payload,
             onConflict: 'agente_id',
           );
@@ -138,23 +411,41 @@ class _IntegracionAgenteDetalleScreenState
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("Integración guardada correctamente"),
-          backgroundColor: Color(0xFF16A34A),
+        SnackBar(
+          content: const Text(
+            'Integración guardada correctamente',
+            style: TextStyle(
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          backgroundColor:
+              const Color(0xFF16A34A),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
         ),
       );
 
       Navigator.pop(context, true);
     } catch (e) {
-      debugPrint("❌ ERROR GUARDAR INTEGRACIÓN: $e");
+      debugPrint(
+        'ERROR GUARDAR INTEGRACIÓN: $e',
+      );
 
       if (!mounted) return;
-      setState(() => saving = false);
+
+      setState(() {
+        saving = false;
+      });
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text("Error al guardar integración: $e"),
+          content: Text(
+            'Error al guardar integración: $e',
+          ),
           backgroundColor: Colors.redAccent,
+          behavior: SnackBarBehavior.floating,
         ),
       );
     }
@@ -184,9 +475,10 @@ class _IntegracionAgenteDetalleScreenState
           style: TextStyle(fontWeight: FontWeight.w900),
         ),
       ),
-      bottomNavigationBar: loading
-          ? null
-          : SafeArea(
+      bottomNavigationBar:
+          loading || !agenteAutorizado
+              ? null
+              : SafeArea(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(16, 8, 16, 14),
                 child: SizedBox(
@@ -228,7 +520,14 @@ class _IntegracionAgenteDetalleScreenState
                 color: Color(0xFF2563EB),
               ),
             )
-          : ListView(
+          : error != null
+              ? _estadoError()
+              : RefreshIndicator(
+                  color: const Color(0xFF2563EB),
+                  onRefresh: cargar,
+                  child: ListView(
+                    physics:
+                        const AlwaysScrollableScrollPhysics(),
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
               children: [
                 _cabeceraAgente(nombre, email),
@@ -294,6 +593,91 @@ class _IntegracionAgenteDetalleScreenState
                 const SizedBox(height: 90),
               ],
             ),
+          ),
+    );
+  }
+
+  Widget _estadoError() {
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(
+        20,
+        40,
+        20,
+        28,
+      ),
+      children: [
+        Container(
+          padding: const EdgeInsets.all(25),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(28),
+            border: Border.all(
+              color:
+                  Colors.redAccent.withOpacity(0.18),
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.05),
+                blurRadius: 20,
+                offset: const Offset(0, 10),
+              ),
+            ],
+          ),
+          child: Column(
+            children: [
+              const Icon(
+                Icons.lock_person_rounded,
+                color: Colors.redAccent,
+                size: 58,
+              ),
+              const SizedBox(height: 14),
+              const Text(
+                'Acceso no autorizado',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: Color(0xFF0F172A),
+                  fontSize: 20,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                error ??
+                    'No se pudo abrir la integración.',
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: Color(0xFF64748B),
+                  fontWeight: FontWeight.w600,
+                  height: 1.35,
+                ),
+              ),
+              const SizedBox(height: 18),
+              ElevatedButton.icon(
+                onPressed: () =>
+                    Navigator.of(context).maybePop(),
+                icon: const Icon(
+                  Icons.arrow_back_rounded,
+                ),
+                label: const Text(
+                  'Volver',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor:
+                      const Color(0xFF0F172A),
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius:
+                        BorderRadius.circular(16),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 

@@ -1,14 +1,12 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:safebrok_andalucia/core/production/production_period_service.dart';
 
 class ObjetivoScreen extends StatefulWidget {
   final String role;
 
-  const ObjetivoScreen({
-    super.key,
-    required this.role,
-  });
+  const ObjetivoScreen({super.key, required this.role});
 
   @override
   State<ObjetivoScreen> createState() => _ObjetivoScreenState();
@@ -32,177 +30,406 @@ class _ObjetivoScreenState extends State<ObjetivoScreen> {
     loadData();
   }
 
- Future<void> loadData() async {
-  try {
-    final user = supabase.auth.currentUser;
+  String _limpiarId(dynamic value) {
+    if (value == null) return '';
 
-    if (user == null) {
-      if (mounted) setState(() => loading = false);
-      return;
+    final texto = value.toString().trim();
+
+    if (texto.isEmpty || texto.toLowerCase() == 'null') {
+      return '';
     }
 
-    final now = DateTime.now();
+    return texto;
+  }
 
-    final start = now.day >= 25
-        ? DateTime(now.year, now.month, 25)
-        : DateTime(now.year, now.month - 1, 25);
+  String _normalizarRol(dynamic value) {
+    return (value ?? '')
+        .toString()
+        .trim()
+        .toLowerCase()
+        .replaceAll('-', '_')
+        .replaceAll(' ', '_');
+  }
 
-    final end = now.day >= 25
-        ? DateTime(now.year, now.month + 1, 25)
-        : DateTime(now.year, now.month, 25);
+  String _normalizarTexto(dynamic value) {
+    return (value ?? '').toString().trim().toLowerCase();
+  }
 
-    final usuariosData = await supabase
-        .from('usuarios')
-        .select('id, auth_id, parent_id, rol_usuario, email');
+  double _numero(dynamic value) {
+    if (value == null) return 0;
+    if (value is num) return value.toDouble();
 
-    final usuariosTabla = List<Map<String, dynamic>>.from(usuariosData);
+    final texto = value.toString().trim();
 
-    String limpiar(dynamic v) => (v ?? '').toString().trim().toLowerCase();
+    if (texto.isEmpty) return 0;
 
-    final miUsuario = usuariosTabla.firstWhere(
-      (u) =>
-          limpiar(u['auth_id']) == limpiar(user.id) ||
-          limpiar(u['email']) == limpiar(user.email),
-      orElse: () => {},
-    );
+    final normalizado = texto.contains(',') && texto.contains('.')
+        ? texto.replaceAll('.', '').replaceAll(',', '.')
+        : texto.replaceAll(',', '.');
 
-    if (miUsuario.isEmpty) {
-      debugPrint('NO SE ENCUENTRA USUARIO LOGUEADO EN TABLA usuarios');
+    return double.tryParse(normalizado) ?? 0;
+  }
 
-      if (mounted) {
-        setState(() {
-          loading = false;
-          primaNeta = 0;
-          primasTotales = 0;
-          primasPropias = 0;
-          primasEquipo = 0;
-          porcentajeDV = 0;
-        });
+  int _nivelRol(dynamic rol) {
+    switch (_normalizarRol(rol)) {
+      case 'director_nacional':
+        return 5;
+      case 'director_zona':
+        return 4;
+      case 'jefe_ventas':
+        return 3;
+      case 'jefe_equipo':
+        return 2;
+      case 'agente':
+        return 1;
+      default:
+        return 0;
+    }
+  }
+
+  Future<Map<String, double>> _getExtornosPeriodo({
+    required DateTime start,
+    required DateTime end,
+    required List<String> authIds,
+    required String myAuthId,
+  }) async {
+    if (authIds.isEmpty) {
+      return {
+        'prima_total': 0,
+        'prima_propia': 0,
+        'prima_equipo': 0,
+        'prima_mix': 0,
+      };
+    }
+
+    final anulacionesData = await supabase
+        .from('anulaciones_polizas')
+        .select('venta_id, prima_extornada, fecha_anulacion')
+        .gte('fecha_anulacion', start.toIso8601String())
+        .lt('fecha_anulacion', end.toIso8601String());
+
+    final anulaciones = List<Map<String, dynamic>>.from(anulacionesData);
+
+    if (anulaciones.isEmpty) {
+      return {
+        'prima_total': 0,
+        'prima_propia': 0,
+        'prima_equipo': 0,
+        'prima_mix': 0,
+      };
+    }
+
+    final ventaIds = anulaciones
+        .map((a) => _limpiarId(a['venta_id']))
+        .where((id) => id.isNotEmpty)
+        .toSet()
+        .toList();
+
+    if (ventaIds.isEmpty) {
+      return {
+        'prima_total': 0,
+        'prima_propia': 0,
+        'prima_equipo': 0,
+        'prima_mix': 0,
+      };
+    }
+
+    final ventasData = await supabase
+        .from('ventas')
+        .select('id, agente_auth_id, producto')
+        .inFilter('id', ventaIds);
+
+    final ventasMap = <String, Map<String, dynamic>>{};
+
+    for (final venta in List<Map<String, dynamic>>.from(ventasData)) {
+      final id = _limpiarId(venta['id']);
+
+      if (id.isNotEmpty) {
+        ventasMap[id] = venta;
       }
-      return;
     }
 
-    final miId = limpiar(miUsuario['id']);
-    final miAuthId = limpiar(miUsuario['auth_id']);
-    final role = limpiar(widget.role);
+    final autorizados = authIds.toSet();
 
-    final idsUsuariosEstructura = <String>{miId};
-    final authIdsEstructura = <String>{};
+    double primaTotal = 0;
+    double primaPropia = 0;
+    double primaEquipo = 0;
+    double primaMix = 0;
 
-    void buscarDescendientes(String parentId) {
-      for (final u in usuariosTabla) {
-        final idUsuario = limpiar(u['id']);
-        final parentUsuario = limpiar(u['parent_id']);
+    for (final anulacion in anulaciones) {
+      final ventaId = _limpiarId(anulacion['venta_id']);
 
-        if (parentUsuario == parentId &&
-            idUsuario.isNotEmpty &&
-            !idsUsuariosEstructura.contains(idUsuario)) {
-          idsUsuariosEstructura.add(idUsuario);
-          buscarDescendientes(idUsuario);
+      final venta = ventasMap[ventaId];
+
+      if (venta == null) continue;
+
+      final agenteAuthId = _limpiarId(venta['agente_auth_id']);
+
+      if (!autorizados.contains(agenteAuthId)) {
+        continue;
+      }
+
+      final primaExtornada = _numero(anulacion['prima_extornada']);
+
+      primaTotal += primaExtornada;
+
+      if (agenteAuthId == myAuthId) {
+        primaPropia += primaExtornada;
+      } else {
+        primaEquipo += primaExtornada;
+      }
+
+      final producto = _normalizarTexto(venta['producto']);
+
+      if (_esProductoMixDV(producto)) {
+        primaMix += primaExtornada;
+      }
+    }
+
+    return {
+      'prima_total': primaTotal,
+      'prima_propia': primaPropia,
+      'prima_equipo': primaEquipo,
+      'prima_mix': primaMix,
+    };
+  }
+
+  bool _esProductoMixDV(String producto) {
+    final normalized = producto.toLowerCase().trim();
+    return normalized.contains('decesos') ||
+        normalized.contains('vida') ||
+        normalized.contains('prima unica') ||
+        normalized.contains('prima única');
+  }
+
+  List<Map<String, dynamic>> _construirEstructuraValida({
+    required Map<String, dynamic> perfil,
+    required List<Map<String, dynamic>> todosUsuarios,
+  }) {
+    final rolRaiz = _normalizarRol(perfil['rol_usuario']);
+    final idRaiz = _limpiarId(perfil['id']);
+    if (idRaiz.isEmpty) {
+      throw Exception(
+        'El usuario conectado no tiene un id válido en usuarios.',
+      );
+    }
+    if (rolRaiz == 'administracion' || rolRaiz == 'director_nacional') {
+      return todosUsuarios.where((usuario) {
+        return _limpiarId(usuario['id']).isNotEmpty &&
+            _limpiarId(usuario['auth_id']).isNotEmpty;
+      }).toList();
+    }
+    final hijosPorParent = <String, List<Map<String, dynamic>>>{};
+    for (final fila in todosUsuarios) {
+      final usuario = Map<String, dynamic>.from(fila);
+      final parentId = _limpiarId(usuario['parent_id']);
+      if (parentId.isEmpty) continue;
+      hijosPorParent
+          .putIfAbsent(parentId, () => <Map<String, dynamic>>[])
+          .add(usuario);
+    }
+    final resultado = <Map<String, dynamic>>[Map<String, dynamic>.from(perfil)];
+    final visitados = <String>{idRaiz};
+    final pendientes = <Map<String, dynamic>>[
+      Map<String, dynamic>.from(perfil),
+    ];
+    while (pendientes.isNotEmpty) {
+      final padre = pendientes.removeAt(0);
+      final padreId = _limpiarId(padre['id']);
+      final nivelPadre = _nivelRol(padre['rol_usuario']);
+      final hijos = hijosPorParent[padreId] ?? <Map<String, dynamic>>[];
+      for (final hijoOriginal in hijos) {
+        final hijo = Map<String, dynamic>.from(hijoOriginal);
+        final hijoId = _limpiarId(hijo['id']);
+        final nivelHijo = _nivelRol(hijo['rol_usuario']);
+        if (hijoId.isEmpty || visitados.contains(hijoId)) continue;
+        if (nivelPadre <= 0 || nivelHijo <= 0 || nivelHijo >= nivelPadre)
+          continue;
+        visitados.add(hijoId);
+        resultado.add(hijo);
+        pendientes.add(hijo);
+      }
+    }
+    return resultado;
+  }
+
+  Future<void> loadData() async {
+    try {
+      final authUser = supabase.auth.currentUser;
+
+      if (authUser == null) {
+        if (mounted) {
+          setState(() {
+            loading = false;
+          });
         }
+        return;
       }
-    }
 
-    if (role == 'director_nacional') {
-      for (final u in usuariosTabla) {
-        final authId = limpiar(u['auth_id']);
-        if (authId.isNotEmpty) authIdsEstructura.add(authId);
+      final perfilData = await supabase
+          .from('usuarios')
+          .select(
+            'id, auth_id, parent_id, rol_usuario, nombre, apellidos, email',
+          )
+          .eq('auth_id', authUser.id)
+          .maybeSingle();
+
+      if (perfilData == null) {
+        throw Exception(
+          'No se encontró el usuario logueado en la tabla usuarios.',
+        );
       }
-    } else if (role == 'agente') {
-      authIdsEstructura.add(miAuthId);
-    } else {
-      buscarDescendientes(miId);
 
-      for (final u in usuariosTabla) {
-        final idUsuario = limpiar(u['id']);
-        final authId = limpiar(u['auth_id']);
+      final perfil = Map<String, dynamic>.from(perfilData);
 
-        if (idsUsuariosEstructura.contains(idUsuario) && authId.isNotEmpty) {
-          authIdsEstructura.add(authId);
-        }
+      final usuariosData = await supabase
+          .from('usuarios')
+          .select(
+            'id, auth_id, parent_id, rol_usuario, nombre, apellidos, email',
+          );
+
+      final todosUsuarios = List<Map<String, dynamic>>.from(usuariosData);
+
+      final estructura = _construirEstructuraValida(
+        perfil: perfil,
+        todosUsuarios: todosUsuarios,
+      );
+
+      final authIdsEstructura = estructura
+          .map((u) => _limpiarId(u['auth_id']))
+          .where((authId) => authId.isNotEmpty)
+          .toSet()
+          .toList();
+
+      if (authIdsEstructura.isEmpty) {
+        throw Exception(
+          'La estructura del usuario no contiene auth_id válidos.',
+        );
       }
-    }
 
-    double primas = 0;
-    double decesosVida = 0;
-    double propias = 0;
-    double equipo = 0;
+      final productionPeriod = await ProductionPeriodService.instance.current();
+      final start = productionPeriod.start;
+      final end = productionPeriod.endExclusive;
 
-    if (authIdsEstructura.isNotEmpty) {
-      final ventas = await supabase
+      final ventasData = await supabase
           .from('ventas')
-          .select('prima_anual_neta, producto, agente_auth_id')
-          .inFilter('agente_auth_id', authIdsEstructura.toList())
+          .select(
+            'id, prima_anual_neta, producto, agente_auth_id, fecha_efecto',
+          )
+          .inFilter('agente_auth_id', authIdsEstructura)
           .gte('fecha_efecto', start.toIso8601String())
           .lt('fecha_efecto', end.toIso8601String());
 
-      for (final v in ventas) {
-        final primaRaw = v['prima_anual_neta'];
-        final prima = primaRaw is num
-            ? primaRaw.toDouble()
-            : double.tryParse(primaRaw?.toString() ?? '0') ?? 0;
+      final ventas = List<Map<String, dynamic>>.from(ventasData).where((venta) {
+        return authIdsEstructura.contains(_limpiarId(venta['agente_auth_id']));
+      }).toList();
 
-        final agenteAuthId = limpiar(v['agente_auth_id']);
+      double totalPrimas = 0;
+      double totalMixDV = 0;
+      double totalPropias = 0;
+      double totalEquipo = 0;
 
-        primas += prima;
+      for (final venta in ventas) {
+        final prima = _numero(venta['prima_anual_neta']);
 
-        if (agenteAuthId == miAuthId) {
-          propias += prima;
+        final agenteAuthId = _limpiarId(venta['agente_auth_id']);
+
+        totalPrimas += prima;
+
+        if (agenteAuthId == authUser.id) {
+          totalPropias += prima;
         } else {
-          equipo += prima;
+          totalEquipo += prima;
         }
 
-        final producto = limpiar(v['producto']);
+        final producto = _normalizarTexto(venta['producto']);
 
-        if (producto.contains('decesos') || producto.contains('vida')) {
-          decesosVida += prima;
+        if (_esProductoMixDV(producto)) {
+          totalMixDV += prima;
         }
       }
-    }
 
-    final porcentaje = primas > 0 ? (decesosVida / primas) * 100 : 0.0;
+      final extornos = await _getExtornosPeriodo(
+        start: start,
+        end: end,
+        authIds: authIdsEstructura,
+        myAuthId: authUser.id,
+      );
 
-    if (!mounted) return;
+      totalPrimas -= extornos['prima_total'] ?? 0;
+      totalPropias -= extornos['prima_propia'] ?? 0;
+      totalEquipo -= extornos['prima_equipo'] ?? 0;
+      totalMixDV -= extornos['prima_mix'] ?? 0;
 
-    setState(() {
-      primaNeta = primas;
-      porcentajeDV = porcentaje;
-      primasPropias = propias;
-      primasEquipo = equipo;
-      primasTotales = primas;
-      loading = false;
-    });
-  } catch (e, s) {
-    debugPrint("ERROR OBJETIVOS: $e");
-    debugPrint("$s");
+      if (totalPrimas < 0) totalPrimas = 0;
+      if (totalPropias < 0) totalPropias = 0;
+      if (totalEquipo < 0) totalEquipo = 0;
+      if (totalMixDV < 0) totalMixDV = 0;
 
-    if (mounted) {
-      setState(() => loading = false);
+      final porcentaje = totalPrimas > 0
+          ? (totalMixDV / totalPrimas) * 100
+          : 0.0;
+
+      debugPrint('=========================================');
+      debugPrint('OBJETIVO SCREEN');
+      debugPrint('ROL REAL: ${perfil['rol_usuario']}');
+      debugPrint('PERSONAS EN ESTRUCTURA: ${estructura.length}');
+      debugPrint('AUTH IDS AUTORIZADOS: ${authIdsEstructura.length}');
+      debugPrint('PRIMAS PROPIAS: $totalPropias');
+      debugPrint('PRIMAS EQUIPO: $totalEquipo');
+      debugPrint('PRIMAS TOTALES: $totalPrimas');
+      debugPrint('MIX VIDA + DECESOS + PRIMA ÚNICA: $totalMixDV');
+      debugPrint('PORCENTAJE MIX: $porcentaje');
+      debugPrint('=========================================');
+
+      if (!mounted) return;
+
+      setState(() {
+        primaNeta = totalPrimas;
+        porcentajeDV = porcentaje;
+        primasPropias = totalPropias;
+        primasEquipo = totalEquipo;
+        primasTotales = totalPrimas;
+        loading = false;
+      });
+    } catch (e, s) {
+      debugPrint('ERROR OBJETIVOS: $e');
+      debugPrint('$s');
+
+      if (!mounted) return;
+
+      setState(() {
+        primaNeta = 0;
+        porcentajeDV = 0;
+        primasPropias = 0;
+        primasEquipo = 0;
+        primasTotales = 0;
+        loading = false;
+      });
     }
   }
-}
 
   double get objetivoPrimas {
-  final role = widget.role.toLowerCase().trim();
+    final role = widget.role.toLowerCase().trim();
 
-  if (role == 'jefe_equipo') return 10000;
-  if (role == 'jefe_ventas') return 12000;
-  if (role == 'director_zona') return 15000;
-  if (role == 'director_nacional') return 25000;
+    if (role == 'jefe_equipo') return 10000;
+    if (role == 'jefe_ventas') return 11500;
+    if (role == 'director_zona') return 15000;
+    if (role == 'director_nacional') return 25000;
 
-  return 12000;
-}
+    return 12000;
+  }
 
- String get roleLabel {
-  final role = widget.role.toLowerCase().trim();
+  String get roleLabel {
+    final role = widget.role.toLowerCase().trim();
 
-  if (role == 'director_nacional') return "Director Nacional";
-  if (role == 'director_zona') return "Director de Zona";
-  if (role == 'jefe_ventas') return "Jefe de Ventas";
-  if (role == 'jefe_equipo') return "Jefe de Equipo";
+    if (role == 'director_nacional') return "Director Nacional";
+    if (role == 'director_zona') return "Director de Zona";
+    if (role == 'jefe_ventas') return "Jefe de Ventas";
+    if (role == 'jefe_equipo') return "Jefe de Equipo";
 
-  return "Agente";
-}
+    return "Agente";
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -221,9 +448,7 @@ class _ObjetivoScreenState extends State<ObjetivoScreen> {
           SafeArea(
             child: loading
                 ? const Center(
-                    child: CircularProgressIndicator(
-                      color: Colors.cyanAccent,
-                    ),
+                    child: CircularProgressIndicator(color: Colors.cyanAccent),
                   )
                 : ListView(
                     padding: const EdgeInsets.fromLTRB(20, 14, 20, 34),
@@ -259,10 +484,8 @@ class _ObjetivoScreenState extends State<ObjetivoScreen> {
                       const SizedBox(height: 20),
                       _objectiveCard(
                         title: "Objetivo primas",
-                        current:
-                            "${primaNeta.toStringAsFixed(2)} €",
-                        target:
-                            "${objetivoPrimas.toStringAsFixed(0)} €",
+                        current: "${primaNeta.toStringAsFixed(2)} €",
+                        target: "${objetivoPrimas.toStringAsFixed(0)} €",
                         progress: progresoPrimas,
                         ok: objetivoPrimasOk,
                         icon: Icons.trending_up_rounded,
@@ -273,8 +496,7 @@ class _ObjetivoScreenState extends State<ObjetivoScreen> {
                       const SizedBox(height: 14),
                       _objectiveCard(
                         title: "Objetivo Decesos + Vida",
-                        current:
-                            "${porcentajeDV.toStringAsFixed(2)}%",
+                        current: "${porcentajeDV.toStringAsFixed(2)}%",
                         target: "30%",
                         progress: progresoDV,
                         ok: objetivoDVOk,
@@ -311,9 +533,7 @@ class _ObjetivoScreenState extends State<ObjetivoScreen> {
               decoration: BoxDecoration(
                 color: Colors.white.withOpacity(0.07),
                 borderRadius: BorderRadius.circular(18),
-                border: Border.all(
-                  color: Colors.white.withOpacity(0.10),
-                ),
+                border: Border.all(color: Colors.white.withOpacity(0.10)),
               ),
               child: const Icon(
                 Icons.arrow_back_ios_new_rounded,
@@ -385,15 +605,9 @@ class _ObjetivoScreenState extends State<ObjetivoScreen> {
         gradient: const LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [
-            Color(0xFF062C68),
-            Color(0xFF10114A),
-            Color(0xFF050B12),
-          ],
+          colors: [Color(0xFF062C68), Color(0xFF10114A), Color(0xFF050B12)],
         ),
-        border: Border.all(
-          color: Colors.cyanAccent.withOpacity(0.24),
-        ),
+        border: Border.all(color: Colors.cyanAccent.withOpacity(0.24)),
         boxShadow: [
           BoxShadow(
             color: Colors.blueAccent.withOpacity(0.24),
@@ -465,7 +679,9 @@ class _ObjetivoScreenState extends State<ObjetivoScreen> {
                 children: [
                   _statusChip(
                     objetivoGeneralOk ? "Objetivo OK" : "En progreso",
-                    objetivoGeneralOk ? Colors.greenAccent : Colors.orangeAccent,
+                    objetivoGeneralOk
+                        ? Colors.greenAccent
+                        : Colors.orangeAccent,
                     objetivoGeneralOk
                         ? Icons.check_circle_rounded
                         : Icons.auto_graph_rounded,
@@ -499,14 +715,9 @@ class _ObjetivoScreenState extends State<ObjetivoScreen> {
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(24),
         gradient: LinearGradient(
-          colors: [
-            color.withOpacity(0.16),
-            Colors.white.withOpacity(0.045),
-          ],
+          colors: [color.withOpacity(0.16), Colors.white.withOpacity(0.045)],
         ),
-        border: Border.all(
-          color: color.withOpacity(0.24),
-        ),
+        border: Border.all(color: color.withOpacity(0.24)),
       ),
       child: Row(
         children: [
@@ -718,9 +929,7 @@ class _ObjetivoScreenState extends State<ObjetivoScreen> {
       decoration: BoxDecoration(
         color: color.withOpacity(0.14),
         borderRadius: BorderRadius.circular(40),
-        border: Border.all(
-          color: color.withOpacity(0.28),
-        ),
+        border: Border.all(color: color.withOpacity(0.28)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -754,9 +963,7 @@ class _ObjetivoScreenState extends State<ObjetivoScreen> {
             Colors.white.withOpacity(0.025),
           ],
         ),
-        border: Border.all(
-          color: color.withOpacity(0.35),
-        ),
+        border: Border.all(color: color.withOpacity(0.35)),
         boxShadow: [
           BoxShadow(
             color: color.withOpacity(0.18),
@@ -765,11 +972,7 @@ class _ObjetivoScreenState extends State<ObjetivoScreen> {
           ),
         ],
       ),
-      child: Icon(
-        icon,
-        color: color,
-        size: size * 0.48,
-      ),
+      child: Icon(icon, color: color, size: size * 0.48),
     );
   }
 }
@@ -786,11 +989,7 @@ class _ObjetivoBackground extends StatelessWidget {
             gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
-              colors: [
-                Color(0xFF050B12),
-                Color(0xFF071A2E),
-                Color(0xFF050B12),
-              ],
+              colors: [Color(0xFF050B12), Color(0xFF071A2E), Color(0xFF050B12)],
             ),
           ),
         ),
@@ -811,9 +1010,7 @@ class _ObjetivoBackground extends StatelessWidget {
         ),
         BackdropFilter(
           filter: ImageFilter.blur(sigmaX: 60, sigmaY: 60),
-          child: Container(
-            color: Colors.black.withOpacity(0.05),
-          ),
+          child: Container(color: Colors.black.withOpacity(0.05)),
         ),
       ],
     );

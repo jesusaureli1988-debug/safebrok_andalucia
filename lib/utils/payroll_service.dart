@@ -1,4 +1,5 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:safebrok_andalucia/core/production/production_period_service.dart';
 
 class PayrollService {
   static final supabase = Supabase.instance.client;
@@ -22,9 +23,12 @@ class PayrollService {
     required int mes,
     required int anio,
   }) async {
-
-    final inicio = startPeriod(mes, anio);
-    final fin = endPeriod(mes, anio);
+    final period = await ProductionPeriodService.instance.forMonth(
+      year: anio,
+      month: mes,
+    );
+    final inicio = period.start;
+    final fin = period.endExclusive;
 
     // =========================
     // 🔥 VENTAS DEL PERIODO
@@ -34,7 +38,7 @@ class PayrollService {
         .select()
         .eq('agente_auth_id', authId)
         .gte('fecha_efecto', inicio.toIso8601String())
-        .lte('fecha_efecto', fin.toIso8601String());
+        .lt('fecha_efecto', fin.toIso8601String());
 
     double primaBrutaTotal = 0;
     double primaNetaTotal = 0;
@@ -42,7 +46,6 @@ class PayrollService {
     double primasDecesosVida = 0;
 
     for (final v in ventas) {
-
       final bruta = (v['prima_anual_bruta'] ?? 0);
       final neta = (v['prima_anual_neta'] ?? 0);
       final com = (v['comision'] ?? 0);
@@ -64,8 +67,7 @@ class PayrollService {
     double porcentajeDecesosVida = 0;
 
     if (primaNetaTotal > 0) {
-      porcentajeDecesosVida =
-          (primasDecesosVida / primaNetaTotal) * 100;
+      porcentajeDecesosVida = (primasDecesosVida / primaNetaTotal) * 100;
     }
 
     // =========================

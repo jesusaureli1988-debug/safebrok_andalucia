@@ -20,10 +20,10 @@ class _ForgotPasswordScreenState
     setState(() => loading = true);
 
     try {
-      await Supabase.instance.client.auth
-          .resetPasswordForEmail(
-        emailController.text.trim(),
-      );
+      await Supabase.instance.client.auth.resetPasswordForEmail(
+  emailController.text.trim().toLowerCase(),
+  redirectTo: 'com.safebrok.andalucia://reset-password',
+);
 
       if (!mounted) return;
 

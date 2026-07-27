@@ -89,21 +89,6 @@ class _DirectorNacionalKpisScreenState
         .replaceAll(' ', '_');
   }
 
-  String? _rolHijoEsperado(String rol) {
-    switch (_normalizarRol(rol)) {
-      case 'director_nacional':
-        return 'director_zona';
-      case 'director_zona':
-        return 'jefe_ventas';
-      case 'jefe_ventas':
-        return 'jefe_equipo';
-      case 'jefe_equipo':
-        return 'agente';
-      default:
-        return null;
-    }
-  }
-
   Future<void> cargarDatos() async {
     try {
       if (mounted) {
@@ -149,43 +134,68 @@ class _DirectorNacionalKpisScreenState
             'id, auth_id, parent_id, rol_usuario, nombre, apellidos, email',
           );
 
-      final todosUsuarios = List<Map<String, dynamic>>.from(usuariosData);
+      final todosUsuarios = List<Map<String, dynamic>>.from(
+        usuariosData,
+      );
 
-      final estructura = _obtenerUsuariosPermitidos(
+      final estructura = _construirEstructuraValida(
         perfil: perfil,
         todosUsuarios: todosUsuarios,
       );
 
-      final authIds = estructura
-          .map((u) => u['auth_id']?.toString())
-          .where(
-            (id) =>
-                id != null &&
-                id.trim().isNotEmpty &&
-                id.toLowerCase() != 'null',
-          )
-          .cast<String>()
+      final authIdsAutorizados = estructura
+          .map((u) => _idTexto(u['auth_id']))
+          .where((id) => id.isNotEmpty)
           .toSet()
           .toList();
 
       List<Map<String, dynamic>> ventasEstructura = [];
       List<Map<String, dynamic>> clientesEstructura = [];
 
-      if (authIds.isNotEmpty) {
+      if (authIdsAutorizados.isNotEmpty) {
         final ventasData = await supabase
             .from('ventas')
             .select()
-            .inFilter('agente_auth_id', authIds)
-            .order('created_at', ascending: false);
+            .inFilter(
+              'agente_auth_id',
+              authIdsAutorizados,
+            )
+            .order(
+              'created_at',
+              ascending: false,
+            );
+
+        ventasEstructura = List<Map<String, dynamic>>.from(
+          ventasData,
+        ).where((venta) {
+          final authId = _idTexto(
+            venta['agente_auth_id'],
+          );
+
+          return authIdsAutorizados.contains(authId);
+        }).toList();
 
         final clientesData = await supabase
             .from('clientes')
             .select()
-            .inFilter('auth_id', authIds)
-            .order('created_at', ascending: false);
+            .inFilter(
+              'auth_id',
+              authIdsAutorizados,
+            )
+            .order(
+              'created_at',
+              ascending: false,
+            );
 
-        ventasEstructura = List<Map<String, dynamic>>.from(ventasData);
-        clientesEstructura = List<Map<String, dynamic>>.from(clientesData);
+        clientesEstructura = List<Map<String, dynamic>>.from(
+          clientesData,
+        ).where((cliente) {
+          final authId = _idTexto(
+            cliente['auth_id'],
+          );
+
+          return authIdsAutorizados.contains(authId);
+        }).toList();
       }
 
       usuarioLogueado = perfil;
@@ -239,63 +249,186 @@ class _DirectorNacionalKpisScreenState
     }
   }
 
-  List<Map<String, dynamic>> _obtenerUsuariosPermitidos({
+  String _idTexto(dynamic value) {
+    if (value == null) return '';
+
+    final id = value.toString().trim();
+
+    if (id.isEmpty || id.toLowerCase() == 'null') {
+      return '';
+    }
+
+    return id;
+  }
+
+  int _nivelRol(dynamic rol) {
+    switch (_normalizarRol(rol)) {
+      case 'director_nacional':
+        return 5;
+      case 'director_zona':
+        return 4;
+      case 'jefe_ventas':
+        return 3;
+      case 'jefe_equipo':
+        return 2;
+      case 'agente':
+        return 1;
+      default:
+        return 0;
+    }
+  }
+
+  List<Map<String, dynamic>> _construirEstructuraValida({
     required Map<String, dynamic> perfil,
     required List<Map<String, dynamic>> todosUsuarios,
   }) {
-    final rolPerfil = _normalizarRol(perfil['rol_usuario']);
+    final idRaiz = _idTexto(perfil['id']);
+    final authIdRaiz = _idTexto(perfil['auth_id']);
+    final authActual = supabase.auth.currentUser?.id ?? '';
 
-    if (rolPerfil == 'administracion') {
-      return todosUsuarios.where((u) {
-        final authId = u['auth_id']?.toString().trim() ?? '';
-        return authId.isNotEmpty && authId.toLowerCase() != 'null';
+    if (idRaiz.isEmpty) {
+      throw Exception(
+        'El usuario conectado no tiene un id válido.',
+      );
+    }
+
+    if (authIdRaiz.isEmpty || authIdRaiz != authActual) {
+      throw Exception(
+        'El perfil recuperado no corresponde al usuario autenticado.',
+      );
+    }
+
+    final nivelRaiz = _nivelRol(perfil['rol_usuario']);
+
+    if (nivelRaiz == 0 &&
+        _normalizarRol(perfil['rol_usuario']) != 'administracion') {
+      throw Exception(
+        'El usuario conectado tiene un rol no reconocido: '
+        '${perfil['rol_usuario']}',
+      );
+    }
+
+    /*
+     * Administración sí puede ver toda la red.
+     */
+    if (_normalizarRol(perfil['rol_usuario']) == 'administracion') {
+      return todosUsuarios.where((usuario) {
+        return _idTexto(usuario['id']).isNotEmpty &&
+            _idTexto(usuario['auth_id']).isNotEmpty;
       }).toList();
     }
 
-    final porParentId = <String, List<Map<String, dynamic>>>{};
+    final hijosPorParent = <String, List<Map<String, dynamic>>>{};
 
-    for (final usuario in todosUsuarios) {
-      final parentId = usuario['parent_id']?.toString().trim();
+    for (final fila in todosUsuarios) {
+      final usuario = Map<String, dynamic>.from(fila);
+      final parentId = _idTexto(usuario['parent_id']);
 
-      if (parentId == null ||
-          parentId.isEmpty ||
-          parentId.toLowerCase() == 'null') {
-        continue;
-      }
+      if (parentId.isEmpty) continue;
 
-      porParentId
-          .putIfAbsent(parentId, () => <Map<String, dynamic>>[])
+      hijosPorParent
+          .putIfAbsent(
+            parentId,
+            () => <Map<String, dynamic>>[],
+          )
           .add(usuario);
     }
 
-    final resultado = <Map<String, dynamic>>[];
-    final visitados = <String>{};
+    final resultado = <Map<String, dynamic>>[
+      Map<String, dynamic>.from(perfil),
+    ];
 
-    void recorrer(Map<String, dynamic> padre) {
-      final padreId = padre['id']?.toString().trim() ?? '';
+    final visitados = <String>{idRaiz};
+    final pendientes = <Map<String, dynamic>>[
+      Map<String, dynamic>.from(perfil),
+    ];
 
-      if (padreId.isEmpty || visitados.contains(padreId)) return;
+    debugPrint('=========================================');
+    debugPrint('INICIO ESTRUCTURA JERÁRQUICA VALIDADA');
+    debugPrint('USUARIO: ${_nombreCompleto(perfil)}');
+    debugPrint('ROL: ${perfil['rol_usuario']}');
+    debugPrint('ID: $idRaiz');
 
-      visitados.add(padreId);
-      resultado.add(padre);
+    while (pendientes.isNotEmpty) {
+      final padre = pendientes.removeAt(0);
+      final padreId = _idTexto(padre['id']);
+      final nivelPadre = _nivelRol(padre['rol_usuario']);
 
-      final rolPadre = _normalizarRol(padre['rol_usuario']);
-      final rolHijo = _rolHijoEsperado(rolPadre);
+      final hijos = hijosPorParent[padreId] ??
+          <Map<String, dynamic>>[];
 
-      if (rolHijo == null) return;
+      for (final hijoOriginal in hijos) {
+        final hijo = Map<String, dynamic>.from(
+          hijoOriginal,
+        );
 
-      final hijos = (porParentId[padreId] ?? <Map<String, dynamic>>[])
-          .where(
-            (u) => _normalizarRol(u['rol_usuario']) == rolHijo,
-          )
-          .toList();
+        final hijoId = _idTexto(hijo['id']);
+        final parentId = _idTexto(hijo['parent_id']);
+        final nivelHijo = _nivelRol(hijo['rol_usuario']);
 
-      for (final hijo in hijos) {
-        recorrer(hijo);
+        if (hijoId.isEmpty ||
+            parentId != padreId ||
+            visitados.contains(hijoId)) {
+          continue;
+        }
+
+        /*
+         * Regla fundamental:
+         * un descendiente debe estar SIEMPRE por debajo del padre.
+         *
+         * Ejemplos admitidos:
+         * director_zona -> jefe_ventas
+         * director_zona -> jefe_equipo
+         * director_zona -> agente
+         * jefe_ventas -> jefe_equipo
+         * jefe_ventas -> agente
+         *
+         * Ejemplos rechazados:
+         * jefe_equipo -> director_nacional
+         * jefe_equipo -> director_zona
+         * agente -> jefe_equipo
+         *
+         * Esto corta los parent_id erróneos que vuelven hacia arriba
+         * y terminan incorporando toda la organización.
+         */
+        final jerarquiaValida =
+            nivelPadre > 0 &&
+            nivelHijo > 0 &&
+            nivelHijo < nivelPadre;
+
+        if (!jerarquiaValida) {
+          debugPrint(
+            'DESCARTADO POR SALTO JERÁRQUICO: '
+            '${_nombreCompleto(hijo)} | '
+            'rol=${hijo['rol_usuario']} | '
+            'parent=${_nombreCompleto(padre)} | '
+            'rol_parent=${padre['rol_usuario']}',
+          );
+          continue;
+        }
+
+        visitados.add(hijoId);
+        resultado.add(hijo);
+        pendientes.add(hijo);
       }
     }
 
-    recorrer(perfil);
+    debugPrint('-----------------------------------------');
+    debugPrint('ESTRUCTURA VALIDADA TERMINADA');
+    debugPrint(
+      'TOTAL INCLUYENDO AL LOGUEADO: ${resultado.length}',
+    );
+
+    for (final usuario in resultado) {
+      debugPrint(
+        '${_nombreCompleto(usuario)} | '
+        'rol=${usuario['rol_usuario']} | '
+        'id=${usuario['id']} | '
+        'parent=${usuario['parent_id']}',
+      );
+    }
+
+    debugPrint('=========================================');
 
     return resultado;
   }
@@ -346,81 +479,139 @@ class _DirectorNacionalKpisScreenState
       return;
     }
 
-    final idsIncluidos = <String>{};
-    final seleccionados = <Map<String, dynamic>>[];
+    final mapaPorId = <String, Map<String, dynamic>>{};
+    final hijosPorParent = <String, List<Map<String, dynamic>>>{};
+
+    for (final usuario in usuariosPermitidosBase) {
+      final id = _idTexto(usuario['id']);
+
+      if (id.isEmpty) continue;
+
+      mapaPorId[id] = usuario;
+
+      final parentId = _idTexto(usuario['parent_id']);
+
+      if (parentId.isNotEmpty) {
+        hijosPorParent
+            .putIfAbsent(
+              parentId,
+              () => <Map<String, dynamic>>[],
+            )
+            .add(usuario);
+      }
+    }
+
+    final raicesSeleccionadas = <Map<String, dynamic>>[];
 
     if (selectedStructureUserId != 'Todos') {
-      final persona = usuariosPermitidosBase.firstWhere(
-        (u) => u['id']?.toString() == selectedStructureUserId,
-        orElse: () => <String, dynamic>{},
-      );
+      final persona = mapaPorId[selectedStructureUserId];
 
-      if (persona.isNotEmpty) {
-        seleccionados.add(persona);
+      if (persona != null) {
+        raicesSeleccionadas.add(persona);
       }
     } else if (selectedStructureRole != 'Todos') {
-      seleccionados.addAll(
+      raicesSeleccionadas.addAll(
         usuariosPermitidosBase.where(
-          (u) =>
-              _normalizarRol(u['rol_usuario']) ==
+          (usuario) =>
+              _normalizarRol(usuario['rol_usuario']) ==
               selectedStructureRole,
         ),
       );
     } else {
-      seleccionados.addAll(usuariosPermitidosBase);
+      usuariosEstructura = List<Map<String, dynamic>>.from(
+        usuariosPermitidosBase,
+      );
+
+      _filtrarVentasYClientesPorUsuarios();
+
+      debugPrint('======= FILTRO ESTRUCTURA KPIS =======');
+      debugPrint('FIGURA: $selectedStructureRole');
+      debugPrint('PERSONA: $selectedStructureUserId');
+      debugPrint(
+        'PERSONAS INCLUIDAS: ${usuariosEstructura.length}',
+      );
+      debugPrint('VENTAS INCLUIDAS: ${ventas.length}');
+      debugPrint('CLIENTES INCLUIDOS: ${clientes.length}');
+      debugPrint('======================================');
+
+      return;
     }
 
-    if (selectedStructureRole == 'Todos' &&
-        selectedStructureUserId == 'Todos') {
-      for (final usuario in usuariosPermitidosBase) {
-        final id = usuario['id']?.toString();
-        if (id != null && id.isNotEmpty) idsIncluidos.add(id);
-      }
-    } else {
-      for (final raiz in seleccionados) {
-        final subestructura = _obtenerUsuariosPermitidos(
-          perfil: raiz,
-          todosUsuarios: usuariosPermitidosBase,
-        );
+    final idsIncluidos = <String>{};
 
-        for (final usuario in subestructura) {
-          final id = usuario['id']?.toString();
-          if (id != null && id.isNotEmpty) idsIncluidos.add(id);
-        }
+    void recorrerSubestructura(
+      Map<String, dynamic> raiz,
+    ) {
+      final raizId = _idTexto(raiz['id']);
+
+      if (raizId.isEmpty || idsIncluidos.contains(raizId)) {
+        return;
+      }
+
+      idsIncluidos.add(raizId);
+
+      final hijos =
+          hijosPorParent[raizId] ??
+          <Map<String, dynamic>>[];
+
+      for (final hijo in hijos) {
+        recorrerSubestructura(hijo);
       }
     }
 
-    usuariosEstructura = usuariosPermitidosBase.where((u) {
-      final id = u['id']?.toString();
-      return id != null && idsIncluidos.contains(id);
-    }).toList();
+    for (final raiz in raicesSeleccionadas) {
+      recorrerSubestructura(raiz);
+    }
 
-    final authIds = usuariosEstructura
-        .map((u) => u['auth_id']?.toString())
-        .where(
-          (id) =>
-              id != null &&
-              id.isNotEmpty &&
-              id.toLowerCase() != 'null',
-        )
-        .cast<String>()
-        .toSet();
+    usuariosEstructura = usuariosPermitidosBase.where(
+      (usuario) {
+        final id = _idTexto(usuario['id']);
+        return id.isNotEmpty && idsIncluidos.contains(id);
+      },
+    ).toList();
 
-    ventas = ventasPermitidasBase.where((v) {
-      return authIds.contains(v['agente_auth_id']?.toString());
-    }).toList();
-
-    clientes = clientesPermitidosBase.where((c) {
-      return authIds.contains(c['auth_id']?.toString());
-    }).toList();
+    _filtrarVentasYClientesPorUsuarios();
 
     debugPrint('======= FILTRO ESTRUCTURA KPIS =======');
     debugPrint('FIGURA: $selectedStructureRole');
     debugPrint('PERSONA: $selectedStructureUserId');
-    debugPrint('PERSONAS INCLUIDAS: ${usuariosEstructura.length}');
+    debugPrint(
+      'PERSONAS INCLUIDAS: ${usuariosEstructura.length}',
+    );
     debugPrint('VENTAS INCLUIDAS: ${ventas.length}');
     debugPrint('CLIENTES INCLUIDOS: ${clientes.length}');
     debugPrint('======================================');
+  }
+
+  void _filtrarVentasYClientesPorUsuarios() {
+    final authIds = usuariosEstructura
+        .map(
+          (usuario) => _idTexto(usuario['auth_id']),
+        )
+        .where((id) => id.isNotEmpty)
+        .toSet();
+
+    ventas = ventasPermitidasBase.where(
+      (venta) {
+        final agenteAuthId = _idTexto(
+          venta['agente_auth_id'],
+        );
+
+        return agenteAuthId.isNotEmpty &&
+            authIds.contains(agenteAuthId);
+      },
+    ).toList();
+
+    clientes = clientesPermitidosBase.where(
+      (cliente) {
+        final propietarioAuthId = _idTexto(
+          cliente['auth_id'],
+        );
+
+        return propietarioAuthId.isNotEmpty &&
+            authIds.contains(propietarioAuthId);
+      },
+    ).toList();
   }
 
   String _fechaTexto(DateTime? fecha) {
@@ -987,6 +1178,16 @@ class _DirectorNacionalKpisScreenState
                   style: TextStyle(
                     color: Colors.cyanAccent.withOpacity(0.86),
                     fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 5),
+                Text(
+                  'Usuario autenticado: '
+                  '${usuarioLogueado?['email']?.toString() ?? 'Sin email'}',
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.42),
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
                 const SizedBox(height: 12),

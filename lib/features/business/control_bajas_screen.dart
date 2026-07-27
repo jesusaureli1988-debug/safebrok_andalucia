@@ -24,6 +24,9 @@ class _ControlBajasScreenState extends State<ControlBajasScreen> {
   List<Map<String, dynamic>> usuarios = [];
   List<Map<String, dynamic>> usuariosPermitidos = [];
   List<Map<String, dynamic>> usuariosEnriquecidos = [];
+
+  final Map<String, Map<String, dynamic>> usuariosPorId = {};
+  final Map<String, Map<String, dynamic>> usuariosPorAuth = {};
   List<Map<String, dynamic>> usuariosFiltradosCache = [];
 
   String busqueda = '';
@@ -59,155 +62,469 @@ class _ControlBajasScreenState extends State<ControlBajasScreen> {
     cargarDatos();
   }
 
+  String _normalizarRol(dynamic rol) {
+    return (rol ?? '')
+        .toString()
+        .trim()
+        .toLowerCase()
+        .replaceAll('-', '_')
+        .replaceAll(' ', '_');
+  }
+
+  String _idTexto(dynamic value) {
+    final id = (value ?? '').toString().trim();
+
+    if (id.isEmpty || id.toLowerCase() == 'null') {
+      return '';
+    }
+
+    return id;
+  }
+
+  bool _esRolAgente(String rol) {
+    final normalizado = _normalizarRol(rol);
+
+    return normalizado == 'agente' ||
+        normalizado == 'mediador' ||
+        normalizado == 'comercial';
+  }
+
+  bool _relacionPermitida({
+    required String rolPadre,
+    required String rolHijo,
+  }) {
+    final padre = _normalizarRol(rolPadre);
+    final hijo = _normalizarRol(rolHijo);
+
+    switch (padre) {
+      case 'director_nacional':
+        return hijo == 'director_zona' ||
+            hijo == 'jefe_ventas' ||
+            hijo == 'jefe_equipo' ||
+            _esRolAgente(hijo);
+
+      case 'director_zona':
+        return hijo == 'jefe_ventas' ||
+            hijo == 'jefe_equipo' ||
+            _esRolAgente(hijo);
+
+      case 'jefe_ventas':
+        return hijo == 'jefe_equipo' ||
+            _esRolAgente(hijo);
+
+      case 'jefe_equipo':
+        return _esRolAgente(hijo);
+
+      default:
+        return false;
+    }
+  }
+
+  void _crearIndicesUsuarios() {
+    usuariosPorId.clear();
+    usuariosPorAuth.clear();
+
+    for (final usuario in usuarios) {
+      final id = _idTexto(usuario['id']);
+      final authId = _idTexto(usuario['auth_id']);
+
+      if (id.isNotEmpty) {
+        usuariosPorId[id] = usuario;
+      }
+
+      if (authId.isNotEmpty) {
+        usuariosPorAuth[authId] = usuario;
+      }
+    }
+  }
+
+  bool _veTodo() {
+    final normalizado = _normalizarRol(role);
+
+    return normalizado == 'director_nacional' ||
+        normalizado == 'administracion' ||
+        normalizado == 'administrador' ||
+        normalizado == 'admin';
+  }
+
+  List<Map<String, dynamic>> _construirEstructura({
+    required Map<String, dynamic> perfil,
+  }) {
+    if (_veTodo()) {
+      return usuarios.where((usuario) {
+        return _idTexto(usuario['id']).isNotEmpty;
+      }).toList();
+    }
+
+    final hijosPorParentId =
+        <String, List<Map<String, dynamic>>>{};
+
+    for (final usuario in usuarios) {
+      final parentId = _idTexto(usuario['parent_id']);
+
+      if (parentId.isEmpty) continue;
+
+      hijosPorParentId
+          .putIfAbsent(
+            parentId,
+            () => <Map<String, dynamic>>[],
+          )
+          .add(usuario);
+    }
+
+    final resultado = <Map<String, dynamic>>[];
+    final visitados = <String>{};
+
+    void recorrer(Map<String, dynamic> actual) {
+      final idActual = _idTexto(actual['id']);
+
+      if (idActual.isEmpty || visitados.contains(idActual)) {
+        return;
+      }
+
+      visitados.add(idActual);
+      resultado.add(actual);
+
+      final rolActual =
+          _normalizarRol(actual['rol_usuario']);
+
+      final hijos = hijosPorParentId[idActual] ??
+          const <Map<String, dynamic>>[];
+
+      for (final hijo in hijos) {
+        final rolHijo =
+            _normalizarRol(hijo['rol_usuario']);
+
+        if (!_relacionPermitida(
+          rolPadre: rolActual,
+          rolHijo: rolHijo,
+        )) {
+          debugPrint(
+            'CONTROL BAJAS: usuario bloqueado '
+            '${_nombreCompleto(hijo)} '
+            '| rol=$rolHijo '
+            '| parent=${hijo['parent_id']} '
+            '| padre=$rolActual',
+          );
+
+          continue;
+        }
+
+        recorrer(hijo);
+      }
+    }
+
+    recorrer(perfil);
+
+    return resultado;
+  }
+
   Future<void> cargarDatos() async {
     final user = supabase.auth.currentUser;
 
     if (user == null) {
-      setState(() => loading = false);
+      if (!mounted) return;
+
+      setState(() {
+        loading = false;
+        usuariosPermitidos = [];
+        usuariosEnriquecidos = [];
+        usuariosFiltradosCache = [];
+      });
+
       return;
     }
 
     try {
-      final perfil = await supabase
+      if (mounted) {
+        setState(() {
+          loading = true;
+        });
+      }
+
+      final perfilData = await supabase
           .from('usuarios')
-          .select('id, auth_id, parent_id, rol_usuario, nombre, apellidos, email, estado, motivo_baja, comentario_baja, fecha_baja, baja_tramitada_por')
+          .select(
+            'id, auth_id, parent_id, rol_usuario, '
+            'nombre, apellidos, email, estado, '
+            'motivo_baja, comentario_baja, fecha_baja, '
+            'baja_tramitada_por',
+          )
           .eq('auth_id', user.id)
           .maybeSingle();
 
-      role = perfil?['rol_usuario']?.toString() ?? '';
-      myId = perfil?['id']?.toString();
-      myAuthId = perfil?['auth_id']?.toString();
+      if (perfilData == null) {
+        throw Exception(
+          'No se encontró el perfil del usuario conectado.',
+        );
+      }
+
+      final perfil =
+          Map<String, dynamic>.from(perfilData);
+
+      role = _normalizarRol(perfil['rol_usuario']);
+      myId = _idTexto(perfil['id']);
+      myAuthId = _idTexto(perfil['auth_id']);
 
       final usuariosData = await supabase
           .from('usuarios')
-          .select('id, auth_id, parent_id, rol_usuario, nombre, apellidos, email, estado, motivo_baja, comentario_baja, fecha_baja, baja_tramitada_por')
+          .select(
+            'id, auth_id, parent_id, rol_usuario, '
+            'nombre, apellidos, email, estado, '
+            'motivo_baja, comentario_baja, fecha_baja, '
+            'baja_tramitada_por',
+          )
           .order('nombre', ascending: true);
 
-      usuarios = List<Map<String, dynamic>>.from(usuariosData);
-      usuariosPermitidos = _calcularUsuariosPermitidos();
+      usuarios =
+          List<Map<String, dynamic>>.from(
+        usuariosData,
+      );
 
-      usuariosEnriquecidos = usuariosPermitidos.map(_enriquecerUsuario).toList();
+      _crearIndicesUsuarios();
+
+      usuariosPermitidos = _construirEstructura(
+        perfil: perfil,
+      );
+
+      usuariosEnriquecidos = usuariosPermitidos
+          .map(_enriquecerUsuario)
+          .toList();
+
       _aplicarFiltros();
 
+      debugPrint(
+        '======= CONTROL BAJAS ESTRUCTURA REAL =======',
+      );
+      debugPrint(
+        'USUARIO: ${_nombreCompleto(perfil)}',
+      );
+      debugPrint('ROL: $role');
+      debugPrint(
+        'PERSONAS EN ESTRUCTURA: '
+        '${usuariosPermitidos.length}',
+      );
+      debugPrint(
+        '============================================',
+      );
+
       if (!mounted) return;
-      setState(() => loading = false);
-    } catch (e) {
+
+      setState(() {
+        loading = false;
+      });
+    } catch (e, stackTrace) {
+      debugPrint(
+        'ERROR CARGANDO CONTROL DE BAJAS: $e',
+      );
+      debugPrintStack(stackTrace: stackTrace);
+
       if (!mounted) return;
-      setState(() => loading = false);
-      _snack('Error cargando control de bajas: $e');
+
+      setState(() {
+        loading = false;
+        usuariosPermitidos = [];
+        usuariosEnriquecidos = [];
+        usuariosFiltradosCache = [];
+      });
+
+      _snack(
+        'Error cargando control de bajas: $e',
+      );
     }
   }
 
-  bool _veTodo() => role == 'director_nacional' || role == 'administracion';
+  Map<String, dynamic>? _usuarioPorId(
+    String? id,
+  ) {
+    final valor = _idTexto(id);
 
-  Map<String, dynamic>? _usuarioPorId(String? id) {
-    if (id == null || id.isEmpty || id == 'null') return null;
-    for (final u in usuarios) {
-      if (u['id']?.toString() == id) return u;
-    }
-    return null;
+    if (valor.isEmpty) return null;
+
+    return usuariosPorId[valor];
   }
 
-  Map<String, dynamic>? _usuarioPorAuth(String? authId) {
-    if (authId == null || authId.isEmpty || authId == 'null') return null;
-    for (final u in usuarios) {
-      if (u['auth_id']?.toString() == authId) return u;
-    }
-    return null;
+  Map<String, dynamic>? _usuarioPorAuth(
+    String? authId,
+  ) {
+    final valor = _idTexto(authId);
+
+    if (valor.isEmpty) return null;
+
+    return usuariosPorAuth[valor];
   }
 
-  List<Map<String, dynamic>> _calcularUsuariosPermitidos() {
-    if (_veTodo()) return usuarios;
-    if (myId == null || myId!.isEmpty) return [];
+  List<Map<String, dynamic>> _cadenaAntecesores(
+    Map<String, dynamic>? usuario,
+  ) {
+    if (usuario == null) return [];
 
-    final ids = <String>{myId!};
-    bool cambios = true;
+    final resultado = <Map<String, dynamic>>[];
+    final visitados = <String>{};
 
-    while (cambios) {
-      cambios = false;
-      for (final u in usuarios) {
-        final id = u['id']?.toString();
-        final parentId = u['parent_id']?.toString();
-        if (id == null || id.isEmpty) continue;
-        if (parentId == null || parentId.isEmpty) continue;
+    var parentId = _idTexto(usuario['parent_id']);
 
-        if (ids.contains(parentId) && !ids.contains(id)) {
-          ids.add(id);
-          cambios = true;
-        }
+    while (parentId.isNotEmpty &&
+        !visitados.contains(parentId)) {
+      visitados.add(parentId);
+
+      final padre = usuariosPorId[parentId];
+
+      if (padre == null) break;
+
+      resultado.add(padre);
+      parentId = _idTexto(padre['parent_id']);
+    }
+
+    return resultado;
+  }
+
+  Map<String, dynamic>? _buscarAntecesorPorRol(
+    Map<String, dynamic>? usuario,
+    String rolBuscado,
+  ) {
+    final buscado = _normalizarRol(rolBuscado);
+
+    if (usuario != null &&
+        _normalizarRol(usuario['rol_usuario']) ==
+            buscado) {
+      return usuario;
+    }
+
+    for (final antecesor in _cadenaAntecesores(usuario)) {
+      if (_normalizarRol(
+            antecesor['rol_usuario'],
+          ) ==
+          buscado) {
+        return antecesor;
       }
     }
 
-    return usuarios.where((u) => ids.contains(u['id']?.toString())).toList();
+    return null;
   }
 
-  Map<String, dynamic> _enriquecerUsuario(Map<String, dynamic> u) {
-    final estructura = _resolverEstructura(u);
+  Map<String, dynamic>? _responsableInmediato(
+    Map<String, dynamic>? usuario,
+  ) {
+    if (usuario == null) return null;
+
+    return _usuarioPorId(
+      _idTexto(usuario['parent_id']),
+    );
+  }
+
+  Map<String, dynamic> _enriquecerUsuario(
+    Map<String, dynamic> usuario,
+  ) {
+    final directorZona = _buscarAntecesorPorRol(
+      usuario,
+      'director_zona',
+    );
+
+    final jefeVentas = _buscarAntecesorPorRol(
+      usuario,
+      'jefe_ventas',
+    );
+
+    final jefeEquipo = _buscarAntecesorPorRol(
+      usuario,
+      'jefe_equipo',
+    );
+
+    final responsable =
+        _responsableInmediato(usuario);
 
     return {
-      ...u,
-      'nombre_completo': _nombreCompleto(u),
-      'director_zona_id': estructura['director_zona']?['id']?.toString(),
-      'director_zona_nombre': estructura['director_zona'] == null ? '' : _nombreCompleto(estructura['director_zona']!),
-      'jefe_ventas_id': estructura['jefe_ventas']?['id']?.toString(),
-      'jefe_ventas_nombre': estructura['jefe_ventas'] == null ? '' : _nombreCompleto(estructura['jefe_ventas']!),
-      'jefe_equipo_id': estructura['jefe_equipo']?['id']?.toString(),
-      'jefe_equipo_nombre': estructura['jefe_equipo'] == null ? '' : _nombreCompleto(estructura['jefe_equipo']!),
+      ...usuario,
+      'nombre_completo':
+          _nombreCompleto(usuario),
+      'responsable_id':
+          _idTexto(responsable?['id']),
+      'responsable_nombre': responsable == null
+          ? ''
+          : _nombreCompleto(responsable),
+      'responsable_rol':
+          _normalizarRol(
+        responsable?['rol_usuario'],
+      ),
+      'director_zona_id':
+          _idTexto(directorZona?['id']),
+      'director_zona_nombre':
+          directorZona == null
+              ? ''
+              : _nombreCompleto(directorZona),
+      'jefe_ventas_id':
+          _idTexto(jefeVentas?['id']),
+      'jefe_ventas_nombre':
+          jefeVentas == null
+              ? ''
+              : _nombreCompleto(jefeVentas),
+      'jefe_equipo_id':
+          _idTexto(jefeEquipo?['id']),
+      'jefe_equipo_nombre':
+          jefeEquipo == null
+              ? ''
+              : _nombreCompleto(jefeEquipo),
     };
   }
 
-  Map<String, Map<String, dynamic>?> _resolverEstructura(Map<String, dynamic> u) {
-    final rol = u['rol_usuario']?.toString() ?? '';
+  String _nombreCompleto(
+    Map<String, dynamic> usuario,
+  ) {
+    final nombre =
+        usuario['nombre']?.toString() ?? '';
 
-    Map<String, dynamic>? directorZona;
-    Map<String, dynamic>? jefeVentas;
-    Map<String, dynamic>? jefeEquipo;
+    final apellidos =
+        usuario['apellidos']?.toString() ?? '';
 
-    if (rol == 'director_zona') {
-      directorZona = u;
-    } else if (rol == 'jefe_ventas') {
-      jefeVentas = u;
-      directorZona = _usuarioPorId(u['parent_id']?.toString());
-    } else if (rol == 'jefe_equipo') {
-      jefeEquipo = u;
-      jefeVentas = _usuarioPorId(u['parent_id']?.toString());
-      directorZona = _usuarioPorId(jefeVentas?['parent_id']?.toString());
-    } else if (_esAgente(u)) {
-      jefeEquipo = _usuarioPorId(u['parent_id']?.toString());
-      jefeVentas = _usuarioPorId(jefeEquipo?['parent_id']?.toString());
-      directorZona = _usuarioPorId(jefeVentas?['parent_id']?.toString());
-    } else if (rol == 'director_nacional' || rol == 'administracion') {
-      // No tiene estructura por encima. Lo ve todo por permisos, no por parent.
-    } else {
-      // Fallback para roles no previstos: subimos hasta 4 niveles buscando roles.
-      Map<String, dynamic>? actual = u;
-      for (int i = 0; i < 4; i++) {
-        final r = actual?['rol_usuario']?.toString();
-        if (r == 'jefe_equipo') jefeEquipo ??= actual;
-        if (r == 'jefe_ventas') jefeVentas ??= actual;
-        if (r == 'director_zona') directorZona ??= actual;
-        actual = _usuarioPorId(actual?['parent_id']?.toString());
-        if (actual == null) break;
-      }
+    final completo =
+        '$nombre $apellidos'.trim();
+
+    return completo.isEmpty
+        ? (usuario['email']?.toString() ??
+            'Sin nombre')
+        : completo;
+  }
+
+  bool _esAgente(Map<String, dynamic> usuario) {
+    return _esRolAgente(
+      usuario['rol_usuario']?.toString() ?? '',
+    );
+  }
+
+  bool _esDescendienteDe(
+    Map<String, dynamic> usuario,
+    String ancestroId,
+  ) {
+    final objetivo = _idTexto(ancestroId);
+
+    if (objetivo.isEmpty) return false;
+
+    if (_idTexto(usuario['id']) == objetivo) {
+      return true;
     }
 
-    return {
-      'director_zona': directorZona,
-      'jefe_ventas': jefeVentas,
-      'jefe_equipo': jefeEquipo,
-    };
-  }
+    final visitados = <String>{};
+    var parentId =
+        _idTexto(usuario['parent_id']);
 
-  String _nombreCompleto(Map<String, dynamic> u) {
-    final nombre = u['nombre']?.toString() ?? '';
-    final apellidos = u['apellidos']?.toString() ?? '';
-    final completo = '$nombre $apellidos'.trim();
-    return completo.isEmpty ? (u['email']?.toString() ?? 'Sin nombre') : completo;
-  }
+    while (parentId.isNotEmpty &&
+        !visitados.contains(parentId)) {
+      if (parentId == objetivo) {
+        return true;
+      }
 
-  bool _esAgente(Map<String, dynamic> u) {
-    final r = u['rol_usuario']?.toString();
-    return r == 'agente' || r == 'mediador' || r == 'comercial';
+      visitados.add(parentId);
+
+      final padre = usuariosPorId[parentId];
+
+      if (padre == null) break;
+
+      parentId =
+          _idTexto(padre['parent_id']);
+    }
+
+    return false;
   }
 
   bool _estaInactivo(Map<String, dynamic> u) {
@@ -239,39 +556,61 @@ class _ControlBajasScreenState extends State<ControlBajasScreen> {
     return '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
   }
 
-  List<Map<String, dynamic>> _usuariosPorRol(String rol) {
-    return usuariosPermitidos.where((u) => u['rol_usuario']?.toString() == rol).toList();
+  List<Map<String, dynamic>> _usuariosPorRol(
+    String rol,
+  ) {
+    final normalizado =
+        _normalizarRol(rol);
+
+    return usuariosPermitidos.where((usuario) {
+      return _normalizarRol(
+            usuario['rol_usuario'],
+          ) ==
+          normalizado;
+    }).toList();
   }
 
-  List<Map<String, dynamic>> get directoresZona => _veTodo() ? _usuariosPorRol('director_zona') : [];
+  List<Map<String, dynamic>> get directoresZona {
+    return _veTodo()
+        ? _usuariosPorRol('director_zona')
+        : const <Map<String, dynamic>>[];
+  }
 
   List<Map<String, dynamic>> get jefesVentas {
-    var lista = _usuariosPorRol('jefe_ventas');
+    var lista =
+        _usuariosPorRol('jefe_ventas');
 
-    if (role == 'jefe_ventas') return [];
+    if (role == 'jefe_ventas') {
+      return const <Map<String, dynamic>>[];
+    }
 
     if (filtroDirectorZonaId != null) {
-      lista = lista.where((u) => u['parent_id']?.toString() == filtroDirectorZonaId).toList();
+      lista = lista.where((usuario) {
+        return _esDescendienteDe(
+          usuario,
+          filtroDirectorZonaId!,
+        );
+      }).toList();
     }
 
     return lista;
   }
 
   List<Map<String, dynamic>> get jefesEquipo {
-    var lista = _usuariosPorRol('jefe_equipo');
+    var lista =
+        _usuariosPorRol('jefe_equipo');
 
-    if (filtroJefeVentasId != null) {
-      lista = lista.where((u) => u['parent_id']?.toString() == filtroJefeVentasId).toList();
-    }
+    final responsableSeleccionado =
+        filtroJefeVentasId ??
+        filtroDirectorZonaId;
 
-    if (filtroDirectorZonaId != null && filtroJefeVentasId == null) {
-      final idsJefesVentas = usuariosPermitidos
-          .where((u) => u['rol_usuario']?.toString() == 'jefe_ventas' && u['parent_id']?.toString() == filtroDirectorZonaId)
-          .map((u) => u['id']?.toString())
-          .whereType<String>()
-          .toSet();
-
-      lista = lista.where((u) => idsJefesVentas.contains(u['parent_id']?.toString())).toList();
+    if (responsableSeleccionado != null) {
+      lista = lista.where((usuario) {
+        return _esDescendienteDe(
+          usuario,
+          responsableSeleccionado,
+        );
+      }).toList();
     }
 
     return lista;
@@ -520,11 +859,197 @@ class _ControlBajasScreenState extends State<ControlBajasScreen> {
     });
   }
 
-  Future<void> _gestionarBaja(Map<String, dynamic> usuario) async {
-    String estado = _estaInactivo(usuario) ? 'Inactivo' : 'Activo';
-    String motivo = (usuario['motivo_baja']?.toString().isNotEmpty ?? false) ? usuario['motivo_baja'].toString() : motivosBaja.first;
-    String comentario = usuario['comentario_baja']?.toString() ?? '';
-    DateTime fechaBaja = _parseDate(usuario['fecha_baja']) ?? DateTime.now();
+
+  String _rolVisible(dynamic rol) {
+    switch (_normalizarRol(rol)) {
+      case 'director_nacional':
+        return 'Director nacional';
+      case 'director_zona':
+        return 'Director de zona';
+      case 'jefe_ventas':
+        return 'Jefe de ventas';
+      case 'jefe_equipo':
+        return 'Jefe de equipo';
+      case 'agente':
+        return 'Agente';
+      case 'mediador':
+        return 'Mediador';
+      case 'comercial':
+        return 'Comercial';
+      case 'administracion':
+      case 'administrador':
+      case 'admin':
+        return 'Administración';
+      default:
+        final texto = (rol ?? '').toString().trim();
+        return texto.isEmpty
+            ? 'Sin rol'
+            : texto.replaceAll('_', ' ');
+    }
+  }
+
+  bool _creariaCiclo({
+    required Map<String, dynamic> usuario,
+    required Map<String, dynamic> nuevoResponsable,
+  }) {
+    final usuarioId = _idTexto(usuario['id']);
+    final responsableId =
+        _idTexto(nuevoResponsable['id']);
+
+    if (usuarioId.isEmpty || responsableId.isEmpty) {
+      return true;
+    }
+
+    if (usuarioId == responsableId) {
+      return true;
+    }
+
+    return _esDescendienteDe(
+      nuevoResponsable,
+      usuarioId,
+    );
+  }
+
+  List<Map<String, dynamic>> _responsablesPermitidosPara(
+    Map<String, dynamic> usuario,
+  ) {
+    final rolUsuario =
+        _normalizarRol(usuario['rol_usuario']);
+
+    final lista = usuariosPermitidos.where((posible) {
+      final idPosible = _idTexto(posible['id']);
+      final authPosible = _idTexto(posible['auth_id']);
+
+      if (idPosible.isEmpty || authPosible.isEmpty) {
+        return false;
+      }
+
+      if (_creariaCiclo(
+        usuario: usuario,
+        nuevoResponsable: posible,
+      )) {
+        return false;
+      }
+
+      return _relacionPermitida(
+        rolPadre:
+            _normalizarRol(posible['rol_usuario']),
+        rolHijo: rolUsuario,
+      );
+    }).toList();
+
+    lista.sort((a, b) {
+      final rolA =
+          _rolVisible(a['rol_usuario']).toLowerCase();
+
+      final rolB =
+          _rolVisible(b['rol_usuario']).toLowerCase();
+
+      final comparacionRol =
+          rolA.compareTo(rolB);
+
+      if (comparacionRol != 0) {
+        return comparacionRol;
+      }
+
+      return _nombreCompleto(a)
+          .toLowerCase()
+          .compareTo(
+            _nombreCompleto(b).toLowerCase(),
+          );
+    });
+
+    return lista;
+  }
+
+  Future<bool> _usuarioSiguePermitido(
+    String usuarioId,
+  ) async {
+    final authUser = supabase.auth.currentUser;
+
+    if (authUser == null) return false;
+
+    final perfilData = await supabase
+        .from('usuarios')
+        .select(
+          'id, auth_id, parent_id, rol_usuario, '
+          'nombre, apellidos, email, estado, '
+          'motivo_baja, comentario_baja, fecha_baja, '
+          'baja_tramitada_por',
+        )
+        .eq('auth_id', authUser.id)
+        .maybeSingle();
+
+    if (perfilData == null) return false;
+
+    if (_veTodo()) return true;
+
+    final usuariosData = await supabase
+        .from('usuarios')
+        .select(
+          'id, auth_id, parent_id, rol_usuario, '
+          'nombre, apellidos, email, estado, '
+          'motivo_baja, comentario_baja, fecha_baja, '
+          'baja_tramitada_por',
+        );
+
+    final anteriores = usuarios;
+
+    usuarios =
+        List<Map<String, dynamic>>.from(
+      usuariosData,
+    );
+
+    _crearIndicesUsuarios();
+
+    final estructura = _construirEstructura(
+      perfil: Map<String, dynamic>.from(
+        perfilData,
+      ),
+    );
+
+    final permitido = estructura.any((usuario) {
+      return _idTexto(usuario['id']) == usuarioId;
+    });
+
+    usuarios = anteriores;
+    _crearIndicesUsuarios();
+
+    return permitido;
+  }
+
+  Future<void> _gestionarBaja(
+    Map<String, dynamic> usuario,
+  ) async {
+    String estado = _estaInactivo(usuario)
+        ? 'Inactivo'
+        : 'Activo';
+
+    String motivo =
+        (usuario['motivo_baja']
+                    ?.toString()
+                    .isNotEmpty ??
+                false)
+            ? usuario['motivo_baja'].toString()
+            : motivosBaja.first;
+
+    String comentario =
+        usuario['comentario_baja']?.toString() ?? '';
+
+    DateTime fechaBaja =
+        _parseDate(usuario['fecha_baja']) ??
+            DateTime.now();
+
+    String? nuevoParentId =
+        _idTexto(usuario['parent_id']).isEmpty
+            ? null
+            : _idTexto(usuario['parent_id']);
+
+    final teniaResponsable =
+        nuevoParentId != null;
+
+    final responsables =
+        _responsablesPermitidosPara(usuario);
 
     await showModalBottomSheet(
       context: context,
@@ -533,69 +1058,253 @@ class _ControlBajasScreenState extends State<ControlBajasScreen> {
       builder: (_) {
         return StatefulBuilder(
           builder: (context, setModalState) {
+            final responsableActual =
+                _usuarioPorId(nuevoParentId);
+
             return _modalShell(
-              title: 'Gestionar baja',
-              subtitle: usuario['nombre_completo']?.toString() ?? 'Usuario',
+              title: 'Gestionar usuario',
+              subtitle:
+                  usuario['nombre_completo']?.toString() ??
+                      'Usuario',
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFEFF6FF),
+                      borderRadius:
+                          BorderRadius.circular(20),
+                      border: Border.all(
+                        color: const Color(0xFFBFDBFE),
+                      ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment:
+                          CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Container(
+                              width: 42,
+                              height: 42,
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF2563EB)
+                                    .withOpacity(0.11),
+                                borderRadius:
+                                    BorderRadius.circular(14),
+                              ),
+                              child: Icon(
+                                teniaResponsable
+                                    ? Icons.swap_horiz_rounded
+                                    : Icons.person_add_alt_1_rounded,
+                                color: const Color(0xFF2563EB),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment:
+                                    CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    teniaResponsable
+                                        ? 'Reasignar responsable'
+                                        : 'Asignar responsable',
+                                    style: const TextStyle(
+                                      color: Color(0xFF0F172A),
+                                      fontSize: 16,
+                                      fontWeight:
+                                          FontWeight.w900,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 3),
+                                  Text(
+                                    responsableActual == null
+                                        ? 'Sin responsable seleccionado'
+                                        : '${_nombreCompleto(responsableActual)} · ${_rolVisible(responsableActual['rol_usuario'])}',
+                                    style: const TextStyle(
+                                      color: Color(0xFF64748B),
+                                      fontSize: 12,
+                                      fontWeight:
+                                          FontWeight.w700,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 14),
+                        DropdownButtonFormField<String>(
+                          value: responsables.any(
+                            (responsable) =>
+                                _idTexto(responsable['id']) ==
+                                nuevoParentId,
+                          )
+                              ? nuevoParentId
+                              : null,
+                          isExpanded: true,
+                          decoration: _inputDecoration(
+                            teniaResponsable
+                                ? 'Nuevo responsable'
+                                : 'Asignar a',
+                          ),
+                          items: responsables.map((responsable) {
+                            return DropdownMenuItem<String>(
+                              value:
+                                  _idTexto(responsable['id']),
+                              child: Text(
+                                '${_nombreCompleto(responsable)} · ${_rolVisible(responsable['rol_usuario'])}',
+                                maxLines: 1,
+                                overflow:
+                                    TextOverflow.ellipsis,
+                              ),
+                            );
+                          }).toList(),
+                          onChanged: (value) {
+                            setModalState(() {
+                              nuevoParentId = value;
+                            });
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 14),
                   DropdownButtonFormField<String>(
                     value: estado,
                     isExpanded: true,
-                    decoration: _inputDecoration('Estado'),
-                    items: const ['Activo', 'Inactivo']
-                        .map((e) => DropdownMenuItem(value: e, child: Text(e)))
+                    decoration:
+                        _inputDecoration('Estado'),
+                    items: const [
+                      'Activo',
+                      'Inactivo',
+                    ]
+                        .map(
+                          (valor) =>
+                              DropdownMenuItem<String>(
+                            value: valor,
+                            child: Text(valor),
+                          ),
+                        )
                         .toList(),
-                    onChanged: (v) => setModalState(() => estado = v!),
-                  ),
-                  const SizedBox(height: 12),
-                  DropdownButtonFormField<String>(
-                    value: motivosBaja.contains(motivo) ? motivo : 'Otro',
-                    isExpanded: true,
-                    decoration: _inputDecoration('Motivo baja'),
-                    items: motivosBaja.map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
-                    onChanged: (v) => setModalState(() => motivo = v!),
-                  ),
-                  const SizedBox(height: 12),
-                  InkWell(
-                    borderRadius: BorderRadius.circular(18),
-                    onTap: () async {
-                      final d = await showDatePicker(
-                        context: context,
-                        initialDate: fechaBaja,
-                        firstDate: DateTime(2020),
-                        lastDate: DateTime(2035),
-                      );
-                      if (d != null) setModalState(() => fechaBaja = d);
+                    onChanged: (value) {
+                      if (value == null) return;
+
+                      setModalState(() {
+                        estado = value;
+                      });
                     },
-                    child: InputDecorator(
-                      decoration: _inputDecoration('Fecha baja'),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.date_range_rounded, color: Color(0xFF0284C7)),
-                          const SizedBox(width: 8),
-                          Text(_formatDate(fechaBaja.toIso8601String())),
-                        ],
+                  ),
+                  const SizedBox(height: 12),
+                  if (estado == 'Inactivo') ...[
+                    DropdownButtonFormField<String>(
+                      value: motivosBaja.contains(motivo)
+                          ? motivo
+                          : 'Otro',
+                      isExpanded: true,
+                      decoration:
+                          _inputDecoration('Motivo baja'),
+                      items: motivosBaja
+                          .map(
+                            (valor) =>
+                                DropdownMenuItem<String>(
+                              value: valor,
+                              child: Text(valor),
+                            ),
+                          )
+                          .toList(),
+                      onChanged: (value) {
+                        if (value == null) return;
+
+                        setModalState(() {
+                          motivo = value;
+                        });
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                    InkWell(
+                      borderRadius:
+                          BorderRadius.circular(18),
+                      onTap: () async {
+                        final fecha =
+                            await showDatePicker(
+                          context: context,
+                          initialDate: fechaBaja,
+                          firstDate: DateTime(2020),
+                          lastDate: DateTime(2035),
+                        );
+
+                        if (fecha != null) {
+                          setModalState(() {
+                            fechaBaja = fecha;
+                          });
+                        }
+                      },
+                      child: InputDecorator(
+                        decoration: _inputDecoration(
+                          'Fecha baja',
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(
+                              Icons.date_range_rounded,
+                              color: Color(0xFF0284C7),
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              _formatDate(
+                                fechaBaja
+                                    .toIso8601String(),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 12),
-                  TextFormField(
-                    initialValue: comentario,
-                    maxLines: 4,
-                    decoration: _inputDecoration('Comentario baja'),
-                    onChanged: (v) => comentario = v,
-                  ),
-                  const SizedBox(height: 18),
+                    const SizedBox(height: 12),
+                    TextFormField(
+                      initialValue: comentario,
+                      maxLines: 4,
+                      decoration: _inputDecoration(
+                        'Comentario baja',
+                      ),
+                      onChanged: (value) {
+                        comentario = value;
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                  ],
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton.icon(
-                      onPressed: () async {
-                        Navigator.pop(context);
-                        await _guardarBaja(usuario, estado, motivo, comentario, fechaBaja);
-                      },
-                      icon: const Icon(Icons.save_rounded),
-                      label: const Text('Guardar cambios'),
+                      onPressed: nuevoParentId == null
+                          ? null
+                          : () async {
+                              Navigator.pop(context);
+
+                              await _guardarBaja(
+                                usuario,
+                                estado,
+                                motivo,
+                                comentario,
+                                fechaBaja,
+                                nuevoParentId:
+                                    nuevoParentId,
+                              );
+                            },
+                      icon: Icon(
+                        teniaResponsable
+                            ? Icons.swap_horiz_rounded
+                            : Icons.person_add_alt_1_rounded,
+                      ),
+                      label: Text(
+                        teniaResponsable
+                            ? 'Reasignar y guardar'
+                            : 'Asignar y guardar',
+                      ),
                       style: _primaryButtonStyle(),
                     ),
                   ),
@@ -613,30 +1322,144 @@ class _ControlBajasScreenState extends State<ControlBajasScreen> {
     String estado,
     String motivo,
     String comentario,
-    DateTime fechaBaja,
-  ) async {
+    DateTime fechaBaja, {
+    required String? nuevoParentId,
+  }) async {
     try {
-      setState(() => guardando = true);
+      if (mounted) {
+        setState(() {
+          guardando = true;
+        });
+      }
 
-      final id = usuario['id']?.toString();
-      if (id == null || id.isEmpty) throw 'Usuario sin id';
+      final id = _idTexto(usuario['id']);
+      final parentId = _idTexto(nuevoParentId);
+
+      if (id.isEmpty) {
+        throw Exception('Usuario sin id válido.');
+      }
+
+      if (parentId.isEmpty) {
+        throw Exception(
+          'Debes seleccionar un responsable.',
+        );
+      }
+
+      final siguePermitido =
+          await _usuarioSiguePermitido(id);
+
+      if (!siguePermitido) {
+        throw Exception(
+          'El usuario ya no pertenece a tu estructura.',
+        );
+      }
+
+      final usuarioActual = await supabase
+          .from('usuarios')
+          .select(
+            'id, auth_id, parent_id, rol_usuario, '
+            'nombre, apellidos, email',
+          )
+          .eq('id', id)
+          .maybeSingle();
+
+      final responsableActual = await supabase
+          .from('usuarios')
+          .select(
+            'id, auth_id, parent_id, rol_usuario, '
+            'nombre, apellidos, email',
+          )
+          .eq('id', parentId)
+          .maybeSingle();
+
+      if (usuarioActual == null ||
+          responsableActual == null) {
+        throw Exception(
+          'No se pudo validar la asignación.',
+        );
+      }
+
+      final usuarioMap =
+          Map<String, dynamic>.from(usuarioActual);
+
+      final responsableMap =
+          Map<String, dynamic>.from(
+        responsableActual,
+      );
+
+      final responsablePermitido =
+          usuariosPermitidos.any((permitido) {
+        return _idTexto(permitido['id']) == parentId;
+      });
+
+      if (!responsablePermitido) {
+        throw Exception(
+          'El responsable seleccionado no pertenece '
+          'a tu estructura.',
+        );
+      }
+
+      if (!_relacionPermitida(
+        rolPadre: _normalizarRol(
+          responsableMap['rol_usuario'],
+        ),
+        rolHijo: _normalizarRol(
+          usuarioMap['rol_usuario'],
+        ),
+      )) {
+        throw Exception(
+          'La dependencia seleccionada no es válida '
+          'para el rol del usuario.',
+        );
+      }
+
+      if (_creariaCiclo(
+        usuario: usuarioMap,
+        nuevoResponsable: responsableMap,
+      )) {
+        throw Exception(
+          'La asignación produciría un ciclo '
+          'en la estructura.',
+        );
+      }
 
       final update = <String, dynamic>{
+        'parent_id': parentId,
         'estado': estado,
-        'motivo_baja': estado == 'Inactivo' ? motivo : null,
-        'comentario_baja': estado == 'Inactivo' ? comentario : null,
-        'fecha_baja': estado == 'Inactivo' ? fechaBaja.toIso8601String() : null,
-        'baja_tramitada_por': estado == 'Inactivo' ? myAuthId : null,
+        'motivo_baja':
+            estado == 'Inactivo' ? motivo : null,
+        'comentario_baja':
+            estado == 'Inactivo' ? comentario : null,
+        'fecha_baja': estado == 'Inactivo'
+            ? fechaBaja.toIso8601String()
+            : null,
+        'baja_tramitada_por':
+            estado == 'Inactivo'
+                ? myAuthId
+                : null,
       };
 
-      await supabase.from('usuarios').update(update).eq('id', id);
+      await supabase
+          .from('usuarios')
+          .update(update)
+          .eq('id', id);
 
-      _snack('Usuario actualizado correctamente');
+      _snack(
+        'Usuario actualizado y asignado a '
+        '${_nombreCompleto(responsableMap)}',
+      );
+
       await cargarDatos();
     } catch (e) {
-      _snack('Error guardando baja: $e');
+      _snack(
+        'Error guardando usuario: $e',
+      );
     } finally {
-      if (mounted) setState(() => guardando = false);
+      if (mounted) {
+        setState(() {
+          guardando = false;
+        });
+      }
     }
   }
 
@@ -660,6 +1483,8 @@ class _ControlBajasScreenState extends State<ControlBajasScreen> {
                   _detailChip('Email', u['email']?.toString() ?? ''),
                   _detailChip('Rol', u['rol_usuario']?.toString() ?? ''),
                   _detailChip('Estado', u['estado']?.toString() ?? ''),
+                  _detailChip('Responsable directo', u['responsable_nombre']?.toString() ?? ''),
+                  _detailChip('Rol responsable', _rolVisible(u['responsable_rol'])),
                   _detailChip('Director zona', u['director_zona_nombre']?.toString() ?? ''),
                   _detailChip('Jefe ventas', u['jefe_ventas_nombre']?.toString() ?? ''),
                   _detailChip('Jefe equipo', u['jefe_equipo_nombre']?.toString() ?? ''),
@@ -677,7 +1502,11 @@ class _ControlBajasScreenState extends State<ControlBajasScreen> {
                     _gestionarBaja(u);
                   },
                   icon: const Icon(Icons.edit_note_rounded),
-                  label: const Text('Gestionar baja'),
+                  label: Text(
+                    _idTexto(u['parent_id']).isEmpty
+                        ? 'Gestionar / Asignar'
+                        : 'Gestionar / Reasignar',
+                  ),
                   style: _primaryButtonStyle(),
                 ),
               ),
@@ -1175,7 +2004,7 @@ class _ControlBajasScreenState extends State<ControlBajasScreen> {
                                   ),
                                   const SizedBox(height: 4),
                                   Text(
-                                    '${u['rol_usuario'] ?? ''} · ${u['jefe_equipo_nombre'] ?? ''} · ${u['jefe_ventas_nombre'] ?? ''} · ${u['director_zona_nombre'] ?? ''}',
+                                    '${_rolVisible(u['rol_usuario'])} · Responsable: ${u['responsable_nombre']?.toString().isEmpty ?? true ? 'Sin asignar' : u['responsable_nombre']} · ${u['jefe_equipo_nombre'] ?? ''} · ${u['jefe_ventas_nombre'] ?? ''} · ${u['director_zona_nombre'] ?? ''}',
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                     style: const TextStyle(color: Color(0xFF64748B), fontWeight: FontWeight.w700),
@@ -1201,9 +2030,19 @@ class _ControlBajasScreenState extends State<ControlBajasScreen> {
                                 if (value == 'detalle') _verDetalle(u);
                                 if (value == 'gestionar') _gestionarBaja(u);
                               },
-                              itemBuilder: (_) => const [
-                                PopupMenuItem(value: 'detalle', child: Text('Ver detalles')),
-                                PopupMenuItem(value: 'gestionar', child: Text('Gestionar baja')),
+                              itemBuilder: (_) => [
+                                const PopupMenuItem(
+                                  value: 'detalle',
+                                  child: Text('Ver detalles'),
+                                ),
+                                PopupMenuItem(
+                                  value: 'gestionar',
+                                  child: Text(
+                                    _idTexto(u['parent_id']).isEmpty
+                                        ? 'Gestionar / Asignar'
+                                        : 'Gestionar / Reasignar',
+                                  ),
+                                ),
                               ],
                             ),
                           ],
@@ -1441,5 +2280,3 @@ class _FondoControlBajas extends StatelessWidget {
     );
   }
 }
-
-

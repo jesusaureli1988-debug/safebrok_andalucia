@@ -270,6 +270,14 @@ class _AnularPolizaScreenState extends State<AnularPolizaScreen> {
   Future<void> anularPoliza() async {
     if (venta == null) return;
 
+    final estadoActual =
+        venta?['estado_poliza']?.toString().trim().toUpperCase() ?? '';
+
+    if (estadoActual == 'ANULADA' || estadoActual == 'ANULADO') {
+      _snack('Esta póliza ya está anulada');
+      return;
+    }
+
     if (!recibosAnulados) {
       _snack('Primero debes anular todos los recibos');
       return;
@@ -333,6 +341,19 @@ if (numeroPoliza == null || numeroPoliza.trim().isEmpty) {
 await supabase.from('recibos').update({
   'anulacion_id': anulacion['id'],
 }).eq('poliza', numeroPoliza);
+
+      // El aviso comienza únicamente después de completar la anulación.
+      // Gestiona sus propios errores y nunca revierte la operación principal.
+      _notificarPolizaAnulada(
+        ventaAnulada: Map<String, dynamic>.from(venta!),
+        clienteAnulado: cliente == null
+            ? null
+            : Map<String, dynamic>.from(cliente!),
+        motivo: motivoCtrl.text.trim(),
+        extorno: Map<String, dynamic>.from(extorno),
+        anulacionId: anulacion['id'],
+      );
+
       _snack('Póliza anulada correctamente');
 
       await buscarPoliza();
@@ -340,6 +361,126 @@ await supabase.from('recibos').update({
       _snack('Error anulando póliza: $e');
     } finally {
       if (mounted) setState(() => anulandoPoliza = false);
+    }
+  }
+
+  Future<void> _notificarPolizaAnulada({
+    required Map<String, dynamic> ventaAnulada,
+    required Map<String, dynamic>? clienteAnulado,
+    required String motivo,
+    required Map<String, dynamic> extorno,
+    required dynamic anulacionId,
+  }) async {
+    try {
+      final agenteAuthId =
+          ventaAnulada['agente_auth_id']?.toString().trim() ?? '';
+
+      if (agenteAuthId.isEmpty) {
+        debugPrint(
+          'PUSH PÓLIZA ANULADA OMITIDO: la venta no tiene agente_auth_id.',
+        );
+        return;
+      }
+
+      final usuariosResponse = await supabase
+          .from('usuarios')
+          .select('id, auth_id, parent_id');
+
+      final usuarios = List<Map<String, dynamic>>.from(usuariosResponse);
+      final usuariosPorId = <String, Map<String, dynamic>>{};
+      final usuariosPorAuthId = <String, Map<String, dynamic>>{};
+
+      for (final usuario in usuarios) {
+        final id = usuario['id']?.toString().trim() ?? '';
+        final authId = usuario['auth_id']?.toString().trim() ?? '';
+
+        if (id.isNotEmpty) usuariosPorId[id] = usuario;
+        if (authId.isNotEmpty) usuariosPorAuthId[authId] = usuario;
+      }
+
+      final destinatarios = <String>{agenteAuthId};
+      final idsVisitados = <String>{};
+      Map<String, dynamic>? usuarioActual =
+          usuariosPorAuthId[agenteAuthId];
+
+      while (usuarioActual != null) {
+        final id = usuarioActual['id']?.toString().trim() ?? '';
+        final authId =
+            usuarioActual['auth_id']?.toString().trim() ?? '';
+
+        if (id.isNotEmpty && !idsVisitados.add(id)) {
+          debugPrint(
+            'PUSH PÓLIZA ANULADA: ciclo de parent_id detectado en $id.',
+          );
+          break;
+        }
+
+        if (authId.isNotEmpty) destinatarios.add(authId);
+
+        final parentId =
+            usuarioActual['parent_id']?.toString().trim() ?? '';
+        usuarioActual =
+            parentId.isEmpty ? null : usuariosPorId[parentId];
+      }
+
+      final numeroPoliza =
+          ventaAnulada['numero_poliza']?.toString().trim() ?? '';
+      final producto =
+          ventaAnulada['producto']?.toString().trim() ?? '';
+      final compania =
+          ventaAnulada['compania']?.toString().trim() ?? '';
+
+      final partesNombre = [
+        clienteAnulado?['nombre']?.toString().trim() ?? '',
+        clienteAnulado?['apellidos']?.toString().trim() ?? '',
+      ].where((parte) => parte.isNotEmpty).toList();
+
+      final nombreCliente =
+          partesNombre.isEmpty ? 'Cliente' : partesNombre.join(' ');
+      final primaExtornada = _money(extorno['prima_extornada']);
+      final comisionExtornada = _money(extorno['comision_extornada']);
+
+      final detalleExtorno = primaExtornada > 0 || comisionExtornada > 0
+          ? ' Extorno calculado: prima '
+              '${primaExtornada.toStringAsFixed(2)} € y comisión '
+              '${comisionExtornada.toStringAsFixed(2)} €.'
+          : '';
+
+      final mensaje =
+          'La póliza $numeroPoliza de $nombreCliente ha sido anulada.'
+          '$detalleExtorno Revisa su impacto en producción y comisiones.';
+
+      for (final authIdDestino in destinatarios) {
+        try {
+          await supabase.functions.invoke(
+            'enviar-push',
+            body: {
+              'auth_id_destino': authIdDestino,
+              'titulo': 'Póliza anulada',
+              'mensaje': mensaje,
+              'data': {
+                'tipo': 'poliza_anulada',
+                'venta_id': ventaAnulada['id'],
+                'anulacion_id': anulacionId,
+                'numero_poliza': numeroPoliza,
+                'cliente': nombreCliente,
+                'producto': producto,
+                'compania': compania,
+                'motivo': motivo,
+                'prima_extornada': primaExtornada,
+                'comision_extornada': comisionExtornada,
+              },
+            },
+          );
+        } catch (errorPush) {
+          debugPrint(
+            'ERROR PUSH PÓLIZA ANULADA A $authIdDestino: $errorPush',
+          );
+        }
+      }
+    } catch (error) {
+      // Un fallo del push nunca debe deshacer una anulación confirmada.
+      debugPrint('ERROR GENERAL PUSH PÓLIZA ANULADA: $error');
     }
   }
 

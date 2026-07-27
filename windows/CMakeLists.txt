@@ -2,6 +2,11 @@
 cmake_minimum_required(VERSION 3.14)
 project(safebrok_andalucia LANGUAGES CXX)
 
+# CMake 4 eliminó la compatibilidad implícita con políticas anteriores a 3.5.
+# Firebase C++ 12.7.0 todavía declara CMake 3.1, por lo que establecemos este
+# mínimo para permitir que el subproyecto de Firebase se configure.
+set(CMAKE_POLICY_VERSION_MINIMUM 3.5)
+
 add_compile_definitions(_SILENCE_EXPERIMENTAL_COROUTINE_DEPRECATION_WARNINGS)
 
 # The name of the executable created for the application. Change this to change
@@ -67,9 +72,7 @@ include(flutter/generated_plugins.cmake)
 set(BUILD_BUNDLE_DIR "$<TARGET_FILE_DIR:${BINARY_NAME}>")
 # Make the "install" step default, as it's required to run.
 set(CMAKE_VS_INCLUDE_INSTALL_TO_DEFAULT_BUILD 1)
-if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
-  set(CMAKE_INSTALL_PREFIX "${BUILD_BUNDLE_DIR}" CACHE PATH "..." FORCE)
-endif()
+set(CMAKE_INSTALL_PREFIX "${BUILD_BUNDLE_DIR}" CACHE PATH "..." FORCE)
 
 set(INSTALL_BUNDLE_DATA_DIR "${CMAKE_INSTALL_PREFIX}/data")
 set(INSTALL_BUNDLE_LIB_DIR "${CMAKE_INSTALL_PREFIX}")

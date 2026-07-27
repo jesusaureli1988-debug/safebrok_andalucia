@@ -18,6 +18,8 @@ class _ControlEquiposJefeVentasScreenState
   bool loading = true;
   String? error;
 
+  Map<String, dynamic>? usuarioLogueado;
+  List<Map<String, dynamic>> usuariosEstructura = [];
   List<Map<String, dynamic>> equipos = [];
 
   final DateTime inicioSistema = DateTime(2026, 6, 1);
@@ -28,130 +30,561 @@ class _ControlEquiposJefeVentasScreenState
     cargarEstado();
   }
 
-  Future<void> cargarEstado() async {
-    try {
-      setState(() {
-        loading = true;
-        error = null;
-      });
+  String _normalizarRol(dynamic rol) {
+    return (rol ?? '')
+        .toString()
+        .trim()
+        .toLowerCase()
+        .replaceAll('-', '_')
+        .replaceAll(' ', '_');
+  }
 
-      final user = supabase.auth.currentUser;
+  String _idTexto(dynamic value) {
+    final id = (value ?? '').toString().trim();
 
-      if (user == null) {
-        setState(() {
-          loading = false;
-          error = "No hay usuario iniciado.";
-        });
+    if (id.isEmpty || id.toLowerCase() == 'null') {
+      return '';
+    }
+
+    return id;
+  }
+
+  String _nombreCompleto(Map<String, dynamic>? usuario) {
+    if (usuario == null) return 'Sin nombre';
+
+    final nombre =
+        usuario['nombre']?.toString().trim() ?? '';
+
+    final apellidos =
+        usuario['apellidos']?.toString().trim() ?? '';
+
+    final completo = '$nombre $apellidos'.trim();
+
+    if (completo.isNotEmpty) return completo;
+
+    final email =
+        usuario['email']?.toString().trim() ?? '';
+
+    return email.isNotEmpty ? email : 'Sin nombre';
+  }
+
+  String _rolTexto(dynamic rol) {
+    switch (_normalizarRol(rol)) {
+      case 'director_nacional':
+        return 'Director nacional';
+      case 'director_zona':
+        return 'Director de zona';
+      case 'jefe_ventas':
+        return 'Jefe de ventas';
+      case 'jefe_equipo':
+        return 'Jefe de equipo';
+      case 'agente':
+        return 'Agente';
+      case 'administracion':
+        return 'Administración';
+      default:
+        return (rol ?? '').toString().replaceAll('_', ' ');
+    }
+  }
+
+  bool _relacionPermitida({
+    required String rolPadre,
+    required String rolHijo,
+  }) {
+    final padre = _normalizarRol(rolPadre);
+    final hijo = _normalizarRol(rolHijo);
+
+    switch (padre) {
+      case 'director_nacional':
+        return hijo == 'director_zona' ||
+            hijo == 'jefe_ventas' ||
+            hijo == 'jefe_equipo' ||
+            hijo == 'agente';
+
+      case 'director_zona':
+        return hijo == 'jefe_ventas' ||
+            hijo == 'jefe_equipo' ||
+            hijo == 'agente';
+
+      case 'jefe_ventas':
+        return hijo == 'jefe_equipo' ||
+            hijo == 'agente';
+
+      case 'jefe_equipo':
+        return hijo == 'agente';
+
+      default:
+        return false;
+    }
+  }
+
+  List<Map<String, dynamic>> _construirEstructura({
+    required Map<String, dynamic> perfil,
+    required List<Map<String, dynamic>> todosUsuarios,
+  }) {
+    final rolPerfil =
+        _normalizarRol(perfil['rol_usuario']);
+
+    if (rolPerfil == 'administracion' ||
+        rolPerfil == 'administrador' ||
+        rolPerfil == 'admin') {
+      return todosUsuarios.where((usuario) {
+        return _idTexto(usuario['id']).isNotEmpty &&
+            _idTexto(usuario['auth_id']).isNotEmpty;
+      }).toList();
+    }
+
+    final hijosPorParentId =
+        <String, List<Map<String, dynamic>>>{};
+
+    for (final usuario in todosUsuarios) {
+      final parentId =
+          _idTexto(usuario['parent_id']);
+
+      if (parentId.isEmpty) continue;
+
+      hijosPorParentId
+          .putIfAbsent(
+            parentId,
+            () => <Map<String, dynamic>>[],
+          )
+          .add(usuario);
+    }
+
+    final resultado = <Map<String, dynamic>>[];
+    final visitados = <String>{};
+
+    void recorrer(Map<String, dynamic> actual) {
+      final idActual = _idTexto(actual['id']);
+
+      if (idActual.isEmpty ||
+          visitados.contains(idActual)) {
         return;
       }
 
-      final jefeVentas = await supabase
-          .from('usuarios')
-          .select()
-          .eq('auth_id', user.id)
-          .single();
+      visitados.add(idActual);
+      resultado.add(actual);
 
-      final jefesEquipo = await supabase
-          .from('usuarios')
-          .select()
-          .eq('parent_id', jefeVentas['id'])
-          .eq('rol_usuario', 'jefe_equipo');
+      final rolActual =
+          _normalizarRol(actual['rol_usuario']);
 
-      final List<Map<String, dynamic>> resultado = [];
+      final hijos = hijosPorParentId[idActual] ??
+          const <Map<String, dynamic>>[];
 
-      for (final jefe in jefesEquipo) {
-        final agentes = await supabase
-            .from('usuarios')
-            .select()
-            .eq('parent_id', jefe['id'])
-            .eq('rol_usuario', 'agente');
+      for (final hijo in hijos) {
+        final rolHijo =
+            _normalizarRol(hijo['rol_usuario']);
 
-        final List<Map<String, dynamic>> agentesProcesados = [];
+        if (!_relacionPermitida(
+          rolPadre: rolActual,
+          rolHijo: rolHijo,
+        )) {
+          debugPrint(
+            'CONTROL EQUIPOS: usuario bloqueado '
+            '${_nombreCompleto(hijo)} '
+            '| rol=$rolHijo '
+            '| parent=${hijo['parent_id']} '
+            '| padre=$rolActual',
+          );
 
-        int incidenciasEquipo = 0;
-
-        for (final agente in agentes) {
-          final tareas = await _analizarTareas(agente['auth_id']);
-
-          final incidencias = tareas.where((t) => t['ok'] == false).length;
-
-          if (incidencias > 0) {
-            incidenciasEquipo++;
-          }
-
-          agentesProcesados.add({
-            "agente": Map<String, dynamic>.from(agente),
-            "tareas": tareas,
-            "incidencias": incidencias,
-          });
+          continue;
         }
 
-        agentesProcesados.sort((a, b) {
-          final incA = a['incidencias'] ?? 0;
-          final incB = b['incidencias'] ?? 0;
-          return incB.compareTo(incA);
+        recorrer(hijo);
+      }
+    }
+
+    recorrer(perfil);
+
+    return resultado;
+  }
+
+  Future<void> cargarEstado() async {
+    final authUser = supabase.auth.currentUser;
+
+    if (authUser == null) {
+      if (!mounted) return;
+
+      setState(() {
+        loading = false;
+        error = 'No hay ningún usuario conectado.';
+        equipos = [];
+        usuariosEstructura = [];
+      });
+
+      return;
+    }
+
+    try {
+      if (mounted) {
+        setState(() {
+          loading = true;
+          error = null;
+        });
+      }
+
+      final perfilData = await supabase
+          .from('usuarios')
+          .select(
+            'id, auth_id, parent_id, rol_usuario, '
+            'nombre, apellidos, email',
+          )
+          .eq('auth_id', authUser.id)
+          .maybeSingle();
+
+      if (perfilData == null) {
+        throw Exception(
+          'No se encontró el perfil del usuario conectado.',
+        );
+      }
+
+      final perfil =
+          Map<String, dynamic>.from(perfilData);
+
+      final usuariosData = await supabase
+          .from('usuarios')
+          .select(
+            'id, auth_id, parent_id, rol_usuario, '
+            'nombre, apellidos, email',
+          );
+
+      final todosUsuarios =
+          List<Map<String, dynamic>>.from(usuariosData);
+
+      final estructura = _construirEstructura(
+        perfil: perfil,
+        todosUsuarios: todosUsuarios,
+      );
+
+      final mapaPorId =
+          <String, Map<String, dynamic>>{};
+
+      for (final usuario in estructura) {
+        final id = _idTexto(usuario['id']);
+
+        if (id.isNotEmpty) {
+          mapaPorId[id] = usuario;
+        }
+      }
+
+      /*
+       * Cada agente se agrupa con el jefe de equipo más cercano
+       * que tenga por encima dentro de la estructura.
+       *
+       * Si no existe jefe de equipo, se crea un grupo directo con
+       * su responsable inmediato. De esta forma también aparecen:
+       *
+       * - agentes directos de un jefe de ventas;
+       * - agentes directos de un director de zona;
+       * - agentes directos de un director nacional.
+       */
+      final grupos =
+          <String, Map<String, dynamic>>{};
+
+      Map<String, dynamic>? buscarResponsableGrupo(
+        Map<String, dynamic> agente,
+      ) {
+        var parentId =
+            _idTexto(agente['parent_id']);
+
+        Map<String, dynamic>? primerResponsable;
+
+        final visitados = <String>{};
+
+        while (parentId.isNotEmpty &&
+            !visitados.contains(parentId)) {
+          visitados.add(parentId);
+
+          final padre = mapaPorId[parentId];
+
+          if (padre == null) break;
+
+          primerResponsable ??= padre;
+
+          if (_normalizarRol(
+                padre['rol_usuario'],
+              ) ==
+              'jefe_equipo') {
+            return padre;
+          }
+
+          parentId =
+              _idTexto(padre['parent_id']);
+        }
+
+        return primerResponsable ?? perfil;
+      }
+
+      final agentes = estructura.where(
+        (usuario) =>
+            _normalizarRol(usuario['rol_usuario']) ==
+            'agente',
+      );
+
+      for (final agente in agentes) {
+        final responsable =
+            buscarResponsableGrupo(agente);
+
+        if (responsable == null) continue;
+
+        final responsableId =
+            _idTexto(responsable['id']);
+
+        if (responsableId.isEmpty) continue;
+
+        final key =
+            '${_normalizarRol(responsable['rol_usuario'])}:$responsableId';
+
+        grupos.putIfAbsent(
+          key,
+          () => <String, dynamic>{
+            'jefe':
+                Map<String, dynamic>.from(responsable),
+            'agentes':
+                <Map<String, dynamic>>[],
+            'esEquipoDirecto':
+                _normalizarRol(
+                      responsable['rol_usuario'],
+                    ) !=
+                    'jefe_equipo',
+          },
+        );
+
+        final tareas = await _analizarTareas(
+          _idTexto(agente['auth_id']),
+        );
+
+        final incidencias = tareas
+            .where((tarea) => tarea['ok'] == false)
+            .length;
+
+        final lista =
+            grupos[key]!['agentes']
+                as List<Map<String, dynamic>>;
+
+        lista.add({
+          'agente':
+              Map<String, dynamic>.from(agente),
+          'tareas': tareas,
+          'incidencias': incidencias,
+        });
+      }
+
+      final resultado =
+          <Map<String, dynamic>>[];
+
+      for (final grupo in grupos.values) {
+        final agentesGrupo =
+            List<Map<String, dynamic>>.from(
+          grupo['agentes'],
+        );
+
+        agentesGrupo.sort((a, b) {
+          final incA =
+              (a['incidencias'] ?? 0) as int;
+
+          final incB =
+              (b['incidencias'] ?? 0) as int;
+
+          final porIncidencias =
+              incB.compareTo(incA);
+
+          if (porIncidencias != 0) {
+            return porIncidencias;
+          }
+
+          final nombreA = _nombreCompleto(
+            Map<String, dynamic>.from(
+              a['agente'],
+            ),
+          );
+
+          final nombreB = _nombreCompleto(
+            Map<String, dynamic>.from(
+              b['agente'],
+            ),
+          );
+
+          return nombreA
+              .toLowerCase()
+              .compareTo(nombreB.toLowerCase());
         });
 
+        final agentesConIncidencias =
+            agentesGrupo.where((item) {
+          return ((item['incidencias'] ?? 0) as int) >
+              0;
+        }).length;
+
         resultado.add({
-          "jefe": Map<String, dynamic>.from(jefe),
-          "agentes": agentesProcesados,
-          "totalAgentes": agentes.length,
-          "incidenciasEquipo": incidenciasEquipo,
+          'jefe': grupo['jefe'],
+          'agentes': agentesGrupo,
+          'totalAgentes': agentesGrupo.length,
+          'incidenciasEquipo':
+              agentesConIncidencias,
+          'esEquipoDirecto':
+              grupo['esEquipoDirecto'] == true,
         });
       }
 
       resultado.sort((a, b) {
-        final incA = a['incidenciasEquipo'] ?? 0;
-        final incB = b['incidenciasEquipo'] ?? 0;
-        return incB.compareTo(incA);
+        final incA =
+            (a['incidenciasEquipo'] ?? 0) as int;
+
+        final incB =
+            (b['incidenciasEquipo'] ?? 0) as int;
+
+        final porIncidencias =
+            incB.compareTo(incA);
+
+        if (porIncidencias != 0) {
+          return porIncidencias;
+        }
+
+        final jefeA =
+            Map<String, dynamic>.from(a['jefe']);
+
+        final jefeB =
+            Map<String, dynamic>.from(b['jefe']);
+
+        return _nombreCompleto(jefeA)
+            .toLowerCase()
+            .compareTo(
+              _nombreCompleto(jefeB).toLowerCase(),
+            );
       });
 
+      debugPrint(
+        '======= CONTROL EQUIPOS ESTRUCTURA REAL =======',
+      );
+      debugPrint(
+        'USUARIO: ${_nombreCompleto(perfil)}',
+      );
+      debugPrint(
+        'ROL: ${perfil['rol_usuario']}',
+      );
+      debugPrint(
+        'PERSONAS EN ESTRUCTURA: ${estructura.length}',
+      );
+      debugPrint(
+        'EQUIPOS GENERADOS: ${resultado.length}',
+      );
+      debugPrint(
+        'AGENTES CONTROLADOS: '
+        '${resultado.fold<int>(0, (total, equipo) => total + ((equipo['totalAgentes'] ?? 0) as int))}',
+      );
+
+      for (final equipo in resultado) {
+        final responsable =
+            Map<String, dynamic>.from(
+          equipo['jefe'],
+        );
+
+        debugPrint(
+          '- ${_nombreCompleto(responsable)} '
+          '| rol=${responsable['rol_usuario']} '
+          '| agentes=${equipo['totalAgentes']} '
+          '| directo=${equipo['esEquipoDirecto']}',
+        );
+      }
+
+      debugPrint(
+        '==============================================',
+      );
+
+      if (!mounted) return;
+
       setState(() {
+        usuarioLogueado = perfil;
+        usuariosEstructura = estructura;
         equipos = resultado;
         loading = false;
       });
-    } catch (e) {
-      debugPrint("ERROR EQUIPOS: $e");
+    } catch (e, stackTrace) {
+      debugPrint(
+        'ERROR CONTROL EQUIPOS: $e',
+      );
+      debugPrintStack(stackTrace: stackTrace);
+
+      if (!mounted) return;
 
       setState(() {
         loading = false;
         error = e.toString();
+        equipos = [];
+        usuariosEstructura = [];
       });
     }
   }
 
-  Future<List<Map<String, dynamic>>> _analizarTareas(String authId) async {
-    final now = DateTime.now();
+  Future<List<Map<String, dynamic>>> _analizarTareas(
+    String authId,
+  ) async {
+    if (authId.isEmpty) {
+      return [
+        {
+          'titulo': 'Referencias diarias',
+          'ok': false,
+          'detalle': 'Usuario sin auth_id válido',
+          'icon': Icons.people_alt_rounded,
+        },
+        {
+          'titulo': 'Contactos diarios',
+          'ok': false,
+          'detalle': 'Usuario sin auth_id válido',
+          'icon': Icons.phone_in_talk_rounded,
+        },
+        {
+          'titulo': 'Seguimientos vencidos',
+          'ok': false,
+          'detalle': 'Usuario sin auth_id válido',
+          'icon': Icons.notification_important_rounded,
+        },
+        {
+          'titulo': 'Entrada en tareas',
+          'ok': false,
+          'detalle': 'Usuario sin auth_id válido',
+          'icon': Icons.task_alt_rounded,
+        },
+      ];
+    }
 
-    final inicioMes = DateTime(
-      now.year,
-      now.month,
-      1,
-    );
+    final now = DateTime.now();
+    final inicioMes =
+        DateTime(now.year, now.month, 1);
 
     final referencias = await supabase
         .from('referencias_viables')
         .select('created_at')
         .eq('auth_id', authId)
-        .gte('created_at', inicioMes.toIso8601String());
+        .gte(
+          'created_at',
+          inicioMes.toIso8601String(),
+        );
 
-    Map<String, int> refsPorDia = {};
+    final refsPorDia = <String, int>{};
 
-    for (final r in referencias) {
-      final fecha = DateTime.parse(r['created_at']);
-      final key = DateTime(fecha.year, fecha.month, fecha.day).toString();
+    for (final referencia in referencias) {
+      final fecha = DateTime.tryParse(
+        referencia['created_at']?.toString() ?? '',
+      );
 
-      refsPorDia[key] = (refsPorDia[key] ?? 0) + 1;
+      if (fecha == null) continue;
+
+      final key =
+          '${fecha.year}-${fecha.month}-${fecha.day}';
+
+      refsPorDia[key] =
+          (refsPorDia[key] ?? 0) + 1;
     }
 
     int diasMalReferencias = 0;
 
-    for (int d = 1; d <= now.day; d++) {
-      final dia = DateTime(now.year, now.month, d).toString();
+    for (int dia = 1; dia <= now.day; dia++) {
+      final key =
+          '${now.year}-${now.month}-$dia';
 
-      final count = refsPorDia[dia] ?? 0;
-
-      if (count < 3) {
+      if ((refsPorDia[key] ?? 0) < 3) {
         diasMalReferencias++;
       }
     }
@@ -160,27 +593,43 @@ class _ControlEquiposJefeVentasScreenState
         .from('contactos_diarios')
         .select('created_at, contactos_positivos')
         .eq('auth_id', authId)
-        .gte('created_at', inicioMes.toIso8601String());
+        .gte(
+          'created_at',
+          inicioMes.toIso8601String(),
+        );
 
-    Map<String, int> contactosPorDia = {};
+    final contactosPorDia = <String, int>{};
 
-    for (final c in contactos) {
-      final fecha = DateTime.parse(c['created_at']);
-      final key = DateTime(fecha.year, fecha.month, fecha.day).toString();
+    for (final contacto in contactos) {
+      final fecha = DateTime.tryParse(
+        contacto['created_at']?.toString() ?? '',
+      );
+
+      if (fecha == null) continue;
+
+      final key =
+          '${fecha.year}-${fecha.month}-${fecha.day}';
+
+      final positivos = contacto['contactos_positivos'];
+
+      final cantidad = positivos is num
+          ? positivos.toInt()
+          : int.tryParse(
+                positivos?.toString() ?? '',
+              ) ??
+              0;
 
       contactosPorDia[key] =
-          (contactosPorDia[key] ?? 0) +
-          ((c['contactos_positivos'] ?? 0) as int);
+          (contactosPorDia[key] ?? 0) + cantidad;
     }
 
     int diasMalContactos = 0;
 
-    for (int d = 1; d <= now.day; d++) {
-      final dia = DateTime(now.year, now.month, d).toString();
+    for (int dia = 1; dia <= now.day; dia++) {
+      final key =
+          '${now.year}-${now.month}-$dia';
 
-      final total = contactosPorDia[dia] ?? 0;
-
-      if (total < 6) {
+      if ((contactosPorDia[key] ?? 0) < 6) {
         diasMalContactos++;
       }
     }
@@ -193,12 +642,14 @@ class _ControlEquiposJefeVentasScreenState
 
     int seguimientosVencidos = 0;
 
-    for (final s in seguimientos) {
-      if (s['proxima_llamada'] == null) continue;
+    for (final seguimiento in seguimientos) {
+      final fecha = DateTime.tryParse(
+        seguimiento['proxima_llamada']
+                ?.toString() ??
+            '',
+      );
 
-      final fecha = DateTime.parse(s['proxima_llamada']);
-
-      if (fecha.isBefore(now)) {
+      if (fecha != null && fecha.isBefore(now)) {
         seguimientosVencidos++;
       }
     }
@@ -211,40 +662,49 @@ class _ControlEquiposJefeVentasScreenState
         .order('created_at', ascending: false)
         .limit(1);
 
-    DateTime fechaBase;
+    DateTime fechaBase = inicioSistema;
 
     if (actividad.isNotEmpty) {
-      fechaBase = DateTime.parse(actividad.first['created_at']);
-    } else {
-      fechaBase = inicioSistema;
+      fechaBase = DateTime.tryParse(
+            actividad.first['created_at']
+                    ?.toString() ??
+                '',
+          ) ??
+          inicioSistema;
     }
 
-    final diasSinEntrar = DateTime.now().difference(fechaBase).inDays;
+    final diasSinEntrar =
+        now.difference(fechaBase).inDays;
 
     return [
       {
-        "titulo": "Referencias diarias",
-        "ok": diasMalReferencias == 0,
-        "detalle": "$diasMalReferencias días por debajo de 3 referencias",
-        "icon": Icons.people_alt_rounded,
+        'titulo': 'Referencias diarias',
+        'ok': diasMalReferencias == 0,
+        'detalle':
+            '$diasMalReferencias días por debajo de 3 referencias',
+        'icon': Icons.people_alt_rounded,
       },
       {
-        "titulo": "Contactos diarios",
-        "ok": diasMalContactos == 0,
-        "detalle": "$diasMalContactos días por debajo de 6 contactos",
-        "icon": Icons.phone_in_talk_rounded,
+        'titulo': 'Contactos diarios',
+        'ok': diasMalContactos == 0,
+        'detalle':
+            '$diasMalContactos días por debajo de 6 contactos',
+        'icon': Icons.phone_in_talk_rounded,
       },
       {
-        "titulo": "Seguimientos vencidos",
-        "ok": seguimientosVencidos == 0,
-        "detalle": "$seguimientosVencidos pendientes",
-        "icon": Icons.notification_important_rounded,
+        'titulo': 'Seguimientos vencidos',
+        'ok': seguimientosVencidos == 0,
+        'detalle':
+            '$seguimientosVencidos pendientes',
+        'icon':
+            Icons.notification_important_rounded,
       },
       {
-        "titulo": "Entrada en tareas",
-        "ok": diasSinEntrar < 3,
-        "detalle": "$diasSinEntrar días sin entrar a tareas",
-        "icon": Icons.task_alt_rounded,
+        'titulo': 'Entrada en tareas',
+        'ok': diasSinEntrar < 3,
+        'detalle':
+            '$diasSinEntrar días sin entrar a tareas',
+        'icon': Icons.task_alt_rounded,
       },
     ];
   }
@@ -254,14 +714,19 @@ class _ControlEquiposJefeVentasScreenState
   int get totalAgentes {
     return equipos.fold<int>(
       0,
-      (total, e) => total + ((e['totalAgentes'] ?? 0) as int),
+      (total, equipo) =>
+          total +
+          ((equipo['totalAgentes'] ?? 0) as int),
     );
   }
 
   int get totalAgentesConIncidencias {
     return equipos.fold<int>(
       0,
-      (total, e) => total + ((e['incidenciasEquipo'] ?? 0) as int),
+      (total, equipo) =>
+          total +
+          ((equipo['incidenciasEquipo'] ?? 0)
+              as int),
     );
   }
 
@@ -269,10 +734,14 @@ class _ControlEquiposJefeVentasScreenState
     int total = 0;
 
     for (final equipo in equipos) {
-      final agentes = List<Map<String, dynamic>>.from(equipo['agentes']);
+      final agentes =
+          List<Map<String, dynamic>>.from(
+        equipo['agentes'],
+      );
 
       for (final item in agentes) {
-        total += (item['incidencias'] ?? 0) as int;
+        total +=
+            (item['incidencias'] ?? 0) as int;
       }
     }
 
@@ -284,79 +753,105 @@ class _ControlEquiposJefeVentasScreenState
 
     final totalTareas = totalAgentes * 4;
 
-    if (totalTareas == 0) return 1;
-
-    return ((totalTareas - totalIncidencias) / totalTareas).clamp(0.0, 1.0);
+    return ((totalTareas - totalIncidencias) /
+            totalTareas)
+        .clamp(0.0, 1.0);
   }
 
-  Color _estadoColorPorIncidencias(int incidencias) {
-    if (incidencias == 0) return Colors.greenAccent;
-    if (incidencias <= 2) return Colors.orangeAccent;
-    return Colors.redAccent;
+  Color _estadoColorPorIncidencias(
+    int incidencias,
+  ) {
+    if (incidencias == 0) {
+      return const Color(0xFF16A34A);
+    }
+
+    if (incidencias <= 2) {
+      return const Color(0xFFF59E0B);
+    }
+
+    return const Color(0xFFDC2626);
   }
 
-  String _estadoTextoPorIncidencias(int incidencias) {
-    if (incidencias == 0) return "Todo correcto";
-    if (incidencias <= 2) return "Revisar";
-    return "Crítico";
+  String _estadoTextoPorIncidencias(
+    int incidencias,
+  ) {
+    if (incidencias == 0) {
+      return 'Todo correcto';
+    }
+
+    if (incidencias <= 2) {
+      return 'Revisar';
+    }
+
+    return 'Crítico';
   }
 
-  double _cumplimientoAgente(List tareas) {
+  double _cumplimientoAgente(
+    List<Map<String, dynamic>> tareas,
+  ) {
     if (tareas.isEmpty) return 1;
 
-    final ok = tareas.where((t) => t['ok'] == true).length;
+    final correctas = tareas
+        .where((tarea) => tarea['ok'] == true)
+        .length;
 
-    return (ok / tareas.length).clamp(0.0, 1.0);
+    return (correctas / tareas.length)
+        .clamp(0.0, 1.0);
   }
 
-  double _cumplimientoEquipo(Map<String, dynamic> equipo) {
-    final agentes = List<Map<String, dynamic>>.from(equipo['agentes']);
+  double _cumplimientoEquipo(
+    Map<String, dynamic> equipo,
+  ) {
+    final agentes =
+        List<Map<String, dynamic>>.from(
+      equipo['agentes'],
+    );
 
     if (agentes.isEmpty) return 1;
 
     int totalTareas = 0;
-    int tareasOk = 0;
+    int tareasCorrectas = 0;
 
     for (final item in agentes) {
-      final tareas = List<Map<String, dynamic>>.from(item['tareas']);
+      final tareas =
+          List<Map<String, dynamic>>.from(
+        item['tareas'],
+      );
 
       totalTareas += tareas.length;
-      tareasOk += tareas.where((t) => t['ok'] == true).length;
+
+      tareasCorrectas += tareas
+          .where((tarea) => tarea['ok'] == true)
+          .length;
     }
 
     if (totalTareas == 0) return 1;
 
-    return (tareasOk / totalTareas).clamp(0.0, 1.0);
-  }
-
-  String _nombreCompleto(Map<String, dynamic>? u) {
-    if (u == null) return "Sin nombre";
-
-    final nombre = u['nombre']?.toString() ?? '';
-    final apellidos = u['apellidos']?.toString() ?? '';
-
-    final completo = '$nombre $apellidos'.trim();
-
-    if (completo.isEmpty) {
-      return u['email']?.toString() ?? 'Sin nombre';
-    }
-
-    return completo;
+    return (tareasCorrectas / totalTareas)
+        .clamp(0.0, 1.0);
   }
 
   String _iniciales(String nombre) {
-    final partes = nombre.trim().split(' ').where((e) => e.isNotEmpty).toList();
+    final partes = nombre
+        .trim()
+        .split(' ')
+        .where((parte) => parte.isNotEmpty)
+        .toList();
 
-    if (partes.isEmpty) return "?";
-    if (partes.length == 1) return partes.first[0].toUpperCase();
+    if (partes.isEmpty) return '?';
 
-    return "${partes[0][0]}${partes[1][0]}".toUpperCase();
+    if (partes.length == 1) {
+      return partes.first[0].toUpperCase();
+    }
+
+    return '${partes[0][0]}${partes[1][0]}'
+        .toUpperCase();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF020617),
+      backgroundColor: const Color(0xFFF4F6FB),
       body: Stack(
         children: [
           const _ControlBackground(),
@@ -364,33 +859,40 @@ class _ControlEquiposJefeVentasScreenState
             child: loading
                 ? const Center(
                     child: CircularProgressIndicator(
-                      color: Colors.cyanAccent,
+                      color: Color(0xFF111827),
                     ),
                   )
                 : RefreshIndicator(
+                    color: const Color(0xFF111827),
                     onRefresh: cargarEstado,
-                    color: Colors.cyanAccent,
-                    backgroundColor: const Color(0xFF0F172A),
                     child: ListView(
-                      padding: const EdgeInsets.fromLTRB(18, 12, 18, 28),
+                      physics:
+                          const AlwaysScrollableScrollPhysics(),
+                      padding:
+                          const EdgeInsets.fromLTRB(
+                        18,
+                        12,
+                        18,
+                        30,
+                      ),
                       children: [
                         _header(),
-                        const SizedBox(height: 18),
-
+                        const SizedBox(height: 24),
                         if (error != null)
                           _errorCard()
                         else ...[
-                          _controlHero(),
-                          const SizedBox(height: 16),
+                          _hero(),
+                          const SizedBox(height: 18),
                           _kpiResumen(),
-                          const SizedBox(height: 20),
+                          const SizedBox(height: 24),
                           _sectionTitle(),
                           const SizedBox(height: 14),
-
                           if (equipos.isEmpty)
                             _emptyCard()
                           else
-                            ...equipos.map(_equipoControlCard),
+                            ...equipos.map(
+                              _equipoControlCard,
+                            ),
                         ],
                       ],
                     ),
@@ -404,212 +906,261 @@ class _ControlEquiposJefeVentasScreenState
   Widget _header() {
     return Row(
       children: [
-        InkWell(
+        Material(
+          color: Colors.white,
+          elevation: 5,
+          shadowColor:
+              Colors.black.withOpacity(0.10),
           borderRadius: BorderRadius.circular(18),
-          onTap: () => Navigator.pop(context),
-          child: Container(
-            height: 54,
-            width: 54,
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.08),
-              borderRadius: BorderRadius.circular(18),
-              border: Border.all(
-                color: Colors.cyanAccent.withOpacity(0.45),
+          child: InkWell(
+            onTap: () =>
+                Navigator.of(context).maybePop(),
+            borderRadius: BorderRadius.circular(18),
+            child: const SizedBox(
+              width: 50,
+              height: 50,
+              child: Icon(
+                Icons.arrow_back_rounded,
+                color: Color(0xFF111827),
+                size: 29,
               ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.cyanAccent.withOpacity(0.16),
-                  blurRadius: 22,
-                ),
-              ],
-            ),
-            child: const Icon(
-              Icons.arrow_back_rounded,
-              color: Colors.white,
             ),
           ),
         ),
         const SizedBox(width: 14),
         const Expanded(
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment:
+                CrossAxisAlignment.start,
             children: [
               Text(
-                "Control de equipos",
+                'Control de equipos',
                 style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 27,
+                  color: Color(0xFF111827),
+                  fontSize: 24,
                   fontWeight: FontWeight.w900,
-                  letterSpacing: -0.8,
                 ),
               ),
-              SizedBox(height: 3),
+              SizedBox(height: 2),
               Text(
-                "Auditoría comercial y tareas críticas",
+                'Auditoría comercial y tareas',
                 style: TextStyle(
-                  color: Colors.white60,
-                  fontSize: 13,
+                  color: Color(0xFF64748B),
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
                 ),
               ),
             ],
           ),
         ),
-        Container(
-          height: 52,
-          width: 52,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: Colors.cyanAccent.withOpacity(0.12),
-            border: Border.all(
-              color: Colors.cyanAccent.withOpacity(0.38),
+        IconButton(
+          tooltip: 'Actualizar',
+          onPressed: cargarEstado,
+          icon: Container(
+            width: 50,
+            height: 50,
+            decoration: BoxDecoration(
+              color: const Color(0xFF111827),
+              borderRadius: BorderRadius.circular(18),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF111827)
+                      .withOpacity(0.18),
+                  blurRadius: 18,
+                  offset: const Offset(0, 8),
+                ),
+              ],
             ),
-          ),
-          child: const Icon(
-            Icons.health_and_safety_rounded,
-            color: Colors.cyanAccent,
+            child: const Icon(
+              Icons.refresh_rounded,
+              color: Colors.white,
+            ),
           ),
         ),
       ],
     );
   }
 
-  Widget _controlHero() {
+  Widget _hero() {
     final porcentaje = cumplimientoGlobal;
+
     final color = porcentaje >= 0.80
-        ? Colors.greenAccent
+        ? const Color(0xFF16A34A)
         : porcentaje >= 0.55
-            ? Colors.orangeAccent
-            : Colors.redAccent;
+            ? const Color(0xFFF59E0B)
+            : const Color(0xFFDC2626);
 
     final texto = porcentaje >= 0.80
-        ? "Estructura controlada"
+        ? 'Estructura controlada'
         : porcentaje >= 0.55
-            ? "Necesita seguimiento"
-            : "Riesgo alto";
+            ? 'Necesita seguimiento'
+            : 'Riesgo alto';
 
-    return _glassCard(
-      padding: const EdgeInsets.all(22),
-      child: Column(
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 68,
-                height: 68,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: color.withOpacity(0.15),
-                  border: Border.all(
-                    color: color.withOpacity(0.38),
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: color.withOpacity(0.16),
-                      blurRadius: 24,
-                    ),
-                  ],
-                ),
-                child: Icon(
-                  porcentaje >= 0.80
-                      ? Icons.verified_rounded
-                      : porcentaje >= 0.55
-                          ? Icons.manage_search_rounded
-                          : Icons.warning_rounded,
-                  color: color,
-                  size: 36,
-                ),
+    final usuario =
+        _nombreCompleto(usuarioLogueado);
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(2),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(32),
+        gradient: const LinearGradient(
+          colors: [
+            Color(0xFF2563EB),
+            Color(0xFF7C3AED),
+            Color(0xFFF59E0B),
+          ],
+        ),
+      ),
+      child: Container(
+        padding: const EdgeInsets.all(22),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(30),
+          gradient: const LinearGradient(
+            colors: [
+              Color(0xFF111827),
+              Color(0xFF1E293B),
+              Color(0xFF172554),
+            ],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+        ),
+        child: Stack(
+          children: [
+            Positioned(
+              right: -20,
+              top: -16,
+              child: Icon(
+                Icons.health_and_safety_rounded,
+                size: 135,
+                color: Colors.white.withOpacity(0.08),
               ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+            ),
+            Column(
+              crossAxisAlignment:
+                  CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'CONTROL DE ACTIVIDAD',
+                  style: TextStyle(
+                    color: Color(0xFF93C5FD),
+                    fontSize: 11,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 1.1,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  texto,
+                  style: TextStyle(
+                    color: color,
+                    fontSize: 28,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  '$usuario · ${usuariosEstructura.length} personas en tu estructura',
+                  style: const TextStyle(
+                    color: Colors.white70,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 20),
+                Row(
                   children: [
+                    Expanded(
+                      child: ClipRRect(
+                        borderRadius:
+                            BorderRadius.circular(99),
+                        child: LinearProgressIndicator(
+                          value: porcentaje,
+                          minHeight: 11,
+                          backgroundColor:
+                              Colors.white.withOpacity(0.15),
+                          color: color,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
                     Text(
-                      texto,
+                      '${(porcentaje * 100).round()}%',
                       style: TextStyle(
                         color: color,
-                        fontSize: 20,
+                        fontSize: 21,
                         fontWeight: FontWeight.w900,
                       ),
                     ),
-                    const SizedBox(height: 5),
-                    const Text(
-                      "Resumen global del cumplimiento de actividad",
-                      style: TextStyle(
-                        color: Colors.white60,
-                        height: 1.3,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
                   ],
                 ),
-              ),
-            ],
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _kpiResumen() {
+    return Container(
+      padding: const EdgeInsets.all(17),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(26),
+        border: Border.all(
+          color: Colors.black.withOpacity(0.045),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.055),
+            blurRadius: 22,
+            offset: const Offset(0, 11),
           ),
-
-          const SizedBox(height: 20),
-
-          Row(
-            children: [
-              Expanded(
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(999),
-                  child: LinearProgressIndicator(
-                    value: porcentaje,
-                    minHeight: 13,
-                    backgroundColor: Colors.white.withOpacity(0.12),
-                    valueColor: AlwaysStoppedAnimation(color),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Text(
-                "${(porcentaje * 100).toStringAsFixed(0)}%",
-                style: TextStyle(
-                  color: color,
-                  fontSize: 23,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-            ],
+        ],
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: _kpiBox(
+              title: 'Equipos',
+              value: totalEquipos.toString(),
+              icon: Icons.account_tree_rounded,
+              color: const Color(0xFF7C3AED),
+            ),
+          ),
+          _separator(),
+          Expanded(
+            child: _kpiBox(
+              title: 'Agentes',
+              value: totalAgentes.toString(),
+              icon: Icons.groups_rounded,
+              color: const Color(0xFF2563EB),
+            ),
+          ),
+          _separator(),
+          Expanded(
+            child: _kpiBox(
+              title: 'Alertas',
+              value:
+                  totalAgentesConIncidencias.toString(),
+              icon: Icons.warning_rounded,
+              color: totalAgentesConIncidencias == 0
+                  ? const Color(0xFF16A34A)
+                  : const Color(0xFFDC2626),
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _kpiResumen() {
-    return Row(
-      children: [
-        Expanded(
-          child: _kpiBox(
-            title: "Equipos",
-            value: totalEquipos.toString(),
-            icon: Icons.account_tree_rounded,
-            color: Colors.purpleAccent,
-          ),
-        ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: _kpiBox(
-            title: "Agentes",
-            value: totalAgentes.toString(),
-            icon: Icons.groups_rounded,
-            color: Colors.cyanAccent,
-          ),
-        ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: _kpiBox(
-            title: "Alertas",
-            value: totalAgentesConIncidencias.toString(),
-            icon: Icons.warning_rounded,
-            color: totalAgentesConIncidencias == 0
-                ? Colors.greenAccent
-                : Colors.redAccent,
-          ),
-        ),
-      ],
+  Widget _separator() {
+    return Container(
+      width: 1,
+      height: 58,
+      color: const Color(0xFFE2E8F0),
     );
   }
 
@@ -619,68 +1170,79 @@ class _ControlEquiposJefeVentasScreenState
     required IconData icon,
     required Color color,
   }) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.075),
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: color.withOpacity(0.25)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.20),
-            blurRadius: 18,
-            offset: const Offset(0, 10),
+    return Column(
+      children: [
+        Icon(icon, color: color, size: 24),
+        const SizedBox(height: 6),
+        Text(
+          value,
+          style: TextStyle(
+            color: color,
+            fontSize: 23,
+            fontWeight: FontWeight.w900,
           ),
-        ],
-      ),
-      child: Column(
-        children: [
-          Icon(icon, color: color, size: 25),
-          const SizedBox(height: 7),
-          Text(
-            value,
-            style: TextStyle(
-              color: color,
-              fontSize: 23,
-              fontWeight: FontWeight.w900,
-            ),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          title,
+          style: const TextStyle(
+            color: Color(0xFF64748B),
+            fontSize: 11,
+            fontWeight: FontWeight.w800,
           ),
-          const SizedBox(height: 2),
-          Text(
-            title,
-            style: const TextStyle(
-              color: Colors.white60,
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
   Widget _sectionTitle() {
     return Row(
       children: [
-        const Icon(
-          Icons.fact_check_rounded,
-          color: Colors.cyanAccent,
+        Container(
+          width: 42,
+          height: 42,
+          decoration: BoxDecoration(
+            color:
+                const Color(0xFF2563EB).withOpacity(0.10),
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: const Icon(
+            Icons.fact_check_rounded,
+            color: Color(0xFF2563EB),
+          ),
         ),
-        const SizedBox(width: 8),
+        const SizedBox(width: 11),
         const Expanded(
-          child: Text(
-            "Panel de incidencias",
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 21,
-              fontWeight: FontWeight.w900,
-            ),
+          child: Column(
+            crossAxisAlignment:
+                CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Panel de incidencias',
+                style: TextStyle(
+                  color: Color(0xFF111827),
+                  fontSize: 18,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              Text(
+                'Control por equipo y agente',
+                style: TextStyle(
+                  color: Color(0xFF64748B),
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
           ),
         ),
         Text(
-          "$totalIncidencias incidencias",
+          '$totalIncidencias',
           style: TextStyle(
-            color: totalIncidencias == 0 ? Colors.greenAccent : Colors.redAccent,
+            color: totalIncidencias == 0
+                ? const Color(0xFF16A34A)
+                : const Color(0xFFDC2626),
+            fontSize: 18,
             fontWeight: FontWeight.w900,
           ),
         ),
@@ -688,21 +1250,53 @@ class _ControlEquiposJefeVentasScreenState
     );
   }
 
-  Widget _equipoControlCard(Map<String, dynamic> equipo) {
-    final jefe = Map<String, dynamic>.from(equipo['jefe']);
-    final agentes = List<Map<String, dynamic>>.from(equipo['agentes']);
+  Widget _equipoControlCard(
+    Map<String, dynamic> equipo,
+  ) {
+    final jefe =
+        Map<String, dynamic>.from(equipo['jefe']);
 
-    final nombreJefe = _nombreCompleto(jefe);
+    final agentes =
+        List<Map<String, dynamic>>.from(
+      equipo['agentes'],
+    );
 
-    final incidenciasEquipo = (equipo['incidenciasEquipo'] ?? 0) as int;
-    final totalAgentesEquipo = (equipo['totalAgentes'] ?? 0) as int;
+    final nombreJefe =
+        _nombreCompleto(jefe);
 
-    final cumplimiento = _cumplimientoEquipo(equipo);
-    final color = _estadoColorPorIncidencias(incidenciasEquipo);
+    final incidenciasEquipo =
+        (equipo['incidenciasEquipo'] ?? 0) as int;
 
-    return _glassCard(
-      margin: const EdgeInsets.only(bottom: 16),
-      padding: EdgeInsets.zero,
+    final totalAgentesEquipo =
+        (equipo['totalAgentes'] ?? 0) as int;
+
+    final cumplimiento =
+        _cumplimientoEquipo(equipo);
+
+    final color =
+        _estadoColorPorIncidencias(
+      incidenciasEquipo,
+    );
+
+    final esDirecto =
+        equipo['esEquipoDirecto'] == true;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 15),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(26),
+        border: Border.all(
+          color: color.withOpacity(0.18),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
       child: Theme(
         data: Theme.of(context).copyWith(
           dividerColor: Colors.transparent,
@@ -711,34 +1305,60 @@ class _ControlEquiposJefeVentasScreenState
         ),
         child: ExpansionTile(
           initiallyExpanded: true,
-          iconColor: Colors.cyanAccent,
-          collapsedIconColor: Colors.white70,
-          tilePadding: const EdgeInsets.all(18),
-          childrenPadding: const EdgeInsets.fromLTRB(18, 0, 18, 18),
+          iconColor: const Color(0xFF2563EB),
+          collapsedIconColor:
+              const Color(0xFF64748B),
+          tilePadding: const EdgeInsets.all(17),
+          childrenPadding:
+              const EdgeInsets.fromLTRB(
+            16,
+            0,
+            16,
+            16,
+          ),
           title: Row(
             children: [
-              _avatar(nombreJefe, Colors.purpleAccent, size: 54),
+              _avatar(
+                nombreJefe,
+                esDirecto
+                    ? const Color(0xFF2563EB)
+                    : const Color(0xFF7C3AED),
+                size: 54,
+              ),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                  crossAxisAlignment:
+                      CrossAxisAlignment.start,
                   children: [
                     Text(
                       nombreJefe,
                       maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+                      overflow:
+                          TextOverflow.ellipsis,
                       style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 17,
+                        color: Color(0xFF111827),
+                        fontSize: 16,
                         fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      esDirecto
+                          ? 'Equipo directo · ${_rolTexto(jefe['rol_usuario'])}'
+                          : 'Jefe de equipo',
+                      style: const TextStyle(
+                        color: Color(0xFF64748B),
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
                       ),
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      "$incidenciasEquipo agentes con incidencias de $totalAgentesEquipo",
+                      '$incidenciasEquipo agentes con incidencias de $totalAgentesEquipo',
                       style: TextStyle(
                         color: color,
-                        fontSize: 12,
+                        fontSize: 11,
                         fontWeight: FontWeight.w900,
                       ),
                     ),
@@ -746,41 +1366,44 @@ class _ControlEquiposJefeVentasScreenState
                 ),
               ),
               _statusPill(
-                _estadoTextoPorIncidencias(incidenciasEquipo),
+                _estadoTextoPorIncidencias(
+                  incidenciasEquipo,
+                ),
                 color,
               ),
             ],
           ),
           subtitle: Padding(
-            padding: const EdgeInsets.only(top: 14),
+            padding:
+                const EdgeInsets.only(top: 13),
             child: Row(
               children: [
                 Expanded(
                   child: ClipRRect(
-                    borderRadius: BorderRadius.circular(999),
+                    borderRadius:
+                        BorderRadius.circular(99),
                     child: LinearProgressIndicator(
                       value: cumplimiento,
-                      minHeight: 9,
-                      backgroundColor: Colors.white.withOpacity(0.12),
-                      valueColor: AlwaysStoppedAnimation(
-                        cumplimiento >= 0.80
-                            ? Colors.greenAccent
-                            : cumplimiento >= 0.55
-                                ? Colors.orangeAccent
-                                : Colors.redAccent,
-                      ),
+                      minHeight: 8,
+                      backgroundColor:
+                          const Color(0xFFE2E8F0),
+                      color: cumplimiento >= 0.80
+                          ? const Color(0xFF16A34A)
+                          : cumplimiento >= 0.55
+                              ? const Color(0xFFF59E0B)
+                              : const Color(0xFFDC2626),
                     ),
                   ),
                 ),
                 const SizedBox(width: 10),
                 Text(
-                  "${(cumplimiento * 100).toStringAsFixed(0)}%",
+                  '${(cumplimiento * 100).round()}%',
                   style: TextStyle(
                     color: cumplimiento >= 0.80
-                        ? Colors.greenAccent
+                        ? const Color(0xFF16A34A)
                         : cumplimiento >= 0.55
-                            ? Colors.orangeAccent
-                            : Colors.redAccent,
+                            ? const Color(0xFFF59E0B)
+                            : const Color(0xFFDC2626),
                     fontWeight: FontWeight.w900,
                     fontSize: 12,
                   ),
@@ -788,32 +1411,47 @@ class _ControlEquiposJefeVentasScreenState
               ],
             ),
           ),
-          children: [
-            if (agentes.isEmpty)
-              _emptyAgents()
-            else
-              ...agentes.map(_agenteControlNode),
-          ],
+          children: agentes.isEmpty
+              ? [_emptyAgents()]
+              : agentes
+                  .map(_agenteControlNode)
+                  .toList(),
         ),
       ),
     );
   }
 
-  Widget _agenteControlNode(Map<String, dynamic> item) {
-    final agente = Map<String, dynamic>.from(item['agente']);
-    final tareas = List<Map<String, dynamic>>.from(item['tareas']);
-    final incidencias = (item['incidencias'] ?? 0) as int;
+  Widget _agenteControlNode(
+    Map<String, dynamic> item,
+  ) {
+    final agente =
+        Map<String, dynamic>.from(item['agente']);
 
-    final nombreAgente = _nombreCompleto(agente);
-    final cumplimiento = _cumplimientoAgente(tareas);
-    final color = _estadoColorPorIncidencias(incidencias);
+    final tareas =
+        List<Map<String, dynamic>>.from(
+      item['tareas'],
+    );
+
+    final incidencias =
+        (item['incidencias'] ?? 0) as int;
+
+    final nombreAgente =
+        _nombreCompleto(agente);
+
+    final cumplimiento =
+        _cumplimientoAgente(tareas);
+
+    final color =
+        _estadoColorPorIncidencias(incidencias);
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: const Color(0xFF0F1C2E),
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: color.withOpacity(0.24)),
+        color: const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(
+          color: color.withOpacity(0.18),
+        ),
       ),
       child: Theme(
         data: Theme.of(context).copyWith(
@@ -822,36 +1460,49 @@ class _ControlEquiposJefeVentasScreenState
           highlightColor: Colors.transparent,
         ),
         child: ExpansionTile(
-          iconColor: Colors.cyanAccent,
-          collapsedIconColor: Colors.white70,
+          iconColor: const Color(0xFF2563EB),
+          collapsedIconColor:
+              const Color(0xFF94A3B8),
           tilePadding: const EdgeInsets.all(14),
-          childrenPadding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
+          childrenPadding:
+              const EdgeInsets.fromLTRB(
+            14,
+            0,
+            14,
+            14,
+          ),
           title: Row(
             children: [
-              _avatar(nombreAgente, Colors.cyanAccent, size: 46),
-              const SizedBox(width: 12),
+              _avatar(
+                nombreAgente,
+                const Color(0xFF2563EB),
+                size: 46,
+              ),
+              const SizedBox(width: 11),
               Expanded(
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                  crossAxisAlignment:
+                      CrossAxisAlignment.start,
                   children: [
                     Text(
                       nombreAgente,
                       maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+                      overflow:
+                          TextOverflow.ellipsis,
                       style: const TextStyle(
-                        color: Colors.white,
+                        color: Color(0xFF111827),
                         fontSize: 15,
                         fontWeight: FontWeight.w900,
                       ),
                     ),
-                    const SizedBox(height: 5),
+                    const SizedBox(height: 4),
                     Text(
                       incidencias == 0
-                          ? "Sin incidencias"
-                          : "$incidencias incidencias detectadas",
+                          ? 'Sin incidencias'
+                          : '$incidencias incidencias detectadas',
                       style: TextStyle(
                         color: color,
-                        fontSize: 12,
+                        fontSize: 11,
                         fontWeight: FontWeight.w900,
                       ),
                     ),
@@ -869,96 +1520,109 @@ class _ControlEquiposJefeVentasScreenState
             ],
           ),
           subtitle: Padding(
-            padding: const EdgeInsets.only(top: 12),
+            padding:
+                const EdgeInsets.only(top: 11),
             child: Row(
               children: [
                 Expanded(
                   child: ClipRRect(
-                    borderRadius: BorderRadius.circular(999),
+                    borderRadius:
+                        BorderRadius.circular(99),
                     child: LinearProgressIndicator(
                       value: cumplimiento,
-                      minHeight: 8,
-                      backgroundColor: Colors.white.withOpacity(0.12),
-                      valueColor: AlwaysStoppedAnimation(color),
+                      minHeight: 7,
+                      backgroundColor:
+                          const Color(0xFFE2E8F0),
+                      color: color,
                     ),
                   ),
                 ),
-                const SizedBox(width: 10),
+                const SizedBox(width: 9),
                 Text(
-                  "${(cumplimiento * 100).toStringAsFixed(0)}%",
+                  '${(cumplimiento * 100).round()}%',
                   style: TextStyle(
                     color: color,
                     fontWeight: FontWeight.w900,
-                    fontSize: 12,
+                    fontSize: 11,
                   ),
                 ),
               ],
             ),
           ),
-          children: tareas.map(_taskTile).toList(),
+          children:
+              tareas.map(_taskTile).toList(),
         ),
       ),
     );
   }
 
-  Widget _taskTile(Map<String, dynamic> t) {
-    final ok = t['ok'] == true;
-    final color = ok ? Colors.greenAccent : Colors.redAccent;
-    final icon = t['icon'] is IconData ? t['icon'] as IconData : Icons.task_alt_rounded;
+  Widget _taskTile(
+    Map<String, dynamic> tarea,
+  ) {
+    final ok = tarea['ok'] == true;
+
+    final color = ok
+        ? const Color(0xFF16A34A)
+        : const Color(0xFFDC2626);
+
+    final icon = tarea['icon'] is IconData
+        ? tarea['icon'] as IconData
+        : Icons.task_alt_rounded;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 9),
       padding: const EdgeInsets.all(13),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.055),
-        borderRadius: BorderRadius.circular(18),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(17),
         border: Border.all(
-          color: color.withOpacity(0.22),
+          color: color.withOpacity(0.17),
         ),
       ),
       child: Row(
         children: [
           Container(
-            width: 38,
-            height: 38,
+            width: 39,
+            height: 39,
             decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: color.withOpacity(0.13),
-              border: Border.all(
-                color: color.withOpacity(0.30),
-              ),
+              color: color.withOpacity(0.10),
+              borderRadius: BorderRadius.circular(13),
             ),
             child: Icon(
-              ok ? Icons.check_circle_rounded : Icons.warning_rounded,
+              ok
+                  ? Icons.check_circle_rounded
+                  : Icons.warning_rounded,
               color: color,
               size: 22,
             ),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 10),
           Icon(
             icon,
-            color: Colors.white54,
+            color: const Color(0xFF64748B),
             size: 19,
           ),
           const SizedBox(width: 9),
           Expanded(
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment:
+                  CrossAxisAlignment.start,
               children: [
                 Text(
-                  t['titulo']?.toString() ?? '',
+                  tarea['titulo']?.toString() ?? '',
                   style: const TextStyle(
-                    color: Colors.white,
+                    color: Color(0xFF111827),
                     fontWeight: FontWeight.w900,
                   ),
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 3),
                 Text(
-                  t['detalle']?.toString() ?? '',
+                  tarea['detalle']?.toString() ?? '',
                   style: const TextStyle(
-                    color: Colors.white60,
-                    fontSize: 12,
-                    height: 1.3,
+                    color: Color(0xFF64748B),
+                    fontSize: 11,
+                    height: 1.25,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
               ],
@@ -969,55 +1633,52 @@ class _ControlEquiposJefeVentasScreenState
     );
   }
 
-  Widget _statusPill(String text, Color color) {
+  Widget _statusPill(
+    String text,
+    Color color,
+  ) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+      padding: const EdgeInsets.symmetric(
+        horizontal: 9,
+        vertical: 6,
+      ),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.13),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(
-          color: color.withOpacity(0.30),
-        ),
+        color: color.withOpacity(0.10),
+        borderRadius: BorderRadius.circular(99),
       ),
       child: Text(
         text,
         style: TextStyle(
           color: color,
-          fontSize: 11,
+          fontSize: 10,
           fontWeight: FontWeight.w900,
         ),
       ),
     );
   }
 
-  Widget _avatar(String nombre, Color color, {double size = 50}) {
+  Widget _avatar(
+    String nombre,
+    Color color, {
+    double size = 50,
+  }) {
     return Container(
       width: size,
       height: size,
       decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        gradient: LinearGradient(
-          colors: [
-            color.withOpacity(0.34),
-            Colors.blueAccent.withOpacity(0.16),
-          ],
-        ),
+        color: color.withOpacity(0.10),
+        borderRadius:
+            BorderRadius.circular(size * 0.34),
         border: Border.all(
-          color: color.withOpacity(0.45),
+          color: color.withOpacity(0.20),
         ),
-        boxShadow: [
-          BoxShadow(
-            color: color.withOpacity(0.12),
-            blurRadius: 16,
-          ),
-        ],
       ),
       child: Center(
         child: Text(
           _iniciales(nombre),
           style: TextStyle(
-            color: Colors.white,
-            fontSize: size * 0.35,
+            color: color,
+            fontSize: size * 0.34,
             fontWeight: FontWeight.w900,
           ),
         ),
@@ -1028,23 +1689,23 @@ class _ControlEquiposJefeVentasScreenState
   Widget _emptyAgents() {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(15),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.055),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: Colors.white.withOpacity(0.10),
-        ),
+        color: const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(17),
       ),
       child: const Row(
         children: [
-          Icon(Icons.info_outline_rounded, color: Colors.white54),
+          Icon(
+            Icons.info_outline_rounded,
+            color: Color(0xFF64748B),
+          ),
           SizedBox(width: 10),
           Expanded(
             child: Text(
-              "Este jefe de equipo todavía no tiene agentes asignados.",
+              'Este responsable todavía no tiene agentes asignados.',
               style: TextStyle(
-                color: Colors.white60,
+                color: Color(0xFF64748B),
                 fontWeight: FontWeight.w700,
               ),
             ),
@@ -1055,30 +1716,43 @@ class _ControlEquiposJefeVentasScreenState
   }
 
   Widget _emptyCard() {
-    return _glassCard(
+    return Container(
+      padding: const EdgeInsets.all(25),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(27),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 22,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
       child: const Column(
         children: [
           Icon(
             Icons.fact_check_outlined,
-            color: Colors.white38,
-            size: 64,
+            color: Color(0xFF94A3B8),
+            size: 62,
           ),
           SizedBox(height: 12),
           Text(
-            "Sin equipos asignados",
+            'Sin agentes en tu estructura',
             style: TextStyle(
-              color: Colors.white,
-              fontSize: 20,
+              color: Color(0xFF111827),
+              fontSize: 19,
               fontWeight: FontWeight.w900,
             ),
           ),
           SizedBox(height: 7),
           Text(
-            "Cuando tengas jefes de equipo y agentes aparecerá aquí el control de actividad.",
+            'Cuando haya agentes asignados a ti o a responsables de tu estructura aparecerán aquí.',
             textAlign: TextAlign.center,
             style: TextStyle(
-              color: Colors.white54,
+              color: Color(0xFF64748B),
               height: 1.4,
+              fontWeight: FontWeight.w600,
             ),
           ),
         ],
@@ -1087,20 +1761,29 @@ class _ControlEquiposJefeVentasScreenState
   }
 
   Widget _errorCard() {
-    return _glassCard(
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(27),
+        border: Border.all(
+          color:
+              Colors.redAccent.withOpacity(0.18),
+        ),
+      ),
       child: Column(
         children: [
           const Icon(
             Icons.error_outline_rounded,
-            color: Colors.orangeAccent,
+            color: Colors.redAccent,
             size: 52,
           ),
           const SizedBox(height: 12),
           const Text(
-            "No se pudo cargar el control",
+            'No se pudo cargar el control',
             style: TextStyle(
-              color: Colors.white,
-              fontSize: 20,
+              color: Color(0xFF111827),
+              fontSize: 19,
               fontWeight: FontWeight.w900,
             ),
           ),
@@ -1109,46 +1792,11 @@ class _ControlEquiposJefeVentasScreenState
             error ?? '',
             textAlign: TextAlign.center,
             style: const TextStyle(
-              color: Colors.white60,
+              color: Color(0xFF64748B),
               height: 1.4,
             ),
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _glassCard({
-    required Widget child,
-    EdgeInsets padding = const EdgeInsets.all(18),
-    EdgeInsets? margin,
-  }) {
-    return Container(
-      margin: margin,
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(28),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
-          child: Container(
-            width: double.infinity,
-            padding: padding,
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.075),
-              borderRadius: BorderRadius.circular(28),
-              border: Border.all(
-                color: Colors.white.withOpacity(0.12),
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.28),
-                  blurRadius: 24,
-                  offset: const Offset(0, 12),
-                ),
-              ],
-            ),
-            child: child,
-          ),
-        ),
       ),
     );
   }
@@ -1162,51 +1810,64 @@ class _ControlBackground extends StatelessWidget {
     return Stack(
       children: [
         Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                Color(0xFF020617),
-                Color(0xFF061A2D),
-                Color(0xFF0B1026),
-              ],
-            ),
-          ),
+          color: const Color(0xFFF4F6FB),
         ),
         Positioned(
           top: -110,
-          right: -90,
-          child: _glow(260, Colors.cyanAccent),
+          right: -85,
+          child: _Glow(
+            color:
+                const Color(0xFF2563EB).withOpacity(0.10),
+            size: 280,
+          ),
         ),
         Positioned(
-          bottom: 160,
-          left: -120,
-          child: _glow(280, Colors.purpleAccent),
+          top: 330,
+          left: -140,
+          child: _Glow(
+            color:
+                const Color(0xFF7C3AED).withOpacity(0.07),
+            size: 310,
+          ),
         ),
         Positioned(
-          bottom: -120,
-          right: -80,
-          child: _glow(240, Colors.blueAccent),
+          bottom: -130,
+          right: -100,
+          child: _Glow(
+            color:
+                const Color(0xFFF59E0B).withOpacity(0.07),
+            size: 290,
+          ),
+        ),
+        BackdropFilter(
+          filter:
+              ImageFilter.blur(sigmaX: 55, sigmaY: 55),
+          child: Container(
+            color: Colors.white.withOpacity(0.02),
+          ),
         ),
       ],
     );
   }
+}
 
-  Widget _glow(double size, Color color) {
+class _Glow extends StatelessWidget {
+  final Color color;
+  final double size;
+
+  const _Glow({
+    required this.color,
+    required this.size,
+  });
+
+  @override
+  Widget build(BuildContext context) {
     return Container(
       width: size,
       height: size,
       decoration: BoxDecoration(
+        color: color,
         shape: BoxShape.circle,
-        color: color.withOpacity(0.15),
-        boxShadow: [
-          BoxShadow(
-            color: color.withOpacity(0.20),
-            blurRadius: 120,
-            spreadRadius: 45,
-          ),
-        ],
       ),
     );
   }

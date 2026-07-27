@@ -3,6 +3,7 @@ import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:safebrok_andalucia/core/production/production_period_service.dart';
 
 class MejoraProduccionScreen extends StatefulWidget {
   const MejoraProduccionScreen({super.key});
@@ -12,49 +13,71 @@ class MejoraProduccionScreen extends StatefulWidget {
 }
 
 class _MejoraProduccionScreenState extends State<MejoraProduccionScreen> {
-  final supabase = Supabase.instance.client;
+  final SupabaseClient supabase = Supabase.instance.client;
+
+  static const List<String> _productos = <String>[
+    'Decesos',
+    'Hogar',
+    'Vida',
+    'Salud',
+    'Auto',
+    'Prima única',
+  ];
 
   bool cargando = true;
   String? error;
 
+  String rolLogueado = '';
+  String nombreLogueado = '';
+  int usuariosIncluidos = 0;
+
   double produccionActual = 0;
   double objetivo = 12000;
+  double totalPrimasPositivas = 0;
+  double totalExtornos = 0;
   int referenciasActivas = 0;
 
-  Map<String, int> ventasPorProducto = {
-    'Decesos': 0,
-    'Hogar': 0,
-    'Vida': 0,
-    'Salud': 0,
-    'Auto': 0,
+  Map<String, int> ventasPorProducto = <String, int>{
+    for (final producto in _productos) producto: 0,
   };
 
-  DateTime get inicioCiclo {
-  final now = DateTime.now();
+  Map<String, double> primasPorProducto = <String, double>{
+    for (final producto in _productos) producto: 0,
+  };
 
-  if (now.day >= 24) {
-    return DateTime(now.year, now.month, 24);
-  }
+  Map<String, double> primaMediaPorProducto = <String, double>{
+    for (final producto in _productos) producto: 0,
+  };
 
-  return DateTime(now.year, now.month - 1, 24);
-}
+  ProductionPeriod? _productionPeriod;
 
-  DateTime get finCiclo {
-  return DateTime(inicioCiclo.year, inicioCiclo.month + 1, 24);
-}
+  DateTime get inicioCiclo => _productionPeriod?.start ?? DateTime.now();
+
+  DateTime get finCiclo => _productionPeriod?.endExclusive ?? DateTime.now();
+
+  double get faltante => math.max(0, objetivo - produccionActual);
 
   double get porcentajeObjetivo {
     if (objetivo <= 0) return 0;
     return (produccionActual / objetivo).clamp(0.0, 1.0);
   }
 
-  double get mixDecesosVida {
-    final decesos = ventasPorProducto['Decesos'] ?? 0;
-    final vida = ventasPorProducto['Vida'] ?? 0;
-    final total = ventasPorProducto.values.fold<int>(0, (a, b) => a + b);
-    if (total == 0) return 0;
-    return ((decesos + vida) / total) * 100;
+  int get totalVentasNetas {
+    return ventasPorProducto.values.fold<int>(0, (a, b) => a + b);
   }
+
+  double get primaMix {
+    return (primasPorProducto['Decesos'] ?? 0) +
+        (primasPorProducto['Vida'] ?? 0) +
+        (primasPorProducto['Prima única'] ?? 0);
+  }
+
+  double get porcentajeMix {
+    if (produccionActual <= 0) return 0;
+    return ((primaMix / produccionActual) * 100).clamp(0.0, 100.0);
+  }
+
+  bool get objetivoCumplido => produccionActual >= objetivo;
 
   @override
   void initState() {
@@ -62,264 +85,609 @@ class _MejoraProduccionScreenState extends State<MejoraProduccionScreen> {
     cargarDatos();
   }
 
+  String _limpiar(dynamic value) {
+    final text = (value ?? '').toString().trim();
+    return text == 'null' ? '' : text;
+  }
+
+  String _normalizar(String value) {
+    return value
+        .trim()
+        .toLowerCase()
+        .replaceAll('á', 'a')
+        .replaceAll('é', 'e')
+        .replaceAll('í', 'i')
+        .replaceAll('ó', 'o')
+        .replaceAll('ú', 'u')
+        .replaceAll('ü', 'u')
+        .replaceAll('ñ', 'n')
+        .replaceAll('-', '_')
+        .replaceAll(' ', '_');
+  }
+
+  String _nombrePerfil(Map<String, dynamic> perfil) {
+    final nombreCompleto = _limpiar(perfil['nombre_completo']);
+    if (nombreCompleto.isNotEmpty) return nombreCompleto;
+
+    final nombre = _limpiar(perfil['nombre']);
+    final apellidos = _limpiar(perfil['apellidos']);
+    final compuesto = '$nombre $apellidos'.trim();
+
+    if (compuesto.isNotEmpty) return compuesto;
+
+    final email = _limpiar(perfil['email']);
+    if (email.isNotEmpty) return email;
+
+    return 'Usuario';
+  }
+
   double _toDouble(dynamic value) {
     if (value == null) return 0;
     if (value is num) return value.toDouble();
-    return double.tryParse(value.toString().replaceAll(',', '.')) ?? 0;
+
+    final raw = value.toString().trim();
+    if (raw.isEmpty) return 0;
+
+    final normalized = raw.contains(',') && raw.contains('.')
+        ? raw.replaceAll('.', '').replaceAll(',', '.')
+        : raw.replaceAll(',', '.');
+
+    return double.tryParse(normalized) ?? 0;
   }
 
-  String _euros(double value) {
-    final n = value.round().toString();
+  String _euros(double value, {int decimales = 0}) {
+    final negativo = value < 0;
+    final absoluto = value.abs();
+
+    final partes = absoluto.toStringAsFixed(decimales).split('.');
+    final entero = partes.first;
     final buffer = StringBuffer();
-    for (int i = 0; i < n.length; i++) {
-      final pos = n.length - i;
-      buffer.write(n[i]);
-      if (pos > 1 && pos % 3 == 1) buffer.write('.');
+
+    for (int i = 0; i < entero.length; i++) {
+      final posicion = entero.length - i;
+
+      buffer.write(entero[i]);
+
+      if (posicion > 1 && posicion % 3 == 1) {
+        buffer.write('.');
+      }
     }
-    return '${buffer.toString()}€';
+
+    final decimal = decimales > 0 && partes.length > 1 ? ',${partes.last}' : '';
+
+    return '${negativo ? '-' : ''}${buffer.toString()}$decimal €';
+  }
+
+  String _rolBonito(String rol) {
+    switch (_normalizar(rol)) {
+      case 'director_nacional':
+        return 'Director nacional';
+      case 'director_zona':
+        return 'Director de zona';
+      case 'jefe_ventas':
+        return 'Jefe de ventas';
+      case 'jefe_equipo':
+        return 'Jefe de equipo';
+      case 'agente':
+        return 'Agente';
+      case 'administracion':
+      case 'administrador':
+      case 'admin':
+        return 'Administración';
+      default:
+        return rol.isEmpty ? 'Usuario' : rol;
+    }
+  }
+
+  double _objetivoPorRol(String rol) {
+    switch (_normalizar(rol)) {
+      case 'director_nacional':
+        return 25000;
+      case 'director_zona':
+        return 15000;
+      case 'jefe_ventas':
+        return 11500;
+      case 'jefe_equipo':
+        return 10000;
+      case 'agente':
+        return 12000;
+      case 'administracion':
+      case 'administrador':
+      case 'admin':
+        return 25000;
+      default:
+        return 12000;
+    }
+  }
+
+  String _clasificarProducto(dynamic value) {
+    final producto = _normalizar(_limpiar(value));
+
+    if (producto.isEmpty) return '';
+
+    if (producto.contains('prima_unica') ||
+        producto.contains('primaunica') ||
+        producto.contains('p_u') ||
+        producto == 'pu') {
+      return 'Prima única';
+    }
+
+    if (producto.contains('deceso')) return 'Decesos';
+    if (producto.contains('hogar')) return 'Hogar';
+    if (producto.contains('vida')) return 'Vida';
+    if (producto.contains('salud')) return 'Salud';
+
+    if (producto.contains('auto') ||
+        producto.contains('coche') ||
+        producto.contains('vehiculo')) {
+      return 'Auto';
+    }
+
+    return '';
+  }
+
+  bool _rolDescendientePermitido({
+    required String rolLogueado,
+    required String rolCandidato,
+  }) {
+    final logueado = _normalizar(rolLogueado);
+    final candidato = _normalizar(rolCandidato);
+
+    // Nunca se incorporan compañeros del mismo rango ni superiores.
+    switch (logueado) {
+      case 'director_nacional':
+        return candidato == 'director_zona' ||
+            candidato == 'jefe_ventas' ||
+            candidato == 'jefe_equipo' ||
+            candidato == 'agente';
+
+      case 'director_zona':
+        // Un DZ puede tener directamente JV, JE o agentes.
+        return candidato == 'jefe_ventas' ||
+            candidato == 'jefe_equipo' ||
+            candidato == 'agente';
+
+      case 'jefe_ventas':
+        // Un JV puede tener directamente JE o agentes.
+        return candidato == 'jefe_equipo' || candidato == 'agente';
+
+      case 'jefe_equipo':
+        return candidato == 'agente';
+
+      case 'agente':
+        return false;
+
+      default:
+        // Ante un rol desconocido se aplica cierre seguro:
+        // únicamente sus propios datos.
+        return false;
+    }
+  }
+
+  Future<Set<String>> _obtenerAuthIdsPermitidos({
+    required String usuarioId,
+    required String usuarioAuthId,
+    required String rolLogueado,
+  }) async {
+    /*
+      FILTRO CERRADO DESDE SUPABASE
+
+      No se descarga toda la organización.
+
+      1. Se añade únicamente el auth_id del usuario logueado.
+      2. Se pregunta a Supabase por usuarios cuyo parent_id sea EXACTAMENTE
+         el usuarios.id del logueado.
+      3. Después se repite únicamente con los hijos válidos encontrados.
+      4. Se rechazan roles iguales, superiores o no permitidos.
+      5. Nunca se consulta el padre del logueado, por tanto no pueden entrar
+         compañeros ni otras ramas.
+    */
+
+    final permitidos = <String>{usuarioAuthId};
+    final idsVisitados = <String>{usuarioId};
+    final padresPendientes = <String>[usuarioId];
+
+    while (padresPendientes.isNotEmpty) {
+      final parentIdActual = padresPendientes.removeAt(0);
+
+      final hijosData = await supabase
+          .from('usuarios')
+          .select('id, auth_id, parent_id, rol_usuario')
+          .eq('parent_id', parentIdActual);
+
+      final hijos = List<Map<String, dynamic>>.from(hijosData);
+
+      for (final hijo in hijos) {
+        final hijoId = _limpiar(hijo['id']);
+        final hijoAuthId = _limpiar(hijo['auth_id']);
+        final hijoParentId = _limpiar(hijo['parent_id']);
+        final hijoRol = _normalizar(_limpiar(hijo['rol_usuario']));
+
+        // Comprobación redundante intencionada: el registro tiene que declarar
+        // exactamente como padre al nodo desde el que se está recorriendo.
+        if (hijoId.isEmpty ||
+            hijoParentId != parentIdActual ||
+            idsVisitados.contains(hijoId)) {
+          continue;
+        }
+
+        // Bloquea compañeros, superiores y roles que no pueden colgar
+        // jerárquicamente del usuario logueado.
+        if (!_rolDescendientePermitido(
+          rolLogueado: rolLogueado,
+          rolCandidato: hijoRol,
+        )) {
+          continue;
+        }
+
+        idsVisitados.add(hijoId);
+
+        if (hijoAuthId.isNotEmpty) {
+          permitidos.add(hijoAuthId);
+        }
+
+        // Continuamos solamente desde un hijo que ha sido validado.
+        padresPendientes.add(hijoId);
+      }
+    }
+
+    debugPrint(
+      '[MejoraProduccion] usuarioId=$usuarioId '
+      'rol=$rolLogueado usuariosPermitidos=${permitidos.length}',
+    );
+
+    return permitidos;
   }
 
   Future<void> cargarDatos() async {
-  try {
+    final productionPeriod = await ProductionPeriodService.instance.current(
+      forceRefresh: true,
+    );
+    _productionPeriod = productionPeriod;
+    if (!mounted) return;
+
     setState(() {
       cargando = true;
       error = null;
     });
 
-    final user = supabase.auth.currentUser;
+    try {
+      final authUser = supabase.auth.currentUser;
 
-    if (user == null) {
-      setState(() {
-        cargando = false;
-        error = 'No hay usuario iniciado.';
-      });
-      return;
-    }
+      if (authUser == null) {
+        throw Exception('No hay ningún usuario autenticado.');
+      }
 
-    final perfil = await supabase
-        .from('usuarios')
-        .select('id, auth_id, rol_usuario, email')
-        .eq('auth_id', user.id)
-        .maybeSingle();
+      final perfilData = await supabase
+          .from('usuarios')
+          .select('id, auth_id, parent_id, rol_usuario, email')
+          .eq('auth_id', authUser.id)
+          .maybeSingle();
 
-    if (perfil == null) {
-      setState(() {
-        cargando = false;
-        error = 'Usuario no encontrado.';
-      });
-      return;
-    }
+      if (perfilData == null) {
+        throw Exception('No se encontró el perfil del usuario logueado.');
+      }
 
-    String limpiar(dynamic value) {
-      return (value ?? '').toString().trim();
-    }
+      final perfil = Map<String, dynamic>.from(perfilData);
+      final usuarioId = _limpiar(perfil['id']);
+      final usuarioAuthId = _limpiar(perfil['auth_id']);
+      final rol = _normalizar(_limpiar(perfil['rol_usuario']));
 
-    final userId = limpiar(perfil['id']);
-    final userAuthId = limpiar(perfil['auth_id']);
-    final role = limpiar(perfil['rol_usuario']);
+      if (usuarioId.isEmpty || usuarioAuthId.isEmpty) {
+        throw Exception(
+          'El perfil no tiene correctamente informados id o auth_id.',
+        );
+      }
 
-    double produccion = 0;
-    int referencias = 0;
-    double objetivoLocal = 12000;
-    List<Map<String, dynamic>> ventas = [];
+      final authIdsPermitidos = await _obtenerAuthIdsPermitidos(
+        usuarioId: usuarioId,
+        usuarioAuthId: usuarioAuthId,
+        rolLogueado: rol,
+      );
 
-    if (role == 'director_nacional') {
-      setState(() {
-        produccionActual = 0;
-        objetivo = 0;
-        referenciasActivas = 0;
-        ventasPorProducto = {
-          'Decesos': 0,
-          'Hogar': 0,
-          'Vida': 0,
-          'Salud': 0,
-          'Auto': 0,
-        };
-        cargando = false;
-      });
-      return;
-    }
+      final objetivoLocal = _objetivoPorRol(rol);
 
-    if (role == 'jefe_equipo') {
-      objetivoLocal = 10000;
-    } else if (role == 'jefe_ventas') {
-      objetivoLocal = 12000;
-    } else if (role == 'director_zona') {
-      objetivoLocal = 15000;
-    } else {
-      objetivoLocal = 12000;
-    }
+      final conteoProductos = <String, int>{
+        for (final producto in _productos) producto: 0,
+      };
 
-    final usuariosData = await supabase
-        .from('usuarios')
-        .select('id, auth_id, parent_id, rol_usuario');
+      final primasProductos = <String, double>{
+        for (final producto in _productos) producto: 0,
+      };
 
-    final usuariosTabla = List<Map<String, dynamic>>.from(usuariosData);
+      double produccion = 0;
+      double primasPositivas = 0;
+      double extornosTotales = 0;
+      int referencias = 0;
 
-    final authIdsPermitidos = <String>{};
+      if (authIdsPermitidos.isNotEmpty) {
+        final ventasData = await supabase
+            .from('ventas')
+            .select(
+              'id, prima_anual_neta, producto, fecha_efecto, agente_auth_id',
+            )
+            .inFilter('agente_auth_id', authIdsPermitidos.toList())
+            .gte('fecha_efecto', inicioCiclo.toIso8601String())
+            .lt('fecha_efecto', finCiclo.toIso8601String());
 
-    if (role == 'agente') {
-      authIdsPermitidos.add(userAuthId);
-    } else {
-      final idsVisitados = <String>{userId};
+        final ventas = List<Map<String, dynamic>>.from(ventasData);
 
-      void buscarDescendientes(String parentId) {
-        for (final u in usuariosTabla) {
-          final idUsuario = limpiar(u['id']);
-          final parentUsuario = limpiar(u['parent_id']);
-          final authUsuario = limpiar(u['auth_id']);
+        for (final venta in ventas) {
+          final prima = _toDouble(venta['prima_anual_neta']);
+          final producto = _clasificarProducto(venta['producto']);
 
-          if (parentUsuario == parentId &&
-              idUsuario.isNotEmpty &&
-              !idsVisitados.contains(idUsuario)) {
-            idsVisitados.add(idUsuario);
+          produccion += prima;
+          primasPositivas += prima;
 
-            if (authUsuario.isNotEmpty && authUsuario != 'null') {
-              authIdsPermitidos.add(authUsuario);
-            }
-
-            buscarDescendientes(idUsuario);
+          if (producto.isNotEmpty) {
+            conteoProductos[producto] = (conteoProductos[producto] ?? 0) + 1;
+            primasProductos[producto] =
+                (primasProductos[producto] ?? 0) + prima;
           }
         }
+
+        final extornosData = await supabase
+            .from('anulaciones_polizas')
+            .select('venta_id, prima_extornada, fecha_anulacion, estado')
+            .eq('estado', 'ANULADA')
+            .gte('fecha_anulacion', inicioCiclo.toIso8601String())
+            .lt('fecha_anulacion', finCiclo.toIso8601String());
+
+        final extornos = List<Map<String, dynamic>>.from(extornosData);
+
+        final ventaIds = extornos
+            .map((e) => _limpiar(e['venta_id']))
+            .where((id) => id.isNotEmpty)
+            .toSet()
+            .toList();
+
+        if (ventaIds.isNotEmpty) {
+          final ventasOriginalesData = await supabase
+              .from('ventas')
+              .select('id, agente_auth_id, producto')
+              .inFilter('id', ventaIds);
+
+          final ventasOriginales = <String, Map<String, dynamic>>{
+            for (final venta in List<Map<String, dynamic>>.from(
+              ventasOriginalesData,
+            ))
+              _limpiar(venta['id']): venta,
+          };
+
+          for (final extorno in extornos) {
+            final ventaId = _limpiar(extorno['venta_id']);
+            final ventaOriginal = ventasOriginales[ventaId];
+
+            if (ventaOriginal == null) continue;
+
+            final agenteAuthId = _limpiar(ventaOriginal['agente_auth_id']);
+
+            if (!authIdsPermitidos.contains(agenteAuthId)) continue;
+
+            final primaExtornada = math.max(
+              0.0,
+              _toDouble(extorno['prima_extornada']),
+            );
+
+            if (primaExtornada <= 0) continue;
+
+            produccion -= primaExtornada;
+            extornosTotales += primaExtornada;
+
+            final producto = _clasificarProducto(ventaOriginal['producto']);
+
+            if (producto.isNotEmpty) {
+              primasProductos[producto] = math.max(
+                0.0,
+                (primasProductos[producto] ?? 0) - primaExtornada,
+              );
+
+              conteoProductos[producto] = math.max(
+                0,
+                (conteoProductos[producto] ?? 0) - 1,
+              );
+            }
+          }
+        }
+
+        final referenciasData = await supabase
+            .from('referencias_viables')
+            .select('id')
+            .inFilter('auth_id', authIdsPermitidos.toList());
+
+        referencias = referenciasData.length;
       }
 
-      if (userAuthId.isNotEmpty && userAuthId != 'null') {
-        authIdsPermitidos.add(userAuthId);
-      }
+      produccion = math.max(0, produccion);
 
-      buscarDescendientes(userId);
-    }
+      final medias = <String, double>{
+        for (final producto in _productos)
+          producto: (conteoProductos[producto] ?? 0) > 0
+              ? (primasProductos[producto] ?? 0) /
+                    (conteoProductos[producto] ?? 1)
+              : 0,
+      };
 
-    if (authIdsPermitidos.isNotEmpty) {
-      final ventasData = await supabase
-    .from('ventas')
-    .select('id, prima_anual_neta, producto, fecha_efecto, agente_auth_id')
-    .inFilter('agente_auth_id', authIdsPermitidos.toList())
-    .gte('fecha_efecto', inicioCiclo.toIso8601String())
-    .lt('fecha_efecto', finCiclo.toIso8601String());
+      if (!mounted) return;
 
-      ventas = List<Map<String, dynamic>>.from(ventasData);
+      setState(() {
+        rolLogueado = rol;
+        nombreLogueado = _nombrePerfil(perfil);
+        usuariosIncluidos = authIdsPermitidos.length;
 
-for (final v in ventas) {
-  produccion += _toDouble(v['prima_anual_neta']);
-}
+        produccionActual = produccion;
+        objetivo = objetivoLocal;
+        totalPrimasPositivas = primasPositivas;
+        totalExtornos = extornosTotales;
+        referenciasActivas = referencias;
 
-final extornosData = await supabase
-    .from('anulaciones_polizas')
-    .select('venta_id, prima_extornada, fecha_anulacion')
-    .eq('estado', 'ANULADA')
-    .gte('fecha_anulacion', inicioCiclo.toIso8601String())
-    .lt('fecha_anulacion', finCiclo.toIso8601String());
+        ventasPorProducto = conteoProductos;
+        primasPorProducto = primasProductos;
+        primaMediaPorProducto = medias;
 
-final extornos = List<Map<String, dynamic>>.from(extornosData);
+        cargando = false;
+      });
+    } on PostgrestException catch (e) {
+      if (!mounted) return;
 
-if (extornos.isNotEmpty) {
-  final ventaIdsExtorno = extornos
-      .map((e) => e['venta_id']?.toString())
-      .where((id) => id != null && id.isNotEmpty && id != 'null')
-      .cast<String>()
-      .toSet()
-      .toList();
+      setState(() {
+        cargando = false;
+        error = 'Error de Supabase: ${e.message}';
+      });
+    } catch (e) {
+      if (!mounted) return;
 
-  if (ventaIdsExtorno.isNotEmpty) {
-    final ventasExtornadasData = await supabase
-        .from('ventas')
-        .select('id, agente_auth_id, producto')
-        .inFilter('id', ventaIdsExtorno);
-
-    final ventasExtornadasMap = {
-      for (final v in List<Map<String, dynamic>>.from(ventasExtornadasData))
-        v['id'].toString(): v,
-    };
-
-    for (final extorno in extornos) {
-      final ventaId = extorno['venta_id']?.toString();
-      final ventaOriginal = ventasExtornadasMap[ventaId];
-
-      if (ventaOriginal == null) continue;
-
-      final agenteAuthId = ventaOriginal['agente_auth_id']?.toString();
-
-      if (agenteAuthId == null || !authIdsPermitidos.contains(agenteAuthId)) {
-        continue;
-      }
-
-      final primaExtornada = _toDouble(extorno['prima_extornada']);
-
-      produccion -= primaExtornada;
-
-      ventas.add({
-        'id': 'extorno_${extorno['venta_id']}',
-        'producto': ventaOriginal['producto'],
-        'prima_anual_neta': -primaExtornada,
-        'fecha_efecto': extorno['fecha_anulacion'],
-        'agente_auth_id': agenteAuthId,
-        'tipo_movimiento': 'EXTORNO',
+      setState(() {
+        cargando = false;
+        error = e.toString().replaceFirst('Exception: ', '');
       });
     }
   }
-}
 
-if (produccion < 0) produccion = 0;
+  double _primaReferencia(String producto) {
+    final mediaReal = primaMediaPorProducto[producto] ?? 0;
 
-      final refs = await supabase
-          .from('referencias_viables')
-          .select('id')
-          .inFilter('auth_id', authIdsPermitidos.toList());
-
-      referencias = refs.length;
+    if (mediaReal > 0) {
+      return mediaReal;
     }
 
-    final map = {
-      'Decesos': 0,
-      'Hogar': 0,
-      'Vida': 0,
-      'Salud': 0,
-      'Auto': 0,
-    };
-
-    for (final v in ventas) {
-  final producto = v['producto']?.toString().trim();
-
-  if (producto == null) continue;
-
-  final esExtorno = v['tipo_movimiento'] == 'EXTORNO';
-  final movimiento = esExtorno ? -1 : 1;
-
-  final p = producto.toLowerCase();
-
-  if (p.contains('decesos')) {
-    map['Decesos'] = math.max(0, map['Decesos']! + movimiento);
-  } else if (p.contains('hogar')) {
-    map['Hogar'] = math.max(0, map['Hogar']! + movimiento);
-  } else if (p.contains('vida')) {
-    map['Vida'] = math.max(0, map['Vida']! + movimiento);
-  } else if (p.contains('salud')) {
-    map['Salud'] = math.max(0, map['Salud']! + movimiento);
-  } else if (p.contains('auto') || p.contains('coche')) {
-    map['Auto'] = math.max(0, map['Auto']! + movimiento);
+    switch (producto) {
+      case 'Decesos':
+        return 420;
+      case 'Hogar':
+        return 300;
+      case 'Vida':
+        return 360;
+      case 'Salud':
+        return 650;
+      case 'Auto':
+        return 450;
+      case 'Prima única':
+        return 3000;
+      default:
+        return 400;
+    }
   }
-}
 
-    setState(() {
-      produccionActual = produccion;
-      objetivo = objetivoLocal;
-      referenciasActivas = referencias;
-      ventasPorProducto = map;
-      cargando = false;
-    });
-  } catch (e) {
-    setState(() {
-      cargando = false;
-      error = e.toString();
-    });
+  List<_RecomendacionVenta> _crearRecomendaciones() {
+    if (faltante <= 0) return const [];
+
+    final recomendaciones = <_RecomendacionVenta>[];
+    final mixMinimoEuros = objetivo * 0.30;
+    final faltaParaMix = math.max(0.0, mixMinimoEuros - primaMix);
+
+    double restante = faltante;
+
+    if (faltaParaMix > 0) {
+      final primaPU = _primaReferencia('Prima única');
+      final cantidadPU = math.max(1, (faltaParaMix / primaPU).ceil());
+      final aportacionPU = math.min(restante, cantidadPU * primaPU);
+
+      recomendaciones.add(
+        _RecomendacionVenta(
+          producto: 'Prima única',
+          cantidad: cantidadPU,
+          primaEstimada: primaPU,
+          aportacionEstimada: aportacionPU,
+          motivo:
+              'Ayuda a recuperar el mix mínimo del 30% y acelera el objetivo.',
+        ),
+      );
+
+      restante = math.max(0, restante - aportacionPU);
+    }
+
+    if (restante > 0) {
+      final candidatos = <String>['Decesos', 'Vida', 'Hogar', 'Salud', 'Auto']
+        ..sort((a, b) => _primaReferencia(b).compareTo(_primaReferencia(a)));
+
+      for (final producto in candidatos) {
+        if (restante <= 0) break;
+
+        final primaEstimada = _primaReferencia(producto);
+        final maxUnidades = producto == 'Decesos' || producto == 'Vida' ? 4 : 3;
+
+        final cantidadNecesaria = math.max(
+          1,
+          (restante / primaEstimada).ceil(),
+        );
+        final cantidad = math.min(maxUnidades, cantidadNecesaria);
+        final aportacion = math.min(restante, cantidad * primaEstimada);
+
+        recomendaciones.add(
+          _RecomendacionVenta(
+            producto: producto,
+            cantidad: cantidad,
+            primaEstimada: primaEstimada,
+            aportacionEstimada: aportacion,
+            motivo: producto == 'Decesos' || producto == 'Vida'
+                ? 'Suma producción y refuerza el mix estratégico.'
+                : 'Completa la producción pendiente con tu prima media estimada.',
+          ),
+        );
+
+        restante = math.max(0, restante - aportacion);
+      }
+    }
+
+    if (restante > 0) {
+      final primaPU = _primaReferencia('Prima única');
+      final cantidad = math.max(1, (restante / primaPU).ceil());
+
+      recomendaciones.add(
+        _RecomendacionVenta(
+          producto: 'Prima única',
+          cantidad: cantidad,
+          primaEstimada: primaPU,
+          aportacionEstimada: restante,
+          motivo: 'Alternativa directa para cubrir el importe restante.',
+        ),
+      );
+    }
+
+    return recomendaciones;
   }
-}
+
+  IconData _iconoProducto(String producto) {
+    switch (producto) {
+      case 'Decesos':
+        return Icons.shield_rounded;
+      case 'Hogar':
+        return Icons.home_rounded;
+      case 'Vida':
+        return Icons.favorite_rounded;
+      case 'Salud':
+        return Icons.medical_services_rounded;
+      case 'Auto':
+        return Icons.directions_car_rounded;
+      case 'Prima única':
+        return Icons.savings_rounded;
+      default:
+        return Icons.sell_rounded;
+    }
+  }
+
+  Color _colorProducto(String producto) {
+    switch (producto) {
+      case 'Decesos':
+        return Colors.purpleAccent;
+      case 'Hogar':
+        return Colors.greenAccent;
+      case 'Vida':
+        return Colors.pinkAccent;
+      case 'Salud':
+        return Colors.blueAccent;
+      case 'Auto':
+        return Colors.orangeAccent;
+      case 'Prima única':
+        return Colors.amberAccent;
+      default:
+        return Colors.cyanAccent;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    final double faltante = math.max(0.0, objetivo - produccionActual);
-
     return Scaffold(
       backgroundColor: const Color(0xFF020617),
       body: Stack(
@@ -331,82 +699,34 @@ if (produccion < 0) produccion = 0;
               backgroundColor: const Color(0xFF0F172A),
               color: Colors.cyanAccent,
               child: ListView(
-                padding: const EdgeInsets.fromLTRB(18, 12, 18, 26),
+                physics: const AlwaysScrollableScrollPhysics(
+                  parent: BouncingScrollPhysics(),
+                ),
+                padding: const EdgeInsets.fromLTRB(18, 12, 18, 28),
                 children: [
                   _header(),
-
                   if (cargando) ...[
-                    const SizedBox(height: 120),
+                    const SizedBox(height: 130),
                     const Center(
                       child: CircularProgressIndicator(
                         color: Colors.cyanAccent,
                       ),
                     ),
                   ] else if (error != null) ...[
-                    const SizedBox(height: 40),
-                    _glassCard(
-                      child: Column(
-                        children: [
-                          const Icon(
-                            Icons.error_outline_rounded,
-                            color: Colors.orangeAccent,
-                            size: 42,
-                          ),
-                          const SizedBox(height: 12),
-                          const Text(
-                            'No se pudieron cargar los datos',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 18,
-                              fontWeight: FontWeight.w800,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            error!,
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(color: Colors.white60),
-                          ),
-                        ],
-                      ),
-                    ),
+                    const SizedBox(height: 30),
+                    _errorCard(),
                   ] else ...[
+                    const SizedBox(height: 16),
+                    _scopeCard(),
+                    const SizedBox(height: 16),
+                    _mainMetrics(),
                     const SizedBox(height: 18),
-
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _bigMetricCard(
-                            title: 'Producción actual',
-                            value: _euros(produccionActual),
-                            icon: Icons.trending_up_rounded,
-                            accent: Colors.cyanAccent,
-                            footer: produccionActual >= objetivo
-                                ? 'Objetivo superado'
-                                : 'Sigue avanzando',
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: _objectiveCard(faltante),
-                        ),
-                      ],
-                    ),
-
-                    const SizedBox(height: 18),
-
                     _portfolioCard(),
-
                     const SizedBox(height: 18),
-
-                    _needsCard(),
-
+                    _smartNeedsCard(),
                     const SizedBox(height: 18),
-
                     _referencesCard(),
-
                     const SizedBox(height: 18),
-
                     _motivationCard(),
                   ],
                 ],
@@ -423,7 +743,7 @@ if (produccion < 0) produccion = 0;
       children: [
         InkWell(
           borderRadius: BorderRadius.circular(18),
-          onTap: () => Navigator.pop(context),
+          onTap: () => Navigator.maybePop(context),
           child: Container(
             height: 54,
             width: 54,
@@ -475,7 +795,10 @@ if (produccion < 0) produccion = 0;
               ),
               const SizedBox(height: 4),
               Text(
-                'Ciclo del ${inicioCiclo.day}/${inicioCiclo.month}/${inicioCiclo.year} al ${finCiclo.day}/${finCiclo.month}/${finCiclo.year}',
+                'Ciclo del ${inicioCiclo.day}/${inicioCiclo.month}/${inicioCiclo.year} '
+                'al ${finCiclo.subtract(const Duration(days: 1)).day}/'
+                '${finCiclo.subtract(const Duration(days: 1)).month}/'
+                '${finCiclo.subtract(const Duration(days: 1)).year}',
                 style: const TextStyle(
                   color: Colors.white60,
                   fontSize: 13,
@@ -486,6 +809,117 @@ if (produccion < 0) produccion = 0;
           ),
         ),
       ],
+    );
+  }
+
+  Widget _errorCard() {
+    return _glassCard(
+      child: Column(
+        children: [
+          const Icon(
+            Icons.error_outline_rounded,
+            color: Colors.orangeAccent,
+            size: 44,
+          ),
+          const SizedBox(height: 12),
+          const Text(
+            'No se pudieron cargar los datos',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 18,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            error!,
+            textAlign: TextAlign.center,
+            style: const TextStyle(color: Colors.white60),
+          ),
+          const SizedBox(height: 16),
+          FilledButton.icon(
+            onPressed: cargarDatos,
+            icon: const Icon(Icons.refresh_rounded),
+            label: const Text('Reintentar'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _scopeCard() {
+    return _glassCard(
+      padding: const EdgeInsets.all(15),
+      borderColor: Colors.cyanAccent.withOpacity(0.24),
+      child: Row(
+        children: [
+          _circleIcon(Icons.account_tree_rounded, Colors.cyanAccent, size: 48),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  nombreLogueado,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w900,
+                    fontSize: 16,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  '${_rolBonito(rolLogueado)} · '
+                  '$usuariosIncluidos usuario${usuariosIncluidos == 1 ? '' : 's'} '
+                  'incluido${usuariosIncluidos == 1 ? '' : 's'}',
+                  style: const TextStyle(
+                    color: Colors.white60,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const Icon(Icons.verified_user_rounded, color: Colors.greenAccent),
+        ],
+      ),
+    );
+  }
+
+  Widget _mainMetrics() {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final wide = constraints.maxWidth >= 680;
+
+        final produccionCard = _bigMetricCard(
+          title: 'Producción actual',
+          value: _euros(produccionActual),
+          icon: Icons.trending_up_rounded,
+          accent: Colors.cyanAccent,
+          footer: objetivoCumplido
+              ? 'Objetivo superado'
+              : 'Faltan ${_euros(faltante)}',
+        );
+
+        final objetivoCard = _objectiveCard();
+
+        if (wide) {
+          return Row(
+            children: [
+              Expanded(child: produccionCard),
+              const SizedBox(width: 12),
+              Expanded(child: objetivoCard),
+            ],
+          );
+        }
+
+        return Column(
+          children: [produccionCard, const SizedBox(height: 12), objetivoCard],
+        );
+      },
     );
   }
 
@@ -513,6 +947,8 @@ if (produccion < 0) produccion = 0;
           ),
           const SizedBox(height: 8),
           FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
             child: Text(
               value,
               style: TextStyle(
@@ -524,28 +960,24 @@ if (produccion < 0) produccion = 0;
             ),
           ),
           const SizedBox(height: 12),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-            decoration: BoxDecoration(
-              color: Colors.greenAccent.withOpacity(0.12),
-              borderRadius: BorderRadius.circular(999),
-              border: Border.all(color: Colors.greenAccent.withOpacity(0.3)),
-            ),
-            child: Text(
-              footer,
-              style: const TextStyle(
-                color: Colors.greenAccent,
-                fontWeight: FontWeight.w800,
-                fontSize: 12,
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              _pill(
+                footer,
+                objetivoCumplido ? Colors.greenAccent : Colors.orangeAccent,
               ),
-            ),
+              if (totalExtornos > 0)
+                _pill('Extornos: -${_euros(totalExtornos)}', Colors.redAccent),
+            ],
           ),
         ],
       ),
     );
   }
 
-  Widget _objectiveCard(double faltante) {
+  Widget _objectiveCard() {
     return _glassCard(
       borderColor: Colors.purpleAccent.withOpacity(0.38),
       child: Column(
@@ -553,9 +985,9 @@ if (produccion < 0) produccion = 0;
         children: [
           _circleIcon(Icons.track_changes_rounded, Colors.purpleAccent),
           const SizedBox(height: 14),
-          const Text(
-            'Objetivo',
-            style: TextStyle(
+          Text(
+            'Objetivo ${_rolBonito(rolLogueado).toLowerCase()}',
+            style: const TextStyle(
               color: Colors.white,
               fontSize: 15,
               fontWeight: FontWeight.w800,
@@ -563,6 +995,8 @@ if (produccion < 0) produccion = 0;
           ),
           const SizedBox(height: 8),
           FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
             child: Text(
               _euros(objetivo),
               style: const TextStyle(
@@ -594,9 +1028,13 @@ if (produccion < 0) produccion = 0;
           ),
           const SizedBox(height: 8),
           Text(
-            faltante <= 0 ? 'Objetivo cumplido' : 'Te faltan ${_euros(faltante)}',
+            objetivoCumplido
+                ? 'Objetivo cumplido'
+                : 'Te faltan ${_euros(faltante)}',
             style: TextStyle(
-              color: faltante <= 0 ? Colors.greenAccent : Colors.orangeAccent,
+              color: objetivoCumplido
+                  ? Colors.greenAccent
+                  : Colors.orangeAccent,
               fontWeight: FontWeight.w900,
             ),
           ),
@@ -613,13 +1051,14 @@ if (produccion < 0) produccion = 0;
         children: [
           _sectionTitle(
             icon: Icons.business_center_rounded,
-            title: 'Tu cartera actual',
-            subtitle: 'Ventas por producto en el ciclo actual',
+            title: 'Producción por producto',
+            subtitle:
+                'Pólizas y prima anual neta del ciclo, descontando extornos',
           ),
           const SizedBox(height: 18),
           LayoutBuilder(
             builder: (context, constraints) {
-              final wide = constraints.maxWidth > 620;
+              final wide = constraints.maxWidth > 720;
 
               if (wide) {
                 return Row(
@@ -628,11 +1067,11 @@ if (produccion < 0) produccion = 0;
                     Expanded(child: _productsList()),
                     Container(
                       width: 1,
-                      height: 250,
+                      height: 360,
                       margin: const EdgeInsets.symmetric(horizontal: 18),
                       color: Colors.white.withOpacity(0.12),
                     ),
-                    SizedBox(width: 260, child: _mixCard()),
+                    SizedBox(width: 285, child: _mixCard()),
                   ],
                 );
               }
@@ -653,19 +1092,22 @@ if (produccion < 0) produccion = 0;
 
   Widget _productsList() {
     return Column(
-      children: [
-        _productRow('Decesos', Icons.shield_rounded, Colors.purpleAccent, 10),
-        _productRow('Hogar', Icons.home_rounded, Colors.greenAccent, 5),
-        _productRow('Vida', Icons.favorite_rounded, Colors.pinkAccent, 3),
-        _productRow('Salud', Icons.medical_services_rounded, Colors.blueAccent, 2),
-        _productRow('Auto', Icons.directions_car_rounded, Colors.orangeAccent, 4),
-      ],
+      children: [for (final producto in _productos) _productRow(producto)],
     );
   }
 
-  Widget _productRow(String producto, IconData icon, Color color, int maxObjetivo) {
+  Widget _productRow(String producto) {
     final cantidad = ventasPorProducto[producto] ?? 0;
-    final progreso = maxObjetivo == 0 ? 0.0 : (cantidad / maxObjetivo).clamp(0.0, 1.0);
+    final prima = primasPorProducto[producto] ?? 0;
+    final color = _colorProducto(producto);
+    final maxPrima = math.max(
+      1.0,
+      primasPorProducto.values.fold<double>(
+        0,
+        (maximo, value) => math.max(maximo, value),
+      ),
+    );
+    final progreso = (prima / maxPrima).clamp(0.0, 1.0);
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -677,19 +1119,33 @@ if (produccion < 0) produccion = 0;
       ),
       child: Row(
         children: [
-          _smallIcon(icon, color),
+          _smallIcon(_iconoProducto(producto), color),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  producto,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w800,
-                    fontSize: 15,
-                  ),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        producto,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w800,
+                          fontSize: 15,
+                        ),
+                      ),
+                    ),
+                    Text(
+                      _euros(prima),
+                      style: TextStyle(
+                        color: color,
+                        fontWeight: FontWeight.w900,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 8),
                 ClipRRect(
@@ -701,16 +1157,16 @@ if (produccion < 0) produccion = 0;
                     valueColor: AlwaysStoppedAnimation(color),
                   ),
                 ),
+                const SizedBox(height: 5),
+                Text(
+                  '$cantidad póliza${cantidad == 1 ? '' : 's'}',
+                  style: const TextStyle(
+                    color: Colors.white54,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
               ],
-            ),
-          ),
-          const SizedBox(width: 12),
-          Text(
-            '$cantidad ventas',
-            style: TextStyle(
-              color: color,
-              fontWeight: FontWeight.w900,
-              fontSize: 14,
             ),
           ),
         ],
@@ -719,8 +1175,8 @@ if (produccion < 0) produccion = 0;
   }
 
   Widget _mixCard() {
-    final cumple = mixDecesosVida >= 30;
-    final valor = (mixDecesosVida / 100).clamp(0.0, 1.0);
+    final cumple = porcentajeMix >= 30;
+    final valor = (porcentajeMix / 100).clamp(0.0, 1.0);
 
     return Container(
       width: double.infinity,
@@ -738,11 +1194,15 @@ if (produccion < 0) produccion = 0;
         children: [
           Row(
             children: [
-              _circleIcon(Icons.pie_chart_rounded, Colors.purpleAccent, size: 44),
+              _circleIcon(
+                Icons.pie_chart_rounded,
+                Colors.purpleAccent,
+                size: 44,
+              ),
               const SizedBox(width: 12),
               const Expanded(
                 child: Text(
-                  'Mix Decesos + Vida',
+                  'Mix Decesos + Vida + Prima única',
                   style: TextStyle(
                     color: Colors.white,
                     fontWeight: FontWeight.w900,
@@ -775,9 +1235,11 @@ if (produccion < 0) produccion = 0;
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Text(
-                      '${mixDecesosVida.toStringAsFixed(1)}%',
+                      '${porcentajeMix.toStringAsFixed(1)}%',
                       style: TextStyle(
-                        color: cumple ? Colors.greenAccent : Colors.orangeAccent,
+                        color: cumple
+                            ? Colors.greenAccent
+                            : Colors.orangeAccent,
                         fontSize: 28,
                         fontWeight: FontWeight.w900,
                       ),
@@ -791,30 +1253,33 @@ if (produccion < 0) produccion = 0;
               ],
             ),
           ),
-          const SizedBox(height: 16),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-            decoration: BoxDecoration(
-              color: (cumple ? Colors.greenAccent : Colors.orangeAccent).withOpacity(0.12),
-              borderRadius: BorderRadius.circular(999),
-              border: Border.all(
-                color: (cumple ? Colors.greenAccent : Colors.orangeAccent).withOpacity(0.30),
-              ),
+          const SizedBox(height: 14),
+          Text(
+            _euros(primaMix),
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w900,
+              fontSize: 20,
             ),
-            child: Text(
-              cumple ? '✔ Mix correcto' : '⚠ Aumenta Decesos + Vida',
-              style: TextStyle(
-                color: cumple ? Colors.greenAccent : Colors.orangeAccent,
-                fontWeight: FontWeight.w900,
-              ),
-            ),
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            'prima computable en el mix',
+            style: TextStyle(color: Colors.white54, fontSize: 11),
+          ),
+          const SizedBox(height: 14),
+          _pill(
+            cumple ? 'Mix correcto' : 'Refuerza Decesos, Vida o Prima única',
+            cumple ? Colors.greenAccent : Colors.orangeAccent,
           ),
         ],
       ),
     );
   }
 
-  Widget _needsCard() {
+  Widget _smartNeedsCard() {
+    final recomendaciones = _crearRecomendaciones();
+
     return _glassCard(
       padding: const EdgeInsets.all(20),
       borderColor: Colors.purpleAccent.withOpacity(0.30),
@@ -822,80 +1287,194 @@ if (produccion < 0) produccion = 0;
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _sectionTitle(
-            icon: Icons.rocket_launch_rounded,
-            title: 'Qué necesitas vender',
-            subtitle: 'Basado en objetivos recomendados',
+            icon: Icons.auto_awesome_rounded,
+            title: 'Plan inteligente de producción',
+            subtitle: objetivoCumplido
+                ? 'Tu objetivo de este ciclo ya está cumplido'
+                : 'Calculado según tu rol, producción, mix y prima media',
           ),
           const SizedBox(height: 18),
-          Wrap(
-            spacing: 12,
-            runSpacing: 12,
-            children: [
-              _needBox('Decesos', Icons.shield_rounded, Colors.purpleAccent, 10),
-              _needBox('Hogar', Icons.home_rounded, Colors.greenAccent, 5),
-              _needBox('Vida', Icons.favorite_rounded, Colors.pinkAccent, 3),
-              _needBox('Salud', Icons.medical_services_rounded, Colors.blueAccent, 2),
-              _needBox('Auto', Icons.directions_car_rounded, Colors.orangeAccent, 4),
+          if (objetivoCumplido)
+            _successPlan()
+          else ...[
+            _planSummary(recomendaciones),
+            const SizedBox(height: 14),
+            for (int i = 0; i < recomendaciones.length; i++) ...[
+              _recommendationTile(
+                index: i + 1,
+                recomendacion: recomendaciones[i],
+              ),
+              if (i < recomendaciones.length - 1) const SizedBox(height: 10),
             ],
+            const SizedBox(height: 14),
+            Text(
+              'Estimación orientativa basada en la prima media real del ciclo. '
+              'Cuando no existe histórico se utiliza una prima de referencia.',
+              style: TextStyle(
+                color: Colors.white.withOpacity(0.48),
+                fontSize: 11,
+                height: 1.4,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _planSummary(List<_RecomendacionVenta> recomendaciones) {
+    final unidades = recomendaciones.fold<int>(
+      0,
+      (total, item) => total + item.cantidad,
+    );
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(15),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            Colors.purpleAccent.withOpacity(0.16),
+            Colors.cyanAccent.withOpacity(0.10),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.cyanAccent.withOpacity(0.22)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.route_rounded, color: Colors.cyanAccent, size: 32),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              'Para alcanzar los ${_euros(objetivo)} te faltan '
+              '${_euros(faltante)}. El plan propone aproximadamente '
+              '$unidades póliza${unidades == 1 ? '' : 's'}.',
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w700,
+                height: 1.45,
+              ),
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _needBox(String producto, IconData icon, Color color, int objetivoProducto) {
-    final actual = ventasPorProducto[producto] ?? 0;
-    final faltan = math.max(0, objetivoProducto - actual);
+  Widget _recommendationTile({
+    required int index,
+    required _RecomendacionVenta recomendacion,
+  }) {
+    final color = _colorProducto(recomendacion.producto);
 
     return Container(
-      width: 142,
+      width: double.infinity,
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.055),
+        color: Colors.white.withOpacity(0.05),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: color.withOpacity(0.28)),
+        border: Border.all(color: color.withOpacity(0.24)),
       ),
-      child: Column(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _smallIcon(icon, color),
-          const SizedBox(height: 8),
-          Text(
-            producto,
-            style: TextStyle(
-              color: color,
-              fontWeight: FontWeight.w900,
-              fontSize: 15,
+          Container(
+            height: 38,
+            width: 38,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: color.withOpacity(0.16),
+              border: Border.all(color: color.withOpacity(0.35)),
+            ),
+            child: Text(
+              '$index',
+              style: TextStyle(
+                color: color,
+                fontWeight: FontWeight.w900,
+                fontSize: 16,
+              ),
             ),
           ),
-          const SizedBox(height: 12),
-          const Text('Objetivo', style: TextStyle(color: Colors.white60, fontSize: 12)),
-          Text(
-            '$objetivoProducto',
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 22,
-              fontWeight: FontWeight.w900,
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(
+                      _iconoProducto(recomendacion.producto),
+                      color: color,
+                      size: 20,
+                    ),
+                    const SizedBox(width: 7),
+                    Expanded(
+                      child: Text(
+                        '${recomendacion.cantidad} '
+                        '${recomendacion.producto}',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w900,
+                          fontSize: 16,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 7),
+                Text(
+                  recomendacion.motivo,
+                  style: const TextStyle(
+                    color: Colors.white60,
+                    height: 1.35,
+                    fontSize: 12,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    _miniTag(
+                      'Prima media ${_euros(recomendacion.primaEstimada)}',
+                    ),
+                    _miniTag(
+                      'Aporta ≈ ${_euros(recomendacion.aportacionEstimada)}',
+                    ),
+                  ],
+                ),
+              ],
             ),
           ),
-          const SizedBox(height: 6),
-          const Text('Actual', style: TextStyle(color: Colors.white60, fontSize: 12)),
-          Text(
-            '$actual',
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 22,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-          const SizedBox(height: 10),
-          Divider(color: Colors.white.withOpacity(0.15)),
-          const SizedBox(height: 8),
-          Text(
-            faltan == 0 ? '✔ OK' : 'Faltan $faltan',
-            style: TextStyle(
-              color: faltan == 0 ? Colors.greenAccent : Colors.orangeAccent,
-              fontWeight: FontWeight.w900,
-              fontSize: 15,
+        ],
+      ),
+    );
+  }
+
+  Widget _successPlan() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: Colors.greenAccent.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: Colors.greenAccent.withOpacity(0.28)),
+      ),
+      child: const Row(
+        children: [
+          Icon(Icons.emoji_events_rounded, color: Colors.amberAccent, size: 42),
+          SizedBox(width: 14),
+          Expanded(
+            child: Text(
+              'Objetivo conseguido. Mantén el ritmo, protege el mix y '
+              'convierte las referencias activas en nueva producción.',
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w800,
+                height: 1.45,
+              ),
             ),
           ),
         ],
@@ -924,7 +1503,7 @@ if (produccion < 0) produccion = 0;
                 ),
                 SizedBox(height: 4),
                 Text(
-                  'Oportunidades en curso',
+                  'Oportunidades de tu estructura en curso',
                   style: TextStyle(color: Colors.white60),
                 ),
               ],
@@ -945,6 +1524,14 @@ if (produccion < 0) produccion = 0;
   }
 
   Widget _motivationCard() {
+    final mensaje = objetivoCumplido
+        ? 'Objetivo cumplido. Ahora toca consolidar y superar.'
+        : faltante <= objetivo * 0.20
+        ? 'Estás muy cerca. Un último impulso puede cerrar el objetivo.'
+        : porcentajeMix < 30
+        ? 'Prioriza Decesos, Vida y Prima única para mejorar producción y mix.'
+        : 'Sigue el plan inteligente y convierte cada oportunidad.';
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(18),
@@ -958,32 +1545,22 @@ if (produccion < 0) produccion = 0;
         ),
         border: Border.all(color: Colors.cyanAccent.withOpacity(0.45)),
         boxShadow: [
-          BoxShadow(
-            color: Colors.cyanAccent.withOpacity(0.16),
-            blurRadius: 28,
-          ),
+          BoxShadow(color: Colors.cyanAccent.withOpacity(0.16), blurRadius: 28),
         ],
       ),
-      child: const Row(
+      child: Row(
         children: [
-          Icon(Icons.star_rounded, color: Colors.amberAccent, size: 34),
-          SizedBox(width: 14),
+          const Icon(Icons.star_rounded, color: Colors.amberAccent, size: 34),
+          const SizedBox(width: 14),
           Expanded(
             child: Text(
-              'Cada acción te acerca a tu objetivo.',
-              style: TextStyle(
+              mensaje,
+              style: const TextStyle(
                 color: Colors.white70,
-                fontSize: 16,
+                fontSize: 15,
                 fontWeight: FontWeight.w700,
+                height: 1.4,
               ),
-            ),
-          ),
-          Text(
-            '¡Tú puedes! 💪',
-            style: TextStyle(
-              color: Colors.cyanAccent,
-              fontSize: 16,
-              fontWeight: FontWeight.w900,
             ),
           ),
         ],
@@ -1019,12 +1596,51 @@ if (produccion < 0) produccion = 0;
                   color: Colors.white60,
                   fontSize: 13,
                   fontWeight: FontWeight.w500,
+                  height: 1.3,
                 ),
               ),
             ],
           ),
         ),
       ],
+    );
+  }
+
+  Widget _pill(String text, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.11),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: color.withOpacity(0.28)),
+      ),
+      child: Text(
+        text,
+        style: TextStyle(
+          color: color,
+          fontWeight: FontWeight.w900,
+          fontSize: 12,
+        ),
+      ),
+    );
+  }
+
+  Widget _miniTag(String text) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.06),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: Colors.white.withOpacity(0.10)),
+      ),
+      child: Text(
+        text,
+        style: const TextStyle(
+          color: Colors.white70,
+          fontSize: 10,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
     );
   }
 
@@ -1067,10 +1683,7 @@ if (produccion < 0) produccion = 0;
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         gradient: RadialGradient(
-          colors: [
-            color.withOpacity(0.32),
-            color.withOpacity(0.08),
-          ],
+          colors: [color.withOpacity(0.32), color.withOpacity(0.08)],
         ),
         border: Border.all(color: color.withOpacity(0.45)),
       ),
@@ -1091,6 +1704,22 @@ if (produccion < 0) produccion = 0;
   }
 }
 
+class _RecomendacionVenta {
+  final String producto;
+  final int cantidad;
+  final double primaEstimada;
+  final double aportacionEstimada;
+  final String motivo;
+
+  const _RecomendacionVenta({
+    required this.producto,
+    required this.cantidad,
+    required this.primaEstimada,
+    required this.aportacionEstimada,
+    required this.motivo,
+  });
+}
+
 class _BackgroundGlow extends StatelessWidget {
   const _BackgroundGlow();
 
@@ -1103,19 +1732,11 @@ class _BackgroundGlow extends StatelessWidget {
             gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
-              colors: [
-                Color(0xFF020617),
-                Color(0xFF061A2D),
-                Color(0xFF0B1026),
-              ],
+              colors: [Color(0xFF020617), Color(0xFF061A2D), Color(0xFF0B1026)],
             ),
           ),
         ),
-        Positioned(
-          top: -120,
-          right: -90,
-          child: _glow(260, Colors.cyanAccent),
-        ),
+        Positioned(top: -120, right: -90, child: _glow(260, Colors.cyanAccent)),
         Positioned(
           bottom: 180,
           left: -120,

@@ -24,6 +24,9 @@ class _ControlAltasScreenState extends State<ControlAltasScreen> {
   List<Map<String, dynamic>> usuarios = [];
   List<Map<String, dynamic>> usuariosPermitidos = [];
   List<Map<String, dynamic>> candidatos = [];
+
+  final Map<String, Map<String, dynamic>> usuariosPorId = {};
+  final Map<String, Map<String, dynamic>> usuariosPorAuth = {};
   List<Map<String, dynamic>> candidatosFiltradosCache = [];
 
   final Set<String> candidatosSeleccionados = {};
@@ -37,9 +40,18 @@ class _ControlAltasScreenState extends State<ControlAltasScreen> {
   String filtroOrigen = 'Todos';
   String filtroPrioridad = 'Todas';
   String filtroCiudad = 'Todas';
+  String filtroAsignacion = 'Todos';
+  String filtroRolAsignado = 'Todos';
+  String filtroSeguimiento = 'Todos';
+  String filtroContacto = 'Todos';
+  String filtroEntrevista = 'Todos';
+  String filtroOrden = 'Más recientes';
   String ratioSeleccionado = 'Incorporados / Incluidos';
+
   DateTime? fechaDesde;
   DateTime? fechaHasta;
+  DateTime? proximaAccionDesde;
+  DateTime? proximaAccionHasta;
 
   String? sortKey;
   bool sortAsc = true;
@@ -48,7 +60,8 @@ class _ControlAltasScreenState extends State<ControlAltasScreen> {
     _CampoTabla(key: 'jefe_equipo_nombre', titulo: 'Jefe equipo', grupo: 'Estructura', ancho: 190),
     _CampoTabla(key: 'jefe_ventas_nombre', titulo: 'Jefe ventas', grupo: 'Estructura', ancho: 190),
     _CampoTabla(key: 'director_zona_nombre', titulo: 'Director zona', grupo: 'Estructura', ancho: 190),
-    _CampoTabla(key: 'comercial_nombre', titulo: 'Comercial / usuario', grupo: 'Estructura', ancho: 190),
+    _CampoTabla(key: 'comercial_nombre', titulo: 'Asignado a', grupo: 'Estructura', ancho: 190),
+    _CampoTabla(key: 'comercial_rol', titulo: 'Rol asignado', grupo: 'Estructura', ancho: 150),
     _CampoTabla(key: 'nombre', titulo: 'Nombre candidato', grupo: 'Candidato', ancho: 220),
     _CampoTabla(key: 'telefono', titulo: 'Teléfono', grupo: 'Candidato', ancho: 140),
     _CampoTabla(key: 'email', titulo: 'Email', grupo: 'Candidato', ancho: 220),
@@ -75,7 +88,8 @@ class _ControlAltasScreenState extends State<ControlAltasScreen> {
   ];
 
   late List<String> columnasActivas = [
-    'jefe_equipo_nombre',
+    'comercial_nombre',
+    'comercial_rol',
     'nombre',
     'telefono',
     'email',
@@ -93,134 +107,460 @@ class _ControlAltasScreenState extends State<ControlAltasScreen> {
     cargarDatos();
   }
 
+  String _normalizarRol(dynamic rol) {
+    return (rol ?? '')
+        .toString()
+        .trim()
+        .toLowerCase()
+        .replaceAll('-', '_')
+        .replaceAll(' ', '_');
+  }
+
+  String _idTexto(dynamic value) {
+    final id = (value ?? '').toString().trim();
+
+    if (id.isEmpty || id.toLowerCase() == 'null') {
+      return '';
+    }
+
+    return id;
+  }
+
+  bool _relacionPermitida({
+    required String rolPadre,
+    required String rolHijo,
+  }) {
+    final padre = _normalizarRol(rolPadre);
+    final hijo = _normalizarRol(rolHijo);
+
+    switch (padre) {
+      case 'director_nacional':
+        return hijo == 'director_zona' ||
+            hijo == 'jefe_ventas' ||
+            hijo == 'jefe_equipo' ||
+            _esRolAgente(hijo);
+
+      case 'director_zona':
+        return hijo == 'jefe_ventas' ||
+            hijo == 'jefe_equipo' ||
+            _esRolAgente(hijo);
+
+      case 'jefe_ventas':
+        return hijo == 'jefe_equipo' ||
+            _esRolAgente(hijo);
+
+      case 'jefe_equipo':
+        return _esRolAgente(hijo);
+
+      default:
+        return false;
+    }
+  }
+
+  bool _esRolAgente(String rol) {
+    final normalizado = _normalizarRol(rol);
+
+    return normalizado == 'agente' ||
+        normalizado == 'mediador' ||
+        normalizado == 'comercial';
+  }
+
+  void _crearIndicesUsuarios() {
+    usuariosPorId.clear();
+    usuariosPorAuth.clear();
+
+    for (final usuario in usuarios) {
+      final id = _idTexto(usuario['id']);
+      final authId = _idTexto(usuario['auth_id']);
+
+      if (id.isNotEmpty) {
+        usuariosPorId[id] = usuario;
+      }
+
+      if (authId.isNotEmpty) {
+        usuariosPorAuth[authId] = usuario;
+      }
+    }
+  }
+
+  List<Map<String, dynamic>> _construirEstructura({
+    required Map<String, dynamic> perfil,
+  }) {
+    if (_veTodo()) {
+      return usuarios.where((usuario) {
+        return _idTexto(usuario['id']).isNotEmpty;
+      }).toList();
+    }
+
+    final hijosPorParentId =
+        <String, List<Map<String, dynamic>>>{};
+
+    for (final usuario in usuarios) {
+      final parentId = _idTexto(usuario['parent_id']);
+
+      if (parentId.isEmpty) continue;
+
+      hijosPorParentId
+          .putIfAbsent(
+            parentId,
+            () => <Map<String, dynamic>>[],
+          )
+          .add(usuario);
+    }
+
+    final resultado = <Map<String, dynamic>>[];
+    final visitados = <String>{};
+
+    void recorrer(Map<String, dynamic> actual) {
+      final idActual = _idTexto(actual['id']);
+
+      if (idActual.isEmpty || visitados.contains(idActual)) {
+        return;
+      }
+
+      visitados.add(idActual);
+      resultado.add(actual);
+
+      final rolActual =
+          _normalizarRol(actual['rol_usuario']);
+
+      final hijos = hijosPorParentId[idActual] ??
+          const <Map<String, dynamic>>[];
+
+      for (final hijo in hijos) {
+        final rolHijo =
+            _normalizarRol(hijo['rol_usuario']);
+
+        if (!_relacionPermitida(
+          rolPadre: rolActual,
+          rolHijo: rolHijo,
+        )) {
+          debugPrint(
+            'CONTROL ALTAS: usuario bloqueado '
+            '${_nombreCompleto(hijo)} '
+            '| rol=$rolHijo '
+            '| parent=${hijo['parent_id']} '
+            '| padre=$rolActual',
+          );
+
+          continue;
+        }
+
+        recorrer(hijo);
+      }
+    }
+
+    recorrer(perfil);
+
+    return resultado;
+  }
+
   Future<void> cargarDatos() async {
     final user = supabase.auth.currentUser;
+
     if (user == null) {
-      setState(() => loading = false);
+      if (!mounted) return;
+
+      setState(() {
+        loading = false;
+        candidatos = [];
+        candidatosFiltradosCache = [];
+      });
+
       return;
     }
 
     try {
-      final perfil = await supabase
+      if (mounted) {
+        setState(() {
+          loading = true;
+        });
+      }
+
+      final perfilData = await supabase
           .from('usuarios')
-          .select('id, auth_id, parent_id, rol_usuario, nombre, apellidos, email')
+          .select(
+            'id, auth_id, parent_id, rol_usuario, '
+            'nombre, apellidos, email',
+          )
           .eq('auth_id', user.id)
           .maybeSingle();
 
-      role = perfil?['rol_usuario']?.toString() ?? '';
-      myId = perfil?['id']?.toString();
-      myAuthId = perfil?['auth_id']?.toString();
+      if (perfilData == null) {
+        throw Exception(
+          'No se encontró el perfil del usuario conectado.',
+        );
+      }
+
+      final perfil =
+          Map<String, dynamic>.from(perfilData);
+
+      role = _normalizarRol(perfil['rol_usuario']);
+      myId = _idTexto(perfil['id']);
+      myAuthId = _idTexto(perfil['auth_id']);
 
       final usuariosData = await supabase
           .from('usuarios')
-          .select('id, auth_id, parent_id, rol_usuario, nombre, apellidos, email')
+          .select(
+            'id, auth_id, parent_id, rol_usuario, '
+            'nombre, apellidos, email',
+          )
           .order('nombre', ascending: true);
 
-      usuarios = List<Map<String, dynamic>>.from(usuariosData);
-      usuariosPermitidos = _calcularUsuariosPermitidos();
+      usuarios =
+          List<Map<String, dynamic>>.from(
+        usuariosData,
+      );
+
+      _crearIndicesUsuarios();
+
+      usuariosPermitidos = _construirEstructura(
+        perfil: perfil,
+      );
 
       final authIdsPermitidos = usuariosPermitidos
-          .map((u) => u['auth_id']?.toString() ?? '')
-          .where((e) => e.isNotEmpty && e != 'null')
+          .map((usuario) => _idTexto(usuario['auth_id']))
+          .where((authId) => authId.isNotEmpty)
           .toList();
 
-      dynamic query = supabase.from('candidatos_captacion').select();
+      List<Map<String, dynamic>> candidatosData = [];
 
-      if (!_veTodo()) {
-        if (authIdsPermitidos.isEmpty) {
-          candidatos = [];
-          candidatosFiltradosCache = [];
-          if (!mounted) return;
-          setState(() => loading = false);
-          return;
-        }
-        query = query.inFilter('auth_id', authIdsPermitidos);
+      if (_veTodo()) {
+        final response = await supabase
+            .from('candidatos_captacion')
+            .select()
+            .order('created_at', ascending: false);
+
+        candidatosData =
+            List<Map<String, dynamic>>.from(
+          response,
+        );
+      } else if (authIdsPermitidos.isNotEmpty) {
+        final response = await supabase
+            .from('candidatos_captacion')
+            .select()
+            .inFilter('auth_id', authIdsPermitidos)
+            .order('created_at', ascending: false);
+
+        candidatosData =
+            List<Map<String, dynamic>>.from(
+          response,
+        );
       }
 
-      final candidatosData = await query.order('created_at', ascending: false);
-
-      candidatos = List<Map<String, dynamic>>.from(candidatosData).map((c) {
-        return _enriquecerCandidato(c);
-      }).toList();
+      candidatos = candidatosData
+          .map(_enriquecerCandidato)
+          .toList();
 
       _aplicarFiltros();
 
+      debugPrint(
+        '======= CONTROL ALTAS ESTRUCTURA REAL =======',
+      );
+      debugPrint(
+        'USUARIO: ${_nombreCompleto(perfil)}',
+      );
+      debugPrint('ROL: $role');
+      debugPrint(
+        'PERSONAS EN ESTRUCTURA: '
+        '${usuariosPermitidos.length}',
+      );
+      debugPrint(
+        'CANDIDATOS VISIBLES: ${candidatos.length}',
+      );
+      debugPrint(
+        '============================================',
+      );
+
       if (!mounted) return;
-      setState(() => loading = false);
-    } catch (e) {
+
+      setState(() {
+        loading = false;
+      });
+    } catch (e, stackTrace) {
+      debugPrint(
+        'ERROR CARGANDO CONTROL DE ALTAS: $e',
+      );
+      debugPrintStack(stackTrace: stackTrace);
+
       if (!mounted) return;
-      setState(() => loading = false);
-      _snack('Error cargando control de altas: $e');
+
+      setState(() {
+        loading = false;
+        candidatos = [];
+        candidatosFiltradosCache = [];
+      });
+
+      _snack(
+        'Error cargando control de altas: $e',
+      );
     }
   }
 
-  bool _veTodo() => role == 'director_nacional' || role == 'administracion';
+  bool _veTodo() {
+    final normalizado = _normalizarRol(role);
 
-  Map<String, dynamic> _enriquecerCandidato(Map<String, dynamic> c) {
-    final auth = c['auth_id']?.toString();
-    final comercial = _usuarioPorAuth(auth);
-    final jefeEquipo = _resolverJefeEquipo(comercial);
-    final jefeVentas = _usuarioPorId(jefeEquipo?['parent_id']?.toString());
-    final directorZona = _usuarioPorId(jefeVentas?['parent_id']?.toString());
-
-    return {
-      ...c,
-      'comercial_nombre': comercial == null ? 'Sin usuario' : _nombreCompleto(comercial),
-      'comercial_id': comercial?['id']?.toString(),
-      'jefe_equipo_nombre': jefeEquipo == null ? '' : _nombreCompleto(jefeEquipo),
-      'jefe_equipo_id': jefeEquipo?['id']?.toString(),
-      'jefe_ventas_nombre': jefeVentas == null ? '' : _nombreCompleto(jefeVentas),
-      'jefe_ventas_id': jefeVentas?['id']?.toString(),
-      'director_zona_nombre': directorZona == null ? '' : _nombreCompleto(directorZona),
-      'director_zona_id': directorZona?['id']?.toString(),
-    };
+    return normalizado == 'director_nacional' ||
+        normalizado == 'administracion' ||
+        normalizado == 'administrador' ||
+        normalizado == 'admin';
   }
 
-  Map<String, dynamic>? _resolverJefeEquipo(Map<String, dynamic>? usuario) {
-    if (usuario == null) return null;
-    final rol = usuario['rol_usuario']?.toString();
-    if (rol == 'jefe_equipo') return usuario;
-    return _usuarioPorId(usuario['parent_id']?.toString());
-  }
+  List<Map<String, dynamic>> _cadenaAntecesores(
+    Map<String, dynamic>? usuario,
+  ) {
+    if (usuario == null) return [];
 
-  Map<String, dynamic>? _usuarioPorAuth(String? authId) {
-    if (authId == null || authId.isEmpty || authId == 'null') return null;
-    for (final u in usuarios) {
-      if (u['auth_id']?.toString() == authId) return u;
+    final resultado = <Map<String, dynamic>>[];
+    final visitados = <String>{};
+
+    var parentId = _idTexto(usuario['parent_id']);
+
+    while (parentId.isNotEmpty &&
+        !visitados.contains(parentId)) {
+      visitados.add(parentId);
+
+      final padre = usuariosPorId[parentId];
+
+      if (padre == null) break;
+
+      resultado.add(padre);
+      parentId = _idTexto(padre['parent_id']);
     }
-    return null;
+
+    return resultado;
   }
 
-  Map<String, dynamic>? _usuarioPorId(String? id) {
-    if (id == null || id.isEmpty || id == 'null') return null;
-    for (final u in usuarios) {
-      if (u['id']?.toString() == id) return u;
+  Map<String, dynamic>? _buscarAntecesorPorRol(
+    Map<String, dynamic>? usuario,
+    String rolBuscado,
+  ) {
+    final rolNormalizado =
+        _normalizarRol(rolBuscado);
+
+    if (usuario != null &&
+        _normalizarRol(usuario['rol_usuario']) ==
+            rolNormalizado) {
+      return usuario;
     }
-    return null;
-  }
 
-  List<Map<String, dynamic>> _calcularUsuariosPermitidos() {
-    if (_veTodo()) return usuarios;
-    if (myId == null || myId!.isEmpty) return [];
-
-    final ids = <String>{myId!};
-    bool cambios = true;
-
-    while (cambios) {
-      cambios = false;
-      for (final u in usuarios) {
-        final id = u['id']?.toString();
-        final parentId = u['parent_id']?.toString();
-        if (id == null || id.isEmpty) continue;
-        if (parentId == null || parentId.isEmpty) continue;
-        if (ids.contains(parentId) && !ids.contains(id)) {
-          ids.add(id);
-          cambios = true;
-        }
+    for (final antecesor in _cadenaAntecesores(usuario)) {
+      if (_normalizarRol(
+            antecesor['rol_usuario'],
+          ) ==
+          rolNormalizado) {
+        return antecesor;
       }
     }
 
-    return usuarios.where((u) => ids.contains(u['id']?.toString())).toList();
+    return null;
+  }
+
+  Map<String, dynamic>? _responsableInmediato(
+    Map<String, dynamic>? usuario,
+  ) {
+    if (usuario == null) return null;
+
+    return usuariosPorId[
+        _idTexto(usuario['parent_id'])];
+  }
+
+  Map<String, dynamic> _enriquecerCandidato(
+    Map<String, dynamic> candidato,
+  ) {
+    final authId =
+        _idTexto(candidato['auth_id']);
+
+    final comercial = _usuarioPorAuth(authId);
+
+    final jefeEquipo = _buscarAntecesorPorRol(
+      comercial,
+      'jefe_equipo',
+    );
+
+    final jefeVentas = _buscarAntecesorPorRol(
+      comercial,
+      'jefe_ventas',
+    );
+
+    final directorZona = _buscarAntecesorPorRol(
+      comercial,
+      'director_zona',
+    );
+
+    final responsable =
+        _responsableInmediato(comercial);
+
+    return {
+      ...candidato,
+      'comercial_nombre': comercial == null
+          ? 'Sin usuario'
+          : _nombreCompleto(comercial),
+      'comercial_id':
+          _idTexto(comercial?['id']),
+      'comercial_rol':
+          _normalizarRol(
+        comercial?['rol_usuario'],
+      ),
+      'responsable_nombre': responsable == null
+          ? ''
+          : _nombreCompleto(responsable),
+      'responsable_id':
+          _idTexto(responsable?['id']),
+      'responsable_rol':
+          _normalizarRol(
+        responsable?['rol_usuario'],
+      ),
+      'jefe_equipo_nombre': jefeEquipo == null
+          ? ''
+          : _nombreCompleto(jefeEquipo),
+      'jefe_equipo_id':
+          _idTexto(jefeEquipo?['id']),
+      'jefe_ventas_nombre': jefeVentas == null
+          ? ''
+          : _nombreCompleto(jefeVentas),
+      'jefe_ventas_id':
+          _idTexto(jefeVentas?['id']),
+      'director_zona_nombre': directorZona == null
+          ? ''
+          : _nombreCompleto(directorZona),
+      'director_zona_id':
+          _idTexto(directorZona?['id']),
+    };
+  }
+
+  Map<String, dynamic>? _usuarioPorAuth(
+    String? authId,
+  ) {
+    final id = _idTexto(authId);
+
+    if (id.isEmpty) return null;
+
+    return usuariosPorAuth[id];
+  }
+
+  Map<String, dynamic>? _usuarioPorId(
+    String? id,
+  ) {
+    final valor = _idTexto(id);
+
+    if (valor.isEmpty) return null;
+
+    return usuariosPorId[valor];
+  }
+
+  List<Map<String, dynamic>>
+      _calcularUsuariosPermitidos() {
+    if (_veTodo()) return usuarios;
+
+    final perfil =
+        usuariosPorId[_idTexto(myId)];
+
+    if (perfil == null) return [];
+
+    return _construirEstructura(
+      perfil: perfil,
+    );
   }
 
   String _nombreCompleto(Map<String, dynamic> u) {
@@ -230,73 +570,124 @@ class _ControlAltasScreenState extends State<ControlAltasScreen> {
     return completo.isEmpty ? (u['email']?.toString() ?? 'Sin nombre') : completo;
   }
 
-  bool _esAgente(Map<String, dynamic> u) {
-    final r = u['rol_usuario']?.toString();
-    return r == 'agente' || r == 'mediador' || r == 'comercial';
+  bool _esAgente(Map<String, dynamic> usuario) {
+    return _esRolAgente(
+      usuario['rol_usuario']?.toString() ?? '',
+    );
   }
 
-  List<Map<String, dynamic>> _usuariosPorRol(String rol) {
-    return usuariosPermitidos.where((u) => u['rol_usuario']?.toString() == rol).toList();
+  List<Map<String, dynamic>> _usuariosPorRol(
+    String rol,
+  ) {
+    final normalizado =
+        _normalizarRol(rol);
+
+    return usuariosPermitidos.where((usuario) {
+      return _normalizarRol(
+            usuario['rol_usuario'],
+          ) ==
+          normalizado;
+    }).toList();
   }
 
-  List<Map<String, dynamic>> get directoresZona => _veTodo() ? _usuariosPorRol('director_zona') : [];
+  bool _esDescendienteDe(
+    Map<String, dynamic> usuario,
+    String ancestroId,
+  ) {
+    final objetivo = _idTexto(ancestroId);
+
+    if (objetivo.isEmpty) return false;
+
+    if (_idTexto(usuario['id']) == objetivo) {
+      return true;
+    }
+
+    final visitados = <String>{};
+    var parentId =
+        _idTexto(usuario['parent_id']);
+
+    while (parentId.isNotEmpty &&
+        !visitados.contains(parentId)) {
+      if (parentId == objetivo) {
+        return true;
+      }
+
+      visitados.add(parentId);
+
+      final padre = usuariosPorId[parentId];
+
+      if (padre == null) break;
+
+      parentId =
+          _idTexto(padre['parent_id']);
+    }
+
+    return false;
+  }
+
+  List<Map<String, dynamic>> get directoresZona {
+    return _veTodo()
+        ? _usuariosPorRol('director_zona')
+        : const <Map<String, dynamic>>[];
+  }
 
   List<Map<String, dynamic>> get jefesVentas {
-    var lista = _usuariosPorRol('jefe_ventas');
-    if (role == 'jefe_ventas') return [];
-    if (filtroDirectorZonaId != null) {
-      lista = lista.where((u) => u['parent_id']?.toString() == filtroDirectorZonaId).toList();
+    var lista =
+        _usuariosPorRol('jefe_ventas');
+
+    if (role == 'jefe_ventas') {
+      return const <Map<String, dynamic>>[];
     }
+
+    if (filtroDirectorZonaId != null) {
+      lista = lista.where((usuario) {
+        return _esDescendienteDe(
+          usuario,
+          filtroDirectorZonaId!,
+        );
+      }).toList();
+    }
+
     return lista;
   }
 
   List<Map<String, dynamic>> get jefesEquipo {
-    var lista = _usuariosPorRol('jefe_equipo');
+    var lista =
+        _usuariosPorRol('jefe_equipo');
 
-    if (filtroJefeVentasId != null) {
-      lista = lista.where((u) => u['parent_id']?.toString() == filtroJefeVentasId).toList();
-    }
+    final responsableSeleccionado =
+        filtroJefeVentasId ??
+        filtroDirectorZonaId;
 
-    if (filtroDirectorZonaId != null && filtroJefeVentasId == null) {
-      final idsVentas = usuariosPermitidos
-          .where((u) => u['rol_usuario']?.toString() == 'jefe_ventas' && u['parent_id']?.toString() == filtroDirectorZonaId)
-          .map((u) => u['id']?.toString())
-          .whereType<String>()
-          .toSet();
-      lista = lista.where((u) => idsVentas.contains(u['parent_id']?.toString())).toList();
+    if (responsableSeleccionado != null) {
+      lista = lista.where((usuario) {
+        return _esDescendienteDe(
+          usuario,
+          responsableSeleccionado,
+        );
+      }).toList();
     }
 
     return lista;
   }
 
   List<Map<String, dynamic>> get agentes {
-    var lista = usuariosPermitidos.where(_esAgente).toList();
+    var lista = usuariosPermitidos
+        .where(_esAgente)
+        .toList();
 
-    if (filtroJefeEquipoId != null) {
-      lista = lista.where((u) => u['parent_id']?.toString() == filtroJefeEquipoId).toList();
-    }
+    final responsableSeleccionado =
+        filtroJefeEquipoId ??
+        filtroJefeVentasId ??
+        filtroDirectorZonaId;
 
-    if (filtroJefeVentasId != null && filtroJefeEquipoId == null) {
-      final idsEquipo = usuariosPermitidos
-          .where((u) => u['rol_usuario']?.toString() == 'jefe_equipo' && u['parent_id']?.toString() == filtroJefeVentasId)
-          .map((u) => u['id']?.toString())
-          .whereType<String>()
-          .toSet();
-      lista = lista.where((u) => idsEquipo.contains(u['parent_id']?.toString())).toList();
-    }
-
-    if (filtroDirectorZonaId != null && filtroJefeVentasId == null && filtroJefeEquipoId == null) {
-      final idsVentas = usuariosPermitidos
-          .where((u) => u['rol_usuario']?.toString() == 'jefe_ventas' && u['parent_id']?.toString() == filtroDirectorZonaId)
-          .map((u) => u['id']?.toString())
-          .whereType<String>()
-          .toSet();
-      final idsEquipo = usuariosPermitidos
-          .where((u) => u['rol_usuario']?.toString() == 'jefe_equipo' && idsVentas.contains(u['parent_id']?.toString()))
-          .map((u) => u['id']?.toString())
-          .whereType<String>()
-          .toSet();
-      lista = lista.where((u) => idsEquipo.contains(u['parent_id']?.toString())).toList();
+    if (responsableSeleccionado != null) {
+      lista = lista.where((usuario) {
+        return _esDescendienteDe(
+          usuario,
+          responsableSeleccionado,
+        );
+      }).toList();
     }
 
     return lista;
@@ -326,6 +717,124 @@ class _ControlAltasScreenState extends State<ControlAltasScreen> {
       );
 
   List<Map<String, dynamic>> get candidatosFiltrados => candidatosFiltradosCache;
+
+
+  bool _estaAsignado(Map<String, dynamic> candidato) {
+    return _idTexto(candidato['auth_id']).isNotEmpty;
+  }
+
+  bool _tieneTelefono(Map<String, dynamic> candidato) {
+    final telefono =
+        (candidato['telefono'] ?? '').toString().trim();
+
+    return telefono.isNotEmpty;
+  }
+
+  bool _tieneEmail(Map<String, dynamic> candidato) {
+    final email =
+        (candidato['email'] ?? '').toString().trim();
+
+    return email.isNotEmpty;
+  }
+
+  bool _tieneSeguimiento(Map<String, dynamic> candidato) {
+    return _parseDate(candidato['fecha_proxima_accion']) != null ||
+        (candidato['proxima_accion'] ?? '')
+            .toString()
+            .trim()
+            .isNotEmpty;
+  }
+
+  bool _seguimientoVencido(Map<String, dynamic> candidato) {
+    final fecha =
+        _parseDate(candidato['fecha_proxima_accion']);
+
+    if (fecha == null) return false;
+
+    final hoy = DateTime.now();
+    final hoySinHora =
+        DateTime(hoy.year, hoy.month, hoy.day);
+
+    final fechaSinHora =
+        DateTime(fecha.year, fecha.month, fecha.day);
+
+    return fechaSinHora.isBefore(hoySinHora);
+  }
+
+  bool _seguimientoHoy(Map<String, dynamic> candidato) {
+    final fecha =
+        _parseDate(candidato['fecha_proxima_accion']);
+
+    if (fecha == null) return false;
+
+    final hoy = DateTime.now();
+
+    return fecha.year == hoy.year &&
+        fecha.month == hoy.month &&
+        fecha.day == hoy.day;
+  }
+
+  bool _seguimientoProximos7Dias(
+    Map<String, dynamic> candidato,
+  ) {
+    final fecha =
+        _parseDate(candidato['fecha_proxima_accion']);
+
+    if (fecha == null) return false;
+
+    final hoy = DateTime.now();
+    final inicio =
+        DateTime(hoy.year, hoy.month, hoy.day);
+
+    final fin = inicio.add(const Duration(days: 7));
+
+    final fechaSinHora =
+        DateTime(fecha.year, fecha.month, fecha.day);
+
+    return !fechaSinHora.isBefore(inicio) &&
+        !fechaSinHora.isAfter(fin);
+  }
+
+  bool _entrevistaProgramada(
+    Map<String, dynamic> candidato,
+  ) {
+    return _parseDate(
+          candidato['fecha_entrevista_programada'],
+        ) !=
+        null;
+  }
+
+  List<String> get rolesAsignadosDisponibles {
+    final set = candidatos
+        .map(
+          (candidato) =>
+              _rolVisible(candidato['comercial_rol']),
+        )
+        .where(
+          (rol) =>
+              rol.trim().isNotEmpty &&
+              rol != 'Sin rol',
+        )
+        .toSet()
+        .toList()
+      ..sort();
+
+    return ['Todos', ...set];
+  }
+
+  int get totalSinAsignar {
+    return candidatos.where(
+      (candidato) => !_estaAsignado(candidato),
+    ).length;
+  }
+
+  int get totalSeguimientosVencidos {
+    return candidatos.where(_seguimientoVencido).length;
+  }
+
+  int get totalEntrevistasProgramadas {
+    return candidatos.where(_entrevistaProgramada).length;
+  }
 
   void _aplicarFiltros() {
     var lista = [...candidatos];
@@ -362,6 +871,111 @@ class _ControlAltasScreenState extends State<ControlAltasScreen> {
       lista = lista.where((c) => c['ciudad']?.toString() == filtroCiudad).toList();
     }
 
+    if (filtroAsignacion == 'Asignados') {
+      lista = lista.where(_estaAsignado).toList();
+    }
+
+    if (filtroAsignacion == 'Sin asignar') {
+      lista = lista.where((c) => !_estaAsignado(c)).toList();
+    }
+
+    if (filtroRolAsignado != 'Todos') {
+      lista = lista.where((c) {
+        return _rolVisible(c['comercial_rol']) ==
+            filtroRolAsignado;
+      }).toList();
+    }
+
+    if (filtroSeguimiento == 'Con seguimiento') {
+      lista = lista.where(_tieneSeguimiento).toList();
+    }
+
+    if (filtroSeguimiento == 'Sin seguimiento') {
+      lista = lista.where((c) => !_tieneSeguimiento(c)).toList();
+    }
+
+    if (filtroSeguimiento == 'Vencidos') {
+      lista = lista.where(_seguimientoVencido).toList();
+    }
+
+    if (filtroSeguimiento == 'Hoy') {
+      lista = lista.where(_seguimientoHoy).toList();
+    }
+
+    if (filtroSeguimiento == 'Próximos 7 días') {
+      lista = lista.where(_seguimientoProximos7Dias).toList();
+    }
+
+    if (filtroContacto == 'Con teléfono') {
+      lista = lista.where(_tieneTelefono).toList();
+    }
+
+    if (filtroContacto == 'Con email') {
+      lista = lista.where(_tieneEmail).toList();
+    }
+
+    if (filtroContacto == 'Con teléfono o email') {
+      lista = lista.where(
+        (c) => _tieneTelefono(c) || _tieneEmail(c),
+      ).toList();
+    }
+
+    if (filtroContacto == 'Sin datos de contacto') {
+      lista = lista.where(
+        (c) => !_tieneTelefono(c) && !_tieneEmail(c),
+      ).toList();
+    }
+
+    if (filtroEntrevista == 'Programada') {
+      lista = lista.where(_entrevistaProgramada).toList();
+    }
+
+    if (filtroEntrevista == 'Sin programar') {
+      lista = lista.where(
+        (c) => !_entrevistaProgramada(c),
+      ).toList();
+    }
+
+    if (proximaAccionDesde != null) {
+      final desde = DateTime(
+        proximaAccionDesde!.year,
+        proximaAccionDesde!.month,
+        proximaAccionDesde!.day,
+      );
+
+      lista = lista.where((c) {
+        final fecha =
+            _parseDate(c['fecha_proxima_accion']);
+
+        if (fecha == null) return false;
+
+        final fechaSinHora =
+            DateTime(fecha.year, fecha.month, fecha.day);
+
+        return !fechaSinHora.isBefore(desde);
+      }).toList();
+    }
+
+    if (proximaAccionHasta != null) {
+      final hasta = DateTime(
+        proximaAccionHasta!.year,
+        proximaAccionHasta!.month,
+        proximaAccionHasta!.day,
+      );
+
+      lista = lista.where((c) {
+        final fecha =
+            _parseDate(c['fecha_proxima_accion']);
+
+        if (fecha == null) return false;
+
+        final fechaSinHora =
+            DateTime(fecha.year, fecha.month, fecha.day);
+
+        return !fechaSinHora.isAfter(hasta);
+      }).toList();
+    }
+
     if (fechaDesde != null) {
       final desde = DateTime(fechaDesde!.year, fechaDesde!.month, fechaDesde!.day);
       lista = lista.where((c) {
@@ -389,10 +1003,92 @@ class _ControlAltasScreenState extends State<ControlAltasScreen> {
 
     if (sortKey != null) {
       lista.sort((a, b) {
-        final av = _valueToString(a, sortKey!).toLowerCase();
-        final bv = _valueToString(b, sortKey!).toLowerCase();
-        return sortAsc ? av.compareTo(bv) : bv.compareTo(av);
+        final av =
+            _valueToString(a, sortKey!).toLowerCase();
+
+        final bv =
+            _valueToString(b, sortKey!).toLowerCase();
+
+        return sortAsc
+            ? av.compareTo(bv)
+            : bv.compareTo(av);
       });
+    } else {
+      switch (filtroOrden) {
+        case 'Más antiguos':
+          lista.sort((a, b) {
+            final fa = _parseDate(a['created_at']) ??
+                DateTime(1900);
+
+            final fb = _parseDate(b['created_at']) ??
+                DateTime(1900);
+
+            return fa.compareTo(fb);
+          });
+          break;
+
+        case 'Nombre A-Z':
+          lista.sort((a, b) {
+            return (a['nombre'] ?? '')
+                .toString()
+                .toLowerCase()
+                .compareTo(
+                  (b['nombre'] ?? '')
+                      .toString()
+                      .toLowerCase(),
+                );
+          });
+          break;
+
+        case 'Prioridad':
+          int valorPrioridad(dynamic value) {
+            switch ((value ?? '').toString()) {
+              case 'Alta':
+                return 0;
+              case 'Media':
+                return 1;
+              case 'Baja':
+                return 2;
+              default:
+                return 3;
+            }
+          }
+
+          lista.sort((a, b) {
+            return valorPrioridad(a['prioridad'])
+                .compareTo(
+                  valorPrioridad(b['prioridad']),
+                );
+          });
+          break;
+
+        case 'Próxima acción':
+          lista.sort((a, b) {
+            final fa = _parseDate(
+                  a['fecha_proxima_accion'],
+                ) ??
+                DateTime(9999);
+
+            final fb = _parseDate(
+                  b['fecha_proxima_accion'],
+                ) ??
+                DateTime(9999);
+
+            return fa.compareTo(fb);
+          });
+          break;
+
+        default:
+          lista.sort((a, b) {
+            final fa = _parseDate(a['created_at']) ??
+                DateTime(1900);
+
+            final fb = _parseDate(b['created_at']) ??
+                DateTime(1900);
+
+            return fb.compareTo(fa);
+          });
+      }
     }
 
     candidatosFiltradosCache = lista;
@@ -449,8 +1145,16 @@ class _ControlAltasScreenState extends State<ControlAltasScreen> {
       filtroOrigen = 'Todos';
       filtroPrioridad = 'Todas';
       filtroCiudad = 'Todas';
+      filtroAsignacion = 'Todos';
+      filtroRolAsignado = 'Todos';
+      filtroSeguimiento = 'Todos';
+      filtroContacto = 'Todos';
+      filtroEntrevista = 'Todos';
+      filtroOrden = 'Más recientes';
       fechaDesde = null;
       fechaHasta = null;
+      proximaAccionDesde = null;
+      proximaAccionHasta = null;
       candidatosSeleccionados.clear();
       _aplicarFiltros();
     });
@@ -470,6 +1174,32 @@ class _ControlAltasScreenState extends State<ControlAltasScreen> {
       } else {
         fechaHasta = date;
       }
+      _aplicarFiltros();
+    });
+  }
+
+
+  Future<void> _pickFechaProximaAccion(
+    bool desde,
+  ) async {
+    final date = await showDatePicker(
+      context: context,
+      initialDate: desde
+          ? (proximaAccionDesde ?? DateTime.now())
+          : (proximaAccionHasta ?? DateTime.now()),
+      firstDate: DateTime(2020),
+      lastDate: DateTime(2035),
+    );
+
+    if (date == null) return;
+
+    setState(() {
+      if (desde) {
+        proximaAccionDesde = date;
+      } else {
+        proximaAccionHasta = date;
+      }
+
       _aplicarFiltros();
     });
   }
@@ -496,14 +1226,108 @@ class _ControlAltasScreenState extends State<ControlAltasScreen> {
     });
   }
 
-  Future<void> _gestionarCandidatos(List<Map<String, dynamic>> refs) async {
+
+  String _rolVisible(dynamic rol) {
+    switch (_normalizarRol(rol)) {
+      case 'director_nacional':
+        return 'Director nacional';
+      case 'director_zona':
+        return 'Director de zona';
+      case 'jefe_ventas':
+        return 'Jefe de ventas';
+      case 'jefe_equipo':
+        return 'Jefe de equipo';
+      case 'agente':
+        return 'Agente';
+      case 'mediador':
+        return 'Mediador';
+      case 'comercial':
+        return 'Comercial';
+      case 'administracion':
+      case 'administrador':
+      case 'admin':
+        return 'Administración';
+      default:
+        final texto = (rol ?? '').toString().trim();
+        return texto.isEmpty
+            ? 'Sin rol'
+            : texto.replaceAll('_', ' ');
+    }
+  }
+
+  List<Map<String, dynamic>> get _destinatariosAsignacion {
+    final lista = usuariosPermitidos.where((usuario) {
+      return _idTexto(usuario['auth_id']).isNotEmpty;
+    }).toList();
+
+    lista.sort((a, b) {
+      final rolA = _rolVisible(a['rol_usuario']).toLowerCase();
+      final rolB = _rolVisible(b['rol_usuario']).toLowerCase();
+
+      final comparacionRol = rolA.compareTo(rolB);
+      if (comparacionRol != 0) return comparacionRol;
+
+      return _nombreCompleto(a)
+          .toLowerCase()
+          .compareTo(_nombreCompleto(b).toLowerCase());
+    });
+
+    return lista;
+  }
+
+  String? _authAsignadoComun(
+    List<Map<String, dynamic>> refs,
+  ) {
+    if (refs.isEmpty) return null;
+
+    final primero = _idTexto(refs.first['auth_id']);
+
+    for (final ref in refs.skip(1)) {
+      if (_idTexto(ref['auth_id']) != primero) {
+        return null;
+      }
+    }
+
+    return primero.isEmpty ? null : primero;
+  }
+
+  bool _tieneAsignacion(
+    Map<String, dynamic> candidato,
+  ) {
+    return _idTexto(candidato['auth_id']).isNotEmpty;
+  }
+
+  Future<void> _gestionarCandidatos(
+    List<Map<String, dynamic>> refs,
+  ) async {
     String nuevoEstado = _estadoParaDropdown(
-  refs.length == 1 ? refs.first['estado']?.toString() : null,
-);
-    String nuevaPrioridad = refs.length == 1 ? (refs.first['prioridad']?.toString() ?? 'Media') : 'Media';
-    String observaciones = refs.length == 1 ? (refs.first['observaciones']?.toString() ?? '') : '';
-    String notas = refs.length == 1 ? (refs.first['notas']?.toString() ?? '') : '';
-    String proximaAccion = refs.length == 1 ? (refs.first['proxima_accion']?.toString() ?? '') : '';
+      refs.length == 1
+          ? refs.first['estado']?.toString()
+          : null,
+    );
+
+    String nuevaPrioridad = refs.length == 1
+        ? (refs.first['prioridad']?.toString() ?? 'Media')
+        : 'Media';
+
+    String observaciones = refs.length == 1
+        ? (refs.first['observaciones']?.toString() ?? '')
+        : '';
+
+    String notas = refs.length == 1
+        ? (refs.first['notas']?.toString() ?? '')
+        : '';
+
+    String proximaAccion = refs.length == 1
+        ? (refs.first['proxima_accion']?.toString() ?? '')
+        : '';
+
+    String? nuevoAsignadoAuthId =
+        _authAsignadoComun(refs);
+
+    final teniaAsignacion = refs.any(_tieneAsignacion);
+
+    final destinatarios = _destinatariosAsignacion;
 
     await showModalBottomSheet(
       context: context,
@@ -512,16 +1336,128 @@ class _ControlAltasScreenState extends State<ControlAltasScreen> {
       builder: (_) {
         return StatefulBuilder(
           builder: (context, setModalState) {
+            final usuarioAsignado =
+                _usuarioPorAuth(nuevoAsignadoAuthId);
+
+            final textoAsignacion = teniaAsignacion
+                ? 'Reasignar candidato'
+                : 'Asignar candidato';
+
             return _modalShell(
               title: 'Gestionar candidatos',
-              subtitle: '${refs.length} candidato(s) seleccionado(s)',
+              subtitle:
+                  '${refs.length} candidato(s) seleccionado(s)',
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFEFF6FF),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: const Color(0xFFBFDBFE),
+                      ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment:
+                          CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Container(
+                              width: 42,
+                              height: 42,
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF2563EB)
+                                    .withOpacity(0.11),
+                                borderRadius:
+                                    BorderRadius.circular(14),
+                              ),
+                              child: Icon(
+                                teniaAsignacion
+                                    ? Icons.swap_horiz_rounded
+                                    : Icons.person_add_alt_1_rounded,
+                                color: const Color(0xFF2563EB),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment:
+                                    CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    textoAsignacion,
+                                    style: const TextStyle(
+                                      color: Color(0xFF0F172A),
+                                      fontSize: 16,
+                                      fontWeight:
+                                          FontWeight.w900,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 3),
+                                  Text(
+                                    usuarioAsignado == null
+                                        ? 'Sin responsable seleccionado'
+                                        : '${_nombreCompleto(usuarioAsignado)} · ${_rolVisible(usuarioAsignado['rol_usuario'])}',
+                                    style: const TextStyle(
+                                      color: Color(0xFF64748B),
+                                      fontSize: 12,
+                                      fontWeight:
+                                          FontWeight.w700,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 14),
+                        DropdownButtonFormField<String>(
+                          value: destinatarios.any(
+                            (usuario) =>
+                                _idTexto(usuario['auth_id']) ==
+                                nuevoAsignadoAuthId,
+                          )
+                              ? nuevoAsignadoAuthId
+                              : null,
+                          isExpanded: true,
+                          decoration: _inputDecoration(
+                            teniaAsignacion
+                                ? 'Nuevo responsable'
+                                : 'Asignar a',
+                          ),
+                          items: destinatarios.map((usuario) {
+                            final authId =
+                                _idTexto(usuario['auth_id']);
+
+                            return DropdownMenuItem<String>(
+                              value: authId,
+                              child: Text(
+                                '${_nombreCompleto(usuario)} · ${_rolVisible(usuario['rol_usuario'])}',
+                                maxLines: 1,
+                                overflow:
+                                    TextOverflow.ellipsis,
+                              ),
+                            );
+                          }).toList(),
+                          onChanged: (value) {
+                            setModalState(() {
+                              nuevoAsignadoAuthId = value;
+                            });
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 14),
                   DropdownButtonFormField<String>(
                     value: nuevoEstado,
                     isExpanded: true,
-                    decoration: _inputDecoration('Estado'),
+                    decoration:
+                        _inputDecoration('Estado'),
                     items: const [
                       'Nuevo',
                       'Contactado',
@@ -530,49 +1466,111 @@ class _ControlAltasScreenState extends State<ControlAltasScreen> {
                       'Seleccionado',
                       'Descartado',
                       'Incorporado',
-                    ].map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
-                    onChanged: (v) => setModalState(() => nuevoEstado = v!),
+                    ]
+                        .map(
+                          (estado) =>
+                              DropdownMenuItem<String>(
+                            value: estado,
+                            child: Text(estado),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: (value) {
+                      if (value == null) return;
+
+                      setModalState(() {
+                        nuevoEstado = value;
+                      });
+                    },
                   ),
                   const SizedBox(height: 12),
                   DropdownButtonFormField<String>(
                     value: nuevaPrioridad,
                     isExpanded: true,
-                    decoration: _inputDecoration('Prioridad'),
-                    items: const ['Alta', 'Media', 'Baja']
-                        .map((e) => DropdownMenuItem(value: e, child: Text(e)))
+                    decoration:
+                        _inputDecoration('Prioridad'),
+                    items: const [
+                      'Alta',
+                      'Media',
+                      'Baja',
+                    ]
+                        .map(
+                          (prioridad) =>
+                              DropdownMenuItem<String>(
+                            value: prioridad,
+                            child: Text(prioridad),
+                          ),
+                        )
                         .toList(),
-                    onChanged: (v) => setModalState(() => nuevaPrioridad = v!),
+                    onChanged: (value) {
+                      if (value == null) return;
+
+                      setModalState(() {
+                        nuevaPrioridad = value;
+                      });
+                    },
                   ),
                   const SizedBox(height: 12),
                   TextFormField(
                     initialValue: proximaAccion,
-                    decoration: _inputDecoration('Próxima acción'),
-                    onChanged: (v) => proximaAccion = v,
+                    decoration: _inputDecoration(
+                      'Próxima acción',
+                    ),
+                    onChanged: (value) {
+                      proximaAccion = value;
+                    },
                   ),
                   const SizedBox(height: 12),
                   TextFormField(
                     initialValue: observaciones,
                     maxLines: 3,
-                    decoration: _inputDecoration('Observaciones'),
-                    onChanged: (v) => observaciones = v,
+                    decoration: _inputDecoration(
+                      'Observaciones',
+                    ),
+                    onChanged: (value) {
+                      observaciones = value;
+                    },
                   ),
                   const SizedBox(height: 12),
                   TextFormField(
                     initialValue: notas,
                     maxLines: 3,
-                    decoration: _inputDecoration('Notas'),
-                    onChanged: (v) => notas = v,
+                    decoration:
+                        _inputDecoration('Notas'),
+                    onChanged: (value) {
+                      notas = value;
+                    },
                   ),
                   const SizedBox(height: 18),
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton.icon(
-                      onPressed: () async {
-                        Navigator.pop(context);
-                        await _guardarGestion(refs, nuevoEstado, nuevaPrioridad, observaciones, notas, proximaAccion);
-                      },
-                      icon: const Icon(Icons.save_rounded),
-                      label: const Text('Guardar cambios'),
+                      onPressed: nuevoAsignadoAuthId == null
+                          ? null
+                          : () async {
+                              Navigator.pop(context);
+
+                              await _guardarGestion(
+                                refs,
+                                nuevoEstado,
+                                nuevaPrioridad,
+                                observaciones,
+                                notas,
+                                proximaAccion,
+                                nuevoAsignadoAuthId:
+                                    nuevoAsignadoAuthId,
+                              );
+                            },
+                      icon: Icon(
+                        teniaAsignacion
+                            ? Icons.swap_horiz_rounded
+                            : Icons.person_add_alt_1_rounded,
+                      ),
+                      label: Text(
+                        teniaAsignacion
+                            ? 'Reasignar y guardar'
+                            : 'Asignar y guardar',
+                      ),
                       style: _primaryButtonStyle(),
                     ),
                   ),
@@ -584,6 +1582,7 @@ class _ControlAltasScreenState extends State<ControlAltasScreen> {
       },
     );
   }
+
   String _estadoParaDropdown(dynamic value) {
   final e = _normalizarEstado(value);
 
@@ -598,19 +1597,144 @@ class _ControlAltasScreenState extends State<ControlAltasScreen> {
   return 'Contactado';
 }
 
+  Future<Set<String>> _idsCandidatosPermitidosActuales() async {
+    if (_veTodo()) {
+      return candidatos
+          .map((candidato) => _idTexto(candidato['id']))
+          .where((id) => id.isNotEmpty)
+          .toSet();
+    }
+
+    final authUser = supabase.auth.currentUser;
+
+    if (authUser == null) return <String>{};
+
+    final perfilData = await supabase
+        .from('usuarios')
+        .select(
+          'id, auth_id, parent_id, rol_usuario, '
+          'nombre, apellidos, email',
+        )
+        .eq('auth_id', authUser.id)
+        .maybeSingle();
+
+    if (perfilData == null) return <String>{};
+
+    final usuariosData = await supabase
+        .from('usuarios')
+        .select(
+          'id, auth_id, parent_id, rol_usuario, '
+          'nombre, apellidos, email',
+        );
+
+    final anteriores = usuarios;
+
+    usuarios =
+        List<Map<String, dynamic>>.from(
+      usuariosData,
+    );
+
+    _crearIndicesUsuarios();
+
+    final estructura = _construirEstructura(
+      perfil: Map<String, dynamic>.from(
+        perfilData,
+      ),
+    );
+
+    final authIds = estructura
+        .map((usuario) => _idTexto(usuario['auth_id']))
+        .where((id) => id.isNotEmpty)
+        .toList();
+
+    usuarios = anteriores;
+    _crearIndicesUsuarios();
+
+    if (authIds.isEmpty) return <String>{};
+
+    final response = await supabase
+        .from('candidatos_captacion')
+        .select('id')
+        .inFilter('auth_id', authIds);
+
+    return List<Map<String, dynamic>>.from(
+      response,
+    )
+        .map((fila) => _idTexto(fila['id']))
+        .where((id) => id.isNotEmpty)
+        .toSet();
+  }
+
   Future<void> _guardarGestion(
     List<Map<String, dynamic>> refs,
     String estado,
     String prioridad,
     String observaciones,
     String notas,
-    String proximaAccion,
-  ) async {
+    String proximaAccion, {
+    required String? nuevoAsignadoAuthId,
+  }) async {
     try {
-      setState(() => guardando = true);
-      final ids = refs.map((r) => r['id']?.toString()).whereType<String>().toList();
-      final now = DateTime.now().toIso8601String();
+      if (mounted) {
+        setState(() {
+          guardando = true;
+        });
+      }
+
+      final idsSolicitados = refs
+          .map((ref) => _idTexto(ref['id']))
+          .where((id) => id.isNotEmpty)
+          .toSet();
+
+      if (idsSolicitados.isEmpty) {
+        throw Exception(
+          'No hay candidatos válidos seleccionados.',
+        );
+      }
+
+      final authDestino =
+          _idTexto(nuevoAsignadoAuthId);
+
+      if (authDestino.isEmpty) {
+        throw Exception(
+          'Debes seleccionar un responsable.',
+        );
+      }
+
+      final destinoPermitido =
+          usuariosPermitidos.any((usuario) {
+        return _idTexto(usuario['auth_id']) ==
+            authDestino;
+      });
+
+      if (!destinoPermitido) {
+        throw Exception(
+          'El responsable seleccionado no pertenece '
+          'a tu estructura.',
+        );
+      }
+
+      final idsPermitidos =
+          await _idsCandidatosPermitidosActuales();
+
+      final idsAutorizados = idsSolicitados
+          .where(idsPermitidos.contains)
+          .toList();
+
+      if (idsAutorizados.length !=
+          idsSolicitados.length) {
+        throw Exception(
+          'Uno o más candidatos ya no pertenecen '
+          'a tu estructura.',
+        );
+      }
+
+      final now =
+          DateTime.now().toIso8601String();
+
       final update = <String, dynamic>{
+        'auth_id': authDestino,
+        'asignado_por': myAuthId,
         'estado': estado,
         'prioridad': prioridad,
         'observaciones': observaciones,
@@ -619,22 +1743,61 @@ class _ControlAltasScreenState extends State<ControlAltasScreen> {
         'update_at': now,
       };
 
-      final normal = _normalizarEstado(estado);
-      if (normal.contains('entrevista')) update['fecha_entrevista_programada'] = now;
-      if (normal == 'entrevistado') update['fecha_entrevista'] = now;
-      if (normal == 'seleccionado') update['fecha_seleccion'] = now;
-      if (normal == 'incorporado') update['fecha_incorporacion'] = now;
-      if (normal == 'contactado') update['fecha_contacto'] = now;
+      final normal =
+          _normalizarEstado(estado);
 
-      await supabase.from('candidatos_captacion').update(update).inFilter('id', ids);
+      if (normal == 'entrevista programada') {
+        update['fecha_entrevista_programada'] = now;
+      }
 
-      _snack('Candidatos actualizados correctamente');
+      if (normal == 'entrevistado') {
+        update['fecha_entrevista'] = now;
+      }
+
+      if (normal == 'seleccionado') {
+        update['fecha_seleccion'] = now;
+      }
+
+      if (normal == 'incorporado') {
+        update['fecha_incorporacion'] = now;
+      }
+
+      if (normal == 'contactado') {
+        update['fecha_contacto'] = now;
+      }
+
+      await supabase
+          .from('candidatos_captacion')
+          .update(update)
+          .inFilter('id', idsAutorizados);
+
+      final destino =
+          _usuarioPorAuth(authDestino);
+
+      _snack(
+        destino == null
+            ? 'Candidatos asignados correctamente'
+            : 'Candidatos asignados a '
+                '${_nombreCompleto(destino)}',
+      );
+
       await cargarDatos();
-      setState(() => candidatosSeleccionados.clear());
+
+      if (!mounted) return;
+
+      setState(() {
+        candidatosSeleccionados.clear();
+      });
     } catch (e) {
-      _snack('Error guardando candidatos: $e');
+      _snack(
+        'Error guardando candidatos: $e',
+      );
     } finally {
-      if (mounted) setState(() => guardando = false);
+      if (mounted) {
+        setState(() {
+          guardando = false;
+        });
+      }
     }
   }
 
@@ -677,108 +1840,117 @@ class _ControlAltasScreenState extends State<ControlAltasScreen> {
     );
   }
 
- List<Map<String, dynamic>> get _resumenJefesEquipo {
-  final map = <String, Map<String, dynamic>>{};
+  List<Map<String, dynamic>> get _resumenJefesEquipo {
+    final map = <String, Map<String, dynamic>>{};
 
-  List<Map<String, dynamic>> base;
+    List<Map<String, dynamic>> base =
+        _usuariosPorRol('jefe_equipo');
 
-  if (filtroJefeEquipoId != null) {
-    base = usuariosPermitidos
-        .where((u) => u['id']?.toString() == filtroJefeEquipoId)
-        .toList();
-  } else if (filtroJefeVentasId != null) {
-    base = usuariosPermitidos
-        .where((u) =>
-            u['rol_usuario']?.toString() == 'jefe_equipo' &&
-            u['parent_id']?.toString() == filtroJefeVentasId)
-        .toList();
-  } else if (filtroDirectorZonaId != null) {
-    final idsJefesVentas = usuariosPermitidos
-        .where((u) =>
-            u['rol_usuario']?.toString() == 'jefe_ventas' &&
-            u['parent_id']?.toString() == filtroDirectorZonaId)
-        .map((u) => u['id']?.toString())
-        .whereType<String>()
-        .toSet();
+    final responsableSeleccionado =
+        filtroJefeEquipoId ??
+        filtroJefeVentasId ??
+        filtroDirectorZonaId;
 
-    base = usuariosPermitidos
-        .where((u) =>
-            u['rol_usuario']?.toString() == 'jefe_equipo' &&
-            idsJefesVentas.contains(u['parent_id']?.toString()))
-        .toList();
-  } else if (role == 'jefe_ventas' && myId != null) {
-    base = usuariosPermitidos
-        .where((u) =>
-            u['rol_usuario']?.toString() == 'jefe_equipo' &&
-            u['parent_id']?.toString() == myId)
-        .toList();
-  } else {
-    base = usuariosPermitidos
-        .where((u) => u['rol_usuario']?.toString() == 'jefe_equipo')
-        .toList();
+    if (responsableSeleccionado != null) {
+      base = base.where((jefe) {
+        return _esDescendienteDe(
+          jefe,
+          responsableSeleccionado,
+        );
+      }).toList();
+    }
+
+    for (final jefe in base) {
+      final jefeId = _idTexto(jefe['id']);
+
+      if (jefeId.isEmpty) continue;
+
+      final jefeVentas = _buscarAntecesorPorRol(
+        jefe,
+        'jefe_ventas',
+      );
+
+      final directorZona = _buscarAntecesorPorRol(
+        jefe,
+        'director_zona',
+      );
+
+      map[jefeId] = {
+        'jefe_id': jefeId,
+        'jefe_equipo': _nombreCompleto(jefe),
+        'jefe_ventas': jefeVentas == null
+            ? ''
+            : _nombreCompleto(jefeVentas),
+        'director_zona': directorZona == null
+            ? ''
+            : _nombreCompleto(directorZona),
+        'incluidos': 0,
+        'contactados': 0,
+        'entrevista_programada': 0,
+        'entrevistados': 0,
+        'seleccionados': 0,
+        'descartados': 0,
+        'incorporados': 0,
+      };
+    }
+
+    for (final candidato in candidatosFiltrados) {
+      final jefeId =
+          _idTexto(candidato['jefe_equipo_id']);
+
+      if (jefeId.isEmpty ||
+          !map.containsKey(jefeId)) {
+        continue;
+      }
+
+      final row = map[jefeId]!;
+      row['incluidos'] =
+          (row['incluidos'] as int) + 1;
+
+      final estado =
+          _normalizarEstado(candidato['estado']);
+
+      if (estado.contains('contact')) {
+        row['contactados'] =
+            (row['contactados'] as int) + 1;
+      }
+
+      if (estado.contains('program')) {
+        row['entrevista_programada'] =
+            (row['entrevista_programada'] as int) +
+                1;
+      }
+
+      if (estado.contains('entrevist')) {
+        row['entrevistados'] =
+            (row['entrevistados'] as int) + 1;
+      }
+
+      if (estado.contains('seleccion')) {
+        row['seleccionados'] =
+            (row['seleccionados'] as int) + 1;
+      }
+
+      if (estado.contains('descart')) {
+        row['descartados'] =
+            (row['descartados'] as int) + 1;
+      }
+
+      if (estado.contains('incorpor')) {
+        row['incorporados'] =
+            (row['incorporados'] as int) + 1;
+      }
+    }
+
+    final lista = map.values.toList();
+
+    lista.sort(
+      (a, b) => (b['incluidos'] as int)
+          .compareTo(a['incluidos'] as int),
+    );
+
+    return lista;
   }
-
-  for (final jefe in base) {
-    final jefeId = jefe['id']?.toString() ?? '';
-    if (jefeId.isEmpty) continue;
-
-    final jefeVentas = _usuarioPorId(jefe['parent_id']?.toString());
-    final directorZona = _usuarioPorId(jefeVentas?['parent_id']?.toString());
-
-    map[jefeId] = {
-      'jefe_id': jefeId,
-      'jefe_equipo': _nombreCompleto(jefe),
-      'jefe_ventas': jefeVentas == null ? '' : _nombreCompleto(jefeVentas),
-      'director_zona': directorZona == null ? '' : _nombreCompleto(directorZona),
-      'incluidos': 0,
-      'contactados': 0,
-      'entrevista_programada': 0,
-      'entrevistados': 0,
-      'seleccionados': 0,
-      'descartados': 0,
-      'incorporados': 0,
-    };
-  }
-
-  for (final c in candidatosFiltrados) {
-    final jefeId = c['jefe_equipo_id']?.toString() ?? '';
-    if (jefeId.isEmpty || !map.containsKey(jefeId)) continue;
-
-    final row = map[jefeId]!;
-    row['incluidos'] = (row['incluidos'] as int) + 1;
-
-    final e = _normalizarEstado(c['estado']);
-
-    if (e.contains('contact')) {
-      row['contactados'] = (row['contactados'] as int) + 1;
-    }
-
-    if (e.contains('program')) {
-      row['entrevista_programada'] =
-          (row['entrevista_programada'] as int) + 1;
-    }
-
-    if (e == 'entrevistado' || e == 'entrevistada' || e.contains('entrevist')) {
-      row['entrevistados'] = (row['entrevistados'] as int) + 1;
-    }
-
-    if (e.contains('seleccion')) {
-      row['seleccionados'] = (row['seleccionados'] as int) + 1;
-    }
-
-    if (e.contains('descart')) {
-      row['descartados'] = (row['descartados'] as int) + 1;
-    }
-
-    if (e.contains('incorpor')) {
-      row['incorporados'] = (row['incorporados'] as int) + 1;
-    }
-  }
-
-  final list = map.values.toList();
-  list.sort((a, b) => (b['incluidos'] as int).compareTo(a['incluidos'] as int));
-  return list;
-}
 
 List<Map<String, dynamic>> get _resumenOrigenes {
   final map = <String, Map<String, dynamic>>{};
@@ -1052,7 +2224,7 @@ List<Map<String, dynamic>> get _resumenOrigenes {
           ),
           const SizedBox(height: 5),
           const Text(
-            'Analiza candidatos y altas por estructura.',
+            'Busca por estructura, asignación, seguimiento, contacto y fechas.',
             style: TextStyle(color: Color(0xFF64748B), fontWeight: FontWeight.w600, height: 1.3),
           ),
           const SizedBox(height: 18),
@@ -1152,8 +2324,108 @@ List<Map<String, dynamic>> get _resumenOrigenes {
               _aplicarFiltros();
             }),
           ),
-          _dateButton(label: 'Fecha desde', value: fechaDesde, onTap: () => _pickFecha(true)),
-          _dateButton(label: 'Fecha hasta', value: fechaHasta, onTap: () => _pickFecha(false)),
+          _dropdownSimple(
+            label: 'Asignación',
+            value: filtroAsignacion,
+            items: const [
+              'Todos',
+              'Asignados',
+              'Sin asignar',
+            ],
+            onChanged: (v) => setState(() {
+              filtroAsignacion = v!;
+              _aplicarFiltros();
+            }),
+          ),
+          _dropdownSimple(
+            label: 'Rol del responsable',
+            value: filtroRolAsignado,
+            items: rolesAsignadosDisponibles,
+            onChanged: (v) => setState(() {
+              filtroRolAsignado = v!;
+              _aplicarFiltros();
+            }),
+          ),
+          _dropdownSimple(
+            label: 'Seguimiento',
+            value: filtroSeguimiento,
+            items: const [
+              'Todos',
+              'Con seguimiento',
+              'Sin seguimiento',
+              'Vencidos',
+              'Hoy',
+              'Próximos 7 días',
+            ],
+            onChanged: (v) => setState(() {
+              filtroSeguimiento = v!;
+              _aplicarFiltros();
+            }),
+          ),
+          _dropdownSimple(
+            label: 'Datos de contacto',
+            value: filtroContacto,
+            items: const [
+              'Todos',
+              'Con teléfono',
+              'Con email',
+              'Con teléfono o email',
+              'Sin datos de contacto',
+            ],
+            onChanged: (v) => setState(() {
+              filtroContacto = v!;
+              _aplicarFiltros();
+            }),
+          ),
+          _dropdownSimple(
+            label: 'Entrevista',
+            value: filtroEntrevista,
+            items: const [
+              'Todos',
+              'Programada',
+              'Sin programar',
+            ],
+            onChanged: (v) => setState(() {
+              filtroEntrevista = v!;
+              _aplicarFiltros();
+            }),
+          ),
+          _dropdownSimple(
+            label: 'Ordenar por',
+            value: filtroOrden,
+            items: const [
+              'Más recientes',
+              'Más antiguos',
+              'Nombre A-Z',
+              'Prioridad',
+              'Próxima acción',
+            ],
+            onChanged: (v) => setState(() {
+              filtroOrden = v!;
+              sortKey = null;
+              _aplicarFiltros();
+            }),
+          ),
+          _dateButton(
+            label: 'Alta desde',
+            value: fechaDesde,
+            onTap: () => _pickFecha(true),
+          ),
+          _dateButton(
+            label: 'Alta hasta',
+            value: fechaHasta,
+            onTap: () => _pickFecha(false),
+          ),
+          _dateButton(
+            label: 'Próxima acción desde',
+            value: proximaAccionDesde,
+            onTap: () => _pickFechaProximaAccion(true),
+          ),
+          _dateButton(
+            label: 'Próxima acción hasta',
+            value: proximaAccionHasta,
+            onTap: () => _pickFechaProximaAccion(false),
+          ),
           _dropdownSimple(
             label: 'Ratio gestión jefes',
             value: ratioSeleccionado,
@@ -1237,6 +2509,54 @@ List<Map<String, dynamic>> get _resumenOrigenes {
                 ),
             ],
           ),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              _quickFilterChip(
+                label: 'Sin asignar ($totalSinAsignar)',
+                active: filtroAsignacion == 'Sin asignar',
+                onTap: () {
+                  setState(() {
+                    filtroAsignacion =
+                        filtroAsignacion == 'Sin asignar'
+                            ? 'Todos'
+                            : 'Sin asignar';
+                    _aplicarFiltros();
+                  });
+                },
+              ),
+              _quickFilterChip(
+                label:
+                    'Seguimientos vencidos ($totalSeguimientosVencidos)',
+                active: filtroSeguimiento == 'Vencidos',
+                onTap: () {
+                  setState(() {
+                    filtroSeguimiento =
+                        filtroSeguimiento == 'Vencidos'
+                            ? 'Todos'
+                            : 'Vencidos';
+                    _aplicarFiltros();
+                  });
+                },
+              ),
+              _quickFilterChip(
+                label:
+                    'Entrevistas ($totalEntrevistasProgramadas)',
+                active: filtroEntrevista == 'Programada',
+                onTap: () {
+                  setState(() {
+                    filtroEntrevista =
+                        filtroEntrevista == 'Programada'
+                            ? 'Todos'
+                            : 'Programada';
+                    _aplicarFiltros();
+                  });
+                },
+              ),
+            ],
+          ),
           if (seleccionadas.isNotEmpty) ...[
             const SizedBox(height: 10),
             Wrap(
@@ -1253,6 +2573,45 @@ List<Map<String, dynamic>> get _resumenOrigenes {
             ),
           ],
         ],
+      ),
+    );
+  }
+
+
+  Widget _quickFilterChip({
+    required String label,
+    required bool active,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(999),
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(
+          horizontal: 12,
+          vertical: 8,
+        ),
+        decoration: BoxDecoration(
+          color: active
+              ? const Color(0xFFE0F2FE)
+              : const Color(0xFFF8FAFC),
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(
+            color: active
+                ? const Color(0xFF38BDF8)
+                : const Color(0xFFE2E8F0),
+          ),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: active
+                ? const Color(0xFF0369A1)
+                : const Color(0xFF475569),
+            fontWeight: FontWeight.w900,
+            fontSize: 12,
+          ),
+        ),
       ),
     );
   }
@@ -1358,9 +2717,19 @@ List<Map<String, dynamic>> get _resumenOrigenes {
                                   if (value == 'detalle') _verDetalle(c);
                                   if (value == 'gestionar') _gestionarCandidatos([c]);
                                 },
-                                itemBuilder: (_) => const [
-                                  PopupMenuItem(value: 'detalle', child: Text('Ver detalles')),
-                                  PopupMenuItem(value: 'gestionar', child: Text('Gestionar candidato')),
+                                itemBuilder: (_) => [
+                                  const PopupMenuItem(
+                                    value: 'detalle',
+                                    child: Text('Ver detalles'),
+                                  ),
+                                  PopupMenuItem(
+                                    value: 'gestionar',
+                                    child: Text(
+                                      _tieneAsignacion(c)
+                                          ? 'Gestionar / Reasignar'
+                                          : 'Gestionar / Asignar',
+                                    ),
+                                  ),
                                 ],
                               ),
                             ],
@@ -1681,7 +3050,21 @@ Widget _miniTotal(
               : const Color(0xFF16A34A);
       return _pill(text.isEmpty ? '-' : text, color);
     }
-    if (key == 'origen') return _pill(text.isEmpty ? '-' : text, const Color(0xFF7C3AED));
+    if (key == 'origen') {
+      return _pill(
+        text.isEmpty ? '-' : text,
+        const Color(0xFF7C3AED),
+      );
+    }
+
+    if (key == 'comercial_rol') {
+      return _pill(
+        text.isEmpty ? 'Sin asignar' : _rolVisible(text),
+        text.isEmpty
+            ? const Color(0xFF94A3B8)
+            : const Color(0xFF2563EB),
+      );
+    }
 
     return Text(
       text.isEmpty ? '-' : text,

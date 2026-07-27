@@ -11,6 +11,8 @@ import 'package:safebrok_andalucia/features/admin/modificar_comisiones_screen.da
 import 'package:safebrok_andalucia/features/business/consultar_poliza_screen.dart';
 import 'package:safebrok_andalucia/features/admin/tramitar_facturas_screen.dart';
 import 'package:safebrok_andalucia/features/business/anular_poliza_screen.dart';
+import 'package:safebrok_andalucia/features/business/cierres_produccion_screen.dart';
+import 'package:safebrok_andalucia/features/business/bi_rentabilidad_screen.dart';
 
 class CuadroMandosScreen extends StatefulWidget {
   const CuadroMandosScreen({super.key});
@@ -42,7 +44,8 @@ class _CuadroMandosScreenState extends State<CuadroMandosScreen> {
     _ModuloMando(
       title: 'Reasignar jefe de equipo',
       icon: Icons.manage_accounts_rounded,
-      description: 'Cambiar la dependencia de un jefe de equipo entre distintos jefes de ventas.',
+      description:
+          'Cambiar la dependencia de un jefe de equipo entre distintos jefes de ventas.',
       blockedFor: ['jefe_ventas'],
     ),
     _ModuloMando(
@@ -58,27 +61,40 @@ class _CuadroMandosScreenState extends State<CuadroMandosScreen> {
       blockedFor: [],
     ),
     _ModuloMando(
-  title: 'Consultar póliza',
-  icon: Icons.policy_rounded,
-  description: 'Consulta rápida de pólizas, clientes, recibos y datos comerciales.',
-  blockedFor: [],
-),
-_ModuloMando(
-  title: 'Anular póliza',
-  icon: Icons.cancel_presentation_rounded,
-  description: 'Gestión y seguimiento de solicitudes de anulación de pólizas.',
-  blockedFor: [
-    'director_zona',
-    'jefe_ventas',
-    'jefe_equipo',
-    'agente',
-  ],
-),
+      title: 'Consultar póliza',
+      icon: Icons.policy_rounded,
+      description:
+          'Consulta rápida de pólizas, clientes, recibos y datos comerciales.',
+      blockedFor: [],
+    ),
+    _ModuloMando(
+      title: 'Anular póliza',
+      icon: Icons.cancel_presentation_rounded,
+      description:
+          'Gestión y seguimiento de solicitudes de anulación de pólizas.',
+      blockedFor: ['director_zona', 'jefe_ventas', 'jefe_equipo', 'agente'],
+    ),
     _ModuloMando(
       title: 'Tramitar facturas',
       icon: Icons.receipt_long_rounded,
       description: 'Expedición y control de facturación.',
       blockedFor: ['director_zona', 'jefe_ventas'],
+    ),
+    _ModuloMando(
+      title: 'Cierres de producción',
+      icon: Icons.event_available_rounded,
+      description:
+          'Consolidación, revisión y cierre de cada periodo de producción.',
+      blockedFor: [],
+      allowedFor: ['director_nacional'],
+    ),
+    _ModuloMando(
+      title: 'BI de Rentabilidad',
+      icon: Icons.analytics_rounded,
+      description:
+          'Análisis de ingresos, costes comerciales, márgenes y resultados.',
+      blockedFor: [],
+      allowedFor: ['director_nacional'],
     ),
     _ModuloMando(
       title: 'Modificar comisiones',
@@ -157,6 +173,10 @@ _ModuloMando(
   }
 
   bool _puedeVer(_ModuloMando modulo) {
+    if (modulo.allowedFor.isNotEmpty && !modulo.allowedFor.contains(role)) {
+      return false;
+    }
+
     if (role == 'director_nacional' || role == 'administracion') {
       return true;
     }
@@ -184,9 +204,7 @@ _ModuloMando(
           SafeArea(
             child: loading
                 ? const Center(
-                    child: CircularProgressIndicator(
-                      color: Color(0xFF0284C7),
-                    ),
+                    child: CircularProgressIndicator(color: Color(0xFF0284C7)),
                   )
                 : Row(
                     children: [
@@ -247,10 +265,7 @@ _ModuloMando(
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(18),
                       gradient: const LinearGradient(
-                        colors: [
-                          Color(0xFF0284C7),
-                          Color(0xFF22D3EE),
-                        ],
+                        colors: [Color(0xFF0284C7), Color(0xFF22D3EE)],
                       ),
                     ),
                     child: const Icon(
@@ -288,7 +303,11 @@ _ModuloMando(
               const SizedBox(height: 24),
               _rolePill(),
               const SizedBox(height: 24),
-              ...modulos.map(_menuItem),
+              ...modulos
+                  .where(
+                    (m) => m.allowedFor.isEmpty || m.allowedFor.contains(role),
+                  )
+                  .map(_menuItem),
             ],
           ),
         ),
@@ -297,7 +316,9 @@ _ModuloMando(
   }
 
   Widget _rolePill() {
-    final text = role.isEmpty ? 'Sin rol' : role.replaceAll('_', ' ').toUpperCase();
+    final text = role.isEmpty
+        ? 'Sin rol'
+        : role.replaceAll('_', ' ').toUpperCase();
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
@@ -308,10 +329,7 @@ _ModuloMando(
       ),
       child: Row(
         children: [
-          const Icon(
-            Icons.verified_user_rounded,
-            color: Color(0xFF0284C7),
-          ),
+          const Icon(Icons.verified_user_rounded, color: Color(0xFF0284C7)),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
@@ -339,111 +357,123 @@ _ModuloMando(
         child: InkWell(
           borderRadius: BorderRadius.circular(19),
           onTap: () {
+            if (!permitido) return;
+
             if (modulo.title == 'Reasignar mediador') {
-  Navigator.push(
-    context,
-    MaterialPageRoute(
-      builder: (_) => const ReasignarMediadorScreen(),
-    ),
-  );
-  return;
-}
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const ReasignarMediadorScreen(),
+                ),
+              );
+              return;
+            }
 
-if (modulo.title == 'Reasignar jefe de equipo') {
-  Navigator.push(
-    context,
-    MaterialPageRoute(
-      builder: (_) => const ReasignarJefeEquipoScreen(),
-    ),
-  );
-  return;
-}
+            if (modulo.title == 'Reasignar jefe de equipo') {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const ReasignarJefeEquipoScreen(),
+                ),
+              );
+              return;
+            }
 
-if (modulo.title == 'Control referencias') {
-  Navigator.push(
-    context,
-    MaterialPageRoute(
-      builder: (_) => const ControlReferenciasScreen(),
-    ),
-  );
-  return;
-}
+            if (modulo.title == 'Control referencias') {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const ControlReferenciasScreen(),
+                ),
+              );
+              return;
+            }
 
-if (modulo.title == 'Cargar gestiones') {
-  Navigator.push(
-    context,
-    MaterialPageRoute(
-      builder: (_) => const CargarGestionesScreen(),
-    ),
-  );
-  return;
-}
+            if (modulo.title == 'Cargar gestiones') {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const CargarGestionesScreen(),
+                ),
+              );
+              return;
+            }
 
-if (modulo.title == 'Consultar póliza') {
-  Navigator.push(
-    context,
-    MaterialPageRoute(
-      builder: (_) => const ConsultarPolizaScreen(),
-    ),
-  );
-  return;
-}
+            if (modulo.title == 'Consultar póliza') {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const ConsultarPolizaScreen(),
+                ),
+              );
+              return;
+            }
 
-if (modulo.title == 'Anular póliza') {
-  Navigator.push(
-    context,
-    MaterialPageRoute(
-      builder: (_) => const AnularPolizaScreen(),
-    ),
-  );
-  return;
-}
+            if (modulo.title == 'Anular póliza') {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const AnularPolizaScreen()),
+              );
+              return;
+            }
 
-if (modulo.title == 'Altas') {
-  Navigator.push(
-    context,
-    MaterialPageRoute(
-      builder: (_) => const ControlAltasScreen(),
-    ),
-  );
-  return;
-}
+            if (modulo.title == 'Altas') {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const ControlAltasScreen()),
+              );
+              return;
+            }
 
-if (modulo.title == 'Modificar comisiones') {
-  Navigator.push(
-    context,
-    MaterialPageRoute(
-      builder: (_) => const ModificarComisionesScreen(),
-    ),
-  );
-  return;
-}
+            if (modulo.title == 'Modificar comisiones') {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const ModificarComisionesScreen(),
+                ),
+              );
+              return;
+            }
 
-if (modulo.title == 'Tramitar facturas') {
-  Navigator.push(
-    context,
-    MaterialPageRoute(
-      builder: (_) => const TramitarFacturasScreen(),
-    ),
-  );
-  return;
-}
+            if (modulo.title == 'Cierres de producción') {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const CierresProduccionScreen(),
+                ),
+              );
+              return;
+            }
 
-if (modulo.title == 'Bajas') {
-  Navigator.push(
-    context,
-    MaterialPageRoute(
-      builder: (_) => const ControlBajasScreen(),
-    ),
-  );
-  return;
-}
+            if (modulo.title == 'BI de Rentabilidad') {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const BiRentabilidadScreen()),
+              );
+              return;
+            }
 
+            if (modulo.title == 'Tramitar facturas') {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const TramitarFacturasScreen(),
+                ),
+              );
+              return;
+            }
 
+            if (modulo.title == 'Bajas') {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const ControlBajasScreen()),
+              );
+              return;
+            }
 
-setState(() => selectedModule = modulo.title);
+            setState(() => selectedModule = modulo.title);
 
-setState(() => selectedModule = modulo.title);
+            setState(() => selectedModule = modulo.title);
           },
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 220),
@@ -562,10 +592,7 @@ setState(() => selectedModule = modulo.title);
           ),
           child: const Row(
             children: [
-              Icon(
-                Icons.shield_rounded,
-                color: Color(0xFF16A34A),
-              ),
+              Icon(Icons.shield_rounded, color: Color(0xFF16A34A)),
               SizedBox(width: 8),
               Text(
                 'Panel seguro',
@@ -647,7 +674,11 @@ setState(() => selectedModule = modulo.title);
                 spacing: 14,
                 runSpacing: 14,
                 children: modulos
-                    .where((m) => m.title != 'Resumen ejecutivo')
+                    .where(
+                      (m) =>
+                          m.title != 'Resumen ejecutivo' &&
+                          (m.allowedFor.isEmpty || m.allowedFor.contains(role)),
+                    )
                     .map(
                       (m) => _quickModuleChip(
                         title: m.title,
@@ -680,11 +711,13 @@ setState(() => selectedModule = modulo.title);
               ),
               _PermisoLine(
                 role: 'Director de zona',
-                text: 'Puede consultar todo excepto modificar comisiones y tramitar facturas.',
+                text:
+                    'Puede consultar todo excepto modificar comisiones y tramitar facturas.',
               ),
               _PermisoLine(
                 role: 'Jefe de ventas',
-                text: 'No puede modificar comisiones, tramitar facturas ni reasignar jefes de ventas.',
+                text:
+                    'No puede modificar comisiones, tramitar facturas ni reasignar jefes de ventas.',
               ),
             ],
           ),
@@ -694,8 +727,6 @@ setState(() => selectedModule = modulo.title);
   }
 
   Widget _moduloGenerico(_ModuloMando modulo) {
-
-
     return _glassPanel(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -843,17 +874,10 @@ setState(() => selectedModule = modulo.title);
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(22),
             gradient: const LinearGradient(
-              colors: [
-                Color(0xFF0284C7),
-                Color(0xFF22D3EE),
-              ],
+              colors: [Color(0xFF0284C7), Color(0xFF22D3EE)],
             ),
           ),
-          child: Icon(
-            modulo.icon,
-            color: Colors.white,
-            size: 31,
-          ),
+          child: Icon(modulo.icon, color: Colors.white, size: 31),
         ),
         const SizedBox(width: 14),
         Expanded(
@@ -936,11 +960,7 @@ setState(() => selectedModule = modulo.title);
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(
-            icon,
-            color: const Color(0xFF0284C7),
-            size: 28,
-          ),
+          Icon(icon, color: const Color(0xFF0284C7), size: 28),
           const SizedBox(height: 12),
           Text(
             title,
@@ -985,14 +1005,18 @@ setState(() => selectedModule = modulo.title);
           children: [
             Icon(
               enabled ? icon : Icons.lock_rounded,
-              color: enabled ? const Color(0xFF0284C7) : const Color(0xFF94A3B8),
+              color: enabled
+                  ? const Color(0xFF0284C7)
+                  : const Color(0xFF94A3B8),
             ),
             const SizedBox(width: 10),
             Expanded(
               child: Text(
                 title,
                 style: TextStyle(
-                  color: enabled ? const Color(0xFF0F172A) : const Color(0xFF64748B),
+                  color: enabled
+                      ? const Color(0xFF0F172A)
+                      : const Color(0xFF64748B),
                   fontWeight: FontWeight.w900,
                   fontSize: 13,
                 ),
@@ -1098,6 +1122,7 @@ class _ModuloMando {
   final IconData icon;
   final String description;
   final List<String> blockedFor;
+  final List<String> allowedFor;
   final List<String> children;
 
   const _ModuloMando({
@@ -1105,6 +1130,7 @@ class _ModuloMando {
     required this.icon,
     required this.description,
     required this.blockedFor,
+    this.allowedFor = const [],
     this.children = const [],
   });
 }
@@ -1116,9 +1142,7 @@ class _FondoClaroPremium extends StatelessWidget {
   Widget build(BuildContext context) {
     return Stack(
       children: [
-        Container(
-          color: const Color(0xFFF4F7FB),
-        ),
+        Container(color: const Color(0xFFF4F7FB)),
         Positioned(
           top: -140,
           right: -120,
@@ -1161,10 +1185,7 @@ class _PermisoLine extends StatelessWidget {
   final String role;
   final String text;
 
-  const _PermisoLine({
-    required this.role,
-    required this.text,
-  });
+  const _PermisoLine({required this.role, required this.text});
 
   @override
   Widget build(BuildContext context) {

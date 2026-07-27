@@ -18,6 +18,7 @@ class _TramitarFacturasScreenState extends State<TramitarFacturasScreen> {
   final supabase = Supabase.instance.client;
 
   bool loading = true;
+  bool guardandoAjusteManual = false;
   String role = '';
   List<Map<String, dynamic>> lineasFactura = [];
   String estadoFiltro = 'pendiente_tramitar';
@@ -60,11 +61,315 @@ class _TramitarFacturasScreenState extends State<TramitarFacturasScreen> {
   double _money(dynamic value) {
     if (value == null) return 0;
     if (value is num) return value.toDouble();
-    return double.tryParse(value.toString()) ?? 0;
+
+    final raw = value.toString().trim();
+    if (raw.isEmpty) return 0;
+
+    final normalizado = raw.contains(',') && raw.contains('.')
+        ? raw.replaceAll('.', '').replaceAll(',', '.')
+        : raw.replaceAll(',', '.');
+
+    return double.tryParse(normalizado) ?? 0;
   }
 
- bool get esAdmin =>
-    role == 'administracion' || role == 'director_nacional';
+  double _primerImporte(
+    Map<String, dynamic> fila,
+    List<String> columnas,
+  ) {
+    for (final columna in columnas) {
+      if (!fila.containsKey(columna)) continue;
+      final valor = _money(fila[columna]);
+      if (valor.abs() > 0.001) return valor;
+    }
+    return 0;
+  }
+
+  double _comisionFirmadaLinea(Map<String, dynamic> linea) {
+    final tipo = (linea['tipo_movimiento'] ??
+            linea['tipo'] ??
+            linea['movimiento'] ??
+            'VENTA')
+        .toString()
+        .trim()
+        .toUpperCase();
+
+    final importe = _primerImporte(linea, const [
+      'comision',
+      'importe_comision',
+      'comision_total',
+      'comision_neta',
+      'importe',
+      'cantidad',
+    ]);
+
+    // Si el importe ya viene negativo, se respeta tal cual.
+    if (importe < 0) return importe;
+
+    // Los extornos históricos a veces se guardaron como positivos.
+    if (tipo.contains('EXTORNO') &&
+        !tipo.contains('REVERSO') &&
+        !tipo.contains('ELIMINAR')) {
+      return -importe.abs();
+    }
+
+    if (tipo.contains('NEGATIVO')) return -importe.abs();
+    return importe;
+  }
+
+  Map<String, dynamic> _compatibilizarFacturaAntigua(
+    Map<String, dynamic> factura,
+    List<Map<String, dynamic>> lineas,
+  ) {
+    final salida = Map<String, dynamic>.from(factura);
+
+    double comisiones = _primerImporte(factura, const [
+      'comisiones',
+      'comision',
+      'total_comisiones',
+      'comisiones_totales',
+      'importe_comisiones',
+      'comision_total',
+    ]);
+
+    double rappel = _primerImporte(factura, const [
+      'rappel',
+      'rapel',
+      'importe_rappel',
+      'importe_rapel',
+      'total_rappel',
+      'total_rapel',
+    ]);
+
+    final fijo = _primerImporte(factura, const [
+      'fijo',
+      'importe_fijo',
+      'fijo_mensual',
+      'salario_fijo',
+    ]);
+
+    double base = _primerImporte(factura, const [
+      'base_imponible',
+      'base',
+      'importe_bruto',
+      'total_bruto',
+      'total_devengado',
+      'importe_total',
+      'total_nomina',
+    ]);
+
+    // Reconstrucción histórica desde las líneas cuando la cabecera antigua
+    // no contiene comisiones o fue guardada a cero.
+    if (comisiones.abs() < 0.001 && lineas.isNotEmpty) {
+      double suma = 0;
+      for (final linea in lineas) {
+        final tipo = (linea['tipo_movimiento'] ??
+                linea['tipo'] ??
+                linea['movimiento'] ??
+                'VENTA')
+            .toString()
+            .toUpperCase();
+
+        // Los ajustes de rappel no forman parte de las comisiones.
+        if (tipo.contains('RAPPEL') || tipo.contains('RAPEL')) {
+          rappel += _comisionFirmadaLinea(linea);
+          continue;
+        }
+
+        suma += _comisionFirmadaLinea(linea);
+      }
+      comisiones = suma;
+    }
+
+    // Una base histórica válida siempre tiene prioridad. Si no existe,
+    // se construye con los conceptos disponibles.
+    if (base.abs() < 0.001) {
+      base = comisiones + rappel + fijo;
+    }
+
+    // Si solo existe la base histórica, recuperamos la comisión restante.
+    if (comisiones.abs() < 0.001 && base.abs() > 0.001) {
+      comisiones = base - rappel - fijo;
+    }
+
+    final irpf = _primerImporte(factura, const [
+      'irpf_porcentaje',
+      'porcentaje_irpf',
+      'irpf',
+    ]);
+    final porcentajeIrpf = irpf.abs() < 0.001 ? 15.0 : irpf;
+
+    double importeIrpf = _primerImporte(factura, const [
+      'importe_irpf',
+      'retencion_irpf',
+      'irpf_importe',
+    ]);
+    if (importeIrpf.abs() < 0.001 && base.abs() > 0.001) {
+      importeIrpf = base * porcentajeIrpf / 100;
+    }
+
+    double total = _primerImporte(factura, const [
+      'total_factura',
+      'total',
+      'liquido',
+      'liquido_a_percibir',
+      'neto_a_pagar',
+      'importe_neto',
+    ]);
+    if (total.abs() < 0.001 && base.abs() > 0.001) {
+      total = base - importeIrpf;
+    }
+
+    salida['comisiones'] = comisiones;
+    salida['rappel'] = rappel;
+    salida['fijo'] = fijo;
+    salida['base_imponible'] = base;
+    salida['irpf_porcentaje'] = porcentajeIrpf;
+    salida['importe_irpf'] = importeIrpf;
+    salida['total_factura'] = total;
+
+    return salida;
+  }
+
+  bool get esAdmin =>
+      role == 'administracion' || role == 'director_nacional';
+
+  bool _esFacturaEditable(Map<String, dynamic> factura) {
+    return esAdmin &&
+        (factura['estado']?.toString() ?? '') == 'pendiente_tramitar';
+  }
+
+  Map<String, double> _calculosFactura(Map<String, dynamic> factura) {
+    /*
+      IMPORTANTE:
+      Las facturas ya creadas desde NominasScreen pueden traer una
+      base_imponible correcta aunque alguno de los campos desglosados
+      (comisiones, rappel o fijo) venga vacío, nulo o a cero.
+
+      Nunca reconstruimos una base válida como 0. Primero respetamos la
+      base guardada y completamos el desglose sin destruir información.
+    */
+    double comisiones = _primerImporte(factura, const [
+      'comisiones', 'comision', 'total_comisiones', 'importe_comisiones'
+    ]);
+    final rappel = _primerImporte(factura, const [
+      'rappel', 'rapel', 'importe_rappel', 'importe_rapel'
+    ]);
+    final fijo = _primerImporte(factura, const [
+      'fijo', 'importe_fijo', 'fijo_mensual'
+    ]);
+
+    final baseGuardada = _primerImporte(factura, const [
+      'base_imponible', 'base', 'importe_bruto', 'total_bruto',
+      'total_devengado', 'importe_total', 'total_nomina'
+    ]);
+    final sumaDesglose = comisiones + rappel + fijo;
+
+    // Si existe una base válida y las comisiones no han llegado informadas,
+    // recuperamos las comisiones como la parte restante de la base.
+    if (baseGuardada.abs() > 0.001 &&
+        comisiones.abs() < 0.001 &&
+        (baseGuardada - rappel - fijo).abs() > 0.001) {
+      comisiones = baseGuardada - rappel - fijo;
+    }
+
+    // Para facturas existentes, la base guardada es la fuente principal.
+    // Para una factura nueva o editada sin base previa, usamos el desglose.
+    final base = baseGuardada.abs() > 0.001
+        ? baseGuardada
+        : (comisiones + rappel + fijo);
+
+    final irpf = _money(factura['irpf_porcentaje']) == 0
+        ? 15.0
+        : _money(factura['irpf_porcentaje']);
+
+    final importeIrpfGuardado = _money(factura['importe_irpf']);
+    final totalGuardado = _money(factura['total_factura']);
+
+    final importeIrpfCalculado = base * irpf / 100;
+    final totalCalculado = base - importeIrpfCalculado;
+
+    // Si la factura ya tiene importes finales válidos, se respetan al cargar.
+    // Tras una edición manual se guardarán de nuevo ya recalculados.
+    final importeIrpf = importeIrpfGuardado.abs() > 0.001
+        ? importeIrpfGuardado
+        : importeIrpfCalculado;
+    final total = totalGuardado.abs() > 0.001
+        ? totalGuardado
+        : totalCalculado;
+
+    return {
+      'comisiones': comisiones,
+      'rappel': rappel,
+      'fijo': fijo,
+      'base': base,
+      'base_desglose': sumaDesglose,
+      'irpf': irpf,
+      'importe_irpf': importeIrpf,
+      'total': total,
+    };
+  }
+
+  Future<void> _guardarTotalesFactura({
+    required Map<String, dynamic> factura,
+    required double comisiones,
+    required double rappel,
+    required double fijo,
+    double? irpf,
+  }) async {
+    final porcentajeIrpf = irpf ??
+        (_money(factura['irpf_porcentaje']) == 0
+            ? 15.0
+            : _money(factura['irpf_porcentaje']));
+
+    final baseAnterior = _money(factura['base_imponible']);
+    final baseCalculada = comisiones + rappel + fijo;
+
+    // Protección contra sobrescribir accidentalmente una factura válida con 0
+    // cuando el desglose no haya llegado todavía desde NominasScreen.
+    final base = baseCalculada.abs() < 0.001 && baseAnterior.abs() > 0.001
+        ? baseAnterior
+        : baseCalculada;
+
+    final importeIrpf = base * porcentajeIrpf / 100;
+    final total = base - importeIrpf;
+
+    await supabase.from('nominas_facturas').update({
+      'comisiones': comisiones,
+      'rappel': rappel,
+      'fijo': fijo,
+      'base_imponible': base,
+      'irpf_porcentaje': porcentajeIrpf,
+      'importe_irpf': importeIrpf,
+      'total_factura': total,
+    }).eq('id', factura['id']);
+  }
+
+  Future<void> _recargarFactura(dynamic facturaId) async {
+    await cargarFacturas();
+
+    Map<String, dynamic>? encontrada;
+    for (final factura in facturas) {
+      if (factura['id'].toString() == facturaId.toString()) {
+        encontrada = factura;
+        break;
+      }
+    }
+
+    if (encontrada != null) {
+      await cargarLineasFactura(encontrada);
+    }
+  }
+
+  void _mensaje(String texto, {bool error = false}) {
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(texto),
+        backgroundColor: error ? Colors.red : Colors.green,
+      ),
+    );
+  }
 
   String nombreMes(dynamic mes) {
     final m = mes is int ? mes : int.tryParse(mes.toString()) ?? 0;
@@ -111,13 +416,43 @@ class _TramitarFacturasScreenState extends State<TramitarFacturasScreen> {
           .select()
           .order('created_at', ascending: false);
 
-      final lista = (data as List)
+      final listaOriginal = (data as List)
           .map((e) => Map<String, dynamic>.from(e))
           .toList();
+
+      // Compatibilidad total: cargamos también las líneas para recuperar
+      // facturas antiguas cuya cabecera no guardaba los campos actuales.
+      final lineasData = await supabase
+          .from('nominas_facturas_lineas')
+          .select()
+          .order('created_at', ascending: true);
+
+      final todasLasLineas = (lineasData as List)
+          .map((e) => Map<String, dynamic>.from(e))
+          .toList();
+
+      final lineasPorFactura = <String, List<Map<String, dynamic>>>{};
+      for (final linea in todasLasLineas) {
+        final facturaId = linea['factura_id']?.toString() ?? '';
+        if (facturaId.isEmpty) continue;
+        lineasPorFactura.putIfAbsent(facturaId, () => []).add(linea);
+      }
+
+      final lista = listaOriginal.map((factura) {
+        final facturaId = factura['id']?.toString() ?? '';
+        return _compatibilizarFacturaAntigua(
+          factura,
+          lineasPorFactura[facturaId] ?? const <Map<String, dynamic>>[],
+        );
+      }).toList();
 
       setState(() {
         facturas = lista;
         facturaSeleccionada = lista.isNotEmpty ? lista.first : null;
+        lineasFactura = lista.isNotEmpty
+            ? (lineasPorFactura[lista.first['id']?.toString() ?? ''] ??
+                <Map<String, dynamic>>[])
+            : <Map<String, dynamic>>[];
         loading = false;
       });
     } catch (e) {
@@ -174,6 +509,410 @@ class _TramitarFacturasScreenState extends State<TramitarFacturasScreen> {
         .fold(0.0, (s, f) => s + _money(f['base_imponible']));
   }
 
+
+  Future<void> _abrirEditorFacturaManual(
+    Map<String, dynamic> factura,
+  ) async {
+    if (!_esFacturaEditable(factura)) return;
+
+    String concepto = 'comisiones';
+    String operacion = 'sumar';
+    final cantidadController = TextEditingController();
+    final motivoController = TextEditingController();
+
+    final aceptar = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            final esExtorno = concepto == 'extorno';
+
+            return AlertDialog(
+              title: const Row(
+                children: [
+                  Icon(Icons.edit_note_rounded, color: Color(0xFF2563EB)),
+                  SizedBox(width: 10),
+                  Expanded(child: Text('Modificar factura manualmente')),
+                ],
+              ),
+              content: SizedBox(
+                width: 500,
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Elige el concepto, indica si quieres añadir o quitar '
+                        'importe y escribe la cantidad. Los totales, el IRPF y '
+                        'el PDF se recalcularán automáticamente.',
+                        style: TextStyle(
+                          color: Color(0xFF64748B),
+                          height: 1.4,
+                        ),
+                      ),
+                      const SizedBox(height: 18),
+                      DropdownButtonFormField<String>(
+                        value: concepto,
+                        decoration: _selectDecoration('Concepto'),
+                        items: const [
+                          DropdownMenuItem(
+                            value: 'comisiones',
+                            child: Text('Comisiones'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'rappel',
+                            child: Text('Rappel'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'extorno',
+                            child: Text('Extorno'),
+                          ),
+                        ],
+                        onChanged: (value) {
+                          if (value == null) return;
+                          setModalState(() => concepto = value);
+                        },
+                      ),
+                      const SizedBox(height: 14),
+                      DropdownButtonFormField<String>(
+                        value: operacion,
+                        decoration: _selectDecoration('Operación'),
+                        items: [
+                          DropdownMenuItem(
+                            value: 'sumar',
+                            child: Text(
+                              esExtorno
+                                  ? 'Añadir extorno'
+                                  : 'Añadir cantidad',
+                            ),
+                          ),
+                          DropdownMenuItem(
+                            value: 'restar',
+                            child: Text(
+                              esExtorno
+                                  ? 'Quitar cantidad de extorno'
+                                  : 'Quitar cantidad',
+                            ),
+                          ),
+                        ],
+                        onChanged: (value) {
+                          if (value == null) return;
+                          setModalState(() => operacion = value);
+                        },
+                      ),
+                      const SizedBox(height: 14),
+                      TextField(
+                        controller: cantidadController,
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
+                        decoration: _inputDecoration(
+                          'Cantidad en euros',
+                          Icons.euro_rounded,
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      TextField(
+                        controller: motivoController,
+                        maxLines: 3,
+                        decoration: _inputDecoration(
+                          'Motivo del ajuste',
+                          Icons.notes_rounded,
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFEFF6FF),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: const Color(0xFFBFDBFE),
+                          ),
+                        ),
+                        child: const Text(
+                          'El ajuste se añadirá al detalle de líneas para que '
+                          'quede identificado en la pantalla y en el PDF.',
+                          style: TextStyle(
+                            color: Color(0xFF1D4ED8),
+                            fontWeight: FontWeight.w700,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(dialogContext, false),
+                  child: const Text('Cancelar'),
+                ),
+                ElevatedButton.icon(
+                  onPressed: () {
+                    final cantidad = _money(cantidadController.text);
+                    if (cantidad <= 0) {
+                      _mensaje(
+                        'Introduce una cantidad superior a cero.',
+                        error: true,
+                      );
+                      return;
+                    }
+                    Navigator.pop(dialogContext, true);
+                  },
+                  icon: const Icon(Icons.check_rounded),
+                  label: const Text('Aplicar'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    if (aceptar != true) return;
+
+    await _aplicarAjusteManual(
+      factura: factura,
+      concepto: concepto,
+      operacion: operacion,
+      cantidad: _money(cantidadController.text),
+      motivo: motivoController.text.trim().isEmpty
+          ? 'Ajuste manual'
+          : motivoController.text.trim(),
+    );
+  }
+
+  Future<void> _aplicarAjusteManual({
+    required Map<String, dynamic> factura,
+    required String concepto,
+    required String operacion,
+    required double cantidad,
+    required String motivo,
+  }) async {
+    if (!_esFacturaEditable(factura) || guardandoAjusteManual) return;
+
+    setState(() => guardandoAjusteManual = true);
+
+    try {
+      final calculos = _calculosFactura(factura);
+      double comisiones = calculos['comisiones']!;
+      double rappel = calculos['rappel']!;
+      final fijo = calculos['fijo']!;
+
+      String tipoMovimiento;
+      double importeLinea;
+
+      if (concepto == 'comisiones') {
+        importeLinea = operacion == 'sumar' ? cantidad : -cantidad;
+        comisiones += importeLinea;
+        tipoMovimiento = operacion == 'sumar'
+            ? 'AJUSTE_COMISION_POSITIVO'
+            : 'AJUSTE_COMISION_NEGATIVO';
+      } else if (concepto == 'rappel') {
+        importeLinea = operacion == 'sumar' ? cantidad : -cantidad;
+        rappel += importeLinea;
+        tipoMovimiento = operacion == 'sumar'
+            ? 'AJUSTE_RAPPEL_POSITIVO'
+            : 'AJUSTE_RAPPEL_NEGATIVO';
+      } else {
+        // Añadir un extorno reduce las comisiones.
+        // Quitar una cantidad de extorno devuelve ese importe.
+        importeLinea = operacion == 'sumar' ? -cantidad : cantidad;
+        comisiones += importeLinea;
+        tipoMovimiento = operacion == 'sumar'
+            ? 'EXTORNO_MANUAL'
+            : 'REVERSO_EXTORNO_MANUAL';
+      }
+
+      await _guardarTotalesFactura(
+        factura: factura,
+        comisiones: comisiones,
+        rappel: rappel,
+        fijo: fijo,
+      );
+
+      await supabase.from('nominas_facturas_lineas').insert({
+        'factura_id': factura['id'],
+        'tipo_movimiento': tipoMovimiento,
+        'numero_poliza': 'AJUSTE MANUAL',
+        'cliente_nombre': motivo,
+        'prima_neta': 0,
+        'comision': importeLinea,
+      });
+
+      await _recargarFactura(factura['id']);
+      _mensaje('Ajuste aplicado correctamente.');
+    } catch (e) {
+      debugPrint('ERROR AJUSTE MANUAL FACTURA: $e');
+      _mensaje('No se pudo aplicar el ajuste: $e', error: true);
+    } finally {
+      if (mounted) {
+        setState(() => guardandoAjusteManual = false);
+      }
+    }
+  }
+
+  bool _esLineaManual(Map<String, dynamic> linea) {
+    final tipo = linea['tipo_movimiento']?.toString() ?? '';
+    return tipo == 'AJUSTE_COMISION_POSITIVO' ||
+        tipo == 'AJUSTE_COMISION_NEGATIVO' ||
+        tipo == 'AJUSTE_RAPPEL_POSITIVO' ||
+        tipo == 'AJUSTE_RAPPEL_NEGATIVO' ||
+        tipo == 'EXTORNO_MANUAL' ||
+        tipo == 'REVERSO_EXTORNO_MANUAL';
+  }
+
+  Future<void> _eliminarAjusteManual(
+    Map<String, dynamic> linea,
+  ) async {
+    final factura = facturaSeleccionada;
+    if (factura == null ||
+        !_esFacturaEditable(factura) ||
+        !_esLineaManual(linea)) {
+      return;
+    }
+
+    final confirmar = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Eliminar ajuste manual'),
+        content: const Text(
+          'El importe se devolverá automáticamente a la factura y '
+          'la línea desaparecerá del detalle.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancelar'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('Eliminar'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmar != true) return;
+
+    try {
+      final calculos = _calculosFactura(factura);
+      double comisiones = calculos['comisiones']!;
+      double rappel = calculos['rappel']!;
+      final fijo = calculos['fijo']!;
+      final importe = _money(linea['comision']);
+      final tipo = linea['tipo_movimiento']?.toString() ?? '';
+
+      if (tipo.startsWith('AJUSTE_RAPPEL')) {
+        rappel -= importe;
+      } else {
+        comisiones -= importe;
+      }
+
+      await _guardarTotalesFactura(
+        factura: factura,
+        comisiones: comisiones,
+        rappel: rappel,
+        fijo: fijo,
+      );
+
+      await supabase
+          .from('nominas_facturas_lineas')
+          .delete()
+          .eq('id', linea['id']);
+
+      await _recargarFactura(factura['id']);
+      _mensaje('Ajuste eliminado correctamente.');
+    } catch (e) {
+      debugPrint('ERROR ELIMINAR AJUSTE: $e');
+      _mensaje('No se pudo eliminar el ajuste: $e', error: true);
+    }
+  }
+
+  Map<String, dynamic> _verificarFactura(
+    Map<String, dynamic> factura,
+  ) {
+    int ventas = 0;
+    int extornos = 0;
+    int ajustes = 0;
+    double comisionesLineas = 0;
+    double ajustesRappel = 0;
+
+    for (final linea in lineasFactura) {
+      final tipo =
+          linea['tipo_movimiento']?.toString().toUpperCase() ?? 'VENTA';
+      final importe = _money(
+        linea['comision'] ??
+            linea['importe_comision'] ??
+            linea['comision_total'],
+      );
+
+      if (tipo == 'VENTA') {
+        ventas++;
+        comisionesLineas += importe;
+      } else if (tipo == 'EXTORNO') {
+        extornos++;
+        comisionesLineas += importe;
+      } else if (tipo.startsWith('AJUSTE_RAPPEL')) {
+        ajustes++;
+        ajustesRappel += importe;
+      } else if (_esLineaManual(linea)) {
+        ajustes++;
+        comisionesLineas += importe;
+      }
+    }
+
+    final calculos = _calculosFactura(factura);
+    final baseGuardada = _money(factura['base_imponible']);
+    final diferenciaBase = baseGuardada - calculos['base']!;
+
+    // La comparación de comisiones solo es concluyente cuando existen líneas.
+    final diferenciaComisiones =
+        _money(factura['comisiones']) - comisionesLineas;
+
+    final sinLineas = lineasFactura.isEmpty;
+    final baseCorrecta = diferenciaBase.abs() < 0.02;
+    final comisionesCorrectas =
+        sinLineas || diferenciaComisiones.abs() < 0.02;
+
+    return {
+      'ventas': ventas,
+      'extornos': extornos,
+      'ajustes': ajustes,
+      'ajustes_rappel': ajustesRappel,
+      'diferencia_base': diferenciaBase,
+      'diferencia_comisiones': diferenciaComisiones,
+      'sin_lineas': sinLineas,
+      'correcta': !sinLineas && baseCorrecta && comisionesCorrectas,
+    };
+  }
+
+  Future<void> _recalcularFactura(
+    Map<String, dynamic> factura,
+  ) async {
+    if (!_esFacturaEditable(factura)) return;
+
+    try {
+      final calculos = _calculosFactura(factura);
+
+      await _guardarTotalesFactura(
+        factura: factura,
+        comisiones: calculos['comisiones']!,
+        rappel: calculos['rappel']!,
+        fijo: calculos['fijo']!,
+      );
+
+      await _recargarFactura(factura['id']);
+      _mensaje('Factura recalculada correctamente.');
+    } catch (e) {
+      _mensaje('No se pudo recalcular la factura: $e', error: true);
+    }
+  }
+
   Future<void> tramitarFactura(Map<String, dynamic> f) async {
   if (!esAdmin) return;
 
@@ -181,15 +920,22 @@ class _TramitarFacturasScreenState extends State<TramitarFacturasScreen> {
   if (user == null) return;
 
   try {
-    final base = _money(f['base_imponible']);
-    final comisiones = _money(f['comisiones']);
-    final rappel = _money(f['rappel']);
-    final fijo = _money(f['fijo']);
-    final irpf = _money(f['irpf_porcentaje']) == 0
-        ? 15.0
-        : _money(f['irpf_porcentaje']);
-    final importeIrpf = base * irpf / 100;
-final total = base - importeIrpf;
+    final calculos = _calculosFactura(f);
+    final comisiones = calculos['comisiones']!;
+    final rappel = calculos['rappel']!;
+    final fijo = calculos['fijo']!;
+    final base = calculos['base']!;
+    final irpf = calculos['irpf']!;
+    final importeIrpf = calculos['importe_irpf']!;
+    final total = calculos['total']!;
+
+    await _guardarTotalesFactura(
+      factura: f,
+      comisiones: comisiones,
+      rappel: rappel,
+      fijo: fijo,
+      irpf: irpf,
+    );
 
     final numeroFactura =
         'FAC-${f['anio']}-${f['mes'].toString().padLeft(2, '0')}-${DateTime.now().millisecondsSinceEpoch}';
@@ -234,8 +980,12 @@ final total = base - importeIrpf;
     await supabase.from('nominas_facturas').update({
       'estado': 'tramitada',
       'numero_factura': numeroFactura,
+      'comisiones': comisiones,
+      'rappel': rappel,
+      'fijo': fijo,
+      'base_imponible': base,
+      'irpf_porcentaje': irpf,
       'importe_irpf': importeIrpf,
-      
       'total_factura': total,
       'factura_url': signedUrl,
       'tramitada_por': user.id,
@@ -393,7 +1143,7 @@ Future<Uint8List> _generarPdfFactura({
           pw.SizedBox(height: 24),
 
           pw.Text(
-           'Pólizas incluidas y extornos aplicados',
+           'Pólizas, extornos y ajustes aplicados',
             style: pw.TextStyle(
               fontSize: 15,
               fontWeight: pw.FontWeight.bold,
@@ -459,15 +1209,27 @@ else
           0,
     );
 
-   final tipo = l['tipo_movimiento']?.toString() ?? 'VENTA';
-final esExtorno = tipo == 'EXTORNO';
+final tipo = l['tipo_movimiento']?.toString() ?? 'VENTA';
+final esNegativo =
+    tipo.contains('EXTORNO') || tipo.contains('NEGATIVO');
+final esPagoComercial =
+    tipo == 'AJUSTE_COMISION_POSITIVO' ||
+    tipo == 'AJUSTE_COMISION_NEGATIVO' ||
+    tipo == 'AJUSTE_RAPPEL_POSITIVO' ||
+    tipo == 'AJUSTE_RAPPEL_NEGATIVO' ||
+    tipo == 'EXTORNO_MANUAL' ||
+    tipo == 'REVERSO_EXTORNO_MANUAL';
+
+final detalleMovimiento = esPagoComercial
+    ? 'Pago comercial - ${comision < 0 ? 'negativo' : 'positivo'}'
+    : '$tipo · $numeroPoliza';
 
 return pw.TableRow(
-  decoration: esExtorno
+  decoration: esNegativo
       ? const pw.BoxDecoration(color: PdfColors.red50)
       : null,
   children: [
-    _pdfCell(esExtorno ? 'EXTORNO · $numeroPoliza' : numeroPoliza),
+    _pdfCell(detalleMovimiento),
     _pdfCell(cliente),
     _pdfCell(euros(prima), alignRight: true),
     _pdfCell(euros(comision), alignRight: true),
@@ -637,16 +1399,24 @@ pw.Widget _pdfTotalLine(String title, double value, {bool bold = false}) {
 
 
  Future<void> cambiarIrpf(Map<String, dynamic> f, double irpf) async {
-  final base = _money(f['base_imponible']);
-  final rappel = _money(f['rappel']);
+  if (!_esFacturaEditable(f)) return;
 
-  await supabase.from('nominas_facturas').update({
-    'irpf_porcentaje': irpf,
-    'importe_irpf': base * irpf / 100,
-    'total_factura': base - (base * irpf / 100),
-  }).eq('id', f['id']);
+  try {
+    final calculos = _calculosFactura(f);
 
-  await cargarFacturas();
+    await _guardarTotalesFactura(
+      factura: f,
+      comisiones: calculos['comisiones']!,
+      rappel: calculos['rappel']!,
+      fijo: calculos['fijo']!,
+      irpf: irpf,
+    );
+
+    await _recargarFactura(f['id']);
+    _mensaje('IRPF actualizado correctamente.');
+  } catch (e) {
+    _mensaje('No se pudo actualizar el IRPF: $e', error: true);
+  }
 }
 
   @override
@@ -1450,18 +2220,18 @@ Expanded(child: _bodyText('${_money(f['irpf_porcentaje']).toStringAsFixed(0)}%')
       );
     }
 
-    final comisiones = _money(f['comisiones']);
-final rappel = _money(f['rappel']);
-final fijo = _money(f['fijo']);
-final base = _money(f['base_imponible']);
-    final irpf = _money(f['irpf_porcentaje']) == 0
-        ? 15.0
-        : _money(f['irpf_porcentaje']);
-    final importeIrpf = base * irpf / 100;
-final total = base - importeIrpf;
+    final calculos = _calculosFactura(f);
+    final comisiones = calculos['comisiones']!;
+    final rappel = calculos['rappel']!;
+    final fijo = calculos['fijo']!;
+    final base = calculos['base']!;
+    final irpf = calculos['irpf']!;
+    final importeIrpf = calculos['importe_irpf']!;
+    final total = calculos['total']!;
 
     final estado = f['estado']?.toString() ?? '';
     final color = _estadoColor(estado);
+    final verificacion = _verificarFactura(f);
 
     return Container(
   padding: const EdgeInsets.all(20),
@@ -1481,6 +2251,19 @@ final total = base - importeIrpf;
                 ),
               ),
               const Spacer(),
+              if (_esFacturaEditable(f))
+                Padding(
+                  padding: const EdgeInsets.only(right: 6),
+                  child: ElevatedButton.icon(
+                    onPressed: guardandoAjusteManual ? null : () => _abrirEditorFacturaManual(f),
+                    icon: const Icon(Icons.edit_rounded, size: 17),
+                    label: const Text('Editar'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF2563EB),
+                      foregroundColor: Colors.white,
+                    ),
+                  ),
+                ),
               IconButton(
                 onPressed: () => setState(() => facturaSeleccionada = null),
                 icon: const Icon(Icons.close_rounded),
@@ -1528,6 +2311,8 @@ final total = base - importeIrpf;
           ),
           const SizedBox(height: 22),
           _estadoBadge(estado),
+          const SizedBox(height: 14),
+          _tarjetaVerificacion(verificacion),
           const SizedBox(height: 22),
           Text(
             '${nombreMes(f['mes']).toUpperCase()} ${f['anio']}',
@@ -1596,9 +2381,6 @@ _detailLine(
   const Color(0xFF2563EB),
   big: true,
 ),
-          
-          const Divider(height: 28),
-          _detailLine('TOTAL FACTURA', total, const Color(0xFF2563EB), big: true),
           const SizedBox(height: 20),
 
 const Text(
@@ -1623,7 +2405,8 @@ if (lineasFactura.isEmpty)
 else
   ...lineasFactura.map((l) {
     final tipo = l['tipo_movimiento']?.toString() ?? 'VENTA';
-    final esExtorno = tipo == 'EXTORNO';
+    final esExtorno = tipo.contains('EXTORNO') || tipo.contains('NEGATIVO');
+    final esManual = _esLineaManual(l);
 
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
@@ -1646,9 +2429,7 @@ else
             children: [
               Expanded(
                 child: Text(
-                  esExtorno
-                      ? 'EXTORNO · ${l['numero_poliza'] ?? 'Sin póliza'}'
-                      : 'VENTA · ${l['numero_poliza'] ?? 'Sin póliza'}',
+                  '$tipo · ${l['numero_poliza'] ?? 'Sin póliza'}',
                   style: TextStyle(
                     color: esExtorno
                         ? const Color(0xFFDC2626)
@@ -1661,13 +2442,19 @@ else
               Text(
                 '${_money(l['comision']).toStringAsFixed(2)} €',
                 style: TextStyle(
-                  color: esExtorno
-                      ? const Color(0xFFDC2626)
-                      : const Color(0xFF16A34A),
+                  color: esExtorno ? const Color(0xFFDC2626) : const Color(0xFF16A34A),
                   fontWeight: FontWeight.w900,
                   fontSize: 12,
                 ),
               ),
+              if (esManual && _esFacturaEditable(f)) ...[
+                const SizedBox(width: 4),
+                IconButton(
+                  tooltip: 'Eliminar ajuste manual',
+                  onPressed: () => _eliminarAjusteManual(l),
+                  icon: const Icon(Icons.delete_outline_rounded, color: Colors.red, size: 20),
+                ),
+              ],
             ],
           ),
           const SizedBox(height: 4),
@@ -1711,6 +2498,17 @@ else
               Expanded(child: _irpfButton(f, 15, irpf == 15)),
             ],
           ),
+          if (_esFacturaEditable(f)) ...[
+            const SizedBox(height: 10),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () => _recalcularFactura(f),
+                icon: const Icon(Icons.calculate_rounded),
+                label: const Text('Recalcular totales'),
+              ),
+            ),
+          ],
           const SizedBox(height: 16),
           TextField(
             maxLines: 3,
@@ -1740,18 +2538,14 @@ else
               onPressed: f == null
     ? null
     : () async {
-    final base = _money(f['base_imponible']);
-    final rappel = _money(f['rappel']);
-    final irpf = _money(f['irpf_porcentaje']) == 0
-        ? 15.0
-        : _money(f['irpf_porcentaje']);
-
-    final importeIrpf = base * irpf / 100;
-    final total = base - importeIrpf;
-
-       final comisiones = _money(f['comisiones']);
-
-final fijo = _money(f['fijo']);
+    final calculosPreview = _calculosFactura(f);
+    final base = calculosPreview['base']!;
+    final rappel = calculosPreview['rappel']!;
+    final irpf = calculosPreview['irpf']!;
+    final importeIrpf = calculosPreview['importe_irpf']!;
+    final total = calculosPreview['total']!;
+    final comisiones = calculosPreview['comisiones']!;
+    final fijo = calculosPreview['fijo']!;
 
 final lineasPreview = await supabase
     .from('nominas_facturas_lineas')
@@ -1790,9 +2584,89 @@ final bytes = await _generarPdfFactura(
     );
   }
 
+
+  Widget _tarjetaVerificacion(Map<String, dynamic> verificacion) {
+    final sinLineas = verificacion['sin_lineas'] == true;
+    final correcta = verificacion['correcta'] == true;
+
+    final color = sinLineas
+        ? const Color(0xFFF59E0B)
+        : correcta
+            ? const Color(0xFF16A34A)
+            : const Color(0xFFDC2626);
+
+    final titulo = sinLineas
+        ? 'Sin líneas recibidas desde Nóminas'
+        : correcta
+            ? 'Datos recibidos correctamente'
+            : 'Hay diferencias que revisar';
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(13),
+        border: Border.all(color: color.withOpacity(0.25)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                correcta
+                    ? Icons.verified_rounded
+                    : Icons.warning_amber_rounded,
+                color: color,
+                size: 19,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  titulo,
+                  style: TextStyle(
+                    color: color,
+                    fontWeight: FontWeight.w900,
+                    fontSize: 12,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 7),
+          Text(
+            '${verificacion['ventas']} ventas · '
+            '${verificacion['extornos']} extornos · '
+            '${verificacion['ajustes']} ajustes manuales',
+            style: const TextStyle(
+              color: Color(0xFF475569),
+              fontWeight: FontWeight.w700,
+              fontSize: 11,
+            ),
+          ),
+          if (!sinLineas && !correcta) ...[
+            const SizedBox(height: 5),
+            Text(
+              'Diferencia comisiones: '
+              '${_money(verificacion['diferencia_comisiones']).toStringAsFixed(2)} € · '
+              'Diferencia base: '
+              '${_money(verificacion['diferencia_base']).toStringAsFixed(2)} €',
+              style: TextStyle(
+                color: color,
+                fontWeight: FontWeight.w800,
+                fontSize: 11,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
   Widget _irpfButton(Map<String, dynamic> f, double value, bool selected) {
     return OutlinedButton(
-      onPressed: esAdmin ? () => cambiarIrpf(f, value) : null,
+      onPressed: _esFacturaEditable(f) ? () => cambiarIrpf(f, value) : null,
       style: OutlinedButton.styleFrom(
         backgroundColor: selected ? const Color(0xFF2563EB) : Colors.white,
         foregroundColor: selected ? Colors.white : const Color(0xFF0F172A),

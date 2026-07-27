@@ -1,10 +1,12 @@
 import 'dart:async';
 import 'dart:ui';
+
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 import 'package:safebrok_andalucia/core/auth/login_screen.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:safebrok_andalucia/core/auth/password_recovery_state.dart';
 import 'package:safebrok_andalucia/core/auth/role_router.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 final AudioPlayer player = AudioPlayer();
 
@@ -28,6 +30,8 @@ class _SplashScreenState extends State<SplashScreen>
 
   final List<String> letters = "SAFEBROK".split("");
   int currentIndex = 0;
+
+  bool _navigationCompleted = false;
 
   @override
   void initState() {
@@ -101,14 +105,24 @@ class _SplashScreenState extends State<SplashScreen>
   Future<void> initFlow() async {
     await Future.delayed(const Duration(seconds: 9));
 
-    if (!mounted) return;
+    if (!mounted || _navigationCompleted) return;
+
+    if (PasswordRecoveryState.active.value) {
+      debugPrint(
+        'SPLASH: recuperación activa, no se navega a Login ni Home',
+      );
+      return;
+    }
 
     try {
-      final session = Supabase.instance.client.auth.currentSession;
+      final session =
+          Supabase.instance.client.auth.currentSession;
+
+      if (PasswordRecoveryState.active.value) return;
 
       if (session != null) {
-        print("SESION ENCONTRADA");
-        print("SESSION USER: ${session.user.id}");
+        debugPrint("SESION ENCONTRADA");
+        debugPrint("SESSION USER: ${session.user.id}");
 
         final profile = await Supabase.instance.client
             .from('usuarios')
@@ -116,19 +130,26 @@ class _SplashScreenState extends State<SplashScreen>
             .eq('auth_id', session.user.id)
             .maybeSingle();
 
-        print("PROFILE: $profile");
+        if (!mounted ||
+            _navigationCompleted ||
+            PasswordRecoveryState.active.value) {
+          return;
+        }
+
+        debugPrint("PROFILE: $profile");
 
         if (profile != null) {
           final role = profile['rol_usuario'];
 
-          print("ROLE: $role");
+          debugPrint("ROLE: $role");
 
-          if (!mounted) return;
+          _navigationCompleted = true;
 
           Navigator.pushReplacement(
             context,
             PageRouteBuilder(
-              transitionDuration: const Duration(milliseconds: 750),
+              transitionDuration:
+                  const Duration(milliseconds: 750),
               pageBuilder: (_, animation, __) {
                 return FadeTransition(
                   opacity: animation,
@@ -141,15 +162,22 @@ class _SplashScreenState extends State<SplashScreen>
           return;
         }
 
-        print("PROFILE NULL");
+        debugPrint("PROFILE NULL");
       }
 
-      if (!mounted) return;
+      if (!mounted ||
+          _navigationCompleted ||
+          PasswordRecoveryState.active.value) {
+        return;
+      }
+
+      _navigationCompleted = true;
 
       Navigator.pushReplacement(
         context,
         PageRouteBuilder(
-          transitionDuration: const Duration(milliseconds: 750),
+          transitionDuration:
+              const Duration(milliseconds: 750),
           pageBuilder: (_, animation, __) {
             return FadeTransition(
               opacity: animation,
@@ -158,13 +186,23 @@ class _SplashScreenState extends State<SplashScreen>
           },
         ),
       );
-    } catch (e) {
-      if (!mounted) return;
+    } catch (e, stackTrace) {
+      debugPrint("ERROR SPLASH: $e");
+      debugPrintStack(stackTrace: stackTrace);
+
+      if (!mounted ||
+          _navigationCompleted ||
+          PasswordRecoveryState.active.value) {
+        return;
+      }
+
+      _navigationCompleted = true;
 
       Navigator.pushReplacement(
         context,
         PageRouteBuilder(
-          transitionDuration: const Duration(milliseconds: 750),
+          transitionDuration:
+              const Duration(milliseconds: 750),
           pageBuilder: (_, animation, __) {
             return FadeTransition(
               opacity: animation,
@@ -180,7 +218,9 @@ class _SplashScreenState extends State<SplashScreen>
     currentIndex = 0;
 
     for (int i = 0; i < letters.length; i++) {
-      await Future.delayed(const Duration(milliseconds: 520));
+      await Future.delayed(
+        const Duration(milliseconds: 520),
+      );
 
       if (!mounted) return;
 
@@ -188,7 +228,9 @@ class _SplashScreenState extends State<SplashScreen>
         currentIndex = i + 1;
       });
 
-      await Future.delayed(const Duration(milliseconds: 180));
+      await Future.delayed(
+        const Duration(milliseconds: 180),
+      );
     }
   }
 
@@ -208,7 +250,6 @@ class _SplashScreenState extends State<SplashScreen>
     return Scaffold(
       body: Stack(
         children: [
-          // FONDO OSCURO CINEMÁTICO
           Container(
             decoration: const BoxDecoration(
               gradient: RadialGradient(
@@ -222,8 +263,6 @@ class _SplashScreenState extends State<SplashScreen>
               ),
             ),
           ),
-
-          // FLASH FINAL
           AnimatedOpacity(
             opacity: completed ? 0.16 : 0,
             duration: const Duration(milliseconds: 350),
@@ -231,8 +270,6 @@ class _SplashScreenState extends State<SplashScreen>
               color: Colors.cyanAccent,
             ),
           ),
-
-          // GLOW SUPERIOR
           Positioned(
             top: -160,
             left: -80,
@@ -242,8 +279,6 @@ class _SplashScreenState extends State<SplashScreen>
               opacity: 0.25,
             ),
           ),
-
-          // GLOW INFERIOR
           Positioned(
             bottom: -170,
             right: -90,
@@ -253,8 +288,6 @@ class _SplashScreenState extends State<SplashScreen>
               opacity: 0.18,
             ),
           ),
-
-          // LUZ CENTRAL
           Center(
             child: AnimatedBuilder(
               animation: _pulse,
@@ -268,7 +301,8 @@ class _SplashScreenState extends State<SplashScreen>
                       shape: BoxShape.circle,
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.blueAccent.withOpacity(0.20),
+                          color:
+                              Colors.blueAccent.withOpacity(0.20),
                           blurRadius: 120,
                           spreadRadius: 30,
                         ),
@@ -279,8 +313,6 @@ class _SplashScreenState extends State<SplashScreen>
               },
             ),
           ),
-
-          // BLUR
           BackdropFilter(
             filter: ImageFilter.blur(
               sigmaX: 34,
@@ -290,8 +322,6 @@ class _SplashScreenState extends State<SplashScreen>
               color: Colors.black.withOpacity(0.18),
             ),
           ),
-
-          // CONTENIDO
           SafeArea(
             child: Center(
               child: FadeTransition(
@@ -299,7 +329,8 @@ class _SplashScreenState extends State<SplashScreen>
                 child: ScaleTransition(
                   scale: _scale,
                   child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
+                    mainAxisAlignment:
+                        MainAxisAlignment.center,
                     children: [
                       AnimatedBuilder(
                         animation: _pulse,
@@ -316,59 +347,71 @@ class _SplashScreenState extends State<SplashScreen>
                               width: 174,
                               height: 174,
                               decoration: BoxDecoration(
-                                borderRadius: BorderRadius.circular(42),
+                                borderRadius:
+                                    BorderRadius.circular(42),
                                 boxShadow: [
                                   BoxShadow(
-                                    color: Colors.blueAccent.withOpacity(0.45),
+                                    color: Colors.blueAccent
+                                        .withOpacity(0.45),
                                     blurRadius: 70,
                                     spreadRadius: 10,
                                   ),
                                   BoxShadow(
-                                    color: Colors.cyanAccent.withOpacity(0.22),
+                                    color: Colors.cyanAccent
+                                        .withOpacity(0.22),
                                     blurRadius: 110,
                                     spreadRadius: 18,
                                   ),
                                 ],
                               ),
                             ),
-
                             Container(
                               height: 154,
                               width: 154,
-                              padding: const EdgeInsets.all(22),
+                              padding:
+                                  const EdgeInsets.all(22),
                               decoration: BoxDecoration(
-                                borderRadius: BorderRadius.circular(38),
-                                color: Colors.white.withOpacity(0.08),
+                                borderRadius:
+                                    BorderRadius.circular(38),
+                                color:
+                                    Colors.white.withOpacity(0.08),
                                 border: Border.all(
-                                  color: Colors.white.withOpacity(0.16),
+                                  color: Colors.white
+                                      .withOpacity(0.16),
                                   width: 1.2,
                                 ),
                               ),
                               child: ClipRRect(
-                                borderRadius: BorderRadius.circular(24),
+                                borderRadius:
+                                    BorderRadius.circular(24),
                                 child: Image.asset(
                                   'assets/images/logo.png',
                                   fit: BoxFit.contain,
                                 ),
                               ),
                             ),
-
-                            // BRILLO PASANDO POR EL LOGO
                             AnimatedBuilder(
                               animation: _shine,
                               builder: (context, child) {
                                 return Positioned.fill(
                                   child: ClipRRect(
-                                    borderRadius: BorderRadius.circular(38),
+                                    borderRadius:
+                                        BorderRadius.circular(38),
                                     child: Transform.translate(
-                                      offset: Offset(_shine.value * 180, 0),
+                                      offset: Offset(
+                                        _shine.value * 180,
+                                        0,
+                                      ),
                                       child: Container(
                                         width: 50,
-                                        decoration: BoxDecoration(
-                                          gradient: LinearGradient(
+                                        decoration:
+                                            BoxDecoration(
+                                          gradient:
+                                              LinearGradient(
                                             colors: [
                                               Colors.transparent,
-                                              Colors.white.withOpacity(0.22),
+                                              Colors.white
+                                                  .withOpacity(0.22),
                                               Colors.transparent,
                                             ],
                                           ),
@@ -382,43 +425,58 @@ class _SplashScreenState extends State<SplashScreen>
                           ],
                         ),
                       ),
-
                       const SizedBox(height: 38),
-
-                      // TEXTO ESTILO NETFLIX
                       SizedBox(
                         height: 82,
                         child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: List.generate(letters.length, (i) {
-                            final visible = i < currentIndex;
+                          mainAxisAlignment:
+                              MainAxisAlignment.center,
+                          children:
+                              List.generate(letters.length, (i) {
+                            final visible =
+                                i < currentIndex;
 
                             return AnimatedOpacity(
-                              duration: const Duration(milliseconds: 420),
+                              duration: const Duration(
+                                milliseconds: 420,
+                              ),
                               opacity: visible ? 1 : 0,
                               child: AnimatedScale(
-                                duration: const Duration(milliseconds: 480),
+                                duration: const Duration(
+                                  milliseconds: 480,
+                                ),
                                 curve: Curves.easeOutBack,
-                                scale: visible ? 1 : 0.15,
+                                scale:
+                                    visible ? 1 : 0.15,
                                 child: AnimatedContainer(
-                                  duration: const Duration(milliseconds: 480),
-                                  margin: EdgeInsets.symmetric(
-                                    horizontal: completed ? 3.5 : 1.5,
+                                  duration: const Duration(
+                                    milliseconds: 480,
+                                  ),
+                                  margin:
+                                      EdgeInsets.symmetric(
+                                    horizontal:
+                                        completed ? 3.5 : 1.5,
                                   ),
                                   child: Text(
                                     letters[i],
                                     style: TextStyle(
-                                      fontSize: completed ? 58 : 52,
-                                      fontWeight: FontWeight.w900,
+                                      fontSize:
+                                          completed ? 58 : 52,
+                                      fontWeight:
+                                          FontWeight.w900,
                                       color: Colors.white,
                                       letterSpacing: 5,
                                       shadows: [
                                         Shadow(
-                                          color: Colors.blueAccent.withOpacity(0.95),
+                                          color: Colors
+                                              .blueAccent
+                                              .withOpacity(0.95),
                                           blurRadius: 38,
                                         ),
                                         Shadow(
-                                          color: Colors.cyanAccent.withOpacity(0.65),
+                                          color: Colors
+                                              .cyanAccent
+                                              .withOpacity(0.65),
                                           blurRadius: 72,
                                         ),
                                       ],
@@ -430,59 +488,69 @@ class _SplashScreenState extends State<SplashScreen>
                           }),
                         ),
                       ),
-
                       const SizedBox(height: 8),
-
                       AnimatedOpacity(
                         opacity: completed ? 1 : 0,
-                        duration: const Duration(milliseconds: 800),
+                        duration:
+                            const Duration(milliseconds: 800),
                         child: Text(
                           'Correduría profesional de seguros',
                           style: TextStyle(
-                            color: Colors.white.withOpacity(0.72),
+                            color:
+                                Colors.white.withOpacity(0.72),
                             fontSize: 15,
                             letterSpacing: 0.8,
                             fontWeight: FontWeight.w500,
                           ),
                         ),
                       ),
-
                       const SizedBox(height: 54),
-
                       SizedBox(
                         width: 220,
                         child: Column(
                           children: [
                             ClipRRect(
-                              borderRadius: BorderRadius.circular(20),
-                              child: TweenAnimationBuilder<double>(
+                              borderRadius:
+                                  BorderRadius.circular(20),
+                              child:
+                                  TweenAnimationBuilder<double>(
                                 tween: Tween<double>(
                                   begin: 0,
-                                  end: completed ? 1 : currentIndex / letters.length,
+                                  end: completed
+                                      ? 1
+                                      : currentIndex /
+                                          letters.length,
                                 ),
-                                duration: const Duration(milliseconds: 600),
+                                duration: const Duration(
+                                  milliseconds: 600,
+                                ),
                                 curve: Curves.easeInOut,
-                                builder: (context, value, child) {
+                                builder:
+                                    (context, value, child) {
                                   return LinearProgressIndicator(
                                     value: value,
                                     minHeight: 5,
-                                    backgroundColor: Colors.white.withOpacity(0.12),
-                                    valueColor: AlwaysStoppedAnimation<Color>(
-                                      Colors.cyanAccent.withOpacity(0.9),
+                                    backgroundColor:
+                                        Colors.white
+                                            .withOpacity(0.12),
+                                    valueColor:
+                                        AlwaysStoppedAnimation<
+                                            Color>(
+                                      Colors.cyanAccent
+                                          .withOpacity(0.9),
                                     ),
                                   );
                                 },
                               ),
                             ),
-
                             const SizedBox(height: 14),
-
                             Text(
                               completed
                                   ? "Preparando tu entorno..."
                                   : "Iniciando SafeBrok...",
                               style: TextStyle(
-                                color: Colors.white.withOpacity(0.58),
+                                color: Colors.white
+                                    .withOpacity(0.58),
                                 fontSize: 12,
                                 fontWeight: FontWeight.w600,
                               ),
@@ -496,15 +564,14 @@ class _SplashScreenState extends State<SplashScreen>
               ),
             ),
           ),
-
-          // FIRMA INFERIOR
           Positioned(
             bottom: 26,
             left: 0,
             right: 0,
             child: AnimatedOpacity(
               opacity: completed ? 1 : 0,
-              duration: const Duration(milliseconds: 800),
+              duration:
+                  const Duration(milliseconds: 800),
               child: Text(
                 "SafeBrok Andalucía · ERP Comercial",
                 textAlign: TextAlign.center,

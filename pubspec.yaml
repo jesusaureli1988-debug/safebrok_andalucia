@@ -11,12 +11,12 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # build by specifying --build-name and --build-number, respectively.
 # In Android, build-name is used as versionName while build-number used as versionCode.
 # Read more about Android versioning at https://developer.android.com/studio/publish/versioning
-# In iOS, build-name is used as CFBundleShortVersionString while build-number is used as CFBundleVersion.
+# In iOS, build-name is used as CFBundleShortVersionString while build-number used as CFBundleVersion.
 # Read more about iOS versioning at
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
-version: 1.0.9+6
+version: 1.1.0+7
 
 environment:
   sdk: ^3.11.5
@@ -33,6 +33,12 @@ dependencies:
 
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
+
+  # Firebase
+  firebase_core: ^3.15.2
+  firebase_messaging: ^15.2.10
+  flutter_local_notifications: ^18.0.1
+
   cupertino_icons: ^1.0.8
   audioplayers: ^6.0.0
   animated_text_kit: ^4.2.2
@@ -41,7 +47,7 @@ dependencies:
   dio: ^5.4.0
   path_provider: ^2.1.2
   package_info_plus: ^4.2.0
-  url_launcher: ^6.3.0
+  url_launcher: ^6.3.2
   file_picker: ^8.0.0
   image_picker: ^1.0.7
   table_calendar: ^3.1.2
@@ -65,11 +71,11 @@ dev_dependencies:
   # The "flutter_lints" package below contains a set of recommended lints to
   # encourage good coding practices. The lint set provided by the package is
   # activated in the `analysis_options.yaml` file located at the root of your
-  # package. See that file for information about deactivating specific lint
-  # rules and activating additional ones.
+  # package. See that file for information about specific lint rules and activating additional ones.
   flutter_lints: ^6.0.0
 
   flutter_launcher_icons: ^0.14.4
+  msix: ^3.18.0
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
@@ -78,8 +84,7 @@ dev_dependencies:
 flutter:
 
   # The following line ensures that the Material Icons font is
-  # included with your application, so that you can use the icons in
-  # the material Icons class.
+  # included with the material Icons class.
   uses-material-design: true
 
   assets:
@@ -99,6 +104,17 @@ flutter_launcher_icons:
     image_path: "assets/icon/icon.png"
     icon_size: 256
 
+msix_config:
+  display_name: SafeBrok
+  publisher_display_name: SafeBrok
+  identity_name: com.safebrok.andalucia
+  publisher: CN=SafeBrok
+  msix_version: 1.1.0.0
+  logo_path: assets/icon/icon.png
+  capabilities: internetClient
+  certificate_path: certificados/SafeBrok_Certificate.pfx
+  install_certificate: false
+
   # To add assets to your application, add an assets section, like this:
   # assets:
   #   - images/a_dot_burr.jpeg
@@ -113,19 +129,6 @@ flutter_launcher_icons:
   # To add custom fonts to your application, add a fonts section here,
   # in this "flutter" section. Each entry in this list should have a
   # "family" key with the font family name, and a "fonts" key with a
-  # list giving the asset and other descriptors for the font. For
-  # example:
-  # fonts:
-  #   - family: Schyler
-  #     fonts:
-  #       - asset: fonts/Schyler-Regular.ttf
-  #       - asset: fonts/Schyler-Italic.ttf
-  #         style: italic
-  #   - family: Trajan Pro
-  #     fonts:
-  #       - asset: fonts/TrajanPro.ttf
-  #       - asset: fonts/TrajanPro_Bold.ttf
-  #         weight: 700
-  #
+  # list giving the asset and other descriptors for the font.
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package
