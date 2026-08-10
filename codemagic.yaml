@@ -42,7 +42,7 @@ workflows:
           flutter build ipa --release \
             -t lib/main.dart \
             --build-name=1.1.0 \
-            --build-number=8 \
+            --build-number=9 \
             --export-options-plist=/Users/builder/export_options.plist
           echo "BUSCANDO IPA..."
           find build -name "*.ipa" -print
