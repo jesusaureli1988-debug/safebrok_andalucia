@@ -13,6 +13,7 @@ import 'package:safebrok_andalucia/features/admin/tramitar_facturas_screen.dart'
 import 'package:safebrok_andalucia/features/business/anular_poliza_screen.dart';
 import 'package:safebrok_andalucia/features/business/cierres_produccion_screen.dart';
 import 'package:safebrok_andalucia/features/business/bi_rentabilidad_screen.dart';
+import 'package:safebrok_andalucia/features/business/solicitudes_eliminacion_screen.dart';
 
 class CuadroMandosScreen extends StatefulWidget {
   const CuadroMandosScreen({super.key});
@@ -131,6 +132,13 @@ class _CuadroMandosScreenState extends State<CuadroMandosScreen> {
       icon: Icons.person_remove_alt_1_rounded,
       description: 'Seguimiento de bajas y motivos.',
       blockedFor: [],
+    ),
+    _ModuloMando(
+      title: 'Eliminar cuentas',
+      icon: Icons.person_remove_rounded,
+      description: 'Tramitación de solicitudes de eliminación de cuenta.',
+      blockedFor: [],
+      allowedFor: ['director_nacional', 'administracion'],
     ),
     _ModuloMando(
       title: 'Incidencias',
@@ -467,6 +475,16 @@ class _CuadroMandosScreenState extends State<CuadroMandosScreen> {
               Navigator.push(
                 context,
                 MaterialPageRoute(builder: (_) => const ControlBajasScreen()),
+              );
+              return;
+            }
+
+            if (modulo.title == 'Eliminar cuentas') {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const SolicitudesEliminacionScreen(),
+                ),
               );
               return;
             }

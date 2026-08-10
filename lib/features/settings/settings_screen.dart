@@ -10,14 +10,12 @@ import 'package:safebrok_andalucia/features/app_info/app_info_screen.dart';
 import 'package:safebrok_andalucia/features/business/crear_visita_screen.dart';
 import 'package:safebrok_andalucia/features/business/mis_visitas_screen.dart';
 import 'package:safebrok_andalucia/features/admin/admin_panel_screen.dart';
+import 'package:safebrok_andalucia/core/auth/app_role.dart';
 
 class SettingsScreen extends StatelessWidget {
   final String role;
 
-  const SettingsScreen({
-    super.key,
-    required this.role,
-  });
+  const SettingsScreen({super.key, required this.role});
 
   @override
   Widget build(BuildContext context) {
@@ -26,13 +24,8 @@ class SettingsScreen extends StatelessWidget {
     final email = user?.email ?? '';
     final initial = email.isNotEmpty ? email[0].toUpperCase() : '?';
 
-    final normalizedRole = role.trim().toLowerCase();
-
-    final bool showAdmin =
-        normalizedRole == 'director_zona' ||
-        normalizedRole == 'jefe_ventas' ||
-        normalizedRole == 'director_nacional' ||
-        normalizedRole == 'administracion';
+    final normalizedRole = AppRole.normalize(role);
+    final bool showAdmin = AppRole.isLeadership(normalizedRole);
 
     return Scaffold(
       backgroundColor: const Color(0xFF050B12),
@@ -43,10 +36,7 @@ class SettingsScreen extends StatelessWidget {
         elevation: 0,
         title: const Text(
           'Ajustes',
-          style: TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.w900,
-          ),
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900),
         ),
       ),
 
@@ -58,11 +48,7 @@ class SettingsScreen extends StatelessWidget {
             child: ListView(
               padding: const EdgeInsets.fromLTRB(18, 14, 18, 32),
               children: [
-                _profileHeader(
-                  email: email,
-                  initial: initial,
-                  role: role,
-                ),
+                _profileHeader(email: email, initial: initial, role: role),
 
                 const SizedBox(height: 20),
 
@@ -95,15 +81,6 @@ class SettingsScreen extends StatelessWidget {
                             builder: (_) => const SecurityScreen(),
                           ),
                         );
-                      },
-                    ),
-                    _item(
-                      icon: Icons.notifications_rounded,
-                      title: 'Notificaciones',
-                      subtitle: 'Avisos y actividad pendiente',
-                      color: Colors.orangeAccent,
-                      onTap: () {
-                        _soon(context);
                       },
                     ),
                   ],
@@ -245,9 +222,7 @@ class SettingsScreen extends StatelessWidget {
                 Colors.white.withOpacity(0.045),
               ],
             ),
-            border: Border.all(
-              color: Colors.white.withOpacity(0.12),
-            ),
+            border: Border.all(color: Colors.white.withOpacity(0.12)),
           ),
           child: Row(
             children: [
@@ -257,10 +232,7 @@ class SettingsScreen extends StatelessWidget {
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   gradient: const LinearGradient(
-                    colors: [
-                      Colors.cyanAccent,
-                      Color(0xFF1D7CFF),
-                    ],
+                    colors: [Colors.cyanAccent, Color(0xFF1D7CFF)],
                   ),
                   boxShadow: [
                     BoxShadow(
@@ -336,18 +308,13 @@ class SettingsScreen extends StatelessWidget {
     );
   }
 
-  Widget _section({
-    required String title,
-    required List<Widget> children,
-  }) {
+  Widget _section({required String title, required List<Widget> children}) {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: Colors.white.withOpacity(0.055),
         borderRadius: BorderRadius.circular(28),
-        border: Border.all(
-          color: Colors.white.withOpacity(0.08),
-        ),
+        border: Border.all(color: Colors.white.withOpacity(0.08)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -394,10 +361,7 @@ class SettingsScreen extends StatelessWidget {
               borderRadius: BorderRadius.circular(22),
               gradient: LinearGradient(
                 colors: premium
-                    ? [
-                        color.withOpacity(0.22),
-                        Colors.white.withOpacity(0.05),
-                      ]
+                    ? [color.withOpacity(0.22), Colors.white.withOpacity(0.05)]
                     : [
                         Colors.white.withOpacity(0.07),
                         Colors.white.withOpacity(0.025),
@@ -417,15 +381,9 @@ class SettingsScreen extends StatelessWidget {
                   decoration: BoxDecoration(
                     color: color.withOpacity(0.14),
                     borderRadius: BorderRadius.circular(18),
-                    border: Border.all(
-                      color: color.withOpacity(0.22),
-                    ),
+                    border: Border.all(color: color.withOpacity(0.22)),
                   ),
-                  child: Icon(
-                    icon,
-                    color: color,
-                    size: 25,
-                  ),
+                  child: Icon(icon, color: color, size: 25),
                 ),
 
                 const SizedBox(width: 13),
@@ -487,22 +445,6 @@ class SettingsScreen extends StatelessWidget {
       ),
     );
   }
-
-  void _soon(BuildContext context) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        backgroundColor: const Color(0xFF102331),
-        behavior: SnackBarBehavior.floating,
-        content: const Text(
-          'Próximamente activaremos esta sección',
-          style: TextStyle(
-            color: Colors.cyanAccent,
-            fontWeight: FontWeight.w800,
-          ),
-        ),
-      ),
-    );
-  }
 }
 
 class _SettingsBackground extends StatelessWidget {
@@ -517,11 +459,7 @@ class _SettingsBackground extends StatelessWidget {
             gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
-              colors: [
-                Color(0xFF050B12),
-                Color(0xFF071A2E),
-                Color(0xFF050B12),
-              ],
+              colors: [Color(0xFF050B12), Color(0xFF071A2E), Color(0xFF050B12)],
             ),
           ),
         ),
@@ -546,9 +484,7 @@ class _SettingsBackground extends StatelessWidget {
 
         BackdropFilter(
           filter: ImageFilter.blur(sigmaX: 60, sigmaY: 60),
-          child: Container(
-            color: Colors.black.withOpacity(0.05),
-          ),
+          child: Container(color: Colors.black.withOpacity(0.05)),
         ),
       ],
     );

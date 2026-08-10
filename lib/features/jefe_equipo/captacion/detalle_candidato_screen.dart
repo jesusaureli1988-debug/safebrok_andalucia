@@ -3,14 +3,12 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:safebrok_andalucia/core/storage/private_storage_reference.dart';
 
 class DetalleCandidatoScreen extends StatefulWidget {
   final Map<String, dynamic> candidato;
 
-  const DetalleCandidatoScreen({
-    super.key,
-    required this.candidato,
-  });
+  const DetalleCandidatoScreen({super.key, required this.candidato});
 
   @override
   State<DetalleCandidatoScreen> createState() => _DetalleCandidatoScreenState();
@@ -52,14 +50,12 @@ class _DetalleCandidatoScreenState extends State<DetalleCandidatoScreen> {
     estado = widget.candidato['estado'] ?? 'CV_RECIBIDO';
     motivoDescarte = widget.candidato['motivo_descarte'];
 
-    responsableAuthId =
-        widget.candidato['asignado_auth_id']?.toString().trim();
-    responsableUsuarioId =
-        widget.candidato['asignado_usuario_id']?.toString().trim();
-    responsableNombre =
-        widget.candidato['asignado_nombre']?.toString().trim();
-    responsableRol =
-        widget.candidato['asignado_rol']?.toString().trim();
+    responsableAuthId = widget.candidato['asignado_auth_id']?.toString().trim();
+    responsableUsuarioId = widget.candidato['asignado_usuario_id']
+        ?.toString()
+        .trim();
+    responsableNombre = widget.candidato['asignado_nombre']?.toString().trim();
+    responsableRol = widget.candidato['asignado_rol']?.toString().trim();
 
     cargarResponsables();
 
@@ -133,9 +129,7 @@ class _DetalleCandidatoScreenState extends State<DetalleCandidatoScreen> {
 
       final data = await supabase
           .from('usuarios')
-          .select(
-            'id, auth_id, parent_id, rol_usuario, nombre, apellidos',
-          );
+          .select('id, auth_id, parent_id, rol_usuario, nombre, apellidos');
 
       final usuarios = List<Map<String, dynamic>>.from(data).map((u) {
         return <String, dynamic>{
@@ -242,10 +236,12 @@ class _DetalleCandidatoScreenState extends State<DetalleCandidatoScreen> {
           final porNivel = nivelB.compareTo(nivelA);
           if (porNivel != 0) return porNivel;
 
-          final nombreA =
-              '${a['nombre'] ?? ''} ${a['apellidos'] ?? ''}'.trim().toLowerCase();
-          final nombreB =
-              '${b['nombre'] ?? ''} ${b['apellidos'] ?? ''}'.trim().toLowerCase();
+          final nombreA = '${a['nombre'] ?? ''} ${a['apellidos'] ?? ''}'
+              .trim()
+              .toLowerCase();
+          final nombreB = '${b['nombre'] ?? ''} ${b['apellidos'] ?? ''}'
+              .trim()
+              .toLowerCase();
 
           return nombreA.compareTo(nombreB);
         });
@@ -271,9 +267,7 @@ class _DetalleCandidatoScreenState extends State<DetalleCandidatoScreen> {
   Future<void> abrirReasignacion() async {
     if (loadingResponsables) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('La estructura todavía se está cargando'),
-        ),
+        const SnackBar(content: Text('La estructura todavía se está cargando')),
       );
       return;
     }
@@ -342,33 +336,30 @@ class _DetalleCandidatoScreenState extends State<DetalleCandidatoScreen> {
                       child: ListView.separated(
                         controller: scrollController,
                         itemCount: responsablesDisponibles.length,
-                        separatorBuilder: (_, __) =>
-                            const SizedBox(height: 9),
+                        separatorBuilder: (_, __) => const SizedBox(height: 9),
                         itemBuilder: (_, index) {
-                          final responsable =
-                              responsablesDisponibles[index];
+                          final responsable = responsablesDisponibles[index];
 
                           final authId =
                               responsable['auth_id']?.toString() ?? '';
                           final nombre =
                               '${responsable['nombre'] ?? ''} ${responsable['apellidos'] ?? ''}'
                                   .trim();
-                          final rol =
-                              _normalizarRol(responsable['rol']);
+                          final rol = _normalizarRol(responsable['rol']);
                           final actual = responsableAuthId == authId;
 
                           return Material(
                             color: Colors.transparent,
                             child: InkWell(
                               borderRadius: BorderRadius.circular(22),
-                              onTap: () =>
-                                  Navigator.pop(context, responsable),
+                              onTap: () => Navigator.pop(context, responsable),
                               child: Ink(
                                 padding: const EdgeInsets.all(14),
                                 decoration: BoxDecoration(
                                   color: actual
-                                      ? const Color(0xFF2563EB)
-                                          .withOpacity(0.10)
+                                      ? const Color(
+                                          0xFF2563EB,
+                                        ).withOpacity(0.10)
                                       : const Color(0xFFF8FAFC),
                                   borderRadius: BorderRadius.circular(22),
                                   border: Border.all(
@@ -385,10 +376,10 @@ class _DetalleCandidatoScreenState extends State<DetalleCandidatoScreen> {
                                       decoration: BoxDecoration(
                                         color: actual
                                             ? const Color(0xFF2563EB)
-                                            : const Color(0xFF111827)
-                                                .withOpacity(0.08),
-                                        borderRadius:
-                                            BorderRadius.circular(17),
+                                            : const Color(
+                                                0xFF111827,
+                                              ).withOpacity(0.08),
+                                        borderRadius: BorderRadius.circular(17),
                                       ),
                                       child: Icon(
                                         actual
@@ -410,8 +401,7 @@ class _DetalleCandidatoScreenState extends State<DetalleCandidatoScreen> {
                                                 ? 'Usuario sin nombre'
                                                 : nombre,
                                             maxLines: 1,
-                                            overflow:
-                                                TextOverflow.ellipsis,
+                                            overflow: TextOverflow.ellipsis,
                                             style: const TextStyle(
                                               color: Color(0xFF111827),
                                               fontSize: 14,
@@ -424,8 +414,9 @@ class _DetalleCandidatoScreenState extends State<DetalleCandidatoScreen> {
                                             style: TextStyle(
                                               color: actual
                                                   ? const Color(0xFF2563EB)
-                                                  : Colors.black
-                                                      .withOpacity(0.45),
+                                                  : Colors.black.withOpacity(
+                                                      0.45,
+                                                    ),
                                               fontSize: 12,
                                               fontWeight: FontWeight.w800,
                                             ),
@@ -478,8 +469,9 @@ class _DetalleCandidatoScreenState extends State<DetalleCandidatoScreen> {
         usuarioRemitente?['apellidos']?.toString().trim() ?? '',
       ].where((parte) => parte.isNotEmpty).join(' ');
 
-      final remitenteVisible =
-          nombreRemitente.isEmpty ? 'Un responsable' : nombreRemitente;
+      final remitenteVisible = nombreRemitente.isEmpty
+          ? 'Un responsable'
+          : nombreRemitente;
 
       final response = await supabase.functions.invoke(
         'enviar-push',
@@ -513,9 +505,7 @@ class _DetalleCandidatoScreenState extends State<DetalleCandidatoScreen> {
     }
   }
 
-  Future<void> reasignarCandidato(
-    Map<String, dynamic> responsable,
-  ) async {
+  Future<void> reasignarCandidato(Map<String, dynamic> responsable) async {
     final authUser = supabase.auth.currentUser;
 
     if (authUser == null) return;
@@ -534,9 +524,7 @@ class _DetalleCandidatoScreenState extends State<DetalleCandidatoScreen> {
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text(
-            'Esta persona ya es responsable del candidato',
-          ),
+          content: Text('Esta persona ya es responsable del candidato'),
         ),
       );
       return;
@@ -545,15 +533,17 @@ class _DetalleCandidatoScreenState extends State<DetalleCandidatoScreen> {
     setState(() => reasignando = true);
 
     try {
-      await supabase.from('candidatos_captacion').update({
-        'asignado_auth_id': authId,
-        'asignado_usuario_id': usuarioId,
-        'asignado_nombre':
-            nombre.isEmpty ? 'Usuario sin nombre' : nombre,
-        'asignado_rol': rol,
-        'asignado_por': authUser.id,
-        'fecha_asignacion': DateTime.now().toIso8601String(),
-      }).eq('id', widget.candidato['id']);
+      await supabase
+          .from('candidatos_captacion')
+          .update({
+            'asignado_auth_id': authId,
+            'asignado_usuario_id': usuarioId,
+            'asignado_nombre': nombre.isEmpty ? 'Usuario sin nombre' : nombre,
+            'asignado_rol': rol,
+            'asignado_por': authUser.id,
+            'fecha_asignacion': DateTime.now().toIso8601String(),
+          })
+          .eq('id', widget.candidato['id']);
 
       final candidatoId = widget.candidato['id'].toString();
       final candidatoNombre =
@@ -575,8 +565,7 @@ class _DetalleCandidatoScreenState extends State<DetalleCandidatoScreen> {
       setState(() {
         responsableAuthId = authId;
         responsableUsuarioId = usuarioId;
-        responsableNombre =
-            nombre.isEmpty ? 'Usuario sin nombre' : nombre;
+        responsableNombre = nombre.isEmpty ? 'Usuario sin nombre' : nombre;
         responsableRol = rol;
         reasignando = false;
       });
@@ -671,197 +660,193 @@ class _DetalleCandidatoScreenState extends State<DetalleCandidatoScreen> {
 
     if (url == null || url.toString().trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("Este candidato no tiene CV adjunto"),
-        ),
+        const SnackBar(content: Text("Este candidato no tiene CV adjunto")),
       );
       return;
     }
 
+    final resolvedUrl = await PrivateStorageReference.resolve(url.toString());
     await launchUrl(
-      Uri.parse(url.toString()),
+      Uri.parse(resolvedUrl),
       mode: LaunchMode.externalApplication,
     );
   }
 
   Future<void> seleccionarEstado() async {
-  final estados = [
-    {
-      "valor": "CV_RECIBIDO",
-      "texto": "CV recibido",
-      "icono": Icons.description_rounded,
-    },
-    {
-      "valor": "CONTACTADO",
-      "texto": "Contactado",
-      "icono": Icons.phone_in_talk_rounded,
-    },
-    {
-      "valor": "ENTREVISTA_CONCERTADA",
-      "texto": "Entrevista concertada",
-      "icono": Icons.event_available_rounded,
-    },
-    {
-      "valor": "ENTREVISTA_REALIZADA",
-      "texto": "Entrevista realizada",
-      "icono": Icons.person_search_rounded,
-    },
-    {
-      "valor": "SELECCIONADO",
-      "texto": "Seleccionado",
-      "icono": Icons.star_rounded,
-    },
-    {
-      "valor": "INCORPORADO",
-      "texto": "Incorporado",
-      "icono": Icons.badge_rounded,
-    },
-    {
-      "valor": "DESCARTADO",
-      "texto": "Descartado",
-      "icono": Icons.cancel_rounded,
-    },
-  ];
+    final estados = [
+      {
+        "valor": "CV_RECIBIDO",
+        "texto": "CV recibido",
+        "icono": Icons.description_rounded,
+      },
+      {
+        "valor": "CONTACTADO",
+        "texto": "Contactado",
+        "icono": Icons.phone_in_talk_rounded,
+      },
+      {
+        "valor": "ENTREVISTA_CONCERTADA",
+        "texto": "Entrevista concertada",
+        "icono": Icons.event_available_rounded,
+      },
+      {
+        "valor": "ENTREVISTA_REALIZADA",
+        "texto": "Entrevista realizada",
+        "icono": Icons.person_search_rounded,
+      },
+      {
+        "valor": "SELECCIONADO",
+        "texto": "Seleccionado",
+        "icono": Icons.star_rounded,
+      },
+      {
+        "valor": "INCORPORADO",
+        "texto": "Incorporado",
+        "icono": Icons.badge_rounded,
+      },
+      {
+        "valor": "DESCARTADO",
+        "texto": "Descartado",
+        "icono": Icons.cancel_rounded,
+      },
+    ];
 
-  final seleccionado = await showModalBottomSheet<String>(
-    context: context,
-    backgroundColor: Colors.transparent,
-    isScrollControlled: true,
-    builder: (_) {
-      return DraggableScrollableSheet(
-        initialChildSize: 0.78,
-        minChildSize: 0.45,
-        maxChildSize: 0.92,
-        expand: false,
-        builder: (context, scrollController) {
-          return Container(
-            margin: const EdgeInsets.all(14),
-            padding: const EdgeInsets.fromLTRB(16, 14, 16, 18),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(30),
-            ),
-            child: SafeArea(
-              child: ListView(
-                controller: scrollController,
-                children: [
-                  Center(
-                    child: Container(
-                      width: 46,
-                      height: 5,
-                      decoration: BoxDecoration(
-                        color: Colors.black.withOpacity(0.12),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                    ),
-                  ),
-
-                  const SizedBox(height: 18),
-
-                  const Text(
-                    "Cambiar estado del candidato",
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: Color(0xFF111827),
-                      fontSize: 20,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-
-                  const SizedBox(height: 6),
-
-                  Text(
-                    "Selecciona en qué punto del proceso se encuentra.",
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: Colors.black.withOpacity(0.45),
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-
-                  const SizedBox(height: 18),
-
-                  ...estados.map((item) {
-                    final valor = item["valor"] as String;
-                    final color = estadoColor(valor);
-                    final seleccionadoActual = estado == valor;
-
-                    return Container(
-                      margin: const EdgeInsets.only(bottom: 9),
-                      decoration: BoxDecoration(
-                        color: seleccionadoActual
-                            ? color.withOpacity(0.10)
-                            : const Color(0xFFF8FAFC),
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(
-                          color: seleccionadoActual
-                              ? color.withOpacity(0.35)
-                              : Colors.black.withOpacity(0.04),
-                        ),
-                      ),
-                      child: MouseRegion(
-                        cursor: SystemMouseCursors.click,
-                        child: ListTile(
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          leading: Container(
-                            height: 44,
-                            width: 44,
-                            decoration: BoxDecoration(
-                              color: color.withOpacity(0.13),
-                              borderRadius: BorderRadius.circular(15),
-                            ),
-                            child: Icon(
-                              item["icono"] as IconData,
-                              color: color,
-                            ),
-                          ),
-                          title: Text(
-                            item["texto"] as String,
-                            style: const TextStyle(
-                              color: Color(0xFF111827),
-                              fontWeight: FontWeight.w900,
-                            ),
-                          ),
-                          trailing: seleccionadoActual
-                              ? Icon(
-                                  Icons.check_circle_rounded,
-                                  color: color,
-                                )
-                              : const Icon(
-                                  Icons.arrow_forward_ios_rounded,
-                                  size: 15,
-                                  color: Color(0xFF94A3B8),
-                                ),
-                          onTap: () => Navigator.pop(context, valor),
-                        ),
-                      ),
-                    );
-                  }),
-
-                  const SizedBox(height: 8),
-                ],
+    final seleccionado = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (_) {
+        return DraggableScrollableSheet(
+          initialChildSize: 0.78,
+          minChildSize: 0.45,
+          maxChildSize: 0.92,
+          expand: false,
+          builder: (context, scrollController) {
+            return Container(
+              margin: const EdgeInsets.all(14),
+              padding: const EdgeInsets.fromLTRB(16, 14, 16, 18),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(30),
               ),
-            ),
-          );
-        },
-      );
-    },
-  );
+              child: SafeArea(
+                child: ListView(
+                  controller: scrollController,
+                  children: [
+                    Center(
+                      child: Container(
+                        width: 46,
+                        height: 5,
+                        decoration: BoxDecoration(
+                          color: Colors.black.withOpacity(0.12),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                      ),
+                    ),
 
-  if (seleccionado == null) return;
+                    const SizedBox(height: 18),
 
-  if (seleccionado == "DESCARTADO") {
-    await marcarDescartado();
-  } else {
-    setState(() {
-      estado = seleccionado;
-      motivoDescarte = null;
-    });
+                    const Text(
+                      "Cambiar estado del candidato",
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: Color(0xFF111827),
+                        fontSize: 20,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+
+                    const SizedBox(height: 6),
+
+                    Text(
+                      "Selecciona en qué punto del proceso se encuentra.",
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: Colors.black.withOpacity(0.45),
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+
+                    const SizedBox(height: 18),
+
+                    ...estados.map((item) {
+                      final valor = item["valor"] as String;
+                      final color = estadoColor(valor);
+                      final seleccionadoActual = estado == valor;
+
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 9),
+                        decoration: BoxDecoration(
+                          color: seleccionadoActual
+                              ? color.withOpacity(0.10)
+                              : const Color(0xFFF8FAFC),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                            color: seleccionadoActual
+                                ? color.withOpacity(0.35)
+                                : Colors.black.withOpacity(0.04),
+                          ),
+                        ),
+                        child: MouseRegion(
+                          cursor: SystemMouseCursors.click,
+                          child: ListTile(
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            leading: Container(
+                              height: 44,
+                              width: 44,
+                              decoration: BoxDecoration(
+                                color: color.withOpacity(0.13),
+                                borderRadius: BorderRadius.circular(15),
+                              ),
+                              child: Icon(
+                                item["icono"] as IconData,
+                                color: color,
+                              ),
+                            ),
+                            title: Text(
+                              item["texto"] as String,
+                              style: const TextStyle(
+                                color: Color(0xFF111827),
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                            trailing: seleccionadoActual
+                                ? Icon(Icons.check_circle_rounded, color: color)
+                                : const Icon(
+                                    Icons.arrow_forward_ios_rounded,
+                                    size: 15,
+                                    color: Color(0xFF94A3B8),
+                                  ),
+                            onTap: () => Navigator.pop(context, valor),
+                          ),
+                        ),
+                      );
+                    }),
+
+                    const SizedBox(height: 8),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+
+    if (seleccionado == null) return;
+
+    if (seleccionado == "DESCARTADO") {
+      await marcarDescartado();
+    } else {
+      setState(() {
+        estado = seleccionado;
+        motivoDescarte = null;
+      });
+    }
   }
-}
 
   Future<void> marcarDescartado() async {
     final controller = TextEditingController(text: motivoDescarte ?? '');
@@ -923,12 +908,15 @@ class _DetalleCandidatoScreenState extends State<DetalleCandidatoScreen> {
     setState(() => loading = true);
 
     try {
-      await supabase.from('candidatos_captacion').update({
-        'estado': estado,
-        'motivo_descarte': motivoDescarte,
-        'fecha_entrevista_programada': fechaEntrevista?.toIso8601String(),
-        'fecha_proxima_accion': fechaProxima?.toIso8601String(),
-      }).eq('id', widget.candidato['id']);
+      await supabase
+          .from('candidatos_captacion')
+          .update({
+            'estado': estado,
+            'motivo_descarte': motivoDescarte,
+            'fecha_entrevista_programada': fechaEntrevista?.toIso8601String(),
+            'fecha_proxima_accion': fechaProxima?.toIso8601String(),
+          })
+          .eq('id', widget.candidato['id']);
 
       if (mounted) Navigator.pop(context, true);
     } catch (e) {
@@ -959,9 +947,7 @@ class _DetalleCandidatoScreenState extends State<DetalleCandidatoScreen> {
       builder: (context, child) {
         return Theme(
           data: ThemeData.light().copyWith(
-            colorScheme: const ColorScheme.light(
-              primary: Color(0xFF111827),
-            ),
+            colorScheme: const ColorScheme.light(primary: Color(0xFF111827)),
           ),
           child: child!,
         );
@@ -1075,10 +1061,7 @@ class _DetalleCandidatoScreenState extends State<DetalleCandidatoScreen> {
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [
-            const Color(0xFF111827),
-            color,
-          ],
+          colors: [const Color(0xFF111827), color],
         ),
         boxShadow: [
           BoxShadow(
@@ -1112,9 +1095,7 @@ class _DetalleCandidatoScreenState extends State<DetalleCandidatoScreen> {
                     decoration: BoxDecoration(
                       color: Colors.white.withOpacity(0.16),
                       borderRadius: BorderRadius.circular(26),
-                      border: Border.all(
-                        color: Colors.white.withOpacity(0.20),
-                      ),
+                      border: Border.all(color: Colors.white.withOpacity(0.20)),
                     ),
                     child: Center(
                       child: Text(
@@ -1169,11 +1150,7 @@ class _DetalleCandidatoScreenState extends State<DetalleCandidatoScreen> {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(
-                Icons.tune_rounded,
-                color: Colors.white,
-                size: 15,
-              ),
+              const Icon(Icons.tune_rounded, color: Colors.white, size: 15),
               const SizedBox(width: 7),
               Text(
                 estadoTexto(estado).toUpperCase(),
@@ -1339,8 +1316,8 @@ class _DetalleCandidatoScreenState extends State<DetalleCandidatoScreen> {
                   text: reasignando
                       ? 'Guardando...'
                       : tieneResponsable
-                          ? 'Reasignar'
-                          : 'Asignar',
+                      ? 'Reasignar'
+                      : 'Asignar',
                   color: const Color(0xFF2563EB),
                   onTap: reasignando ? () {} : abrirReasignacion,
                 ),
@@ -1444,7 +1421,8 @@ class _DetalleCandidatoScreenState extends State<DetalleCandidatoScreen> {
   }
 
   Widget _cvCard() {
-    final tieneCV = widget.candidato['cv_url'] != null &&
+    final tieneCV =
+        widget.candidato['cv_url'] != null &&
         widget.candidato['cv_url'].toString().trim().isNotEmpty;
 
     return _WhiteCard(
@@ -1463,8 +1441,9 @@ class _DetalleCandidatoScreenState extends State<DetalleCandidatoScreen> {
               tieneCV
                   ? Icons.picture_as_pdf_rounded
                   : Icons.description_outlined,
-              color:
-                  tieneCV ? const Color(0xFFEF4444) : const Color(0xFF64748B),
+              color: tieneCV
+                  ? const Color(0xFFEF4444)
+                  : const Color(0xFF64748B),
             ),
           ),
           const SizedBox(width: 14),
@@ -1512,17 +1491,12 @@ class _DetalleCandidatoScreenState extends State<DetalleCandidatoScreen> {
       decoration: BoxDecoration(
         color: const Color(0xFFEF4444).withOpacity(0.10),
         borderRadius: BorderRadius.circular(28),
-        border: Border.all(
-          color: const Color(0xFFEF4444).withOpacity(0.20),
-        ),
+        border: Border.all(color: const Color(0xFFEF4444).withOpacity(0.20)),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(
-            Icons.warning_rounded,
-            color: Color(0xFFEF4444),
-          ),
+          const Icon(Icons.warning_rounded, color: Color(0xFFEF4444)),
           const SizedBox(width: 12),
           Expanded(
             child: Text(
@@ -1553,10 +1527,7 @@ class _DetalleCandidatoScreenState extends State<DetalleCandidatoScreen> {
             color: const Color(0xFF111827).withOpacity(0.08),
             borderRadius: BorderRadius.circular(15),
           ),
-          child: Icon(
-            icon,
-            color: const Color(0xFF111827),
-          ),
+          child: Icon(icon, color: const Color(0xFF111827)),
         ),
         const SizedBox(width: 13),
         Expanded(
@@ -1592,9 +1563,7 @@ class _DetalleCandidatoScreenState extends State<DetalleCandidatoScreen> {
       child: Padding(
         padding: const EdgeInsets.fromLTRB(18, 8, 18, 14),
         child: MouseRegion(
-          cursor: loading
-              ? SystemMouseCursors.basic
-              : SystemMouseCursors.click,
+          cursor: loading ? SystemMouseCursors.basic : SystemMouseCursors.click,
           child: SizedBox(
             height: 58,
             width: double.infinity,
@@ -1635,9 +1604,7 @@ class _DetalleCandidatoScreenState extends State<DetalleCandidatoScreen> {
 class _WhiteCard extends StatelessWidget {
   final Widget child;
 
-  const _WhiteCard({
-    required this.child,
-  });
+  const _WhiteCard({required this.child});
 
   @override
   Widget build(BuildContext context) {
@@ -1686,8 +1653,8 @@ class _ActionButtonState extends State<_ActionButton> {
     final scale = pressing
         ? 0.96
         : hovering
-            ? 1.04
-            : 1.0;
+        ? 1.04
+        : 1.0;
 
     return MouseRegion(
       cursor: SystemMouseCursors.click,
@@ -1723,11 +1690,7 @@ class _ActionButtonState extends State<_ActionButton> {
               ),
               child: Column(
                 children: [
-                  Icon(
-                    widget.icon,
-                    color: widget.color,
-                    size: 25,
-                  ),
+                  Icon(widget.icon, color: widget.color, size: 25),
                   const SizedBox(height: 7),
                   Text(
                     widget.label,
@@ -1819,10 +1782,7 @@ class _DateRow extends StatelessWidget {
             ),
             child: Row(
               children: [
-                Icon(
-                  icon,
-                  color: const Color(0xFF2563EB),
-                ),
+                Icon(icon, color: const Color(0xFF2563EB)),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(

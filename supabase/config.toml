@@ -1,6 +1,7 @@
 
 [functions.enviar-tpv-recibo]
 enabled = true
+# Valida el JWT actual con auth.getUser() dentro de la función.
 verify_jwt = false
 import_map = "./functions/enviar-tpv-recibo/deno.json"
 # Uncomment to specify a custom file path to the entrypoint.
@@ -12,6 +13,7 @@ entrypoint = "./functions/enviar-tpv-recibo/index.ts"
 
 [functions.safebrok-ia]
 enabled = true
+# Valida el JWT actual con auth.getUser() dentro de la función.
 verify_jwt = false
 import_map = "./functions/safebrok-ia/deno.json"
 # Uncomment to specify a custom file path to the entrypoint.
@@ -23,6 +25,7 @@ entrypoint = "./functions/safebrok-ia/index.ts"
 
 [functions.enviar-push]
 enabled = true
+# Valida el JWT actual con auth.getUser() dentro de la función.
 verify_jwt = false
 import_map = "./functions/enviar-push/deno.json"
 # Uncomment to specify a custom file path to the entrypoint.
@@ -31,3 +34,29 @@ entrypoint = "./functions/enviar-push/index.ts"
 # Specifies static files to be bundled with the function. Supports glob patterns.
 # For example, if you want to serve static HTML pages in your function:
 # static_files = [ "./functions/enviar-push/*.html" ]
+
+[functions.enviar-factura-nomina]
+enabled = true
+# Valida el JWT actual y el rol dentro de la función.
+verify_jwt = false
+entrypoint = "./functions/enviar-factura-nomina/index.ts"
+
+[functions.informes-plan-comercial]
+enabled = true
+# Acepta cron con secreto y usuarios con JWT; ambos se validan en la función.
+verify_jwt = false
+import_map = "./functions/informes-plan-comercial/deno.json"
+entrypoint = "./functions/informes-plan-comercial/index.ts"
+
+[functions.notificar-objetivos]
+enabled = true
+# Endpoint exclusivo de cron, protegido por CRON_SECRET dentro de la función.
+verify_jwt = false
+import_map = "./functions/notificar-objetivos/deno.json"
+entrypoint = "./functions/notificar-objetivos/index.ts"
+
+[functions.notificar-cierre-produccion]
+enabled = true
+# Endpoint exclusivo de cron, protegido por CRON_SECRET dentro de la función.
+verify_jwt = false
+entrypoint = "./functions/notificar-cierre-produccion/index.ts"

@@ -4,6 +4,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:safebrok_andalucia/core/storage/private_storage_reference.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:image_picker/image_picker.dart';
 
@@ -129,9 +130,7 @@ class _NuevoCandidatoScreenState extends State<NuevoCandidatoScreen> {
 
       final data = await supabase
           .from('usuarios')
-          .select(
-            'id, auth_id, parent_id, rol_usuario, nombre, apellidos',
-          );
+          .select('id, auth_id, parent_id, rol_usuario, nombre, apellidos');
 
       final usuarios = List<Map<String, dynamic>>.from(data).map((u) {
         return <String, dynamic>{
@@ -240,10 +239,12 @@ class _NuevoCandidatoScreenState extends State<NuevoCandidatoScreen> {
           final porNivel = nivelB.compareTo(nivelA);
           if (porNivel != 0) return porNivel;
 
-          final nombreA =
-              '${a['nombre'] ?? ''} ${a['apellidos'] ?? ''}'.trim().toLowerCase();
-          final nombreB =
-              '${b['nombre'] ?? ''} ${b['apellidos'] ?? ''}'.trim().toLowerCase();
+          final nombreA = '${a['nombre'] ?? ''} ${a['apellidos'] ?? ''}'
+              .trim()
+              .toLowerCase();
+          final nombreB = '${b['nombre'] ?? ''} ${b['apellidos'] ?? ''}'
+              .trim()
+              .toLowerCase();
 
           return nombreA.compareTo(nombreB);
         });
@@ -350,13 +351,17 @@ class _NuevoCandidatoScreenState extends State<NuevoCandidatoScreen> {
       final fileName =
           "${DateTime.now().millisecondsSinceEpoch}_${userId}_cv.$extension";
 
-      final path = fileName;
+      final path = '$userId/$fileName';
 
       await supabase.storage
           .from('cv_candidatos')
-          .uploadBinary(path, bytes, fileOptions: const FileOptions(upsert: true));
+          .uploadBinary(
+            path,
+            bytes,
+            fileOptions: const FileOptions(upsert: true),
+          );
 
-      final url = supabase.storage.from('cv_candidatos').getPublicUrl(path);
+      final url = PrivateStorageReference.encode('cv_candidatos', path);
 
       setState(() {
         cvUrl = url;
@@ -374,9 +379,9 @@ class _NuevoCandidatoScreenState extends State<NuevoCandidatoScreen> {
 
       if (mounted) {
         setState(() => uploadingCV = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("No se pudo subir el CV: $e")),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text("No se pudo subir el CV: $e")));
       }
     }
   }
@@ -399,8 +404,9 @@ class _NuevoCandidatoScreenState extends State<NuevoCandidatoScreen> {
         usuarioRemitente?['apellidos']?.toString().trim() ?? '',
       ].where((parte) => parte.isNotEmpty).join(' ');
 
-      final remitenteVisible =
-          nombreRemitente.isEmpty ? 'Un responsable' : nombreRemitente;
+      final remitenteVisible = nombreRemitente.isEmpty
+          ? 'Un responsable'
+          : nombreRemitente;
 
       final response = await supabase.functions.invoke(
         'enviar-push',
@@ -495,9 +501,9 @@ class _NuevoCandidatoScreenState extends State<NuevoCandidatoScreen> {
       debugPrint("ERROR GUARDAR: $e");
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.toString())),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(e.toString())));
       }
     }
 
@@ -521,16 +527,15 @@ class _NuevoCandidatoScreenState extends State<NuevoCandidatoScreen> {
         color: error ? const Color(0xFFEF4444) : Colors.black.withOpacity(0.48),
         fontWeight: FontWeight.w700,
       ),
-      hintStyle: TextStyle(
-        color: Colors.black.withOpacity(0.30),
-        fontSize: 13,
-      ),
+      hintStyle: TextStyle(color: Colors.black.withOpacity(0.30), fontSize: 13),
       filled: true,
       fillColor: const Color(0xFFF8FAFC),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(22),
         borderSide: BorderSide(
-          color: error ? const Color(0xFFEF4444) : Colors.black.withOpacity(0.05),
+          color: error
+              ? const Color(0xFFEF4444)
+              : Colors.black.withOpacity(0.05),
         ),
       ),
       focusedBorder: OutlineInputBorder(
@@ -581,7 +586,8 @@ class _NuevoCandidatoScreenState extends State<NuevoCandidatoScreen> {
                         const SizedBox(height: 18),
                         _sectionCard(
                           title: "Datos del candidato",
-                          subtitle: "Información principal para iniciar el proceso",
+                          subtitle:
+                              "Información principal para iniciar el proceso",
                           icon: Icons.person_add_alt_1_rounded,
                           child: Column(
                             children: [
@@ -631,7 +637,8 @@ class _NuevoCandidatoScreenState extends State<NuevoCandidatoScreen> {
                         const SizedBox(height: 18),
                         _sectionCard(
                           title: "Asignar candidato",
-                          subtitle: "Selecciona quién será responsable del proceso",
+                          subtitle:
+                              "Selecciona quién será responsable del proceso",
                           icon: Icons.assignment_ind_rounded,
                           child: _responsableSelector(),
                         ),
@@ -703,10 +710,7 @@ class _NuevoCandidatoScreenState extends State<NuevoCandidatoScreen> {
         gradient: const LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [
-            Color(0xFF111827),
-            Color(0xFF2563EB),
-          ],
+          colors: [Color(0xFF111827), Color(0xFF2563EB)],
         ),
         boxShadow: [
           BoxShadow(
@@ -731,7 +735,10 @@ class _NuevoCandidatoScreenState extends State<NuevoCandidatoScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 7,
+                ),
                 decoration: BoxDecoration(
                   color: Colors.white.withOpacity(0.14),
                   borderRadius: BorderRadius.circular(30),
@@ -879,12 +886,7 @@ class _NuevoCandidatoScreenState extends State<NuevoCandidatoScreen> {
         color: Color(0xFF111827),
         fontWeight: FontWeight.w700,
       ),
-      decoration: deco(
-        label: label,
-        icon: icon,
-        hint: hint,
-        error: error,
-      ),
+      decoration: deco(label: label, icon: icon, hint: hint, error: error),
       onChanged: (_) => setState(() {}),
     );
   }
@@ -923,14 +925,15 @@ class _NuevoCandidatoScreenState extends State<NuevoCandidatoScreen> {
                 onTap: () => setState(() => origenSeleccionado = origen),
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 150),
-                  padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 10),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 13,
+                    vertical: 10,
+                  ),
                   decoration: BoxDecoration(
                     color: selected ? color : const Color(0xFFF8FAFC),
                     borderRadius: BorderRadius.circular(30),
                     border: Border.all(
-                      color: selected
-                          ? color
-                          : Colors.black.withOpacity(0.05),
+                      color: selected ? color : Colors.black.withOpacity(0.05),
                     ),
                   ),
                   child: Text(
@@ -955,9 +958,7 @@ class _NuevoCandidatoScreenState extends State<NuevoCandidatoScreen> {
       return const Padding(
         padding: EdgeInsets.symmetric(vertical: 14),
         child: Center(
-          child: CircularProgressIndicator(
-            color: Color(0xFF2563EB),
-          ),
+          child: CircularProgressIndicator(color: Color(0xFF2563EB)),
         ),
       );
     }
@@ -969,9 +970,7 @@ class _NuevoCandidatoScreenState extends State<NuevoCandidatoScreen> {
         decoration: BoxDecoration(
           color: const Color(0xFFEF4444).withOpacity(0.08),
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: const Color(0xFFEF4444).withOpacity(0.18),
-          ),
+          border: Border.all(color: const Color(0xFFEF4444).withOpacity(0.18)),
         ),
         child: const Text(
           "No se han encontrado responsables disponibles en tu estructura.",
@@ -1027,8 +1026,9 @@ class _NuevoCandidatoScreenState extends State<NuevoCandidatoScreen> {
                     setState(() {
                       responsableAuthId = authId;
                       responsableUsuarioId = usuarioId;
-                      responsableNombre =
-                          nombre.isEmpty ? 'Usuario sin nombre' : nombre;
+                      responsableNombre = nombre.isEmpty
+                          ? 'Usuario sin nombre'
+                          : nombre;
                       responsableRol = rol;
                     });
                   },
@@ -1072,9 +1072,7 @@ class _NuevoCandidatoScreenState extends State<NuevoCandidatoScreen> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                nombre.isEmpty
-                                    ? 'Usuario sin nombre'
-                                    : nombre,
+                                nombre.isEmpty ? 'Usuario sin nombre' : nombre,
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: const TextStyle(
@@ -1105,8 +1103,9 @@ class _NuevoCandidatoScreenState extends State<NuevoCandidatoScreen> {
                             setState(() {
                               responsableAuthId = authId;
                               responsableUsuarioId = usuarioId;
-                              responsableNombre =
-                                  nombre.isEmpty ? 'Usuario sin nombre' : nombre;
+                              responsableNombre = nombre.isEmpty
+                                  ? 'Usuario sin nombre'
+                                  : nombre;
                               responsableRol = rol;
                             });
                           },
@@ -1152,7 +1151,9 @@ class _NuevoCandidatoScreenState extends State<NuevoCandidatoScreen> {
       width: double.infinity,
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: tieneCV ? const Color(0xFF22C55E).withOpacity(0.10) : Colors.white,
+        color: tieneCV
+            ? const Color(0xFF22C55E).withOpacity(0.10)
+            : Colors.white,
         borderRadius: BorderRadius.circular(30),
         border: Border.all(
           color: tieneCV
@@ -1187,8 +1188,12 @@ class _NuevoCandidatoScreenState extends State<NuevoCandidatoScreen> {
                     ),
                   )
                 : Icon(
-                    tieneCV ? Icons.check_circle_rounded : Icons.upload_file_rounded,
-                    color: tieneCV ? const Color(0xFF22C55E) : const Color(0xFF2563EB),
+                    tieneCV
+                        ? Icons.check_circle_rounded
+                        : Icons.upload_file_rounded,
+                    color: tieneCV
+                        ? const Color(0xFF22C55E)
+                        : const Color(0xFF2563EB),
                     size: 31,
                   ),
           ),
@@ -1440,7 +1445,9 @@ class _ClickChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MouseRegion(
-      cursor: onTap == null ? SystemMouseCursors.basic : SystemMouseCursors.click,
+      cursor: onTap == null
+          ? SystemMouseCursors.basic
+          : SystemMouseCursors.click,
       child: Material(
         color: Colors.transparent,
         child: InkWell(
@@ -1481,7 +1488,9 @@ class _SmallButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MouseRegion(
-      cursor: onTap == null ? SystemMouseCursors.basic : SystemMouseCursors.click,
+      cursor: onTap == null
+          ? SystemMouseCursors.basic
+          : SystemMouseCursors.click,
       child: Material(
         color: Colors.transparent,
         child: InkWell(

@@ -1456,12 +1456,35 @@ final asegurados = aseguradosTexto.isEmpty
     ? null
     : int.tryParse(aseguradosTexto);
 
+final producto = productoController.text.trim();
+final formaPago = formaPagoController.text.trim();
+
 if (precioTexto.isNotEmpty && precio == null) {
   ScaffoldMessenger.of(context).showSnackBar(
     const SnackBar(
       content: Text(
         'El precio introducido no es válido.',
       ),
+      backgroundColor: Colors.orangeAccent,
+    ),
+  );
+  return;
+}
+
+if (precio == null || precio <= 0) {
+  ScaffoldMessenger.of(context).showSnackBar(
+    const SnackBar(
+      content: Text('El precio debe ser mayor que cero.'),
+      backgroundColor: Colors.orangeAccent,
+    ),
+  );
+  return;
+}
+
+if (producto.isEmpty || formaPago.isEmpty) {
+  ScaffoldMessenger.of(context).showSnackBar(
+    const SnackBar(
+      content: Text('Producto y forma de pago son obligatorios.'),
       backgroundColor: Colors.orangeAccent,
     ),
   );
@@ -1483,20 +1506,70 @@ if (aseguradosTexto.isNotEmpty && asegurados == null) {
             try {
               setModalState(() => saving = true);
 
+              final double primaAnual;
+
+              switch (formaPago.toLowerCase()) {
+                case 'mensual':
+                  primaAnual = precio * 12;
+                  break;
+                case 'trimestral':
+                  primaAnual = precio * 4;
+                  break;
+                case 'semestral':
+                  primaAnual = precio * 2;
+                  break;
+                case 'anual':
+                  primaAnual = precio;
+                  break;
+                default:
+                  throw Exception(
+                    'Forma de pago no válida: $formaPago',
+                  );
+              }
+
+              final configuracion = await supabase
+                  .from('comisiones_productos')
+                  .select('porcentaje_comision, porcentaje_impuestos')
+                  .eq('producto', producto)
+                  .maybeSingle();
+
+              if (configuracion == null) {
+                throw Exception(
+                  'No existe configuración de comisión e impuestos para $producto.',
+                );
+              }
+
+              final porcentajeImpuestos =
+                  _money(configuracion['porcentaje_impuestos'])
+                      .clamp(0.0, 100.0)
+                      .toDouble();
+              final porcentajeComision =
+                  _money(configuracion['porcentaje_comision'])
+                      .clamp(0.0, 100.0)
+                      .toDouble();
+              final primaNeta =
+                  primaAnual * (1 - (porcentajeImpuestos / 100));
+              final comision =
+                  primaNeta * (porcentajeComision / 100);
+
              await supabase.from('ventas').update({
-  'producto': productoController.text.trim().isEmpty
-      ? null
-      : productoController.text.trim(),
+  'producto': producto,
 
   'compania': companiaController.text.trim().isEmpty
       ? null
       : companiaController.text.trim(),
 
-  'forma_pago': formaPagoController.text.trim().isEmpty
-      ? null
-      : formaPagoController.text.trim(),
+  'forma_pago': formaPago,
 
   'precio': precio,
+
+  'prima_anual': primaAnual,
+
+  'prima_anual_bruta': primaAnual,
+
+  'prima_anual_neta': primaNeta,
+
+  'comision': comision,
 
   'numero_asegurados': asegurados,
 

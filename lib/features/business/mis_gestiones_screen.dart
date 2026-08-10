@@ -6,6 +6,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:safebrok_andalucia/core/storage/private_storage_reference.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class MisGestionesScreen extends StatefulWidget {
@@ -41,12 +42,7 @@ class _MisGestionesScreenState extends State<MisGestionesScreen> {
     'Cancelada',
   ];
 
-  final prioridades = const [
-    'Todas',
-    'Alta',
-    'Media',
-    'Baja',
-  ];
+  final prioridades = const ['Todas', 'Alta', 'Media', 'Baja'];
 
   final tipos = const [
     'Todos',
@@ -104,7 +100,9 @@ class _MisGestionesScreenState extends State<MisGestionesScreen> {
         final creador = _usuarioPorAuth(g['asignado_por_auth_id']?.toString());
         return {
           ...g,
-          'creador_nombre': creador == null ? 'Responsable' : _nombreCompleto(creador),
+          'creador_nombre': creador == null
+              ? 'Responsable'
+              : _nombreCompleto(creador),
         };
       }).toList();
 
@@ -149,7 +147,9 @@ class _MisGestionesScreenState extends State<MisGestionesScreen> {
     }
 
     if (filtroPrioridad != 'Todas') {
-      lista = lista.where((g) => g['prioridad']?.toString() == filtroPrioridad).toList();
+      lista = lista
+          .where((g) => g['prioridad']?.toString() == filtroPrioridad)
+          .toList();
     }
 
     if (filtroTipo != 'Todos') {
@@ -159,8 +159,9 @@ class _MisGestionesScreenState extends State<MisGestionesScreen> {
     final q = busqueda.toLowerCase().trim();
     if (q.isNotEmpty) {
       lista = lista.where((g) {
-        final text = '${g['titulo']} ${g['descripcion']} ${g['tipo']} ${g['prioridad']} ${g['estado']} ${g['comentario_realizacion']} ${g['creador_nombre']}'
-            .toLowerCase();
+        final text =
+            '${g['titulo']} ${g['descripcion']} ${g['tipo']} ${g['prioridad']} ${g['estado']} ${g['comentario_realizacion']} ${g['creador_nombre']}'
+                .toLowerCase();
         return text.contains(q);
       }).toList();
     }
@@ -169,14 +170,14 @@ class _MisGestionesScreenState extends State<MisGestionesScreen> {
   }
 
   int get pendientes => gestiones.where((g) {
-        final e = g['estado']?.toString() ?? 'Pendiente';
-        return e == 'Pendiente' || e == 'En gestión';
-      }).length;
+    final e = g['estado']?.toString() ?? 'Pendiente';
+    return e == 'Pendiente' || e == 'En gestión';
+  }).length;
 
   int get completadas => gestiones.where((g) {
-        final e = g['estado']?.toString() ?? '';
-        return e == 'Completada' || e == 'Realizada';
-      }).length;
+    final e = g['estado']?.toString() ?? '';
+    return e == 'Completada' || e == 'Realizada';
+  }).length;
 
   int get vencidas {
     final hoy = DateTime.now();
@@ -184,7 +185,8 @@ class _MisGestionesScreenState extends State<MisGestionesScreen> {
 
     return gestiones.where((g) {
       final e = g['estado']?.toString() ?? 'Pendiente';
-      if (e == 'Completada' || e == 'Realizada' || e == 'Cancelada') return false;
+      if (e == 'Completada' || e == 'Realizada' || e == 'Cancelada')
+        return false;
       final f = DateTime.tryParse(g['fecha_limite']?.toString() ?? '');
       if (f == null) return false;
       final limpia = DateTime(f.year, f.month, f.day);
@@ -251,7 +253,8 @@ class _MisGestionesScreenState extends State<MisGestionesScreen> {
                       if (picked == null) return;
                       setModalState(() => archivoRespuesta = picked);
                     },
-                    onRemove: () => setModalState(() => archivoRespuesta = null),
+                    onRemove: () =>
+                        setModalState(() => archivoRespuesta = null),
                   ),
                   const SizedBox(height: 18),
                   SizedBox(
@@ -259,7 +262,11 @@ class _MisGestionesScreenState extends State<MisGestionesScreen> {
                     child: ElevatedButton.icon(
                       onPressed: () async {
                         Navigator.pop(context);
-                        await _guardarRealizada(g, comentario, archivoRespuesta);
+                        await _guardarRealizada(
+                          g,
+                          comentario,
+                          archivoRespuesta,
+                        );
                       },
                       icon: const Icon(Icons.check_circle_rounded),
                       label: const Text('Enviar reporte y marcar realizada'),
@@ -324,7 +331,10 @@ class _MisGestionesScreenState extends State<MisGestionesScreen> {
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.description_rounded, color: Color(0xFF0284C7)),
+                  const Icon(
+                    Icons.description_rounded,
+                    color: Color(0xFF0284C7),
+                  ),
                   const SizedBox(width: 10),
                   Expanded(
                     child: Column(
@@ -352,7 +362,10 @@ class _MisGestionesScreenState extends State<MisGestionesScreen> {
                   ),
                   IconButton(
                     onPressed: onRemove,
-                    icon: const Icon(Icons.close_rounded, color: Color(0xFFDC2626)),
+                    icon: const Icon(
+                      Icons.close_rounded,
+                      color: Color(0xFFDC2626),
+                    ),
                   ),
                 ],
               ),
@@ -386,19 +399,22 @@ class _MisGestionesScreenState extends State<MisGestionesScreen> {
       final extension = archivo.extension?.trim().isNotEmpty == true
           ? archivo.extension!.trim()
           : archivo.name.split('.').length > 1
-              ? archivo.name.split('.').last
-              : 'file';
+          ? archivo.name.split('.').last
+          : 'file';
 
       final cleanName = archivo.name
           .replaceAll(RegExp(r'[^A-Za-z0-9_\.\-]'), '_')
           .replaceAll('__', '_');
 
-      final path = 'respuestas/$gestionId/${DateTime.now().millisecondsSinceEpoch}_$cleanName';
+      final path =
+          'respuestas/$gestionId/${DateTime.now().millisecondsSinceEpoch}_$cleanName';
 
       if (kIsWeb) {
         final bytes = archivo.bytes;
         if (bytes == null) throw Exception('No se pudo leer el archivo');
-        await supabase.storage.from('gestiones-archivos').uploadBinary(
+        await supabase.storage
+            .from('gestiones-archivos')
+            .uploadBinary(
               path,
               bytes,
               fileOptions: FileOptions(
@@ -408,8 +424,11 @@ class _MisGestionesScreenState extends State<MisGestionesScreen> {
             );
       } else {
         final filePath = archivo.path;
-        if (filePath == null || filePath.isEmpty) throw Exception('No se pudo leer el archivo');
-        await supabase.storage.from('gestiones-archivos').upload(
+        if (filePath == null || filePath.isEmpty)
+          throw Exception('No se pudo leer el archivo');
+        await supabase.storage
+            .from('gestiones-archivos')
+            .upload(
               path,
               File(filePath),
               fileOptions: FileOptions(
@@ -419,10 +438,8 @@ class _MisGestionesScreenState extends State<MisGestionesScreen> {
             );
       }
 
-      final publicUrl = supabase.storage.from('gestiones-archivos').getPublicUrl(path);
-
       return {
-        'url': publicUrl,
+        'url': PrivateStorageReference.encode('gestiones-archivos', path),
         'nombre': archivo.name,
         'tipo': extension,
       };
@@ -439,9 +456,11 @@ class _MisGestionesScreenState extends State<MisGestionesScreen> {
     if (e == 'png') return 'image/png';
     if (e == 'gif') return 'image/gif';
     if (e == 'webp') return 'image/webp';
-    if (e == 'xlsx') return 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+    if (e == 'xlsx')
+      return 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
     if (e == 'xls') return 'application/vnd.ms-excel';
-    if (e == 'docx') return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+    if (e == 'docx')
+      return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
     if (e == 'doc') return 'application/msword';
     if (e == 'zip') return 'application/zip';
     if (e == 'txt') return 'text/plain';
@@ -496,14 +515,20 @@ class _MisGestionesScreenState extends State<MisGestionesScreen> {
 
       await supabase.from('gestiones_asignadas').update(update).eq('id', id);
 
-      await supabase.from('notificaciones').update({'leida': true}).eq('referencia_id', id);
+      await supabase
+          .from('notificaciones')
+          .update({'leida': true})
+          .eq('referencia_id', id);
 
       final responsableAuth = g['asignado_por_auth_id']?.toString();
-      if (responsableAuth != null && responsableAuth.isNotEmpty && responsableAuth != 'null') {
+      if (responsableAuth != null &&
+          responsableAuth.isNotEmpty &&
+          responsableAuth != 'null') {
         await supabase.from('notificaciones').insert({
           'auth_id': responsableAuth,
           'titulo': 'Gestión completada',
-          'mensaje': '$myName ha completado la gestión: ${g['titulo'] ?? 'Sin título'}',
+          'mensaje':
+              '$myName ha completado la gestión: ${g['titulo'] ?? 'Sin título'}',
           'tipo': 'gestion_realizada',
           'leida': false,
           'referencia_id': id,
@@ -528,7 +553,8 @@ class _MisGestionesScreenState extends State<MisGestionesScreen> {
       return;
     }
 
-    final uri = Uri.tryParse(url.trim());
+    final resolvedUrl = await PrivateStorageReference.resolve(url.trim());
+    final uri = Uri.tryParse(resolvedUrl);
     if (uri == null) {
       _snack('Archivo no válido');
       return;
@@ -551,35 +577,56 @@ class _MisGestionesScreenState extends State<MisGestionesScreen> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _detailBox('Asignada por', g['creador_nombre']?.toString() ?? 'Responsable'),
+              _detailBox(
+                'Asignada por',
+                g['creador_nombre']?.toString() ?? 'Responsable',
+              ),
               _detailBox('Tipo', g['tipo']?.toString() ?? 'Otro'),
               _detailBox('Prioridad', g['prioridad']?.toString() ?? 'Media'),
               _detailBox('Estado', g['estado']?.toString() ?? 'Pendiente'),
-              _detailBox('Fecha límite', _formatDate(g['fecha_limite']).isEmpty ? '-' : _formatDate(g['fecha_limite'])),
+              _detailBox(
+                'Fecha límite',
+                _formatDate(g['fecha_limite']).isEmpty
+                    ? '-'
+                    : _formatDate(g['fecha_limite']),
+              ),
               _detailBox('Descripción', g['descripcion']?.toString() ?? '-'),
               if ((g['archivo_url']?.toString().isNotEmpty ?? false))
-                _detailBox('Archivo recibido', g['archivo_nombre']?.toString() ?? 'Archivo adjunto'),
+                _detailBox(
+                  'Archivo recibido',
+                  g['archivo_nombre']?.toString() ?? 'Archivo adjunto',
+                ),
               if ((g['comentario_realizacion']?.toString().isNotEmpty ?? false))
-                _detailBox('Comentario realizado', g['comentario_realizacion'].toString()),
+                _detailBox(
+                  'Comentario realizado',
+                  g['comentario_realizacion'].toString(),
+                ),
               if ((g['archivo_respuesta_url']?.toString().isNotEmpty ?? false))
-                _detailBox('Archivo enviado', g['archivo_respuesta_nombre']?.toString() ?? 'Archivo respuesta'),
+                _detailBox(
+                  'Archivo enviado',
+                  g['archivo_respuesta_nombre']?.toString() ??
+                      'Archivo respuesta',
+                ),
               const SizedBox(height: 18),
               if ((g['archivo_url']?.toString().isNotEmpty ?? false)) ...[
                 SizedBox(
                   width: double.infinity,
                   child: OutlinedButton.icon(
-                    onPressed: () => _abrirArchivo(g['archivo_url']?.toString()),
+                    onPressed: () =>
+                        _abrirArchivo(g['archivo_url']?.toString()),
                     icon: const Icon(Icons.attach_file_rounded),
                     label: const Text('Abrir archivo recibido'),
                   ),
                 ),
                 const SizedBox(height: 10),
               ],
-              if ((g['archivo_respuesta_url']?.toString().isNotEmpty ?? false)) ...[
+              if ((g['archivo_respuesta_url']?.toString().isNotEmpty ??
+                  false)) ...[
                 SizedBox(
                   width: double.infinity,
                   child: OutlinedButton.icon(
-                    onPressed: () => _abrirArchivo(g['archivo_respuesta_url']?.toString()),
+                    onPressed: () =>
+                        _abrirArchivo(g['archivo_respuesta_url']?.toString()),
                     icon: const Icon(Icons.upload_file_rounded),
                     label: const Text('Abrir archivo enviado'),
                   ),
@@ -656,7 +703,9 @@ class _MisGestionesScreenState extends State<MisGestionesScreen> {
           const _FondoMisGestiones(),
           SafeArea(
             child: loading
-                ? const Center(child: CircularProgressIndicator(color: Color(0xFF0284C7)))
+                ? const Center(
+                    child: CircularProgressIndicator(color: Color(0xFF0284C7)),
+                  )
                 : Padding(
                     padding: const EdgeInsets.fromLTRB(18, 18, 18, 22),
                     child: Column(
@@ -675,7 +724,9 @@ class _MisGestionesScreenState extends State<MisGestionesScreen> {
           if (guardando)
             Container(
               color: Colors.black.withOpacity(0.18),
-              child: const Center(child: CircularProgressIndicator(color: Color(0xFF0284C7))),
+              child: const Center(
+                child: CircularProgressIndicator(color: Color(0xFF0284C7)),
+              ),
             ),
         ],
       ),
@@ -697,7 +748,10 @@ class _MisGestionesScreenState extends State<MisGestionesScreen> {
               borderRadius: BorderRadius.circular(18),
               border: Border.all(color: const Color(0xFFE2E8F0)),
             ),
-            child: const Icon(Icons.arrow_back_rounded, color: Color(0xFF0F172A)),
+            child: const Icon(
+              Icons.arrow_back_rounded,
+              color: Color(0xFF0F172A),
+            ),
           ),
         );
 
@@ -708,13 +762,20 @@ class _MisGestionesScreenState extends State<MisGestionesScreen> {
               'Mis gestiones asignadas',
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: TextStyle(color: Color(0xFF0F172A), fontSize: 25, fontWeight: FontWeight.w900),
+              style: TextStyle(
+                color: Color(0xFF0F172A),
+                fontSize: 25,
+                fontWeight: FontWeight.w900,
+              ),
             ),
             Text(
               '${gestionesFiltradas.length} gestiones visibles',
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(color: Color(0xFF64748B), fontWeight: FontWeight.w700),
+              style: const TextStyle(
+                color: Color(0xFF64748B),
+                fontWeight: FontWeight.w700,
+              ),
             ),
           ],
         );
@@ -723,7 +784,13 @@ class _MisGestionesScreenState extends State<MisGestionesScreen> {
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(children: [volver, const SizedBox(width: 12), Expanded(child: title)]),
+              Row(
+                children: [
+                  volver,
+                  const SizedBox(width: 12),
+                  Expanded(child: title),
+                ],
+              ),
               const SizedBox(height: 10),
               Align(alignment: Alignment.centerRight, child: _refreshButton()),
             ],
@@ -760,9 +827,24 @@ class _MisGestionesScreenState extends State<MisGestionesScreen> {
       builder: (context, constraints) {
         final narrow = constraints.maxWidth < 720;
         final cards = [
-          _summaryCard('Pendientes', pendientes.toString(), Icons.pending_actions_rounded, const Color(0xFFF97316)),
-          _summaryCard('Realizadas', completadas.toString(), Icons.check_circle_rounded, const Color(0xFF16A34A)),
-          _summaryCard('Vencidas', vencidas.toString(), Icons.warning_rounded, const Color(0xFFDC2626)),
+          _summaryCard(
+            'Pendientes',
+            pendientes.toString(),
+            Icons.pending_actions_rounded,
+            const Color(0xFFF97316),
+          ),
+          _summaryCard(
+            'Realizadas',
+            completadas.toString(),
+            Icons.check_circle_rounded,
+            const Color(0xFF16A34A),
+          ),
+          _summaryCard(
+            'Vencidas',
+            vencidas.toString(),
+            Icons.warning_rounded,
+            const Color(0xFFDC2626),
+          ),
         ];
 
         if (narrow) {
@@ -803,7 +885,10 @@ class _MisGestionesScreenState extends State<MisGestionesScreen> {
           Container(
             height: 44,
             width: 44,
-            decoration: BoxDecoration(color: color.withOpacity(0.12), borderRadius: BorderRadius.circular(15)),
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.12),
+              borderRadius: BorderRadius.circular(15),
+            ),
             child: Icon(icon, color: color),
           ),
           const SizedBox(width: 12),
@@ -811,8 +896,21 @@ class _MisGestionesScreenState extends State<MisGestionesScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title, style: const TextStyle(color: Color(0xFF64748B), fontWeight: FontWeight.w800)),
-                Text(value, style: TextStyle(color: color, fontSize: 25, fontWeight: FontWeight.w900)),
+                Text(
+                  title,
+                  style: const TextStyle(
+                    color: Color(0xFF64748B),
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                Text(
+                  value,
+                  style: TextStyle(
+                    color: color,
+                    fontSize: 25,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
               ],
             ),
           ),
@@ -837,28 +935,41 @@ class _MisGestionesScreenState extends State<MisGestionesScreen> {
               width: narrow ? double.infinity : 260,
               child: TextField(
                 onChanged: (v) => setState(() => busqueda = v),
-                decoration: _inputDecoration('Buscar').copyWith(prefixIcon: const Icon(Icons.search_rounded)),
+                decoration: _inputDecoration(
+                  'Buscar',
+                ).copyWith(prefixIcon: const Icon(Icons.search_rounded)),
               ),
             ),
             SizedBox(
               width: narrow ? double.infinity : 180,
-              child: _dropdownSimple('Estado', filtroEstado, estados, (v) => setState(() => filtroEstado = v!)),
+              child: _dropdownSimple(
+                'Estado',
+                filtroEstado,
+                estados,
+                (v) => setState(() => filtroEstado = v!),
+              ),
             ),
             SizedBox(
               width: narrow ? double.infinity : 180,
-              child: _dropdownSimple('Prioridad', filtroPrioridad, prioridades, (v) => setState(() => filtroPrioridad = v!)),
+              child: _dropdownSimple(
+                'Prioridad',
+                filtroPrioridad,
+                prioridades,
+                (v) => setState(() => filtroPrioridad = v!),
+              ),
             ),
             SizedBox(
               width: narrow ? double.infinity : 220,
-              child: _dropdownSimple('Tipo', filtroTipo, tipos, (v) => setState(() => filtroTipo = v!)),
+              child: _dropdownSimple(
+                'Tipo',
+                filtroTipo,
+                tipos,
+                (v) => setState(() => filtroTipo = v!),
+              ),
             ),
           ];
 
-          return Wrap(
-            spacing: 10,
-            runSpacing: 10,
-            children: children,
-          );
+          return Wrap(spacing: 10, runSpacing: 10, children: children);
         },
       ),
     );
@@ -878,7 +989,10 @@ class _MisGestionesScreenState extends State<MisGestionesScreen> {
         child: const Center(
           child: Text(
             'No tienes gestiones con estos filtros.',
-            style: TextStyle(color: Color(0xFF64748B), fontWeight: FontWeight.w800),
+            style: TextStyle(
+              color: Color(0xFF64748B),
+              fontWeight: FontWeight.w800,
+            ),
           ),
         ),
       );
@@ -901,8 +1015,10 @@ class _MisGestionesScreenState extends State<MisGestionesScreen> {
   }
 
   Widget _gestionCard(Map<String, dynamic> g) {
-    final tieneArchivo = g['archivo_url']?.toString().trim().isNotEmpty ?? false;
-    final tieneRespuesta = g['archivo_respuesta_url']?.toString().trim().isNotEmpty ?? false;
+    final tieneArchivo =
+        g['archivo_url']?.toString().trim().isNotEmpty ?? false;
+    final tieneRespuesta =
+        g['archivo_respuesta_url']?.toString().trim().isNotEmpty ?? false;
     final estado = g['estado']?.toString() ?? 'Pendiente';
     final completada = _estaCompletada(g);
 
@@ -931,22 +1047,59 @@ class _MisGestionesScreenState extends State<MisGestionesScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(g['titulo']?.toString() ?? 'Sin título', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xFF0F172A), fontSize: 16, fontWeight: FontWeight.w900)),
+                Text(
+                  g['titulo']?.toString() ?? 'Sin título',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Color(0xFF0F172A),
+                    fontSize: 16,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
                 const SizedBox(height: 4),
-                Text('Asignada por: ${g['creador_nombre'] ?? 'Responsable'}', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xFF0284C7), fontWeight: FontWeight.w800)),
+                Text(
+                  'Asignada por: ${g['creador_nombre'] ?? 'Responsable'}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Color(0xFF0284C7),
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
                 const SizedBox(height: 4),
-                Text(g['descripcion']?.toString() ?? '', maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xFF64748B), fontWeight: FontWeight.w700)),
+                Text(
+                  g['descripcion']?.toString() ?? '',
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Color(0xFF64748B),
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
                 const SizedBox(height: 8),
                 Wrap(
                   spacing: 8,
                   runSpacing: 8,
                   children: [
-                    _pill(g['tipo']?.toString() ?? 'Otro', const Color(0xFF7C3AED)),
-                    _pill(g['prioridad']?.toString() ?? 'Media', _prioridadColor(g['prioridad'])),
+                    _pill(
+                      g['tipo']?.toString() ?? 'Otro',
+                      const Color(0xFF7C3AED),
+                    ),
+                    _pill(
+                      g['prioridad']?.toString() ?? 'Media',
+                      _prioridadColor(g['prioridad']),
+                    ),
                     _pill(estado, _estadoColor(estado)),
-                    if (_formatDate(g['fecha_limite']).isNotEmpty) _pill('Límite ${_formatDate(g['fecha_limite'])}', const Color(0xFF0891B2)),
-                    if (tieneArchivo) _pill('Archivo recibido', const Color(0xFF0EA5E9)),
-                    if (tieneRespuesta) _pill('Archivo enviado', const Color(0xFF16A34A)),
+                    if (_formatDate(g['fecha_limite']).isNotEmpty)
+                      _pill(
+                        'Límite ${_formatDate(g['fecha_limite'])}',
+                        const Color(0xFF0891B2),
+                      ),
+                    if (tieneArchivo)
+                      _pill('Archivo recibido', const Color(0xFF0EA5E9)),
+                    if (tieneRespuesta)
+                      _pill('Archivo enviado', const Color(0xFF16A34A)),
                   ],
                 ),
                 const SizedBox(height: 10),
@@ -961,7 +1114,8 @@ class _MisGestionesScreenState extends State<MisGestionesScreen> {
                     ),
                     if (tieneArchivo)
                       OutlinedButton.icon(
-                        onPressed: () => _abrirArchivo(g['archivo_url']?.toString()),
+                        onPressed: () =>
+                            _abrirArchivo(g['archivo_url']?.toString()),
                         icon: const Icon(Icons.attach_file_rounded),
                         label: const Text('Abrir archivo'),
                       ),
@@ -995,9 +1149,22 @@ class _MisGestionesScreenState extends State<MisGestionesScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, style: const TextStyle(color: Color(0xFF64748B), fontSize: 12, fontWeight: FontWeight.w900)),
+          Text(
+            label,
+            style: const TextStyle(
+              color: Color(0xFF64748B),
+              fontSize: 12,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
           const SizedBox(height: 4),
-          Text(value.isEmpty ? '-' : value, style: const TextStyle(color: Color(0xFF0F172A), fontWeight: FontWeight.w800)),
+          Text(
+            value.isEmpty ? '-' : value,
+            style: const TextStyle(
+              color: Color(0xFF0F172A),
+              fontWeight: FontWeight.w800,
+            ),
+          ),
         ],
       ),
     );
@@ -1011,29 +1178,67 @@ class _MisGestionesScreenState extends State<MisGestionesScreen> {
         borderRadius: BorderRadius.circular(999),
         border: Border.all(color: color.withOpacity(0.24)),
       ),
-      child: Text(text, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: color, fontWeight: FontWeight.w900, fontSize: 12)),
+      child: Text(
+        text,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: TextStyle(
+          color: color,
+          fontWeight: FontWeight.w900,
+          fontSize: 12,
+        ),
+      ),
     );
   }
 
-  Widget _modalShell({required String title, required String subtitle, required Widget child}) {
+  Widget _modalShell({
+    required String title,
+    required String subtitle,
+    required Widget child,
+  }) {
     return Padding(
-      padding: EdgeInsets.only(left: 18, right: 18, bottom: MediaQuery.of(context).viewInsets.bottom + 18),
+      padding: EdgeInsets.only(
+        left: 18,
+        right: 18,
+        bottom: MediaQuery.of(context).viewInsets.bottom + 18,
+      ),
       child: Container(
-        constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.88),
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(context).size.height * 0.88,
+        ),
         padding: const EdgeInsets.all(22),
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(30),
-          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.18), blurRadius: 28, offset: const Offset(0, 14))],
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.18),
+              blurRadius: 28,
+              offset: const Offset(0, 14),
+            ),
+          ],
         ),
         child: SingleChildScrollView(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(title, style: const TextStyle(color: Color(0xFF0F172A), fontSize: 23, fontWeight: FontWeight.w900)),
+              Text(
+                title,
+                style: const TextStyle(
+                  color: Color(0xFF0F172A),
+                  fontSize: 23,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
               const SizedBox(height: 3),
-              Text(subtitle, style: const TextStyle(color: Color(0xFF64748B), fontWeight: FontWeight.w700)),
+              Text(
+                subtitle,
+                style: const TextStyle(
+                  color: Color(0xFF64748B),
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
               const SizedBox(height: 22),
               child,
             ],
@@ -1043,14 +1248,21 @@ class _MisGestionesScreenState extends State<MisGestionesScreen> {
     );
   }
 
-  Widget _dropdownSimple(String label, String value, List<String> items, void Function(String?) onChanged) {
+  Widget _dropdownSimple(
+    String label,
+    String value,
+    List<String> items,
+    void Function(String?) onChanged,
+  ) {
     final safeItems = items.toSet().toList();
     final safeValue = safeItems.contains(value) ? value : safeItems.first;
     return DropdownButtonFormField<String>(
       value: safeValue,
       isExpanded: true,
       decoration: _inputDecoration(label),
-      items: safeItems.map((e) => DropdownMenuItem<String>(value: e, child: Text(e))).toList(),
+      items: safeItems
+          .map((e) => DropdownMenuItem<String>(value: e, child: Text(e)))
+          .toList(),
       onChanged: onChanged,
     );
   }
@@ -1060,9 +1272,18 @@ class _MisGestionesScreenState extends State<MisGestionesScreen> {
       labelText: label,
       filled: true,
       fillColor: const Color(0xFFF8FAFC),
-      border: OutlineInputBorder(borderRadius: BorderRadius.circular(18), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
-      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(18), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
-      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(18), borderSide: const BorderSide(color: Color(0xFF0284C7))),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(18),
+        borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(18),
+        borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(18),
+        borderSide: const BorderSide(color: Color(0xFF0284C7)),
+      ),
     );
   }
 
@@ -1070,7 +1291,10 @@ class _MisGestionesScreenState extends State<MisGestionesScreen> {
     return ElevatedButton.styleFrom(
       backgroundColor: const Color(0xFF0284C7),
       foregroundColor: Colors.white,
-      padding: EdgeInsets.symmetric(vertical: compact ? 10 : 15, horizontal: 16),
+      padding: EdgeInsets.symmetric(
+        vertical: compact ? 10 : 15,
+        horizontal: 16,
+      ),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       textStyle: const TextStyle(fontWeight: FontWeight.w900),
     );
@@ -1078,7 +1302,9 @@ class _MisGestionesScreenState extends State<MisGestionesScreen> {
 
   void _snack(String text) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text), backgroundColor: const Color(0xFF0F172A)));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(text), backgroundColor: const Color(0xFF0F172A)),
+    );
   }
 }
 
@@ -1090,8 +1316,16 @@ class _FondoMisGestiones extends StatelessWidget {
     return Stack(
       children: [
         Container(color: const Color(0xFFF4F7FB)),
-        Positioned(top: -130, right: -120, child: _orb(330, const Color(0xFF7DD3FC))),
-        Positioned(bottom: -150, left: -130, child: _orb(360, const Color(0xFFC4B5FD))),
+        Positioned(
+          top: -130,
+          right: -120,
+          child: _orb(330, const Color(0xFF7DD3FC)),
+        ),
+        Positioned(
+          bottom: -150,
+          left: -130,
+          child: _orb(360, const Color(0xFFC4B5FD)),
+        ),
       ],
     );
   }
@@ -1103,7 +1337,13 @@ class _FondoMisGestiones extends StatelessWidget {
       decoration: BoxDecoration(
         color: color.withOpacity(0.42),
         shape: BoxShape.circle,
-        boxShadow: [BoxShadow(color: color.withOpacity(0.28), blurRadius: 70, spreadRadius: 20)],
+        boxShadow: [
+          BoxShadow(
+            color: color.withOpacity(0.28),
+            blurRadius: 70,
+            spreadRadius: 20,
+          ),
+        ],
       ),
     );
   }

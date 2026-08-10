@@ -1,6 +1,7 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:safebrok_andalucia/core/storage/private_storage_reference.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -81,7 +82,9 @@ class _CargarGestionesScreenState extends State<CargarGestionesScreen> {
     try {
       final perfil = await supabase
           .from('usuarios')
-          .select('id, auth_id, parent_id, rol_usuario, nombre, apellidos, email')
+          .select(
+            'id, auth_id, parent_id, rol_usuario, nombre, apellidos, email',
+          )
           .eq('auth_id', user.id)
           .maybeSingle();
 
@@ -91,7 +94,9 @@ class _CargarGestionesScreenState extends State<CargarGestionesScreen> {
 
       final usuariosData = await supabase
           .from('usuarios')
-          .select('id, auth_id, parent_id, rol_usuario, nombre, apellidos, email')
+          .select(
+            'id, auth_id, parent_id, rol_usuario, nombre, apellidos, email',
+          )
           .order('nombre', ascending: true);
 
       usuarios = List<Map<String, dynamic>>.from(usuariosData);
@@ -125,7 +130,9 @@ class _CargarGestionesScreenState extends State<CargarGestionesScreen> {
     }
 
     final data = await query.order('created_at', ascending: false);
-    gestiones = List<Map<String, dynamic>>.from(data).map(_enriquecerGestion).toList();
+    gestiones = List<Map<String, dynamic>>.from(
+      data,
+    ).map(_enriquecerGestion).toList();
   }
 
   bool _veTodo() => role == 'director_nacional' || role == 'administracion';
@@ -161,7 +168,9 @@ class _CargarGestionesScreenState extends State<CargarGestionesScreen> {
 
     return {
       ...g,
-      'destino_nombre': destino == null ? 'Sin usuario' : _nombreCompleto(destino),
+      'destino_nombre': destino == null
+          ? 'Sin usuario'
+          : _nombreCompleto(destino),
       'creador_nombre': creador == null ? 'Sistema' : _nombreCompleto(creador),
       'jefe_equipo_nombre': estructura['jefe_equipo_nombre'] ?? '',
       'jefe_equipo_id': estructura['jefe_equipo_id'],
@@ -198,11 +207,17 @@ class _CargarGestionesScreenState extends State<CargarGestionesScreen> {
 
     return {
       'jefe_equipo_id': jefeEquipo?['id']?.toString(),
-      'jefe_equipo_nombre': jefeEquipo == null ? '' : _nombreCompleto(jefeEquipo),
+      'jefe_equipo_nombre': jefeEquipo == null
+          ? ''
+          : _nombreCompleto(jefeEquipo),
       'jefe_ventas_id': jefeVentas?['id']?.toString(),
-      'jefe_ventas_nombre': jefeVentas == null ? '' : _nombreCompleto(jefeVentas),
+      'jefe_ventas_nombre': jefeVentas == null
+          ? ''
+          : _nombreCompleto(jefeVentas),
       'director_zona_id': directorZona?['id']?.toString(),
-      'director_zona_nombre': directorZona == null ? '' : _nombreCompleto(directorZona),
+      'director_zona_nombre': directorZona == null
+          ? ''
+          : _nombreCompleto(directorZona),
     };
   }
 
@@ -226,42 +241,68 @@ class _CargarGestionesScreenState extends State<CargarGestionesScreen> {
     final nombre = u['nombre']?.toString() ?? '';
     final apellidos = u['apellidos']?.toString() ?? '';
     final completo = '$nombre $apellidos'.trim();
-    return completo.isEmpty ? (u['email']?.toString() ?? 'Sin nombre') : completo;
+    return completo.isEmpty
+        ? (u['email']?.toString() ?? 'Sin nombre')
+        : completo;
   }
 
   List<Map<String, dynamic>> _usuariosPorRol(String rol) {
-    return usuariosPermitidos.where((u) => u['rol_usuario']?.toString() == rol).toList();
+    return usuariosPermitidos
+        .where((u) => u['rol_usuario']?.toString() == rol)
+        .toList();
   }
 
   bool _esUsuarioAsignable(Map<String, dynamic> u) {
     final auth = u['auth_id']?.toString() ?? '';
     final rol = u['rol_usuario']?.toString() ?? '';
-    return auth.isNotEmpty && auth != 'null' && rol != 'director_nacional' && rol != 'administracion';
+    return auth.isNotEmpty &&
+        auth != 'null' &&
+        rol != 'director_nacional' &&
+        rol != 'administracion';
   }
 
   List<Map<String, dynamic>> get usuariosAsignables {
     var lista = usuariosPermitidos.where(_esUsuarioAsignable).toList();
 
     if (filtroDirectorZonaId != null) {
-      lista = lista.where((u) => _resolverEstructura(u)['director_zona_id'] == filtroDirectorZonaId).toList();
+      lista = lista
+          .where(
+            (u) =>
+                _resolverEstructura(u)['director_zona_id'] ==
+                filtroDirectorZonaId,
+          )
+          .toList();
     }
     if (filtroJefeVentasId != null) {
-      lista = lista.where((u) => _resolverEstructura(u)['jefe_ventas_id'] == filtroJefeVentasId).toList();
+      lista = lista
+          .where(
+            (u) =>
+                _resolverEstructura(u)['jefe_ventas_id'] == filtroJefeVentasId,
+          )
+          .toList();
     }
     if (filtroJefeEquipoId != null) {
-      lista = lista.where((u) => _resolverEstructura(u)['jefe_equipo_id'] == filtroJefeEquipoId).toList();
+      lista = lista
+          .where(
+            (u) =>
+                _resolverEstructura(u)['jefe_equipo_id'] == filtroJefeEquipoId,
+          )
+          .toList();
     }
 
     return lista;
   }
 
-  List<Map<String, dynamic>> get directoresZona => _veTodo() ? _usuariosPorRol('director_zona') : [];
+  List<Map<String, dynamic>> get directoresZona =>
+      _veTodo() ? _usuariosPorRol('director_zona') : [];
 
   List<Map<String, dynamic>> get jefesVentas {
     var lista = _usuariosPorRol('jefe_ventas');
     if (role == 'jefe_ventas') return [];
     if (filtroDirectorZonaId != null) {
-      lista = lista.where((u) => u['parent_id']?.toString() == filtroDirectorZonaId).toList();
+      lista = lista
+          .where((u) => u['parent_id']?.toString() == filtroDirectorZonaId)
+          .toList();
     }
     return lista;
   }
@@ -269,15 +310,23 @@ class _CargarGestionesScreenState extends State<CargarGestionesScreen> {
   List<Map<String, dynamic>> get jefesEquipo {
     var lista = _usuariosPorRol('jefe_equipo');
     if (filtroJefeVentasId != null) {
-      lista = lista.where((u) => u['parent_id']?.toString() == filtroJefeVentasId).toList();
+      lista = lista
+          .where((u) => u['parent_id']?.toString() == filtroJefeVentasId)
+          .toList();
     }
     if (filtroDirectorZonaId != null && filtroJefeVentasId == null) {
       final idsVentas = usuariosPermitidos
-          .where((u) => u['rol_usuario']?.toString() == 'jefe_ventas' && u['parent_id']?.toString() == filtroDirectorZonaId)
+          .where(
+            (u) =>
+                u['rol_usuario']?.toString() == 'jefe_ventas' &&
+                u['parent_id']?.toString() == filtroDirectorZonaId,
+          )
           .map((u) => u['id']?.toString())
           .whereType<String>()
           .toSet();
-      lista = lista.where((u) => idsVentas.contains(u['parent_id']?.toString())).toList();
+      lista = lista
+          .where((u) => idsVentas.contains(u['parent_id']?.toString()))
+          .toList();
     }
     return lista;
   }
@@ -286,22 +335,38 @@ class _CargarGestionesScreenState extends State<CargarGestionesScreen> {
     var lista = [...gestiones];
 
     if (filtroDirectorZonaId != null) {
-      lista = lista.where((g) => g['director_zona_id']?.toString() == filtroDirectorZonaId).toList();
+      lista = lista
+          .where(
+            (g) => g['director_zona_id']?.toString() == filtroDirectorZonaId,
+          )
+          .toList();
     }
     if (filtroJefeVentasId != null) {
-      lista = lista.where((g) => g['jefe_ventas_id']?.toString() == filtroJefeVentasId).toList();
+      lista = lista
+          .where((g) => g['jefe_ventas_id']?.toString() == filtroJefeVentasId)
+          .toList();
     }
     if (filtroJefeEquipoId != null) {
-      lista = lista.where((g) => g['jefe_equipo_id']?.toString() == filtroJefeEquipoId).toList();
+      lista = lista
+          .where((g) => g['jefe_equipo_id']?.toString() == filtroJefeEquipoId)
+          .toList();
     }
     if (filtroUsuarioAuthId != null) {
-      lista = lista.where((g) => g['asignado_a_auth_id']?.toString() == filtroUsuarioAuthId).toList();
+      lista = lista
+          .where(
+            (g) => g['asignado_a_auth_id']?.toString() == filtroUsuarioAuthId,
+          )
+          .toList();
     }
     if (filtroEstado != 'Todos') {
-      lista = lista.where((g) => g['estado']?.toString() == filtroEstado).toList();
+      lista = lista
+          .where((g) => g['estado']?.toString() == filtroEstado)
+          .toList();
     }
     if (filtroPrioridad != 'Todas') {
-      lista = lista.where((g) => g['prioridad']?.toString() == filtroPrioridad).toList();
+      lista = lista
+          .where((g) => g['prioridad']?.toString() == filtroPrioridad)
+          .toList();
     }
     if (filtroTipo != 'Todos') {
       lista = lista.where((g) => g['tipo']?.toString() == filtroTipo).toList();
@@ -310,14 +375,15 @@ class _CargarGestionesScreenState extends State<CargarGestionesScreen> {
     final q = busqueda.toLowerCase().trim();
     if (q.isNotEmpty) {
       lista = lista.where((g) {
-        final text = '${g['titulo']} ${g['descripcion']} ${g['destino_nombre']} ${g['creador_nombre']} ${g['tipo']} ${g['estado']}'.toLowerCase();
+        final text =
+            '${g['titulo']} ${g['descripcion']} ${g['destino_nombre']} ${g['creador_nombre']} ${g['tipo']} ${g['estado']}'
+                .toLowerCase();
         return text.contains(q);
       }).toList();
     }
 
     return lista;
   }
-
 
   Future<void> _seleccionarArchivoGestion() async {
     final result = await FilePicker.platform.pickFiles(
@@ -347,36 +413,33 @@ class _CargarGestionesScreenState extends State<CargarGestionesScreen> {
 
   Future<Map<String, String?>> _subirArchivoGestion() async {
     if (archivoGestion == null) {
-      return {
-        'url': null,
-        'nombre': null,
-        'tipo': null,
-      };
+      return {'url': null, 'nombre': null, 'tipo': null};
     }
 
     final bytes = archivoGestion!.bytes;
     if (bytes == null) {
-      throw Exception('No se pudo leer el archivo seleccionado. Vuelve a seleccionarlo.');
+      throw Exception(
+        'No se pudo leer el archivo seleccionado. Vuelve a seleccionarlo.',
+      );
     }
 
     final originalName = archivoGestion!.name;
     final cleanName = _limpiarNombreArchivo(originalName);
     final extension = archivoGestion!.extension ?? '';
     final owner = myAuthId ?? 'sin_usuario';
-    final storagePath = '$owner/${DateTime.now().millisecondsSinceEpoch}_$cleanName';
+    final storagePath =
+        '$owner/${DateTime.now().millisecondsSinceEpoch}_$cleanName';
 
-    await supabase.storage.from('gestiones-archivos').uploadBinary(
+    await supabase.storage
+        .from('gestiones-archivos')
+        .uploadBinary(
           storagePath,
           bytes,
           fileOptions: const FileOptions(upsert: false),
         );
 
-    final publicUrl = supabase.storage
-        .from('gestiones-archivos')
-        .getPublicUrl(storagePath);
-
     return {
-      'url': publicUrl,
+      'url': PrivateStorageReference.encode('gestiones-archivos', storagePath),
       'nombre': originalName,
       'tipo': extension,
     };
@@ -394,7 +457,8 @@ class _CargarGestionesScreenState extends State<CargarGestionesScreen> {
       return;
     }
 
-    final uri = Uri.tryParse(cleanUrl);
+    final resolvedUrl = await PrivateStorageReference.resolve(cleanUrl);
+    final uri = Uri.tryParse(resolvedUrl);
     if (uri == null) {
       _snack('El enlace del archivo no es válido');
       return;
@@ -502,15 +566,21 @@ class _CargarGestionesScreenState extends State<CargarGestionesScreen> {
                     value: estados.contains(estado) ? estado : 'Pendiente',
                     isExpanded: true,
                     decoration: _inputDecoration('Estado'),
-                    items: estados.map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
+                    items: estados
+                        .map((e) => DropdownMenuItem(value: e, child: Text(e)))
+                        .toList(),
                     onChanged: (v) => setModalState(() => estado = v!),
                   ),
                   const SizedBox(height: 12),
                   DropdownButtonFormField<String>(
-                    value: prioridades.contains(prioridad) ? prioridad : 'Media',
+                    value: prioridades.contains(prioridad)
+                        ? prioridad
+                        : 'Media',
                     isExpanded: true,
                     decoration: _inputDecoration('Prioridad'),
-                    items: prioridades.map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
+                    items: prioridades
+                        .map((e) => DropdownMenuItem(value: e, child: Text(e)))
+                        .toList(),
                     onChanged: (v) => setModalState(() => prioridad = v!),
                   ),
                   const SizedBox(height: 12),
@@ -519,10 +589,12 @@ class _CargarGestionesScreenState extends State<CargarGestionesScreen> {
                     isExpanded: true,
                     decoration: _inputDecoration('Reasignar a'),
                     items: usuariosAsignables
-                        .map((u) => DropdownMenuItem<String>(
-                              value: u['auth_id']?.toString(),
-                              child: Text(_nombreCompleto(u)),
-                            ))
+                        .map(
+                          (u) => DropdownMenuItem<String>(
+                            value: u['auth_id']?.toString(),
+                            child: Text(_nombreCompleto(u)),
+                          ),
+                        )
                         .toList(),
                     onChanged: (v) => setModalState(() => nuevoDestino = v),
                   ),
@@ -538,9 +610,12 @@ class _CargarGestionesScreenState extends State<CargarGestionesScreen> {
                     SizedBox(
                       width: double.infinity,
                       child: OutlinedButton.icon(
-                        onPressed: () => _abrirArchivo(g['archivo_url']?.toString()),
+                        onPressed: () =>
+                            _abrirArchivo(g['archivo_url']?.toString()),
                         icon: const Icon(Icons.attach_file_rounded),
-                        label: Text('Abrir archivo: ${g['archivo_nombre']?.toString() ?? 'Adjunto'}'),
+                        label: Text(
+                          'Abrir archivo: ${g['archivo_nombre']?.toString() ?? 'Adjunto'}',
+                        ),
                       ),
                     ),
                   ],
@@ -550,7 +625,13 @@ class _CargarGestionesScreenState extends State<CargarGestionesScreen> {
                     child: ElevatedButton.icon(
                       onPressed: () async {
                         Navigator.pop(context);
-                        await _guardarActualizacionGestion(g, estado, prioridad, descripcion, nuevoDestino);
+                        await _guardarActualizacionGestion(
+                          g,
+                          estado,
+                          prioridad,
+                          descripcion,
+                          nuevoDestino,
+                        );
                       },
                       icon: const Icon(Icons.save_rounded),
                       label: const Text('Guardar cambios'),
@@ -580,13 +661,16 @@ class _CargarGestionesScreenState extends State<CargarGestionesScreen> {
 
       final destinoAnterior = g['asignado_a_auth_id']?.toString();
 
-      await supabase.from('gestiones_asignadas').update({
-        'estado': estado,
-        'prioridad': prioridad,
-        'descripcion': descripcion,
-        'asignado_a_auth_id': nuevoDestino,
-        'updated_at': DateTime.now().toIso8601String(),
-      }).eq('id', id);
+      await supabase
+          .from('gestiones_asignadas')
+          .update({
+            'estado': estado,
+            'prioridad': prioridad,
+            'descripcion': descripcion,
+            'asignado_a_auth_id': nuevoDestino,
+            'updated_at': DateTime.now().toIso8601String(),
+          })
+          .eq('id', id);
 
       if (nuevoDestino != null && nuevoDestino != destinoAnterior) {
         await supabase.from('notificaciones').insert({
@@ -653,12 +737,19 @@ class _CargarGestionesScreenState extends State<CargarGestionesScreen> {
           const _FondoGestiones(),
           SafeArea(
             child: loading
-                ? const Center(child: CircularProgressIndicator(color: Color(0xFF0284C7)))
+                ? const Center(
+                    child: CircularProgressIndicator(color: Color(0xFF0284C7)),
+                  )
                 : LayoutBuilder(
                     builder: (context, constraints) {
                       final isMobile = constraints.maxWidth < 980;
                       final contenido = Padding(
-                        padding: EdgeInsets.fromLTRB(isMobile ? 12 : 18, 18, isMobile ? 12 : 22, 22),
+                        padding: EdgeInsets.fromLTRB(
+                          isMobile ? 12 : 18,
+                          18,
+                          isMobile ? 12 : 22,
+                          22,
+                        ),
                         child: Column(
                           children: [
                             _header(),
@@ -669,13 +760,20 @@ class _CargarGestionesScreenState extends State<CargarGestionesScreen> {
                                       children: [
                                         _formCrearGestion(),
                                         const SizedBox(height: 14),
-                                        SizedBox(height: 620, child: _listadoGestiones()),
+                                        SizedBox(
+                                          height: 620,
+                                          child: _listadoGestiones(),
+                                        ),
                                       ],
                                     )
                                   : Row(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
                                       children: [
-                                        SizedBox(width: 420, child: _formCrearGestion()),
+                                        SizedBox(
+                                          width: 420,
+                                          child: _formCrearGestion(),
+                                        ),
                                         const SizedBox(width: 16),
                                         Expanded(child: _listadoGestiones()),
                                       ],
@@ -688,7 +786,10 @@ class _CargarGestionesScreenState extends State<CargarGestionesScreen> {
                       if (isMobile) {
                         return Column(
                           children: [
-                            SizedBox(height: 300, child: _panelFiltros(compacto: true)),
+                            SizedBox(
+                              height: 300,
+                              child: _panelFiltros(compacto: true),
+                            ),
                             Expanded(child: contenido),
                           ],
                         );
@@ -706,7 +807,9 @@ class _CargarGestionesScreenState extends State<CargarGestionesScreen> {
           if (guardando)
             Container(
               color: Colors.black.withOpacity(0.18),
-              child: const Center(child: CircularProgressIndicator(color: Color(0xFF0284C7))),
+              child: const Center(
+                child: CircularProgressIndicator(color: Color(0xFF0284C7)),
+              ),
             ),
         ],
       ),
@@ -727,7 +830,10 @@ class _CargarGestionesScreenState extends State<CargarGestionesScreen> {
               borderRadius: BorderRadius.circular(18),
               border: Border.all(color: const Color(0xFFE2E8F0)),
             ),
-            child: const Icon(Icons.arrow_back_rounded, color: Color(0xFF0F172A)),
+            child: const Icon(
+              Icons.arrow_back_rounded,
+              color: Color(0xFF0F172A),
+            ),
           ),
         ),
         const SizedBox(width: 14),
@@ -739,13 +845,20 @@ class _CargarGestionesScreenState extends State<CargarGestionesScreen> {
                 'Cargar gestiones',
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: TextStyle(color: Color(0xFF0F172A), fontSize: 25, fontWeight: FontWeight.w900),
+                style: TextStyle(
+                  color: Color(0xFF0F172A),
+                  fontSize: 25,
+                  fontWeight: FontWeight.w900,
+                ),
               ),
               Text(
                 '${gestionesFiltradas.length} gestiones visibles',
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(color: Color(0xFF64748B), fontWeight: FontWeight.w700),
+                style: const TextStyle(
+                  color: Color(0xFF64748B),
+                  fontWeight: FontWeight.w700,
+                ),
               ),
             ],
           ),
@@ -765,7 +878,11 @@ class _CargarGestionesScreenState extends State<CargarGestionesScreen> {
       ),
       child: Text(
         role.replaceAll('_', ' ').toUpperCase(),
-        style: const TextStyle(color: Color(0xFF075985), fontWeight: FontWeight.w900, fontSize: 12),
+        style: const TextStyle(
+          color: Color(0xFF075985),
+          fontWeight: FontWeight.w900,
+          fontSize: 12,
+        ),
       ),
     );
   }
@@ -779,17 +896,38 @@ class _CargarGestionesScreenState extends State<CargarGestionesScreen> {
         color: Colors.white.withOpacity(0.94),
         borderRadius: BorderRadius.circular(30),
         border: Border.all(color: Colors.white),
-        boxShadow: [BoxShadow(color: Colors.blueGrey.withOpacity(0.10), blurRadius: 16, offset: const Offset(0, 8))],
+        boxShadow: [
+          BoxShadow(
+            color: Colors.blueGrey.withOpacity(0.10),
+            blurRadius: 16,
+            offset: const Offset(0, 8),
+          ),
+        ],
       ),
       child: ListView(
         children: [
-          const Text('Filtros', style: TextStyle(color: Color(0xFF0F172A), fontSize: 24, fontWeight: FontWeight.w900)),
+          const Text(
+            'Filtros',
+            style: TextStyle(
+              color: Color(0xFF0F172A),
+              fontSize: 24,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
           const SizedBox(height: 5),
-          const Text('Filtra por estructura, usuario, tipo, prioridad y estado.', style: TextStyle(color: Color(0xFF64748B), fontWeight: FontWeight.w600)),
+          const Text(
+            'Filtra por estructura, usuario, tipo, prioridad y estado.',
+            style: TextStyle(
+              color: Color(0xFF64748B),
+              fontWeight: FontWeight.w600,
+            ),
+          ),
           const SizedBox(height: 18),
           TextField(
             onChanged: (v) => setState(() => busqueda = v),
-            decoration: _inputDecoration('Buscar gestión').copyWith(prefixIcon: const Icon(Icons.search_rounded)),
+            decoration: _inputDecoration(
+              'Buscar gestión',
+            ).copyWith(prefixIcon: const Icon(Icons.search_rounded)),
           ),
           const SizedBox(height: 14),
           if (directoresZona.isNotEmpty)
@@ -831,9 +969,24 @@ class _CargarGestionesScreenState extends State<CargarGestionesScreen> {
             usuarios: usuariosAsignables,
             onChanged: (v) => setState(() => filtroUsuarioAuthId = v),
           ),
-          _dropdownSimple(label: 'Estado', value: filtroEstado, items: ['Todos', ...estados], onChanged: (v) => setState(() => filtroEstado = v!)),
-          _dropdownSimple(label: 'Prioridad', value: filtroPrioridad, items: ['Todas', ...prioridades], onChanged: (v) => setState(() => filtroPrioridad = v!)),
-          _dropdownSimple(label: 'Tipo', value: filtroTipo, items: ['Todos', ...tipos], onChanged: (v) => setState(() => filtroTipo = v!)),
+          _dropdownSimple(
+            label: 'Estado',
+            value: filtroEstado,
+            items: ['Todos', ...estados],
+            onChanged: (v) => setState(() => filtroEstado = v!),
+          ),
+          _dropdownSimple(
+            label: 'Prioridad',
+            value: filtroPrioridad,
+            items: ['Todas', ...prioridades],
+            onChanged: (v) => setState(() => filtroPrioridad = v!),
+          ),
+          _dropdownSimple(
+            label: 'Tipo',
+            value: filtroTipo,
+            items: ['Todos', ...tipos],
+            onChanged: (v) => setState(() => filtroTipo = v!),
+          ),
           const SizedBox(height: 10),
           ElevatedButton.icon(
             onPressed: limpiarFiltros,
@@ -857,9 +1010,22 @@ class _CargarGestionesScreenState extends State<CargarGestionesScreen> {
       child: ListView(
         shrinkWrap: true,
         children: [
-          const Text('Nueva gestión', style: TextStyle(color: Color(0xFF0F172A), fontSize: 22, fontWeight: FontWeight.w900)),
+          const Text(
+            'Nueva gestión',
+            style: TextStyle(
+              color: Color(0xFF0F172A),
+              fontSize: 22,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
           const SizedBox(height: 6),
-          const Text('Asigna una tarea a una persona de tu estructura y se le notificará al instante.', style: TextStyle(color: Color(0xFF64748B), fontWeight: FontWeight.w600)),
+          const Text(
+            'Asigna una tarea a una persona de tu estructura y se le notificará al instante.',
+            style: TextStyle(
+              color: Color(0xFF64748B),
+              fontWeight: FontWeight.w600,
+            ),
+          ),
           const SizedBox(height: 18),
           _dropdownAuthUsuarios(
             label: 'Asignar a',
@@ -867,12 +1033,33 @@ class _CargarGestionesScreenState extends State<CargarGestionesScreen> {
             usuarios: usuariosAsignables,
             onChanged: (v) => setState(() => destinoAuthId = v),
           ),
-          _dropdownSimple(label: 'Tipo de gestión', value: tipoGestion, items: tipos, onChanged: (v) => setState(() => tipoGestion = v!)),
-          _dropdownSimple(label: 'Prioridad', value: prioridadGestion, items: prioridades, onChanged: (v) => setState(() => prioridadGestion = v!)),
-          _dateButton(label: 'Fecha límite', value: fechaLimite, onTap: _pickFechaLimite),
-          TextField(controller: tituloCtrl, decoration: _inputDecoration('Título')),
+          _dropdownSimple(
+            label: 'Tipo de gestión',
+            value: tipoGestion,
+            items: tipos,
+            onChanged: (v) => setState(() => tipoGestion = v!),
+          ),
+          _dropdownSimple(
+            label: 'Prioridad',
+            value: prioridadGestion,
+            items: prioridades,
+            onChanged: (v) => setState(() => prioridadGestion = v!),
+          ),
+          _dateButton(
+            label: 'Fecha límite',
+            value: fechaLimite,
+            onTap: _pickFechaLimite,
+          ),
+          TextField(
+            controller: tituloCtrl,
+            decoration: _inputDecoration('Título'),
+          ),
           const SizedBox(height: 12),
-          TextField(controller: descripcionCtrl, maxLines: 5, decoration: _inputDecoration('Descripción')),
+          TextField(
+            controller: descripcionCtrl,
+            maxLines: 5,
+            decoration: _inputDecoration('Descripción'),
+          ),
           const SizedBox(height: 12),
           _archivoAdjuntoBox(),
           const SizedBox(height: 18),
@@ -886,7 +1073,6 @@ class _CargarGestionesScreenState extends State<CargarGestionesScreen> {
       ),
     );
   }
-
 
   Widget _archivoAdjuntoBox() {
     return Container(
@@ -960,7 +1146,10 @@ class _CargarGestionesScreenState extends State<CargarGestionesScreen> {
                 ),
                 IconButton(
                   onPressed: _quitarArchivoGestion,
-                  icon: const Icon(Icons.close_rounded, color: Color(0xFFDC2626)),
+                  icon: const Icon(
+                    Icons.close_rounded,
+                    color: Color(0xFFDC2626),
+                  ),
                 ),
               ],
             ),
@@ -981,7 +1170,15 @@ class _CargarGestionesScreenState extends State<CargarGestionesScreen> {
       child: ClipRRect(
         borderRadius: BorderRadius.circular(28),
         child: lista.isEmpty
-            ? const Center(child: Text('No hay gestiones para estos filtros.', style: TextStyle(color: Color(0xFF64748B), fontWeight: FontWeight.w800)))
+            ? const Center(
+                child: Text(
+                  'No hay gestiones para estos filtros.',
+                  style: TextStyle(
+                    color: Color(0xFF64748B),
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              )
             : Column(
                 children: [
                   Container(
@@ -990,9 +1187,18 @@ class _CargarGestionesScreenState extends State<CargarGestionesScreen> {
                     color: const Color(0xFFF1F5F9),
                     child: Row(
                       children: [
-                        Text('Mostrando ${lista.length} de ${gestionesFiltradas.length}', style: const TextStyle(color: Color(0xFF64748B), fontWeight: FontWeight.w900)),
+                        Text(
+                          'Mostrando ${lista.length} de ${gestionesFiltradas.length}',
+                          style: const TextStyle(
+                            color: Color(0xFF64748B),
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
                         const Spacer(),
-                        const Icon(Icons.notifications_active_rounded, color: Color(0xFF0284C7)),
+                        const Icon(
+                          Icons.notifications_active_rounded,
+                          color: Color(0xFF0284C7),
+                        ),
                       ],
                     ),
                   ),
@@ -1026,37 +1232,86 @@ class _CargarGestionesScreenState extends State<CargarGestionesScreen> {
           Container(
             height: 46,
             width: 46,
-            decoration: BoxDecoration(color: const Color(0xFFE0F2FE), borderRadius: BorderRadius.circular(15)),
-            child: const Icon(Icons.assignment_turned_in_rounded, color: Color(0xFF0284C7)),
+            decoration: BoxDecoration(
+              color: const Color(0xFFE0F2FE),
+              borderRadius: BorderRadius.circular(15),
+            ),
+            child: const Icon(
+              Icons.assignment_turned_in_rounded,
+              color: Color(0xFF0284C7),
+            ),
           ),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(g['titulo']?.toString() ?? 'Sin título', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xFF0F172A), fontSize: 16, fontWeight: FontWeight.w900)),
+                Text(
+                  g['titulo']?.toString() ?? 'Sin título',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Color(0xFF0F172A),
+                    fontSize: 16,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
                 const SizedBox(height: 4),
-                Text('Asignado a: ${g['destino_nombre']} · Por: ${g['creador_nombre']}', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xFF64748B), fontWeight: FontWeight.w700)),
+                Text(
+                  'Asignado a: ${g['destino_nombre']} · Por: ${g['creador_nombre']}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Color(0xFF64748B),
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
                 const SizedBox(height: 8),
                 Wrap(
                   spacing: 8,
                   runSpacing: 8,
                   children: [
-                    _pill(g['tipo']?.toString() ?? 'Otro', const Color(0xFF7C3AED)),
-                    _pill(g['prioridad']?.toString() ?? 'Media', _prioridadColor(g['prioridad'])),
-                    _pill(g['estado']?.toString() ?? 'Pendiente', _estadoColor(g['estado'])),
-                    if (_formatDate(g['fecha_limite']).isNotEmpty) _pill('Límite ${_formatDate(g['fecha_limite'])}', const Color(0xFF0891B2)),
+                    _pill(
+                      g['tipo']?.toString() ?? 'Otro',
+                      const Color(0xFF7C3AED),
+                    ),
+                    _pill(
+                      g['prioridad']?.toString() ?? 'Media',
+                      _prioridadColor(g['prioridad']),
+                    ),
+                    _pill(
+                      g['estado']?.toString() ?? 'Pendiente',
+                      _estadoColor(g['estado']),
+                    ),
+                    if (_formatDate(g['fecha_limite']).isNotEmpty)
+                      _pill(
+                        'Límite ${_formatDate(g['fecha_limite'])}',
+                        const Color(0xFF0891B2),
+                      ),
                     if (_tieneArchivo(g))
                       InkWell(
                         borderRadius: BorderRadius.circular(999),
-                        onTap: () => _abrirArchivo(g['archivo_url']?.toString()),
-                        child: _pill(g['archivo_nombre']?.toString() ?? 'Archivo adjunto', const Color(0xFF0F766E)),
+                        onTap: () =>
+                            _abrirArchivo(g['archivo_url']?.toString()),
+                        child: _pill(
+                          g['archivo_nombre']?.toString() ?? 'Archivo adjunto',
+                          const Color(0xFF0F766E),
+                        ),
                       ),
                   ],
                 ),
-                if ((g['descripcion']?.toString().trim().isNotEmpty ?? false)) ...[
+                if ((g['descripcion']?.toString().trim().isNotEmpty ??
+                    false)) ...[
                   const SizedBox(height: 8),
-                  Text(g['descripcion'].toString(), maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xFF475569), fontWeight: FontWeight.w600)),
+                  Text(
+                    g['descripcion'].toString(),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: Color(0xFF475569),
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
                 ],
               ],
             ),
@@ -1065,11 +1320,19 @@ class _CargarGestionesScreenState extends State<CargarGestionesScreen> {
             icon: const Icon(Icons.more_vert_rounded),
             onSelected: (value) {
               if (value == 'gestionar') _actualizarGestion(g);
-              if (value == 'archivo') _abrirArchivo(g['archivo_url']?.toString());
+              if (value == 'archivo')
+                _abrirArchivo(g['archivo_url']?.toString());
             },
             itemBuilder: (_) => [
-              const PopupMenuItem(value: 'gestionar', child: Text('Gestionar / reasignar')),
-              if (_tieneArchivo(g)) const PopupMenuItem(value: 'archivo', child: Text('Abrir archivo')),
+              const PopupMenuItem(
+                value: 'gestionar',
+                child: Text('Gestionar / reasignar'),
+              ),
+              if (_tieneArchivo(g))
+                const PopupMenuItem(
+                  value: 'archivo',
+                  child: Text('Abrir archivo'),
+                ),
             ],
           ),
         ],
@@ -1100,29 +1363,67 @@ class _CargarGestionesScreenState extends State<CargarGestionesScreen> {
         borderRadius: BorderRadius.circular(999),
         border: Border.all(color: color.withOpacity(0.24)),
       ),
-      child: Text(text, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: color, fontWeight: FontWeight.w900, fontSize: 12)),
+      child: Text(
+        text,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: TextStyle(
+          color: color,
+          fontWeight: FontWeight.w900,
+          fontSize: 12,
+        ),
+      ),
     );
   }
 
-  Widget _modalShell({required String title, required String subtitle, required Widget child}) {
+  Widget _modalShell({
+    required String title,
+    required String subtitle,
+    required Widget child,
+  }) {
     return Padding(
-      padding: EdgeInsets.only(left: 18, right: 18, bottom: MediaQuery.of(context).viewInsets.bottom + 18),
+      padding: EdgeInsets.only(
+        left: 18,
+        right: 18,
+        bottom: MediaQuery.of(context).viewInsets.bottom + 18,
+      ),
       child: Container(
-        constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.88),
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(context).size.height * 0.88,
+        ),
         padding: const EdgeInsets.all(22),
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(30),
-          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.18), blurRadius: 28, offset: const Offset(0, 14))],
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.18),
+              blurRadius: 28,
+              offset: const Offset(0, 14),
+            ),
+          ],
         ),
         child: SingleChildScrollView(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(title, style: const TextStyle(color: Color(0xFF0F172A), fontSize: 23, fontWeight: FontWeight.w900)),
+              Text(
+                title,
+                style: const TextStyle(
+                  color: Color(0xFF0F172A),
+                  fontSize: 23,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
               const SizedBox(height: 3),
-              Text(subtitle, style: const TextStyle(color: Color(0xFF64748B), fontWeight: FontWeight.w700)),
+              Text(
+                subtitle,
+                style: const TextStyle(
+                  color: Color(0xFF64748B),
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
               const SizedBox(height: 22),
               child,
             ],
@@ -1132,7 +1433,12 @@ class _CargarGestionesScreenState extends State<CargarGestionesScreen> {
     );
   }
 
-  Widget _dropdownUsuarios({required String label, required String? value, required List<Map<String, dynamic>> usuarios, required void Function(String?) onChanged}) {
+  Widget _dropdownUsuarios({
+    required String label,
+    required String? value,
+    required List<Map<String, dynamic>> usuarios,
+    required void Function(String?) onChanged,
+  }) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 13),
       child: DropdownButtonFormField<String>(
@@ -1141,15 +1447,28 @@ class _CargarGestionesScreenState extends State<CargarGestionesScreen> {
         decoration: _inputDecoration(label),
         items: [
           const DropdownMenuItem<String>(value: null, child: Text('Todos')),
-          ...usuarios.map((u) => DropdownMenuItem<String>(value: u['id']?.toString(), child: Text(_nombreCompleto(u)))),
+          ...usuarios.map(
+            (u) => DropdownMenuItem<String>(
+              value: u['id']?.toString(),
+              child: Text(_nombreCompleto(u)),
+            ),
+          ),
         ],
         onChanged: onChanged,
       ),
     );
   }
 
-  Widget _dropdownAuthUsuarios({required String label, required String? value, required List<Map<String, dynamic>> usuarios, required void Function(String?) onChanged}) {
-    final values = usuarios.map((u) => u['auth_id']?.toString()).whereType<String>().toSet();
+  Widget _dropdownAuthUsuarios({
+    required String label,
+    required String? value,
+    required List<Map<String, dynamic>> usuarios,
+    required void Function(String?) onChanged,
+  }) {
+    final values = usuarios
+        .map((u) => u['auth_id']?.toString())
+        .whereType<String>()
+        .toSet();
     final safeValue = value != null && values.contains(value) ? value : null;
 
     return Padding(
@@ -1160,14 +1479,24 @@ class _CargarGestionesScreenState extends State<CargarGestionesScreen> {
         decoration: _inputDecoration(label),
         items: [
           const DropdownMenuItem<String>(value: null, child: Text('Todos')),
-          ...usuarios.map((u) => DropdownMenuItem<String>(value: u['auth_id']?.toString(), child: Text(_nombreCompleto(u)))),
+          ...usuarios.map(
+            (u) => DropdownMenuItem<String>(
+              value: u['auth_id']?.toString(),
+              child: Text(_nombreCompleto(u)),
+            ),
+          ),
         ],
         onChanged: onChanged,
       ),
     );
   }
 
-  Widget _dropdownSimple({required String label, required String value, required List<String> items, required void Function(String?) onChanged}) {
+  Widget _dropdownSimple({
+    required String label,
+    required String value,
+    required List<String> items,
+    required void Function(String?) onChanged,
+  }) {
     final safeItems = items.toSet().toList();
     final safeValue = safeItems.contains(value) ? value : safeItems.first;
     return Padding(
@@ -1176,14 +1505,22 @@ class _CargarGestionesScreenState extends State<CargarGestionesScreen> {
         value: safeValue,
         isExpanded: true,
         decoration: _inputDecoration(label),
-        items: safeItems.map((e) => DropdownMenuItem<String>(value: e, child: Text(e))).toList(),
+        items: safeItems
+            .map((e) => DropdownMenuItem<String>(value: e, child: Text(e)))
+            .toList(),
         onChanged: onChanged,
       ),
     );
   }
 
-  Widget _dateButton({required String label, required DateTime? value, required VoidCallback onTap}) {
-    final text = value == null ? 'Sin seleccionar' : '${value.day.toString().padLeft(2, '0')}/${value.month.toString().padLeft(2, '0')}/${value.year}';
+  Widget _dateButton({
+    required String label,
+    required DateTime? value,
+    required VoidCallback onTap,
+  }) {
+    final text = value == null
+        ? 'Sin seleccionar'
+        : '${value.day.toString().padLeft(2, '0')}/${value.month.toString().padLeft(2, '0')}/${value.year}';
     return Padding(
       padding: const EdgeInsets.only(bottom: 13),
       child: InkWell(
@@ -1208,9 +1545,18 @@ class _CargarGestionesScreenState extends State<CargarGestionesScreen> {
       labelText: label,
       filled: true,
       fillColor: const Color(0xFFF8FAFC),
-      border: OutlineInputBorder(borderRadius: BorderRadius.circular(18), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
-      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(18), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
-      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(18), borderSide: const BorderSide(color: Color(0xFF0284C7))),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(18),
+        borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(18),
+        borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(18),
+        borderSide: const BorderSide(color: Color(0xFF0284C7)),
+      ),
     );
   }
 
@@ -1226,7 +1572,9 @@ class _CargarGestionesScreenState extends State<CargarGestionesScreen> {
 
   void _snack(String text) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text), backgroundColor: const Color(0xFF0F172A)));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(text), backgroundColor: const Color(0xFF0F172A)),
+    );
   }
 }
 
@@ -1238,8 +1586,16 @@ class _FondoGestiones extends StatelessWidget {
     return Stack(
       children: [
         Container(color: const Color(0xFFF4F7FB)),
-        Positioned(top: -130, right: -120, child: _orb(330, const Color(0xFF7DD3FC))),
-        Positioned(bottom: -150, left: -130, child: _orb(360, const Color(0xFFC4B5FD))),
+        Positioned(
+          top: -130,
+          right: -120,
+          child: _orb(330, const Color(0xFF7DD3FC)),
+        ),
+        Positioned(
+          bottom: -150,
+          left: -130,
+          child: _orb(360, const Color(0xFFC4B5FD)),
+        ),
       ],
     );
   }
@@ -1251,7 +1607,13 @@ class _FondoGestiones extends StatelessWidget {
       decoration: BoxDecoration(
         color: color.withOpacity(0.42),
         shape: BoxShape.circle,
-        boxShadow: [BoxShadow(color: color.withOpacity(0.28), blurRadius: 70, spreadRadius: 20)],
+        boxShadow: [
+          BoxShadow(
+            color: color.withOpacity(0.28),
+            blurRadius: 70,
+            spreadRadius: 20,
+          ),
+        ],
       ),
     );
   }

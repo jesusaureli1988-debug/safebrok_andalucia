@@ -1,3 +1,5 @@
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
@@ -26,7 +28,30 @@ Deno.serve(async (req) => {
       );
     }
 
+    const authHeader = req.headers.get("Authorization") ?? "";
+    const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
+    const anonKey = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
+    const userClient = createClient(supabaseUrl, anonKey, {
+      global: { headers: { Authorization: authHeader } },
+    });
+    const { data: { user }, error: authError } =
+      await userClient.auth.getUser();
+    if (authError || !user) {
+      return new Response(JSON.stringify({ error: "No autorizado" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const { email, cliente, poliza, importe, url } = await req.json();
+
+    const paymentUrl = UriSafe.parseHttps(url);
+    if (!paymentUrl) {
+      return new Response(JSON.stringify({ error: "Enlace de pago inválido" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     if (!email || !email.includes("@")) {
       return new Response(
@@ -91,7 +116,7 @@ Deno.serve(async (req) => {
                   <p style="margin:0;"><strong>Importe:</strong> ${importeFormateado} €</p>
                 </div>
 
-                <a href="${url}"
+                <a href="${paymentUrl}"
                    style="display:inline-block;background:#06b6d4;color:white;
                    padding:14px 22px;border-radius:12px;text-decoration:none;
                    font-weight:bold;">
@@ -102,7 +127,7 @@ Deno.serve(async (req) => {
                   Si el botón no funciona, copia y pega este enlace en tu navegador:
                 </p>
 
-                <p style="font-size:13px;color:#0f766e;word-break:break-all;">${url}</p>
+                <p style="font-size:13px;color:#0f766e;word-break:break-all;">${paymentUrl}</p>
               </div>
 
               <p style="text-align:center;color:#64748b;font-size:12px;margin-top:18px;">
@@ -162,3 +187,15 @@ Deno.serve(async (req) => {
     );
   }
 });
+
+class UriSafe {
+  static parseHttps(value: unknown): string | null {
+    if (typeof value !== "string") return null;
+    try {
+      const parsed = new URL(value);
+      return parsed.protocol === "https:" ? parsed.toString() : null;
+    } catch {
+      return null;
+    }
+  }
+}

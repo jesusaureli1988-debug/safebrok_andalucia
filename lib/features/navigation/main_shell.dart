@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import '../home/home_screen.dart';
 import '../../core/permissions/role_permissions.dart';
 import '../team/team_screen.dart';
@@ -6,6 +6,7 @@ import 'package:safebrok_andalucia/features/settings/settings_screen.dart';
 import 'package:safebrok_andalucia/features/business/business_screen.dart';
 import 'package:safebrok_andalucia/features/safecloud/safecloud_screen.dart';
 import 'package:safebrok_andalucia/features/chat/internal_chat_screen.dart';
+import '../../core/auth/app_role.dart';
 
 class MainShell extends StatefulWidget {
   final String role;
@@ -19,28 +20,22 @@ class MainShell extends StatefulWidget {
 class _MainShellState extends State<MainShell> {
   int index = 0;
 
-  bool get isDirector => widget.role == 'director';
-  bool get isJefeVentas => widget.role == 'jefe_ventas';
-  bool get isJefeEquipo => widget.role == 'jefe_equipo';
-  bool get isAgente => widget.role == 'agente';
+  String get role => AppRole.normalize(widget.role);
+
+  bool get isDirector => role == AppRole.directorZona.value;
+  bool get isJefeVentas => role == AppRole.jefeVentas.value;
+  bool get isJefeEquipo => role == AppRole.jefeEquipo.value;
+  bool get isAgente => role == AppRole.agente.value;
 
   @override
   Widget build(BuildContext context) {
-
-   final pages = [
-
-  HomeScreen(role: widget.role),
-
-  const InternalChatScreen(),
-
-  BusinessScreen(role: widget.role),
-
-  const SafeCloudScreen(),
-
-  SettingsScreen(role: widget.role),
-];
-
-    
+    final pages = [
+      HomeScreen(role: role),
+      const InternalChatScreen(),
+      BusinessScreen(role: role),
+      const SafeCloudScreen(),
+      SettingsScreen(role: role),
+    ];
 
     return Scaffold(
       body: pages[index],
@@ -55,26 +50,17 @@ class _MainShellState extends State<MainShell> {
         unselectedItemColor: Colors.white60,
 
         items: const [
+          BottomNavigationBarItem(icon: Icon(Icons.home), label: "Inicio"),
           BottomNavigationBarItem(
-            icon: Icon(Icons.home),
-            label: "Inicio",
+            icon: Icon(Icons.chat_bubble_rounded),
+            label: "Chat",
           ),
+          BottomNavigationBarItem(icon: Icon(Icons.euro), label: "Negocio"),
           BottomNavigationBarItem(
-  icon: Icon(Icons.chat_bubble_rounded),
-  label: "Chat",
-),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.euro),
-            label: "Negocio",
+            icon: Icon(Icons.cloud_done_rounded),
+            label: "SafeCloud",
           ),
-          BottomNavigationBarItem(
-  icon: Icon(Icons.cloud_done_rounded),
-  label: "SafeCloud",
-),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.settings),
-            label: "Ajustes",
-          ),
+          BottomNavigationBarItem(icon: Icon(Icons.settings), label: "Ajustes"),
         ],
       ),
     );

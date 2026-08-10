@@ -2757,12 +2757,6 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                         Icons.dashboard_rounded,
                       ),
 
-                      _menuItem(
-                        "Producción",
-                        "produccion",
-                        Icons.bar_chart_rounded,
-                      ),
-
                       _menuItem("Ventas", "ventas", Icons.euro_rounded),
 
                       _menuItem(
@@ -3647,18 +3641,6 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
           SizedBox(height: 210, child: buildDashboardKpis()),
           const SizedBox(height: 20),
           Expanded(child: buildVentasPage()),
-        ],
-      );
-    }
-
-    // PRODUCCIÓN
-    if (selectedMenu == 'produccion') {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(height: 210, child: buildDashboardKpis()),
-          const SizedBox(height: 20),
-          Expanded(child: buildProduccionPage()),
         ],
       );
     }
@@ -8517,28 +8499,11 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
             mainAxisSize: MainAxisSize.min,
             children: [
               ListTile(
-                leading: const Icon(Icons.account_balance),
-                title: const Text("Enviar a banco"),
-                enabled: false,
-              ),
-
-              ListTile(
                 leading: const Icon(Icons.credit_card),
                 title: const Text("Pago TPV / Tarjeta"),
                 onTap: () {
                   Navigator.pop(context);
                   abrirPasarelaTPV(recibo);
-                },
-              ),
-
-              ListTile(
-                leading: const Icon(Icons.swap_horiz),
-                title: const Text("Transferencia"),
-                onTap: () {
-                  Navigator.pop(context);
-                  ScaffoldMessenger.of(
-                    context,
-                  ).showSnackBar(const SnackBar(content: Text("Próximamente")));
                 },
               ),
 
@@ -11132,10 +11097,6 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
 
   String _formatoEuro(double valor) {
     return '${valor.toStringAsFixed(2)} €';
-  }
-
-  Widget buildProduccionPage() {
-    return const Center(child: Text("Producción (en desarrollo)"));
   }
 
   Future<void> cargarCompanias() async {
