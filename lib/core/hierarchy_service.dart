@@ -10,6 +10,9 @@ class HierarchyService {
       final res = await supabase
           .from('usuarios')
           .select('auth_id')
+          .or(
+            'estado.is.null,estado.not.in.(inactivo,Inactivo,INACTIVO,baja,Baja,BAJA,desactivado,Desactivado,DESACTIVADO,bloqueado,Bloqueado,BLOQUEADO,suspendido,Suspendido,SUSPENDIDO)',
+          )
           .eq('parent_id', authId);
 
       for (final row in res) {

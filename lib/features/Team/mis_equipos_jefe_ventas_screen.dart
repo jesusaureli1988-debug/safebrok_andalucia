@@ -1,6 +1,7 @@
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
+import 'package:safebrok_andalucia/core/production/premium_weighting.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class MisEquiposJefeVentasScreen extends StatefulWidget {
@@ -14,15 +15,15 @@ class MisEquiposJefeVentasScreen extends StatefulWidget {
 class _EstructuraNode {
   final Map<String, dynamic> usuario;
   final String rol;
-  final int clientesPropios;
-  final int ventasPropias;
+  final double primasPropias;
+  final double mixPropio;
   final List<_EstructuraNode> hijos;
 
   const _EstructuraNode({
     required this.usuario,
     required this.rol,
-    required this.clientesPropios,
-    required this.ventasPropias,
+    required this.primasPropias,
+    required this.mixPropio,
     required this.hijos,
   });
 
@@ -34,20 +35,27 @@ class _EstructuraNode {
     return total;
   }
 
-  int get totalClientes {
-    int total = clientesPropios;
+  bool _incluyeCargo(String cargo) => cargo == 'todos' || rol == cargo;
+
+  double primasEstructura(String cargo) {
+    double total = _incluyeCargo(cargo) ? primasPropias : 0;
     for (final hijo in hijos) {
-      total += hijo.totalClientes;
+      total += hijo.primasEstructura(cargo);
     }
     return total;
   }
 
-  int get totalVentas {
-    int total = ventasPropias;
+  double mixEstructura(String cargo) {
+    double total = _incluyeCargo(cargo) ? mixPropio : 0;
     for (final hijo in hijos) {
-      total += hijo.totalVentas;
+      total += hijo.mixEstructura(cargo);
     }
     return total;
+  }
+
+  double porcentajeMix(String cargo) {
+    final primas = primasEstructura(cargo);
+    return primas <= 0 ? 0 : (mixEstructura(cargo) / primas) * 100;
   }
 
   int contarRol(String rolBuscado) {
@@ -68,6 +76,8 @@ class _MisEquiposJefeVentasScreenState
 
   Map<String, dynamic>? usuarioLogueado;
   _EstructuraNode? raiz;
+  DateTime periodo = DateTime(DateTime.now().year, DateTime.now().month);
+  String cargoSeleccionado = 'todos';
 
   @override
   void initState() {
@@ -83,8 +93,6 @@ class _MisEquiposJefeVentasScreenState
         .replaceAll('-', '_')
         .replaceAll(' ', '_');
   }
-
-  
 
   Future<void> cargarEquipos() async {
     try {
@@ -111,6 +119,9 @@ class _MisEquiposJefeVentasScreenState
           .select(
             'id, auth_id, parent_id, rol_usuario, nombre, apellidos, email, estado',
           )
+          .or(
+            'estado.is.null,estado.not.in.(inactivo,Inactivo,INACTIVO,baja,Baja,BAJA,desactivado,Desactivado,DESACTIVADO,bloqueado,Bloqueado,BLOQUEADO,suspendido,Suspendido,SUSPENDIDO)',
+          )
           .eq('auth_id', authUser.id)
           .maybeSingle();
 
@@ -129,6 +140,9 @@ class _MisEquiposJefeVentasScreenState
           .from('usuarios')
           .select(
             'id, auth_id, parent_id, rol_usuario, nombre, apellidos, email, estado',
+          )
+          .or(
+            'estado.is.null,estado.not.in.(inactivo,Inactivo,INACTIVO,baja,Baja,BAJA,desactivado,Desactivado,DESACTIVADO,bloqueado,Bloqueado,BLOQUEADO,suspendido,Suspendido,SUSPENDIDO)',
           );
 
       final usuarios = List<Map<String, dynamic>>.from(usuariosData);
@@ -145,33 +159,30 @@ class _MisEquiposJefeVentasScreenState
           .toSet()
           .toList();
 
-      final clientesPorAuth = <String, int>{};
-      final ventasPorAuth = <String, int>{};
+      final primasPorAuth = <String, double>{};
+      final mixPorAuth = <String, double>{};
 
       if (authIds.isNotEmpty) {
-        final clientesData = await supabase
-            .from('clientes')
-            .select('auth_id')
-            .inFilter('auth_id', authIds);
-
-        for (final item in clientesData as List) {
-          final authId = item['auth_id']?.toString();
-          if (authId == null || authId.isEmpty) continue;
-          clientesPorAuth[authId] = (clientesPorAuth[authId] ?? 0) + 1;
-        }
-
+        final finPeriodo = DateTime(periodo.year, periodo.month + 1);
         final ventasData = await supabase
             .from('ventas')
-            .select('agente_auth_id')
-            .inFilter('agente_auth_id', authIds);
+            .select()
+            .inFilter('agente_auth_id', authIds)
+            .gte('fecha_efecto', periodo.toIso8601String())
+            .lt('fecha_efecto', finPeriodo.toIso8601String());
 
-        for (final item in ventasData as List) {
-          final authId = item['agente_auth_id']?.toString();
+        for (final raw in ventasData as List) {
+          final venta = Map<String, dynamic>.from(raw as Map);
+          if (!_ventaProductiva(venta)) continue;
+          final authId = venta['agente_auth_id']?.toString();
           if (authId == null || authId.isEmpty) continue;
-          ventasPorAuth[authId] = (ventasPorAuth[authId] ?? 0) + 1;
+          final prima = PremiumWeighting.net(venta);
+          primasPorAuth[authId] = (primasPorAuth[authId] ?? 0) + prima;
+          if (_esMix(venta)) {
+            mixPorAuth[authId] = (mixPorAuth[authId] ?? 0) + prima;
+          }
         }
       }
-
       final usuariosPorParentId = <String, List<Map<String, dynamic>>>{};
 
       for (final usuario in usuarios) {
@@ -200,43 +211,40 @@ class _MisEquiposJefeVentasScreenState
           return _EstructuraNode(
             usuario: usuario,
             rol: rol,
-            clientesPropios: clientesPorAuth[authId] ?? 0,
-            ventasPropias: ventasPorAuth[authId] ?? 0,
+            primasPropias: primasPorAuth[authId] ?? 0,
+            mixPropio: mixPorAuth[authId] ?? 0,
             hijos: const [],
           );
         }
 
         final nuevosVisitados = {...visitados, id};
 
-final hijosDirectos = List<Map<String, dynamic>>.from(
-  usuariosPorParentId[id] ?? <Map<String, dynamic>>[],
-);
+        final hijosDirectos = List<Map<String, dynamic>>.from(
+          usuariosPorParentId[id] ?? <Map<String, dynamic>>[],
+        );
 
-debugPrint(
-  '➡️ ${_nombreCompleto(usuario)} '
-  '| rol=$rol '
-  '| hijos directos=${hijosDirectos.length}',
-);
+        debugPrint(
+          '➡️ ${_nombreCompleto(usuario)} '
+          '| rol=$rol '
+          '| hijos directos=${hijosDirectos.length}',
+        );
 
-for (final hijo in hijosDirectos) {
-  debugPrint(
-    '   ✔ ${_nombreCompleto(hijo)} '
-    '| rol=${hijo['rol_usuario']} '
-    '| parent_id=${hijo['parent_id']}',
-  );
-}
+        for (final hijo in hijosDirectos) {
+          debugPrint(
+            '   ✔ ${_nombreCompleto(hijo)} '
+            '| rol=${hijo['rol_usuario']} '
+            '| parent_id=${hijo['parent_id']}',
+          );
+        }
 
-final hijos = hijosDirectos
-    .map(
-      (hijo) => construirNodo(
-        hijo,
-        nuevosVisitados,
-      ),
-    )
-    .toList();
+        final hijos = hijosDirectos
+            .map((hijo) => construirNodo(hijo, nuevosVisitados))
+            .toList();
 
         hijos.sort((a, b) {
-          final ventas = b.totalVentas.compareTo(a.totalVentas);
+          final ventas = b
+              .primasEstructura(cargoSeleccionado)
+              .compareTo(a.primasEstructura(cargoSeleccionado));
           if (ventas != 0) return ventas;
 
           return _nombreCompleto(
@@ -247,8 +255,8 @@ final hijos = hijosDirectos
         return _EstructuraNode(
           usuario: usuario,
           rol: rol,
-          clientesPropios: clientesPorAuth[authId] ?? 0,
-          ventasPropias: ventasPorAuth[authId] ?? 0,
+          primasPropias: primasPorAuth[authId] ?? 0,
+          mixPropio: mixPorAuth[authId] ?? 0,
           hijos: hijos,
         );
       }
@@ -262,8 +270,10 @@ final hijos = hijosDirectos
       debugPrint('ID: ${perfil['id']}');
       debugPrint('HIJOS DIRECTOS: ${arbol.hijos.length}');
       debugPrint('PERSONAS TOTALES: ${arbol.totalPersonas}');
-      debugPrint('VENTAS TOTALES: ${arbol.totalVentas}');
-      debugPrint('CLIENTES TOTALES: ${arbol.totalClientes}');
+      debugPrint(
+        'PRIMAS ESTRUCTURA: ${arbol.primasEstructura(cargoSeleccionado)}',
+      );
+      debugPrint('MIX ESTRUCTURA: ${arbol.porcentajeMix(cargoSeleccionado)}%');
 
       if (!mounted) return;
 
@@ -340,7 +350,7 @@ final hijos = hijosDirectos
       case 'jefe_ventas':
         return Colors.purpleAccent;
       case 'jefe_equipo':
-        return Colors.cyanAccent;
+        return const Color(0xFF2563EB);
       case 'agente':
         return Colors.greenAccent;
       default:
@@ -365,37 +375,91 @@ final hijos = hijosDirectos
     }
   }
 
-  double _rendimientoNodo(_EstructuraNode node) {
-    final agentes = node.contarRol('agente');
-
-    final divisor = agentes > 0 ? agentes * 10 : 10;
-
-    return (node.totalVentas / divisor).clamp(0.0, 1.0);
+  bool _ventaProductiva(Map<String, dynamic> venta) {
+    final estado = [
+      venta['estado'],
+      venta['estado_poliza'],
+      venta['tipo_movimiento'],
+      venta['situacion'],
+    ].join(' ').toLowerCase();
+    return !const [
+      'baja',
+      'extorno',
+      'anulada',
+      'anulado',
+      'cancelada',
+      'cancelado',
+    ].any(estado.contains);
   }
 
+  bool _esMix(Map<String, dynamic> venta) {
+    final producto =
+        (venta['producto'] ?? venta['ramo'] ?? venta['tipo_seguro'] ?? '')
+            .toString()
+            .trim()
+            .toLowerCase()
+            .replaceAll('á', 'a')
+            .replaceAll('é', 'e')
+            .replaceAll('í', 'i')
+            .replaceAll('ó', 'o')
+            .replaceAll('ú', 'u');
+    return producto.contains('deceso') || producto.contains('vida');
+  }
+
+  double _rendimientoNodo(_EstructuraNode node) =>
+      (node.porcentajeMix(cargoSeleccionado) / 100).clamp(0.0, 1.0);
+
   Color _rendimientoColor(double value) {
-    if (value >= 0.75) return Colors.greenAccent;
-    if (value >= 0.45) return Colors.orangeAccent;
+    if (value >= 0.40) return Colors.greenAccent;
+    if (value >= 0.25) return Colors.orangeAccent;
     return Colors.redAccent;
   }
 
-  String _rendimientoTexto(double value) {
-    if (value >= 0.75) return 'Estructura fuerte';
-    if (value >= 0.45) return 'En crecimiento';
-    return 'Necesita impulso';
-  }
+  String _rendimientoTexto(_EstructuraNode node) =>
+      'Mix ${node.porcentajeMix(cargoSeleccionado).toStringAsFixed(1)} %';
 
   int get totalDirectoresZona => raiz?.contarRol('director_zona') ?? 0;
   int get totalJefesVentas => raiz?.contarRol('jefe_ventas') ?? 0;
   int get totalJefesEquipo => raiz?.contarRol('jefe_equipo') ?? 0;
   int get totalAgentes => raiz?.contarRol('agente') ?? 0;
-  int get totalClientes => raiz?.totalClientes ?? 0;
-  int get totalVentas => raiz?.totalVentas ?? 0;
+  double get totalPrimas => raiz?.primasEstructura(cargoSeleccionado) ?? 0;
+  double get totalMix => raiz?.porcentajeMix(cargoSeleccionado) ?? 0;
+
+  String _euros(double value) {
+    final entero = value.round().toString().replaceAllMapped(
+      RegExp(r'\B(?=(\d{3})+(?!\d))'),
+      (_) => '.',
+    );
+    return '$entero €';
+  }
+
+  String _mesTexto(DateTime fecha) {
+    const meses = [
+      'Enero',
+      'Febrero',
+      'Marzo',
+      'Abril',
+      'Mayo',
+      'Junio',
+      'Julio',
+      'Agosto',
+      'Septiembre',
+      'Octubre',
+      'Noviembre',
+      'Diciembre',
+    ];
+    return '${meses[fecha.month - 1]} ${fecha.year}';
+  }
+
+  void _cambiarMes(int delta) {
+    setState(() => periodo = DateTime(periodo.year, periodo.month + delta));
+    cargarEquipos();
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF020617),
+      backgroundColor: const Color(0xFFF4F6FB),
       body: Stack(
         children: [
           const _EquiposBackground(),
@@ -403,12 +467,12 @@ final hijos = hijosDirectos
             child: loading
                 ? const Center(
                     child: CircularProgressIndicator(
-                      color: Colors.cyanAccent,
+                      color: const Color(0xFF2563EB),
                     ),
                   )
                 : RefreshIndicator(
-                    color: Colors.cyanAccent,
-                    backgroundColor: const Color(0xFF0F172A),
+                    color: const Color(0xFF2563EB),
+                    backgroundColor: const Color(0xFFF1F5F9),
                     onRefresh: cargarEquipos,
                     child: ListView(
                       physics: const AlwaysScrollableScrollPhysics(),
@@ -422,6 +486,8 @@ final hijos = hijosDirectos
                           _emptyCard()
                         else ...[
                           _usuarioPrincipalCard(),
+                          const SizedBox(height: 16),
+                          _filtrosComerciales(),
                           const SizedBox(height: 16),
                           _kpiResumen(),
                           const SizedBox(height: 20),
@@ -459,7 +525,7 @@ final hijos = hijosDirectos
               width: 54,
               child: Icon(
                 Icons.arrow_back_rounded,
-                color: Color(0xFF020617),
+                color: Color(0xFF111827),
                 size: 30,
               ),
             ),
@@ -471,9 +537,9 @@ final hijos = hijosDirectos
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Mi estructura',
+                'Rendimiento comercial',
                 style: TextStyle(
-                  color: Colors.white,
+                  color: const Color(0xFF111827),
                   fontSize: 27,
                   fontWeight: FontWeight.w900,
                   letterSpacing: -0.8,
@@ -481,11 +547,8 @@ final hijos = hijosDirectos
               ),
               SizedBox(height: 3),
               Text(
-                'Organigrama completo según el usuario conectado',
-                style: TextStyle(
-                  color: Colors.white60,
-                  fontSize: 13,
-                ),
+                'Primas y mix mensual de toda tu estructura',
+                style: TextStyle(color: const Color(0xFF64748B), fontSize: 13),
               ),
             ],
           ),
@@ -498,14 +561,14 @@ final hijos = hijosDirectos
             width: 50,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: Colors.cyanAccent.withOpacity(0.12),
+              color: const Color(0xFF2563EB).withOpacity(0.12),
               border: Border.all(
-                color: Colors.cyanAccent.withOpacity(0.38),
+                color: const Color(0xFF2563EB).withOpacity(0.38),
               ),
             ),
             child: const Icon(
               Icons.refresh_rounded,
-              color: Colors.cyanAccent,
+              color: const Color(0xFF2563EB),
             ),
           ),
         ),
@@ -521,6 +584,7 @@ final hijos = hijosDirectos
     final color = _rolColor(rol);
 
     return _glassCard(
+      hero: true,
       padding: const EdgeInsets.all(22),
       child: Column(
         children: [
@@ -546,12 +610,12 @@ final hijos = hijosDirectos
             children: [
               _miniPill(
                 Icons.people_alt_rounded,
-                '${node.clientesPropios} clientes propios',
-                Colors.cyanAccent,
+                '${_euros(node.primasEstructura(cargoSeleccionado))} primas estructura',
+                const Color(0xFF2563EB),
               ),
               _miniPill(
                 Icons.trending_up_rounded,
-                '${node.ventasPropias} ventas propias',
+                '${node.porcentajeMix(cargoSeleccionado).toStringAsFixed(1)} % mix estructura',
                 Colors.greenAccent,
               ),
               _miniPill(
@@ -574,8 +638,106 @@ final hijos = hijosDirectos
           const Text(
             'Estructura comercial',
             style: TextStyle(
-              color: Colors.white60,
+              color: Color(0xFFD8E2F2),
               fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _filtrosComerciales() {
+    const cargos = <String, String>{
+      'todos': 'Todos los cargos',
+      'director_zona': 'Directores de zona',
+      'jefe_ventas': 'Jefes de ventas',
+      'jefe_equipo': 'Jefes de equipo',
+      'agente': 'Agentes',
+    };
+    return _glassCard(
+      padding: const EdgeInsets.all(16),
+      child: Wrap(
+        spacing: 12,
+        runSpacing: 12,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 6),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: const Color(0xFF2563EB).withOpacity(0.25),
+              ),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                IconButton(
+                  tooltip: 'Mes anterior',
+                  onPressed: loading ? null : () => _cambiarMes(-1),
+                  icon: const Icon(
+                    Icons.chevron_left,
+                    color: Color(0xFF111827),
+                  ),
+                ),
+                SizedBox(
+                  width: 150,
+                  child: Text(
+                    _mesTexto(periodo),
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      color: const Color(0xFF111827),
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+                IconButton(
+                  tooltip: 'Mes siguiente',
+                  onPressed: loading ? null : () => _cambiarMes(1),
+                  icon: const Icon(
+                    Icons.chevron_right,
+                    color: Color(0xFF111827),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          SizedBox(
+            width: 230,
+            child: DropdownButtonFormField<String>(
+              value: cargoSeleccionado,
+              dropdownColor: const Color(0xFFF1F5F9),
+              decoration: InputDecoration(
+                labelText: 'Filtrar producción por cargo',
+                labelStyle: const TextStyle(color: const Color(0xFF64748B)),
+                prefixIcon: const Icon(
+                  Icons.badge_outlined,
+                  color: const Color(0xFF2563EB),
+                ),
+                filled: true,
+                fillColor: Colors.white,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  borderSide: BorderSide.none,
+                ),
+              ),
+              style: const TextStyle(
+                color: const Color(0xFF111827),
+                fontWeight: FontWeight.w800,
+              ),
+              items: cargos.entries
+                  .map(
+                    (item) => DropdownMenuItem(
+                      value: item.key,
+                      child: Text(item.value),
+                    ),
+                  )
+                  .toList(),
+              onChanged: (value) {
+                if (value != null) setState(() => cargoSeleccionado = value);
+              },
             ),
           ),
         ],
@@ -601,7 +763,7 @@ final hijos = hijosDirectos
         title: 'J. equipo',
         value: totalJefesEquipo.toString(),
         icon: Icons.supervisor_account_rounded,
-        color: Colors.cyanAccent,
+        color: const Color(0xFF2563EB),
       ),
       _kpiBox(
         title: 'Agentes',
@@ -610,15 +772,15 @@ final hijos = hijosDirectos
         color: Colors.greenAccent,
       ),
       _kpiBox(
-        title: 'Clientes',
-        value: totalClientes.toString(),
-        icon: Icons.people_alt_rounded,
+        title: 'Primas',
+        value: _euros(totalPrimas),
+        icon: Icons.euro_rounded,
         color: Colors.lightBlueAccent,
       ),
       _kpiBox(
-        title: 'Ventas',
-        value: totalVentas.toString(),
-        icon: Icons.trending_up_rounded,
+        title: 'Mix',
+        value: '${totalMix.toStringAsFixed(1)} %',
+        icon: Icons.donut_large_rounded,
         color: Colors.amberAccent,
       ),
     ];
@@ -629,12 +791,11 @@ final hijos = hijosDirectos
         final columnas = ancho >= 900
             ? 6
             : ancho >= 600
-                ? 3
-                : 3;
+            ? 3
+            : 3;
 
         final separacion = 10.0;
-        final itemWidth =
-            (ancho - (separacion * (columnas - 1))) / columnas;
+        final itemWidth = (ancho - (separacion * (columnas - 1))) / columnas;
 
         return Wrap(
           spacing: separacion,
@@ -656,12 +817,12 @@ final hijos = hijosDirectos
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 14),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.075),
+        color: Colors.white,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: color.withOpacity(0.25)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.20),
+            color: Colors.black.withOpacity(0.08),
             blurRadius: 18,
             offset: const Offset(0, 10),
           ),
@@ -685,7 +846,7 @@ final hijos = hijosDirectos
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: const TextStyle(
-              color: Colors.white60,
+              color: const Color(0xFF64748B),
               fontSize: 11,
               fontWeight: FontWeight.w700,
             ),
@@ -698,16 +859,13 @@ final hijos = hijosDirectos
   Widget _sectionTitle() {
     return Row(
       children: [
-        const Icon(
-          Icons.account_tree_rounded,
-          color: Colors.cyanAccent,
-        ),
+        const Icon(Icons.account_tree_rounded, color: const Color(0xFF2563EB)),
         const SizedBox(width: 8),
         const Expanded(
           child: Text(
             'Árbol de estructura',
             style: TextStyle(
-              color: Colors.white,
+              color: const Color(0xFF111827),
               fontSize: 21,
               fontWeight: FontWeight.w900,
             ),
@@ -716,7 +874,7 @@ final hijos = hijosDirectos
         Text(
           '${(raiz?.totalPersonas ?? 1) - 1} personas',
           style: const TextStyle(
-            color: Colors.white54,
+            color: const Color(0xFF64748B),
             fontWeight: FontWeight.w700,
           ),
         ),
@@ -731,10 +889,7 @@ final hijos = hijosDirectos
     final rendimientoColor = _rendimientoColor(rendimiento);
 
     return Container(
-      margin: EdgeInsets.only(
-        left: level == 0 ? 0 : 10,
-        bottom: 14,
-      ),
+      margin: EdgeInsets.only(left: level == 0 ? 0 : 10, bottom: 14),
       child: _glassCard(
         padding: EdgeInsets.zero,
         child: Theme(
@@ -751,7 +906,7 @@ final hijos = hijosDirectos
             tilePadding: const EdgeInsets.all(17),
             childrenPadding: const EdgeInsets.fromLTRB(14, 0, 14, 15),
             iconColor: color,
-            collapsedIconColor: Colors.white70,
+            collapsedIconColor: const Color(0xFF475569),
             title: Row(
               children: [
                 _avatar(nombre, color, size: 54),
@@ -765,7 +920,7 @@ final hijos = hijosDirectos
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
-                          color: Colors.white,
+                          color: const Color(0xFF111827),
                           fontSize: 17,
                           fontWeight: FontWeight.w900,
                         ),
@@ -787,12 +942,12 @@ final hijos = hijosDirectos
                     children: [
                       _miniPill(
                         Icons.people_alt_rounded,
-                        '${node.clientesPropios} clientes propios',
-                        Colors.cyanAccent,
+                        '${_euros(node.primasEstructura(cargoSeleccionado))} primas estructura',
+                        const Color(0xFF2563EB),
                       ),
                       _miniPill(
                         Icons.trending_up_rounded,
-                        '${node.ventasPropias} ventas propias',
+                        '${node.porcentajeMix(cargoSeleccionado).toStringAsFixed(1)} % mix estructura',
                         Colors.greenAccent,
                       ),
                       _miniPill(
@@ -811,7 +966,7 @@ final hijos = hijosDirectos
                           child: LinearProgressIndicator(
                             value: rendimiento,
                             minHeight: 8,
-                            backgroundColor: Colors.white.withOpacity(0.12),
+                            backgroundColor: Colors.white,
                             valueColor: AlwaysStoppedAnimation(
                               rendimientoColor,
                             ),
@@ -820,7 +975,7 @@ final hijos = hijosDirectos
                       ),
                       const SizedBox(width: 10),
                       Text(
-                        _rendimientoTexto(rendimiento),
+                        _rendimientoTexto(node),
                         style: TextStyle(
                           color: rendimientoColor,
                           fontWeight: FontWeight.w900,
@@ -838,9 +993,7 @@ final hijos = hijosDirectos
                 _sinDependenciasCard(node)
               else ...[
                 _treeConnector(color),
-                ...node.hijos.map(
-                  (hijo) => _nodoTreeCard(hijo, level + 1),
-                ),
+                ...node.hijos.map((hijo) => _nodoTreeCard(hijo, level + 1)),
               ],
             ],
           ),
@@ -867,30 +1020,28 @@ final hijos = hijosDirectos
         alignment: WrapAlignment.spaceBetween,
         children: [
           _resumenDato(
-            'Clientes propios',
-            node.clientesPropios.toString(),
-            Colors.cyanAccent,
+            'Primas propias',
+            _euros(node.primasPropias),
+            const Color(0xFF2563EB),
           ),
           _resumenDato(
-            'Ventas propias',
-            node.ventasPropias.toString(),
+            'Mix propio',
+            node.primasPropias <= 0
+                ? '0,0 %'
+                : '${(node.mixPropio / node.primasPropias * 100).toStringAsFixed(1)} %',
             Colors.greenAccent,
           ),
           _resumenDato(
-            'Clientes estructura',
-            node.totalClientes.toString(),
+            'Primas estructura',
+            _euros(node.primasEstructura(cargoSeleccionado)),
             Colors.lightBlueAccent,
           ),
           _resumenDato(
-            'Ventas estructura',
-            node.totalVentas.toString(),
+            'Mix estructura',
+            '${node.porcentajeMix(cargoSeleccionado).toStringAsFixed(1)} %',
             Colors.amberAccent,
           ),
-          _resumenDato(
-            'Personas',
-            node.totalPersonas.toString(),
-            color,
-          ),
+          _resumenDato('Personas', node.totalPersonas.toString(), color),
         ],
       ),
     );
@@ -914,7 +1065,7 @@ final hijos = hijosDirectos
           Text(
             label,
             style: const TextStyle(
-              color: Colors.white54,
+              color: const Color(0xFF64748B),
               fontSize: 11,
               fontWeight: FontWeight.w700,
             ),
@@ -955,11 +1106,7 @@ final hijos = hijosDirectos
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(
-            _rolIcono(rol),
-            color: color,
-            size: compact ? 14 : 17,
-          ),
+          Icon(_rolIcono(rol), color: color, size: compact ? 14 : 17),
           SizedBox(width: compact ? 5 : 7),
           Flexible(
             child: Text(
@@ -990,18 +1137,13 @@ final hijos = hijosDirectos
           ],
         ),
         border: Border.all(color: color.withOpacity(0.45)),
-        boxShadow: [
-          BoxShadow(
-            color: color.withOpacity(0.12),
-            blurRadius: 16,
-          ),
-        ],
+        boxShadow: [BoxShadow(color: color.withOpacity(0.12), blurRadius: 16)],
       ),
       child: Center(
         child: Text(
           _iniciales(nombre),
           style: TextStyle(
-            color: Colors.white,
+            color: const Color(0xFF111827),
             fontSize: size * 0.35,
             fontWeight: FontWeight.w900,
           ),
@@ -1037,36 +1179,31 @@ final hijos = hijosDirectos
   }
 
   Widget _sinDependenciasCard(_EstructuraNode node) {
-  return Container(
-    width: double.infinity,
-    padding: const EdgeInsets.all(15),
-    decoration: BoxDecoration(
-      color: Colors.white.withOpacity(0.055),
-      borderRadius: BorderRadius.circular(18),
-      border: Border.all(
-        color: Colors.white.withOpacity(0.10),
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(15),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: Colors.white),
       ),
-    ),
-    child: const Row(
-      children: [
-        Icon(
-          Icons.info_outline_rounded,
-          color: Colors.white54,
-        ),
-        SizedBox(width: 10),
-        Expanded(
-          child: Text(
-            'Este usuario no tiene personas asignadas directamente.',
-            style: TextStyle(
-              color: Colors.white60,
-              fontWeight: FontWeight.w700,
+      child: const Row(
+        children: [
+          Icon(Icons.info_outline_rounded, color: const Color(0xFF64748B)),
+          SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              'Este usuario no tiene personas asignadas directamente.',
+              style: TextStyle(
+                color: const Color(0xFF64748B),
+                fontWeight: FontWeight.w700,
+              ),
             ),
           ),
-        ),
-      ],
-    ),
-  );
-}
+        ],
+      ),
+    );
+  }
 
   Widget _emptyCard() {
     return _glassCard(
@@ -1074,14 +1211,14 @@ final hijos = hijosDirectos
         children: [
           Icon(
             Icons.account_tree_outlined,
-            color: Colors.white38,
+            color: const Color(0xFF78909C),
             size: 64,
           ),
           SizedBox(height: 12),
           Text(
             'Sin estructura disponible',
             style: TextStyle(
-              color: Colors.white,
+              color: const Color(0xFF111827),
               fontSize: 20,
               fontWeight: FontWeight.w900,
             ),
@@ -1090,10 +1227,7 @@ final hijos = hijosDirectos
           Text(
             'No se ha podido construir el árbol del usuario conectado.',
             textAlign: TextAlign.center,
-            style: TextStyle(
-              color: Colors.white54,
-              height: 1.4,
-            ),
+            style: TextStyle(color: const Color(0xFF64748B), height: 1.4),
           ),
         ],
       ),
@@ -1113,7 +1247,7 @@ final hijos = hijosDirectos
           const Text(
             'No se pudo cargar la estructura',
             style: TextStyle(
-              color: Colors.white,
+              color: const Color(0xFF111827),
               fontSize: 20,
               fontWeight: FontWeight.w900,
             ),
@@ -1122,10 +1256,7 @@ final hijos = hijosDirectos
           Text(
             error ?? '',
             textAlign: TextAlign.center,
-            style: const TextStyle(
-              color: Colors.white60,
-              height: 1.4,
-            ),
+            style: const TextStyle(color: const Color(0xFF64748B), height: 1.4),
           ),
         ],
       ),
@@ -1136,6 +1267,7 @@ final hijos = hijosDirectos
     required Widget child,
     EdgeInsets padding = const EdgeInsets.all(18),
     EdgeInsets? margin,
+    bool hero = false,
   }) {
     return Container(
       margin: margin,
@@ -1147,12 +1279,24 @@ final hijos = hijosDirectos
             width: double.infinity,
             padding: padding,
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.075),
+              gradient: hero
+                  ? const LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [Color(0xFF111827), Color(0xFF1D4ED8)],
+                    )
+                  : null,
+              color: hero ? null : Colors.white,
               borderRadius: BorderRadius.circular(28),
-              border: Border.all(color: Colors.white.withOpacity(0.12)),
+              border: Border.all(
+                color: hero
+                    ? Colors.white.withOpacity(0.14)
+                    : const Color(0xFFE2E8F0),
+              ),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.28),
+                  color: (hero ? const Color(0xFF1D4ED8) : Colors.black)
+                      .withOpacity(hero ? 0.20 : 0.08),
                   blurRadius: 24,
                   offset: const Offset(0, 12),
                 ),
@@ -1171,55 +1315,6 @@ class _EquiposBackground extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Stack(
-      children: [
-        Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                Color(0xFF020617),
-                Color(0xFF061A2D),
-                Color(0xFF0B1026),
-              ],
-            ),
-          ),
-        ),
-        Positioned(
-          top: -110,
-          right: -90,
-          child: _glow(260, Colors.cyanAccent),
-        ),
-        Positioned(
-          bottom: 160,
-          left: -120,
-          child: _glow(280, Colors.purpleAccent),
-        ),
-        Positioned(
-          bottom: -120,
-          right: -80,
-          child: _glow(240, Colors.blueAccent),
-        ),
-      ],
-    );
-  }
-
-  Widget _glow(double size, Color color) {
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: color.withOpacity(0.15),
-        boxShadow: [
-          BoxShadow(
-            color: color.withOpacity(0.20),
-            blurRadius: 120,
-            spreadRadius: 45,
-          ),
-        ],
-      ),
-    );
+    return const Positioned.fill(child: ColoredBox(color: Color(0xFFF4F6FB)));
   }
 }

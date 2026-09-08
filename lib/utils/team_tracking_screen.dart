@@ -1,4 +1,5 @@
 import 'dart:ui';
+import 'package:safebrok_andalucia/core/production/premium_weighting.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:fl_chart/fl_chart.dart';
@@ -60,6 +61,9 @@ class _TeamTrackingScreenState extends State<TeamTrackingScreen> {
       final me = await supabase
           .from('usuarios')
           .select('id')
+          .or(
+            'estado.is.null,estado.not.in.(inactivo,Inactivo,INACTIVO,baja,Baja,BAJA,desactivado,Desactivado,DESACTIVADO,bloqueado,Bloqueado,BLOQUEADO,suspendido,Suspendido,SUSPENDIDO)',
+          )
           .eq('auth_id', user.id)
           .single();
 
@@ -68,6 +72,9 @@ class _TeamTrackingScreenState extends State<TeamTrackingScreen> {
       final agentsRes = await supabase
           .from('usuarios')
           .select('auth_id, nombre, apellidos')
+          .or(
+            'estado.is.null,estado.not.in.(inactivo,Inactivo,INACTIVO,baja,Baja,BAJA,desactivado,Desactivado,DESACTIVADO,bloqueado,Bloqueado,BLOQUEADO,suspendido,Suspendido,SUSPENDIDO)',
+          )
           .eq('parent_id', myUserId!)
           .order('nombre', ascending: true);
 
@@ -127,21 +134,13 @@ class _TeamTrackingScreenState extends State<TeamTrackingScreen> {
       bool toOk = true;
 
       if (fromDate != null) {
-        final from = DateTime(
-          fromDate!.year,
-          fromDate!.month,
-          fromDate!.day,
-        );
+        final from = DateTime(fromDate!.year, fromDate!.month, fromDate!.day);
 
         fromOk = !saleDate.isBefore(from);
       }
 
       if (toDate != null) {
-        final to = DateTime(
-          toDate!.year,
-          toDate!.month,
-          toDate!.day,
-        );
+        final to = DateTime(toDate!.year, toDate!.month, toDate!.day);
 
         toOk = !saleDate.isAfter(to);
       }
@@ -157,15 +156,15 @@ class _TeamTrackingScreenState extends State<TeamTrackingScreen> {
 
     switch (form) {
       case 'mensual':
-        return price * 12;
+        return PremiumWeighting.amount(s, price * 12);
       case 'trimestral':
-        return price * 4;
+        return PremiumWeighting.amount(s, price * 4);
       case 'semestral':
-        return price * 2;
+        return PremiumWeighting.amount(s, price * 2);
       case 'anual':
-        return price;
+        return PremiumWeighting.amount(s, price);
       default:
-        return price;
+        return PremiumWeighting.amount(s, price);
     }
   }
 
@@ -204,29 +203,23 @@ class _TeamTrackingScreenState extends State<TeamTrackingScreen> {
 
       final prima = calcPrima(sale);
 
-      totals.update(
-        date.day,
-        (value) => value + prima,
-        ifAbsent: () => prima,
-      );
+      totals.update(date.day, (value) => value + prima, ifAbsent: () => prima);
     }
 
     final lastDay = DateTime(now.year, now.month + 1, 0).day;
 
-    return List.generate(
-      lastDay,
-      (index) {
-        final day = index + 1;
-        return FlSpot(day.toDouble(), totals[day] ?? 0);
-      },
-    );
+    return List.generate(lastDay, (index) {
+      final day = index + 1;
+      return FlSpot(day.toDouble(), totals[day] ?? 0);
+    });
   }
 
   double get chartMaxY {
     if (monthlySalesSpots.isEmpty) return 100;
 
-    final maxValue =
-        monthlySalesSpots.map((e) => e.y).reduce((a, b) => a > b ? a : b);
+    final maxValue = monthlySalesSpots
+        .map((e) => e.y)
+        .reduce((a, b) => a > b ? a : b);
 
     if (maxValue <= 0) return 100;
 
@@ -293,8 +286,8 @@ class _TeamTrackingScreenState extends State<TeamTrackingScreen> {
     return Theme(
       data: Theme.of(context).copyWith(
         colorScheme: const ColorScheme.dark(
-          primary: Color(0xFF38BDF8),
-          surface: Color(0xFF0F172A),
+          primary: Color(0xFF20C7C2),
+          surface: Color(0xFFEAF8F8),
           onSurface: Colors.white,
         ),
       ),
@@ -305,14 +298,11 @@ class _TeamTrackingScreenState extends State<TeamTrackingScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF07111B),
+      backgroundColor: const Color(0xFFF2FCFD),
       appBar: AppBar(
         title: const Text(
           "Seguimiento Equipo",
-          style: TextStyle(
-            fontWeight: FontWeight.w900,
-            letterSpacing: -0.4,
-          ),
+          style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: -0.4),
         ),
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -339,8 +329,8 @@ class _TeamTrackingScreenState extends State<TeamTrackingScreen> {
                     child: CircularProgressIndicator(color: Colors.white),
                   )
                 : RefreshIndicator(
-                    color: const Color(0xFF38BDF8),
-                    backgroundColor: const Color(0xFF0F172A),
+                    color: const Color(0xFF20C7C2),
+                    backgroundColor: const Color(0xFFEAF8F8),
                     onRefresh: () => loadData(isRefresh: true),
                     child: ListView(
                       physics: const AlwaysScrollableScrollPhysics(),
@@ -424,11 +414,7 @@ class _TrackingBackground extends StatelessWidget {
             gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
-              colors: [
-                Color(0xFF07111B),
-                Color(0xFF0B1F2E),
-                Color(0xFF12384E),
-              ],
+              colors: [Color(0xFFF2FCFD), Color(0xFFFFFFFF), Color(0xFFFFFFFF)],
             ),
           ),
         ),
@@ -437,7 +423,7 @@ class _TrackingBackground extends StatelessWidget {
           right: -80,
           child: _GlowCircle(
             size: 230,
-            color: const Color(0xFF38BDF8).withOpacity(0.24),
+            color: const Color(0xFF20C7C2).withOpacity(0.24),
           ),
         ),
         Positioned(
@@ -445,14 +431,12 @@ class _TrackingBackground extends StatelessWidget {
           left: -90,
           child: _GlowCircle(
             size: 260,
-            color: const Color(0xFF22C55E).withOpacity(0.16),
+            color: const Color(0xFF0AAEAE).withOpacity(0.16),
           ),
         ),
         BackdropFilter(
           filter: ImageFilter.blur(sigmaX: 34, sigmaY: 34),
-          child: Container(
-            color: Colors.black.withOpacity(0.08),
-          ),
+          child: Container(color: Colors.black.withOpacity(0.08)),
         ),
       ],
     );
@@ -463,20 +447,14 @@ class _GlowCircle extends StatelessWidget {
   final double size;
   final Color color;
 
-  const _GlowCircle({
-    required this.size,
-    required this.color,
-  });
+  const _GlowCircle({required this.size, required this.color});
 
   @override
   Widget build(BuildContext context) {
     return Container(
       width: size,
       height: size,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: color,
-      ),
+      decoration: BoxDecoration(shape: BoxShape.circle, color: color),
     );
   }
 }
@@ -500,10 +478,8 @@ class _HeaderPanel extends StatelessWidget {
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(30),
-        color: Colors.white.withOpacity(0.08),
-        border: Border.all(
-          color: Colors.white.withOpacity(0.10),
-        ),
+        color: Colors.white,
+        border: Border.all(color: Colors.white),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.28),
@@ -522,10 +498,7 @@ class _HeaderPanel extends StatelessWidget {
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(20),
                   gradient: const LinearGradient(
-                    colors: [
-                      Color(0xFF38BDF8),
-                      Color(0xFF2563EB),
-                    ],
+                    colors: [Color(0xFF20C7C2), Color(0xFF0A7F91)],
                   ),
                 ),
                 child: const Icon(
@@ -542,7 +515,7 @@ class _HeaderPanel extends StatelessWidget {
                     const Text(
                       "Panel comercial",
                       style: TextStyle(
-                        color: Colors.white,
+                        color: const Color(0xFF071A3A),
                         fontSize: 20,
                         fontWeight: FontWeight.w900,
                         letterSpacing: -0.5,
@@ -554,7 +527,7 @@ class _HeaderPanel extends StatelessWidget {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                        color: Colors.white.withOpacity(0.58),
+                        color: const Color(0xFF53627A),
                         fontSize: 13,
                         fontWeight: FontWeight.w600,
                       ),
@@ -616,24 +589,18 @@ class _HeaderMetric extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.black.withOpacity(0.18),
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: Colors.white.withOpacity(0.08),
-        ),
+        border: Border.all(color: Colors.white),
       ),
       child: Column(
         children: [
-          Icon(
-            icon,
-            color: const Color(0xFF7DD3FC),
-            size: 21,
-          ),
+          Icon(icon, color: const Color(0xFF20C7C2), size: 21),
           const SizedBox(height: 8),
           Text(
             value,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: const TextStyle(
-              color: Colors.white,
+              color: const Color(0xFF071A3A),
               fontSize: 17,
               fontWeight: FontWeight.w900,
             ),
@@ -642,7 +609,7 @@ class _HeaderMetric extends StatelessWidget {
           Text(
             label,
             style: TextStyle(
-              color: Colors.white.withOpacity(0.50),
+              color: const Color(0xFF53627A),
               fontSize: 11,
               fontWeight: FontWeight.w700,
             ),
@@ -684,11 +651,9 @@ class _FiltersPanel extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.075),
+        color: Colors.white,
         borderRadius: BorderRadius.circular(26),
-        border: Border.all(
-          color: Colors.white.withOpacity(0.10),
-        ),
+        border: Border.all(color: Colors.white),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -699,7 +664,7 @@ class _FiltersPanel extends StatelessWidget {
                 child: Text(
                   "Filtros de seguimiento",
                   style: TextStyle(
-                    color: Colors.white,
+                    color: const Color(0xFF071A3A),
                     fontSize: 17,
                     fontWeight: FontWeight.w900,
                     letterSpacing: -0.3,
@@ -720,18 +685,16 @@ class _FiltersPanel extends StatelessWidget {
             decoration: BoxDecoration(
               color: Colors.black.withOpacity(0.18),
               borderRadius: BorderRadius.circular(18),
-              border: Border.all(
-                color: Colors.white.withOpacity(0.08),
-              ),
+              border: Border.all(color: Colors.white),
             ),
             child: DropdownButtonHideUnderline(
               child: DropdownButton<String>(
                 value: selectedAgent,
                 isExpanded: true,
-                dropdownColor: const Color(0xFF102331),
-                iconEnabledColor: Colors.white70,
+                dropdownColor: const Color(0xFFFFFFFF),
+                iconEnabledColor: const Color(0xFF53627A),
                 style: const TextStyle(
-                  color: Colors.white,
+                  color: const Color(0xFF071A3A),
                   fontWeight: FontWeight.w700,
                 ),
                 items: [
@@ -759,7 +722,9 @@ class _FiltersPanel extends StatelessWidget {
               Expanded(
                 child: _DateFilterButton(
                   label: "Desde",
-                  value: fromDate == null ? "Seleccionar" : formatDate(fromDate),
+                  value: fromDate == null
+                      ? "Seleccionar"
+                      : formatDate(fromDate),
                   icon: Icons.calendar_month_rounded,
                   onTap: onFromTap,
                 ),
@@ -810,8 +775,8 @@ class _DateFilterButton extends StatelessWidget {
             borderRadius: BorderRadius.circular(18),
             border: Border.all(
               color: selected
-                  ? const Color(0xFF38BDF8).withOpacity(0.35)
-                  : Colors.white.withOpacity(0.08),
+                  ? const Color(0xFF20C7C2).withOpacity(0.35)
+                  : Colors.white,
             ),
           ),
           child: Row(
@@ -819,7 +784,7 @@ class _DateFilterButton extends StatelessWidget {
               Icon(
                 icon,
                 color: selected
-                    ? const Color(0xFF7DD3FC)
+                    ? const Color(0xFF20C7C2)
                     : Colors.white.withOpacity(0.42),
                 size: 20,
               ),
@@ -831,7 +796,7 @@ class _DateFilterButton extends StatelessWidget {
                     Text(
                       label,
                       style: TextStyle(
-                        color: Colors.white.withOpacity(0.46),
+                        color: const Color(0xFF53627A),
                         fontSize: 11,
                         fontWeight: FontWeight.w700,
                       ),
@@ -842,7 +807,7 @@ class _DateFilterButton extends StatelessWidget {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
-                        color: Colors.white,
+                        color: const Color(0xFF071A3A),
                         fontSize: 13,
                         fontWeight: FontWeight.w800,
                       ),
@@ -862,21 +827,16 @@ class _MonthlySalesChart extends StatelessWidget {
   final List<FlSpot> spots;
   final double maxY;
 
-  const _MonthlySalesChart({
-    required this.spots,
-    required this.maxY,
-  });
+  const _MonthlySalesChart({required this.spots, required this.maxY});
 
   @override
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.075),
+        color: Colors.white,
         borderRadius: BorderRadius.circular(26),
-        border: Border.all(
-          color: Colors.white.withOpacity(0.10),
-        ),
+        border: Border.all(color: Colors.white),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -897,10 +857,7 @@ class _MonthlySalesChart extends StatelessWidget {
                   drawVerticalLine: false,
                   horizontalInterval: maxY / 4,
                   getDrawingHorizontalLine: (value) {
-                    return FlLine(
-                      color: Colors.white.withOpacity(0.05),
-                      strokeWidth: 1,
-                    );
+                    return FlLine(color: Colors.white, strokeWidth: 1);
                   },
                 ),
                 borderData: FlBorderData(show: false),
@@ -920,7 +877,7 @@ class _MonthlySalesChart extends StatelessWidget {
                         return Text(
                           value.toInt().toString(),
                           style: TextStyle(
-                            color: Colors.white.withOpacity(0.35),
+                            color: const Color(0xFF53627A),
                             fontSize: 10,
                           ),
                         );
@@ -941,7 +898,7 @@ class _MonthlySalesChart extends StatelessWidget {
                         return Text(
                           day.toString(),
                           style: TextStyle(
-                            color: Colors.white.withOpacity(0.35),
+                            color: const Color(0xFF53627A),
                             fontSize: 10,
                           ),
                         );
@@ -960,7 +917,7 @@ class _MonthlySalesChart extends StatelessWidget {
                         return LineTooltipItem(
                           "${spot.y.toStringAsFixed(0)} €",
                           const TextStyle(
-                            color: Colors.white,
+                            color: const Color(0xFF071A3A),
                             fontWeight: FontWeight.bold,
                           ),
                         );
@@ -974,13 +931,13 @@ class _MonthlySalesChart extends StatelessWidget {
                     isCurved: true,
                     curveSmoothness: 0.25,
                     barWidth: 3.5,
-                    color: const Color(0xFF4DA3FF),
+                    color: const Color(0xFF20C7C2),
                     dotData: const FlDotData(show: false),
                     belowBarData: BarAreaData(
                       show: true,
                       gradient: LinearGradient(
                         colors: [
-                          const Color(0xFF4DA3FF).withOpacity(0.25),
+                          const Color(0xFF20C7C2).withOpacity(0.25),
                           Colors.transparent,
                         ],
                         begin: Alignment.topCenter,
@@ -1075,11 +1032,9 @@ class _KpiCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(15),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.075),
+        color: Colors.white,
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(
-          color: Colors.white.withOpacity(0.10),
-        ),
+        border: Border.all(color: Colors.white),
       ),
       child: Row(
         children: [
@@ -1087,14 +1042,10 @@ class _KpiCard extends StatelessWidget {
             width: 42,
             height: 42,
             decoration: BoxDecoration(
-              color: const Color(0xFF38BDF8).withOpacity(0.13),
+              color: const Color(0xFF20C7C2).withOpacity(0.13),
               borderRadius: BorderRadius.circular(15),
             ),
-            child: Icon(
-              icon,
-              color: const Color(0xFF7DD3FC),
-              size: 22,
-            ),
+            child: Icon(icon, color: const Color(0xFF20C7C2), size: 22),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -1106,7 +1057,7 @@ class _KpiCard extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
-                    color: Colors.white,
+                    color: const Color(0xFF071A3A),
                     fontSize: 17,
                     fontWeight: FontWeight.w900,
                   ),
@@ -1115,7 +1066,7 @@ class _KpiCard extends StatelessWidget {
                 Text(
                   title,
                   style: TextStyle(
-                    color: Colors.white.withOpacity(0.55),
+                    color: const Color(0xFF53627A),
                     fontSize: 12,
                     fontWeight: FontWeight.w700,
                   ),
@@ -1133,10 +1084,7 @@ class _SectionTitle extends StatelessWidget {
   final String title;
   final String subtitle;
 
-  const _SectionTitle({
-    required this.title,
-    required this.subtitle,
-  });
+  const _SectionTitle({required this.title, required this.subtitle});
 
   @override
   Widget build(BuildContext context) {
@@ -1146,7 +1094,7 @@ class _SectionTitle extends StatelessWidget {
         Text(
           title,
           style: const TextStyle(
-            color: Colors.white,
+            color: const Color(0xFF071A3A),
             fontSize: 19,
             fontWeight: FontWeight.w900,
             letterSpacing: -0.4,
@@ -1156,7 +1104,7 @@ class _SectionTitle extends StatelessWidget {
         Text(
           subtitle,
           style: TextStyle(
-            color: Colors.white.withOpacity(0.55),
+            color: const Color(0xFF53627A),
             fontSize: 13,
             fontWeight: FontWeight.w500,
           ),
@@ -1185,11 +1133,9 @@ class _ProductRow extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(15),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.075),
+        color: Colors.white,
         borderRadius: BorderRadius.circular(22),
-        border: Border.all(
-          color: Colors.white.withOpacity(0.10),
-        ),
+        border: Border.all(color: Colors.white),
       ),
       child: Column(
         children: [
@@ -1199,12 +1145,12 @@ class _ProductRow extends StatelessWidget {
                 width: 38,
                 height: 38,
                 decoration: BoxDecoration(
-                  color: const Color(0xFF22C55E).withOpacity(0.13),
+                  color: const Color(0xFF0AAEAE).withOpacity(0.13),
                   borderRadius: BorderRadius.circular(14),
                 ),
                 child: const Icon(
                   Icons.inventory_2_rounded,
-                  color: Color(0xFF86EFAC),
+                  color: Color(0xFF20C7C2),
                   size: 20,
                 ),
               ),
@@ -1215,7 +1161,7 @@ class _ProductRow extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
-                    color: Colors.white,
+                    color: const Color(0xFF071A3A),
                     fontSize: 15,
                     fontWeight: FontWeight.w900,
                   ),
@@ -1225,7 +1171,7 @@ class _ProductRow extends StatelessWidget {
               Text(
                 "$count",
                 style: const TextStyle(
-                  color: Color(0xFFBAE6FD),
+                  color: Color(0xFFEAF8F8),
                   fontSize: 16,
                   fontWeight: FontWeight.w900,
                 ),
@@ -1238,9 +1184,9 @@ class _ProductRow extends StatelessWidget {
             child: LinearProgressIndicator(
               minHeight: 7,
               value: percent,
-              backgroundColor: Colors.white.withOpacity(0.08),
+              backgroundColor: Colors.white,
               valueColor: const AlwaysStoppedAnimation<Color>(
-                Color(0xFF38BDF8),
+                Color(0xFF20C7C2),
               ),
             ),
           ),
@@ -1258,11 +1204,9 @@ class _EmptyProductsState extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(26),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.065),
+        color: Colors.white,
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(
-          color: Colors.white.withOpacity(0.08),
-        ),
+        border: Border.all(color: Colors.white),
       ),
       child: Column(
         children: [
@@ -1275,7 +1219,7 @@ class _EmptyProductsState extends StatelessWidget {
           const Text(
             "Sin productos en este filtro",
             style: TextStyle(
-              color: Colors.white,
+              color: const Color(0xFF071A3A),
               fontSize: 17,
               fontWeight: FontWeight.w900,
             ),
@@ -1285,7 +1229,7 @@ class _EmptyProductsState extends StatelessWidget {
             "Cuando existan ventas para el filtro seleccionado, aparecerán agrupadas aquí.",
             textAlign: TextAlign.center,
             style: TextStyle(
-              color: Colors.white.withOpacity(0.55),
+              color: const Color(0xFF53627A),
               fontSize: 13,
               height: 1.4,
             ),
@@ -1300,10 +1244,7 @@ class _ErrorBox extends StatelessWidget {
   final String message;
   final VoidCallback onRetry;
 
-  const _ErrorBox({
-    required this.message,
-    required this.onRetry,
-  });
+  const _ErrorBox({required this.message, required this.onRetry});
 
   @override
   Widget build(BuildContext context) {
@@ -1312,30 +1253,22 @@ class _ErrorBox extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.redAccent.withOpacity(0.12),
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: Colors.redAccent.withOpacity(0.25),
-        ),
+        border: Border.all(color: Colors.redAccent.withOpacity(0.25)),
       ),
       child: Row(
         children: [
-          const Icon(
-            Icons.error_outline_rounded,
-            color: Colors.redAccent,
-          ),
+          const Icon(Icons.error_outline_rounded, color: Colors.redAccent),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
               message,
               style: const TextStyle(
-                color: Colors.white,
+                color: const Color(0xFF071A3A),
                 fontWeight: FontWeight.w700,
               ),
             ),
           ),
-          TextButton(
-            onPressed: onRetry,
-            child: const Text("Reintentar"),
-          ),
+          TextButton(onPressed: onRetry, child: const Text("Reintentar")),
         ],
       ),
     );

@@ -4,7 +4,6 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../clients/client_detail_screen.dart';
 
-
 class MyClientsScreen extends StatefulWidget {
   const MyClientsScreen({super.key});
 
@@ -35,146 +34,156 @@ class _MyClientsScreenState extends State<MyClientsScreen> {
   }
 
   Future<void> loadClients() async {
-  final user = supabase.auth.currentUser;
+    final user = supabase.auth.currentUser;
 
-  if (user == null) {
-    if (mounted) setState(() => loading = false);
-    return;
-  }
+    if (user == null) {
+      if (mounted) setState(() => loading = false);
+      return;
+    }
 
-  try {
-    setState(() => loading = true);
+    try {
+      setState(() => loading = true);
 
-    final userData = await supabase
-        .from('usuarios')
-        .select('id, auth_id, rol_usuario')
-        .eq('auth_id', user.id)
-        .single();
+      final userData = await supabase
+          .from('usuarios')
+          .select('id, auth_id, rol_usuario')
+          .or(
+            'estado.is.null,estado.not.in.(inactivo,Inactivo,INACTIVO,baja,Baja,BAJA,desactivado,Desactivado,DESACTIVADO,bloqueado,Bloqueado,BLOQUEADO,suspendido,Suspendido,SUSPENDIDO)',
+          )
+          .eq('auth_id', user.id)
+          .single();
 
-    userAuthId = userData['auth_id']?.toString();
-    userRole = userData['rol_usuario']?.toString();
+      userAuthId = userData['auth_id']?.toString();
+      userRole = userData['rol_usuario']?.toString();
 
-    final userInternalId = userData['id']?.toString();
+      final userInternalId = userData['id']?.toString();
 
-    if (userAuthId == null || userInternalId == null || userRole == null) {
+      if (userAuthId == null || userInternalId == null || userRole == null) {
+        if (mounted) {
+          setState(() {
+            clients = [];
+            loading = false;
+          });
+        }
+        return;
+      }
+
+      final allowedIds = await getClientesPermitidosPorRol(
+        internalId: userInternalId,
+        authId: userAuthId!,
+        role: userRole!,
+      );
+
+      if (allowedIds.isEmpty) {
+        if (mounted) {
+          setState(() {
+            clients = [];
+            loading = false;
+          });
+        }
+        return;
+      }
+
+      final response = await supabase
+          .from('clientes')
+          .select('*')
+          .inFilter('auth_id', allowedIds)
+          .order('created_at', ascending: false);
+
+      clients = List<Map<String, dynamic>>.from(response);
+
+      _buildFilters();
+
+      if (mounted) {
+        setState(() => loading = false);
+      }
+    } catch (e) {
+      debugPrint("ERROR LOAD CLIENTS: $e");
+
       if (mounted) {
         setState(() {
           clients = [];
           loading = false;
         });
       }
-      return;
-    }
-
-    final allowedIds = await getClientesPermitidosPorRol(
-      internalId: userInternalId,
-      authId: userAuthId!,
-      role: userRole!,
-    );
-
-    if (allowedIds.isEmpty) {
-      if (mounted) {
-        setState(() {
-          clients = [];
-          loading = false;
-        });
-      }
-      return;
-    }
-
-    final response = await supabase
-        .from('clientes')
-        .select('*')
-        .inFilter('auth_id', allowedIds)
-        .order('created_at', ascending: false);
-
-    clients = List<Map<String, dynamic>>.from(response);
-
-    _buildFilters();
-
-    if (mounted) {
-      setState(() => loading = false);
-    }
-  } catch (e) {
-    debugPrint("ERROR LOAD CLIENTS: $e");
-
-    if (mounted) {
-      setState(() {
-        clients = [];
-        loading = false;
-      });
     }
   }
-}
-Future<List<String>> getClientesPermitidosPorRol({
-  required String internalId,
-  required String authId,
-  required String role,
-}) async {
-  if (role == 'administracion') {
-    return [];
-  }
 
-  if (role == 'agente') {
-    return [authId];
-  }
+  Future<List<String>> getClientesPermitidosPorRol({
+    required String internalId,
+    required String authId,
+    required String role,
+  }) async {
+    if (role == 'administracion') {
+      return [];
+    }
 
-  if (role == 'director_nacional') {
+    if (role == 'agente') {
+      return [authId];
+    }
+
+    if (role == 'director_nacional') {
+      final usuarios = await supabase
+          .from('usuarios')
+          .select('auth_id')
+          .or(
+            'estado.is.null,estado.not.in.(inactivo,Inactivo,INACTIVO,baja,Baja,BAJA,desactivado,Desactivado,DESACTIVADO,bloqueado,Bloqueado,BLOQUEADO,suspendido,Suspendido,SUSPENDIDO)',
+          )
+          .not('auth_id', 'is', null);
+
+      return usuarios
+          .map<String>((e) => e['auth_id']?.toString() ?? '')
+          .where((e) => e.isNotEmpty && e != 'null')
+          .toList();
+    }
+
     final usuarios = await supabase
         .from('usuarios')
-        .select('auth_id')
-        .not('auth_id', 'is', null);
+        .select('id, auth_id, parent_id, rol_usuario')
+        .or(
+          'estado.is.null,estado.not.in.(inactivo,Inactivo,INACTIVO,baja,Baja,BAJA,desactivado,Desactivado,DESACTIVADO,bloqueado,Bloqueado,BLOQUEADO,suspendido,Suspendido,SUSPENDIDO)',
+        );
 
-    return usuarios
-        .map<String>((e) => e['auth_id']?.toString() ?? '')
-        .where((e) => e.isNotEmpty && e != 'null')
-        .toList();
-  }
+    final normalized = usuarios.map<Map<String, String?>>((u) {
+      return {
+        'id': u['id']?.toString(),
+        'auth_id': u['auth_id']?.toString(),
+        'parent_id': u['parent_id']?.toString(),
+        'rol_usuario': u['rol_usuario']?.toString(),
+      };
+    }).toList();
 
-  final usuarios = await supabase
-      .from('usuarios')
-      .select('id, auth_id, parent_id, rol_usuario');
+    final Set<String> resultAuthIds = {};
+    resultAuthIds.add(authId);
 
-  final normalized = usuarios.map<Map<String, String?>>((u) {
-    return {
-      'id': u['id']?.toString(),
-      'auth_id': u['auth_id']?.toString(),
-      'parent_id': u['parent_id']?.toString(),
-      'rol_usuario': u['rol_usuario']?.toString(),
-    };
-  }).toList();
+    void buscarHijos(String parentId) {
+      for (final u in normalized) {
+        if (u['parent_id'] == parentId) {
+          final childId = u['id'];
+          final childAuthId = u['auth_id'];
 
-  final Set<String> resultAuthIds = {};
-  resultAuthIds.add(authId);
+          if (childAuthId != null &&
+              childAuthId.isNotEmpty &&
+              childAuthId != 'null') {
+            resultAuthIds.add(childAuthId);
+          }
 
-  void buscarHijos(String parentId) {
-    for (final u in normalized) {
-      if (u['parent_id'] == parentId) {
-        final childId = u['id'];
-        final childAuthId = u['auth_id'];
-
-        if (childAuthId != null &&
-            childAuthId.isNotEmpty &&
-            childAuthId != 'null') {
-          resultAuthIds.add(childAuthId);
-        }
-
-        if (childId != null && childId.isNotEmpty && childId != parentId) {
-          buscarHijos(childId);
+          if (childId != null && childId.isNotEmpty && childId != parentId) {
+            buscarHijos(childId);
+          }
         }
       }
     }
-  }
 
-  if (role == 'director_zona' ||
-      role == 'jefe_ventas' ||
-      role == 'jefe_equipo') {
-    buscarHijos(internalId);
-    return resultAuthIds.toList();
-  }
+    if (role == 'director_zona' ||
+        role == 'jefe_ventas' ||
+        role == 'jefe_equipo') {
+      buscarHijos(internalId);
+      return resultAuthIds.toList();
+    }
 
-  return [];
-}
+    return [];
+  }
 
   void _buildFilters() {
     final Set<String> yearSet = {};
@@ -191,16 +200,12 @@ Future<List<String>> getClientesPermitidosPorRol({
       monthSet.add(date.month);
     }
 
-    final orderedYears = yearSet.toList()
-      ..sort((a, b) => b.compareTo(a));
+    final orderedYears = yearSet.toList()..sort((a, b) => b.compareTo(a));
 
     final orderedMonths = monthSet.toList()..sort();
 
     years = ['Todos', ...orderedYears];
-    months = [
-      'Todos',
-      ...orderedMonths.map(_monthName),
-    ];
+    months = ['Todos', ...orderedMonths.map(_monthName)];
   }
 
   String _monthName(int m) {
@@ -229,21 +234,24 @@ Future<List<String>> getClientesPermitidosPorRol({
           ? null
           : DateTime.tryParse(rawDate.toString());
 
-      final matchYear = selectedYear == 'Todos' ||
+      final matchYear =
+          selectedYear == 'Todos' ||
           (date != null && selectedYear == date.year.toString());
 
-      final matchMonth = selectedMonth == 'Todos' ||
+      final matchMonth =
+          selectedMonth == 'Todos' ||
           (date != null && selectedMonth == _monthName(date.month));
 
-      final fullName =
-          "${c['nombre'] ?? ''} ${c['apellidos'] ?? ''}".toLowerCase();
+      final fullName = "${c['nombre'] ?? ''} ${c['apellidos'] ?? ''}"
+          .toLowerCase();
 
       final phone = (c['telefono'] ?? '').toString().toLowerCase();
       final email = (c['email'] ?? '').toString().toLowerCase();
 
       final query = searchText.toLowerCase().trim();
 
-      final matchSearch = query.isEmpty ||
+      final matchSearch =
+          query.isEmpty ||
           fullName.contains(query) ||
           phone.contains(query) ||
           email.contains(query);
@@ -257,74 +265,74 @@ Future<List<String>> getClientesPermitidosPorRol({
     final filtered = filteredClients;
 
     return Scaffold(
-      backgroundColor: const Color(0xFF050B12),
+      backgroundColor: const Color(0xFFF2FCFD),
       body: Stack(
         children: [
           const _ClientsPremiumBackground(),
           SafeArea(
             child: loading
-    ? const Center(
-        child: CircularProgressIndicator(
-          color: Colors.cyanAccent,
-        ),
-      )
-    : RefreshIndicator(
-        color: Colors.cyanAccent,
-        backgroundColor: const Color(0xFF071421),
-        onRefresh: loadClients,
-        child: CustomScrollView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          slivers: [
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
-                child: Column(
-                  children: [
-                    _header(),
-                    const SizedBox(height: 22),
-                    _summaryCard(filtered.length),
-                    const SizedBox(height: 16),
-                    _searchBox(),
-                    const SizedBox(height: 14),
-                    _filtersRow(),
-                    const SizedBox(height: 10),
-                  ],
-                ),
-              ),
-            ),
+                ? const Center(
+                    child: CircularProgressIndicator(color: Colors.cyanAccent),
+                  )
+                : RefreshIndicator(
+                    color: Colors.cyanAccent,
+                    backgroundColor: const Color(0xFFFFFFFF),
+                    onRefresh: loadClients,
+                    child: CustomScrollView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      slivers: [
+                        SliverToBoxAdapter(
+                          child: Padding(
+                            padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
+                            child: Column(
+                              children: [
+                                _header(),
+                                const SizedBox(height: 22),
+                                _summaryCard(filtered.length),
+                                const SizedBox(height: 16),
+                                _searchBox(),
+                                const SizedBox(height: 14),
+                                _filtersRow(),
+                                const SizedBox(height: 10),
+                              ],
+                            ),
+                          ),
+                        ),
 
-            if (clients.isEmpty)
-              SliverFillRemaining(
-                hasScrollBody: false,
-                child: _emptyState(
-                  title: "No hay clientes todavía",
-                  subtitle: "Cuando registres clientes aparecerán aquí.",
-                  icon: Icons.people_alt_outlined,
-                ),
-              )
-            else if (filtered.isEmpty)
-              SliverFillRemaining(
-                hasScrollBody: false,
-                child: _emptyState(
-                  title: "Sin resultados",
-                  subtitle: "Prueba con otro nombre, teléfono, año o mes.",
-                  icon: Icons.search_off_rounded,
-                ),
-              )
-            else
-              SliverPadding(
-                padding: const EdgeInsets.fromLTRB(20, 10, 20, 28),
-                sliver: SliverList.builder(
-                  itemCount: filtered.length,
-                  itemBuilder: (context, index) {
-                    return _clientCard(filtered[index], index);
-                  },
-                ),
-              ),
-          ],
-        ),
-      ),
-      ),
+                        if (clients.isEmpty)
+                          SliverFillRemaining(
+                            hasScrollBody: false,
+                            child: _emptyState(
+                              title: "No hay clientes todavía",
+                              subtitle:
+                                  "Cuando registres clientes aparecerán aquí.",
+                              icon: Icons.people_alt_outlined,
+                            ),
+                          )
+                        else if (filtered.isEmpty)
+                          SliverFillRemaining(
+                            hasScrollBody: false,
+                            child: _emptyState(
+                              title: "Sin resultados",
+                              subtitle:
+                                  "Prueba con otro nombre, teléfono, año o mes.",
+                              icon: Icons.search_off_rounded,
+                            ),
+                          )
+                        else
+                          SliverPadding(
+                            padding: const EdgeInsets.fromLTRB(20, 10, 20, 28),
+                            sliver: SliverList.builder(
+                              itemCount: filtered.length,
+                              itemBuilder: (context, index) {
+                                return _clientCard(filtered[index], index);
+                              },
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+          ),
         ],
       ),
     );
@@ -342,11 +350,9 @@ Future<List<String>> getClientesPermitidosPorRol({
               width: 48,
               height: 48,
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.07),
+                color: Colors.white,
                 borderRadius: BorderRadius.circular(18),
-                border: Border.all(
-                  color: Colors.white.withOpacity(0.10),
-                ),
+                border: Border.all(color: Colors.white),
               ),
               child: const Icon(
                 Icons.arrow_back_ios_new_rounded,
@@ -364,7 +370,7 @@ Future<List<String>> getClientesPermitidosPorRol({
               const Text(
                 "Mis Clientes",
                 style: TextStyle(
-                  color: Colors.white,
+                  color: const Color(0xFF071A3A),
                   fontSize: 29,
                   fontWeight: FontWeight.w900,
                   letterSpacing: -0.8,
@@ -373,7 +379,7 @@ Future<List<String>> getClientesPermitidosPorRol({
               Text(
                 _roleSubtitle(),
                 style: TextStyle(
-                  color: Colors.white.withOpacity(0.58),
+                  color: const Color(0xFF53627A),
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
                 ),
@@ -381,42 +387,38 @@ Future<List<String>> getClientesPermitidosPorRol({
             ],
           ),
         ),
-        _premiumIcon(
-          Icons.people_alt_rounded,
-          Colors.cyanAccent,
-          50,
-        ),
+        _premiumIcon(Icons.people_alt_rounded, Colors.cyanAccent, 50),
       ],
     );
   }
 
   String _roleSubtitle() {
-  if (userRole == 'agente') {
-    return "Clientes asignados a tu usuario";
-  }
+    if (userRole == 'agente') {
+      return "Clientes asignados a tu usuario";
+    }
 
-  if (userRole == 'jefe_equipo') {
-    return "Clientes de tu equipo comercial";
-  }
+    if (userRole == 'jefe_equipo') {
+      return "Clientes de tu equipo comercial";
+    }
 
-  if (userRole == 'jefe_ventas') {
-    return "Clientes de tu estructura comercial";
-  }
+    if (userRole == 'jefe_ventas') {
+      return "Clientes de tu estructura comercial";
+    }
 
-  if (userRole == 'director_zona') {
-    return "Clientes de tu zona comercial";
-  }
+    if (userRole == 'director_zona') {
+      return "Clientes de tu zona comercial";
+    }
 
-  if (userRole == 'director_nacional') {
-    return "Cartera global de toda la compañía";
-  }
+    if (userRole == 'director_nacional') {
+      return "Cartera global de toda la compañía";
+    }
 
-  if (userRole == 'administracion') {
-    return "Sin acceso a cartera comercial";
-  }
+    if (userRole == 'administracion') {
+      return "Sin acceso a cartera comercial";
+    }
 
-  return "Cartera comercial";
-}
+    return "Cartera comercial";
+  }
 
   Widget _summaryCard(int totalFiltrado) {
     return Container(
@@ -428,15 +430,9 @@ Future<List<String>> getClientesPermitidosPorRol({
         gradient: const LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [
-            Color(0xFF062C68),
-            Color(0xFF071B3E),
-            Color(0xFF050B12),
-          ],
+          colors: [Color(0xFFFFFFFF), Color(0xFF071B3E), Color(0xFFF2FCFD)],
         ),
-        border: Border.all(
-          color: Colors.cyanAccent.withOpacity(0.28),
-        ),
+        border: Border.all(color: Colors.cyanAccent.withOpacity(0.28)),
         boxShadow: [
           BoxShadow(
             color: Colors.blueAccent.withOpacity(0.20),
@@ -462,7 +458,7 @@ Future<List<String>> getClientesPermitidosPorRol({
               Text(
                 "CARTERA ACTIVA",
                 style: TextStyle(
-                  color: Colors.white.withOpacity(0.72),
+                  color: const Color(0xFF53627A),
                   fontSize: 12,
                   fontWeight: FontWeight.w900,
                   letterSpacing: 0.8,
@@ -472,7 +468,7 @@ Future<List<String>> getClientesPermitidosPorRol({
               Text(
                 "$totalFiltrado",
                 style: const TextStyle(
-                  color: Colors.white,
+                  color: const Color(0xFF071A3A),
                   fontSize: 54,
                   fontWeight: FontWeight.w900,
                   letterSpacing: -2,
@@ -484,7 +480,7 @@ Future<List<String>> getClientesPermitidosPorRol({
                     ? "clientes registrados"
                     : "clientes según filtros",
                 style: TextStyle(
-                  color: Colors.white.withOpacity(0.60),
+                  color: const Color(0xFF53627A),
                   fontSize: 14,
                   fontWeight: FontWeight.w700,
                 ),
@@ -500,7 +496,9 @@ Future<List<String>> getClientesPermitidosPorRol({
                   const SizedBox(width: 8),
                   _summaryChip(
                     Icons.calendar_month_rounded,
-                    selectedMonth == 'Todos' ? "Todos los meses" : selectedMonth,
+                    selectedMonth == 'Todos'
+                        ? "Todos los meses"
+                        : selectedMonth,
                     Colors.purpleAccent,
                   ),
                 ],
@@ -519,9 +517,7 @@ Future<List<String>> getClientesPermitidosPorRol({
         decoration: BoxDecoration(
           color: color.withOpacity(0.13),
           borderRadius: BorderRadius.circular(40),
-          border: Border.all(
-            color: color.withOpacity(0.25),
-          ),
+          border: Border.all(color: color.withOpacity(0.25)),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -549,14 +545,14 @@ Future<List<String>> getClientesPermitidosPorRol({
     return TextField(
       onChanged: (v) => setState(() => searchText = v),
       style: const TextStyle(
-        color: Colors.white,
+        color: const Color(0xFF071A3A),
         fontWeight: FontWeight.w700,
       ),
       cursorColor: Colors.cyanAccent,
       decoration: InputDecoration(
         hintText: "Buscar por nombre, teléfono o email...",
         hintStyle: TextStyle(
-          color: Colors.white.withOpacity(0.42),
+          color: const Color(0xFF53627A),
           fontWeight: FontWeight.w600,
         ),
         prefixIcon: Icon(
@@ -571,26 +567,22 @@ Future<List<String>> getClientesPermitidosPorRol({
                 },
                 icon: const Icon(
                   Icons.close_rounded,
-                  color: Colors.white70,
+                  color: const Color(0xFF53627A),
                 ),
               ),
         filled: true,
-        fillColor: Colors.white.withOpacity(0.07),
+        fillColor: Colors.white,
         contentPadding: const EdgeInsets.symmetric(
           horizontal: 18,
           vertical: 18,
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(22),
-          borderSide: BorderSide(
-            color: Colors.white.withOpacity(0.08),
-          ),
+          borderSide: BorderSide(color: Colors.white),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(22),
-          borderSide: BorderSide(
-            color: Colors.cyanAccent.withOpacity(0.45),
-          ),
+          borderSide: BorderSide(color: Colors.cyanAccent.withOpacity(0.45)),
         ),
       ),
     );
@@ -643,10 +635,8 @@ Future<List<String>> getClientesPermitidosPorRol({
       padding: const EdgeInsets.symmetric(horizontal: 13),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(20),
-        color: Colors.white.withOpacity(0.065),
-        border: Border.all(
-          color: color.withOpacity(0.18),
-        ),
+        color: Colors.white,
+        border: Border.all(color: color.withOpacity(0.18)),
       ),
       child: Row(
         children: [
@@ -657,13 +647,10 @@ Future<List<String>> getClientesPermitidosPorRol({
               child: DropdownButton<String>(
                 value: value,
                 isExpanded: true,
-                dropdownColor: const Color(0xFF071421),
-                icon: Icon(
-                  Icons.keyboard_arrow_down_rounded,
-                  color: color,
-                ),
+                dropdownColor: const Color(0xFFFFFFFF),
+                icon: Icon(Icons.keyboard_arrow_down_rounded, color: color),
                 style: const TextStyle(
-                  color: Colors.white,
+                  color: const Color(0xFF071A3A),
                   fontWeight: FontWeight.w800,
                   fontSize: 13,
                 ),
@@ -699,11 +686,9 @@ Future<List<String>> getClientesPermitidosPorRol({
           width: double.infinity,
           padding: const EdgeInsets.all(26),
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.06),
+            color: Colors.white,
             borderRadius: BorderRadius.circular(30),
-            border: Border.all(
-              color: Colors.white.withOpacity(0.09),
-            ),
+            border: Border.all(color: Colors.white),
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -714,7 +699,7 @@ Future<List<String>> getClientesPermitidosPorRol({
                 title,
                 textAlign: TextAlign.center,
                 style: const TextStyle(
-                  color: Colors.white,
+                  color: const Color(0xFF071A3A),
                   fontSize: 20,
                   fontWeight: FontWeight.w900,
                 ),
@@ -724,7 +709,7 @@ Future<List<String>> getClientesPermitidosPorRol({
                 subtitle,
                 textAlign: TextAlign.center,
                 style: TextStyle(
-                  color: Colors.white.withOpacity(0.58),
+                  color: const Color(0xFF53627A),
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
                   height: 1.35,
@@ -748,9 +733,7 @@ Future<List<String>> getClientesPermitidosPorRol({
         : "$nombre $apellidos".trim();
 
     final rawDate = c['created_at'];
-    final date = rawDate == null
-        ? null
-        : DateTime.tryParse(rawDate.toString());
+    final date = rawDate == null ? null : DateTime.tryParse(rawDate.toString());
 
     final color = _cardColor(index);
 
@@ -772,11 +755,9 @@ Future<List<String>> getClientesPermitidosPorRol({
           margin: const EdgeInsets.only(bottom: 14),
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.055),
+            color: Colors.white,
             borderRadius: BorderRadius.circular(26),
-            border: Border.all(
-              color: Colors.white.withOpacity(0.08),
-            ),
+            border: Border.all(color: Colors.white),
             boxShadow: [
               BoxShadow(
                 color: Colors.black.withOpacity(0.16),
@@ -798,7 +779,7 @@ Future<List<String>> getClientesPermitidosPorRol({
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
-                        color: Colors.white,
+                        color: const Color(0xFF071A3A),
                         fontSize: 16,
                         fontWeight: FontWeight.w900,
                       ),
@@ -811,11 +792,7 @@ Future<List<String>> getClientesPermitidosPorRol({
                         Colors.greenAccent,
                       ),
                     if (email.isNotEmpty)
-                      _infoLine(
-                        Icons.mail_rounded,
-                        email,
-                        Colors.cyanAccent,
-                      ),
+                      _infoLine(Icons.mail_rounded, email, Colors.cyanAccent),
                     if (date != null)
                       _infoLine(
                         Icons.event_rounded,
@@ -853,9 +830,7 @@ Future<List<String>> getClientesPermitidosPorRol({
             Colors.white.withOpacity(0.03),
           ],
         ),
-        border: Border.all(
-          color: color.withOpacity(0.36),
-        ),
+        border: Border.all(color: color.withOpacity(0.36)),
         boxShadow: [
           BoxShadow(
             color: color.withOpacity(0.18),
@@ -890,7 +865,7 @@ Future<List<String>> getClientesPermitidosPorRol({
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
-                color: Colors.white.withOpacity(0.58),
+                color: const Color(0xFF53627A),
                 fontSize: 12,
                 fontWeight: FontWeight.w600,
               ),
@@ -914,9 +889,7 @@ Future<List<String>> getClientesPermitidosPorRol({
             Colors.white.withOpacity(0.025),
           ],
         ),
-        border: Border.all(
-          color: color.withOpacity(0.35),
-        ),
+        border: Border.all(color: color.withOpacity(0.35)),
         boxShadow: [
           BoxShadow(
             color: color.withOpacity(0.18),
@@ -925,11 +898,7 @@ Future<List<String>> getClientesPermitidosPorRol({
           ),
         ],
       ),
-      child: Icon(
-        icon,
-        color: color,
-        size: size * 0.48,
-      ),
+      child: Icon(icon, color: color, size: size * 0.48),
     );
   }
 
@@ -958,11 +927,7 @@ class _ClientsPremiumBackground extends StatelessWidget {
             gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
-              colors: [
-                Color(0xFF050B12),
-                Color(0xFF071A2E),
-                Color(0xFF050B12),
-              ],
+              colors: [Color(0xFFF2FCFD), Color(0xFFFFFFFF), Color(0xFFF2FCFD)],
             ),
           ),
         ),
@@ -983,9 +948,7 @@ class _ClientsPremiumBackground extends StatelessWidget {
         ),
         BackdropFilter(
           filter: ImageFilter.blur(sigmaX: 60, sigmaY: 60),
-          child: Container(
-            color: Colors.black.withOpacity(0.05),
-          ),
+          child: Container(color: Colors.black.withOpacity(0.05)),
         ),
       ],
     );

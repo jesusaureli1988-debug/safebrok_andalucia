@@ -1,14 +1,14 @@
 # Compilación y entrega iOS de SafeBrok
 
-Estado preparado: versión `1.1.0`, build `8`, Bundle ID `com.safebrok`, iOS mínimo 13.0.
+Estado preparado: versión `1.1.1`, build `10`, Bundle ID `com.safebrok`, iOS mínimo 15.0.
 
 ## Flujo principal: Codemagic
 
 El repositorio ya contiene el workflow `ios-release`, que reutiliza la integración `Codemagic Safebrok`, el perfil `safebrok_appstore_push` y el certificado `safebrok_distribution` usados por la versión anterior.
 
-El workflow ejecuta paquetes, análisis, pruebas de roles, CocoaPods, asignación de perfiles, compilación firmada del IPA y publicación en App Store Connect. La build configurada es la 8.
+El workflow ejecuta paquetes, análisis, pruebas de roles, CocoaPods, asignación de perfiles, compilación firmada del IPA y publicación en App Store Connect. La build configurada es la 10.
 
-Antes de iniciarlo, confirmar en Codemagic que el certificado y el perfil no estén caducados. Si la build 8 ya aparece en App Store Connect, cambiar `--build-number` en `codemagic.yaml` y `pubspec.yaml` al siguiente número.
+Antes de iniciarlo, confirmar en Codemagic que el certificado y el perfil no estén caducados. Si la build 10 ya aparece en App Store Connect, cambiar `--build-number` en `codemagic.yaml` y `pubspec.yaml` al siguiente número.
 
 ## Alternativa: preparar el proyecto en un Mac
 
@@ -21,7 +21,7 @@ pod install --repo-update
 cd ..
 flutter test
 flutter analyze
-flutter build ipa --release --build-name=1.1.0 --build-number=8
+flutter build ipa --release --build-name=1.1.1 --build-number=10
 open ios/Runner.xcworkspace
 ```
 
@@ -37,7 +37,7 @@ No abrir `Runner.xcodeproj`: con CocoaPods debe abrirse `Runner.xcworkspace`.
 6. En Organizer, ejecutar primero `Validate App` y resolver todos los errores y avisos relevantes.
 7. Elegir `Distribute App > App Store Connect > Upload`.
 
-Si el build 8 ya existe en App Store Connect, incrementar el número sin cambiar la versión, por ejemplo `--build-number=9`.
+Si el build 10 ya existe en App Store Connect, incrementar el número sin cambiar la versión, por ejemplo `--build-number=11`.
 
 ## App Store Connect
 

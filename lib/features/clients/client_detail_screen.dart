@@ -1,4 +1,5 @@
 import 'dart:ui';
+import 'package:safebrok_andalucia/core/production/premium_weighting.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -7,10 +8,7 @@ import '../sales/create_sale_wizard.dart';
 class ClientDetailScreen extends StatefulWidget {
   final String clientId;
 
-  const ClientDetailScreen({
-    super.key,
-    required this.clientId,
-  });
+  const ClientDetailScreen({super.key, required this.clientId});
 
   @override
   State<ClientDetailScreen> createState() => _ClientDetailScreenState();
@@ -79,14 +77,9 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> {
   }
 
   double get totalEuros {
-    return ventas.fold<double>(
-      0,
-      (sum, v) {
-        final value = v['precio'];
-        if (value is num) return sum + value.toDouble();
-        return sum + (double.tryParse(value?.toString() ?? '0') ?? 0);
-      },
-    );
+    return ventas.fold<double>(0, (sum, v) {
+      return sum + PremiumWeighting.amount(v, v['precio']);
+    });
   }
 
   int get totalProductos {
@@ -122,11 +115,11 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF07111B),
+      backgroundColor: const Color(0xFFF2FCFD),
       floatingActionButton: client == null
           ? null
           : FloatingActionButton.extended(
-              backgroundColor: const Color(0xFF2563EB),
+              backgroundColor: const Color(0xFF0A7F91),
               foregroundColor: Colors.white,
               elevation: 12,
               icon: const Icon(Icons.add_rounded),
@@ -138,9 +131,7 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> {
                 await Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (_) => CreateSaleWizard(
-                      clientId: widget.clientId,
-                    ),
+                    builder: (_) => CreateSaleWizard(clientId: widget.clientId),
                   ),
                 );
 
@@ -182,81 +173,81 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> {
                     child: CircularProgressIndicator(color: Colors.white),
                   )
                 : client == null
-                    ? _NotFoundState(
-                        message: errorMessage ?? "Cliente no encontrado",
-                        onRetry: () => loadData(),
-                      )
-                    : RefreshIndicator(
-                        color: const Color(0xFF38BDF8),
-                        backgroundColor: const Color(0xFF0F172A),
-                        onRefresh: () => loadData(isRefresh: true),
-                        child: ListView(
-                          physics: const AlwaysScrollableScrollPhysics(),
-                          padding: const EdgeInsets.fromLTRB(20, 12, 20, 100),
-                          children: [
-                            _ClientHeaderCard(
-                              initial: initial,
-                              name: clientName,
-                              phone: _text(client!['telefono']),
-                              email: _text(client!['email']),
+                ? _NotFoundState(
+                    message: errorMessage ?? "Cliente no encontrado",
+                    onRetry: () => loadData(),
+                  )
+                : RefreshIndicator(
+                    color: const Color(0xFF20C7C2),
+                    backgroundColor: const Color(0xFFEAF8F8),
+                    onRefresh: () => loadData(isRefresh: true),
+                    child: ListView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      padding: const EdgeInsets.fromLTRB(20, 12, 20, 100),
+                      children: [
+                        _ClientHeaderCard(
+                          initial: initial,
+                          name: clientName,
+                          phone: _text(client!['telefono']),
+                          email: _text(client!['email']),
+                        ),
+                        if (errorMessage != null) ...[
+                          const SizedBox(height: 16),
+                          _ErrorBox(
+                            message: errorMessage!,
+                            onRetry: () => loadData(),
+                          ),
+                        ],
+                        const SizedBox(height: 18),
+                        _KpiGrid(
+                          ventas: ventas.length,
+                          totalEuros: totalEuros,
+                          productos: totalProductos,
+                        ),
+                        const SizedBox(height: 24),
+                        _SectionTitle(
+                          title: "Información del cliente",
+                          subtitle: "Datos principales de contacto",
+                        ),
+                        const SizedBox(height: 12),
+                        _InfoPanel(
+                          rows: [
+                            _InfoRowData(
+                              icon: Icons.phone_rounded,
+                              label: "Teléfono",
+                              value: _text(client!['telefono']),
                             ),
-                            if (errorMessage != null) ...[
-                              const SizedBox(height: 16),
-                              _ErrorBox(
-                                message: errorMessage!,
-                                onRetry: () => loadData(),
-                              ),
-                            ],
-                            const SizedBox(height: 18),
-                            _KpiGrid(
-                              ventas: ventas.length,
-                              totalEuros: totalEuros,
-                              productos: totalProductos,
+                            _InfoRowData(
+                              icon: Icons.email_rounded,
+                              label: "Email",
+                              value: _text(client!['email']),
                             ),
-                            const SizedBox(height: 24),
-                            _SectionTitle(
-                              title: "Información del cliente",
-                              subtitle: "Datos principales de contacto",
+                            _InfoRowData(
+                              icon: Icons.badge_rounded,
+                              label: "DNI",
+                              value: _text(client!['dni']),
                             ),
-                            const SizedBox(height: 12),
-                            _InfoPanel(
-                              rows: [
-                                _InfoRowData(
-                                  icon: Icons.phone_rounded,
-                                  label: "Teléfono",
-                                  value: _text(client!['telefono']),
-                                ),
-                                _InfoRowData(
-                                  icon: Icons.email_rounded,
-                                  label: "Email",
-                                  value: _text(client!['email']),
-                                ),
-                                _InfoRowData(
-                                  icon: Icons.badge_rounded,
-                                  label: "DNI",
-                                  value: _text(client!['dni']),
-                                ),
-                                _InfoRowData(
-                                  icon: Icons.location_on_rounded,
-                                  label: "Dirección",
-                                  value: _text(client!['direccion']),
-                                ),
-                              ],
+                            _InfoRowData(
+                              icon: Icons.location_on_rounded,
+                              label: "Dirección",
+                              value: _text(client!['direccion']),
                             ),
-                            const SizedBox(height: 24),
-                            _SectionTitle(
-                              title: "Pólizas",
-                              subtitle:
-                                  "${ventas.length} pólizas registradas en la ficha",
-                            ),
-                            const SizedBox(height: 12),
-                            if (ventas.isEmpty)
-                              const _EmptySalesState()
-                            else
-                              ...ventas.map((v) => _SaleCard(v: v)),
                           ],
                         ),
-                      ),
+                        const SizedBox(height: 24),
+                        _SectionTitle(
+                          title: "Pólizas",
+                          subtitle:
+                              "${ventas.length} pólizas registradas en la ficha",
+                        ),
+                        const SizedBox(height: 12),
+                        if (ventas.isEmpty)
+                          const _EmptySalesState()
+                        else
+                          ...ventas.map((v) => _SaleCard(v: v)),
+                      ],
+                    ),
+                  ),
           ),
         ],
       ),
@@ -276,11 +267,7 @@ class _PremiumBackground extends StatelessWidget {
             gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
-              colors: [
-                Color(0xFF07111B),
-                Color(0xFF0B1F2E),
-                Color(0xFF12384E),
-              ],
+              colors: [Color(0xFFF2FCFD), Color(0xFFFFFFFF), Color(0xFFFFFFFF)],
             ),
           ),
         ),
@@ -289,7 +276,7 @@ class _PremiumBackground extends StatelessWidget {
           right: -80,
           child: _GlowCircle(
             size: 230,
-            color: const Color(0xFF38BDF8).withOpacity(0.24),
+            color: const Color(0xFF20C7C2).withOpacity(0.24),
           ),
         ),
         Positioned(
@@ -297,14 +284,12 @@ class _PremiumBackground extends StatelessWidget {
           left: -90,
           child: _GlowCircle(
             size: 260,
-            color: const Color(0xFF22C55E).withOpacity(0.16),
+            color: const Color(0xFF0AAEAE).withOpacity(0.16),
           ),
         ),
         BackdropFilter(
           filter: ImageFilter.blur(sigmaX: 34, sigmaY: 34),
-          child: Container(
-            color: Colors.black.withOpacity(0.08),
-          ),
+          child: Container(color: Colors.black.withOpacity(0.08)),
         ),
       ],
     );
@@ -315,20 +300,14 @@ class _GlowCircle extends StatelessWidget {
   final double size;
   final Color color;
 
-  const _GlowCircle({
-    required this.size,
-    required this.color,
-  });
+  const _GlowCircle({required this.size, required this.color});
 
   @override
   Widget build(BuildContext context) {
     return Container(
       width: size,
       height: size,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: color,
-      ),
+      decoration: BoxDecoration(shape: BoxShape.circle, color: color),
     );
   }
 }
@@ -355,10 +334,8 @@ class _ClientHeaderCard extends StatelessWidget {
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(30),
-        color: Colors.white.withOpacity(0.08),
-        border: Border.all(
-          color: Colors.white.withOpacity(0.10),
-        ),
+        color: Colors.white,
+        border: Border.all(color: Colors.white),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.28),
@@ -375,14 +352,11 @@ class _ClientHeaderCard extends StatelessWidget {
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               gradient: const LinearGradient(
-                colors: [
-                  Color(0xFF2563EB),
-                  Color(0xFF38BDF8),
-                ],
+                colors: [Color(0xFF0A7F91), Color(0xFF20C7C2)],
               ),
               boxShadow: [
                 BoxShadow(
-                  color: const Color(0xFF38BDF8).withOpacity(0.22),
+                  color: const Color(0xFF20C7C2).withOpacity(0.22),
                   blurRadius: 22,
                   offset: const Offset(0, 10),
                 ),
@@ -392,7 +366,7 @@ class _ClientHeaderCard extends StatelessWidget {
               child: Text(
                 initial,
                 style: const TextStyle(
-                  color: Colors.white,
+                  color: const Color(0xFF071A3A),
                   fontSize: 25,
                   fontWeight: FontWeight.w900,
                 ),
@@ -411,7 +385,7 @@ class _ClientHeaderCard extends StatelessWidget {
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
-                    color: Colors.white,
+                    color: const Color(0xFF071A3A),
                     fontSize: 20,
                     fontWeight: FontWeight.w900,
                     letterSpacing: -0.5,
@@ -444,21 +418,16 @@ class _StatusChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: 10,
-        vertical: 5,
-      ),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
-        color: const Color(0xFF22C55E).withOpacity(0.14),
+        color: const Color(0xFF0AAEAE).withOpacity(0.14),
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(
-          color: const Color(0xFF22C55E).withOpacity(0.28),
-        ),
+        border: Border.all(color: const Color(0xFF0AAEAE).withOpacity(0.28)),
       ),
       child: const Text(
         "CLIENTE ACTIVO",
         style: TextStyle(
-          color: Color(0xFFBBF7D0),
+          color: Color(0xFFEAF8F8),
           fontSize: 11,
           fontWeight: FontWeight.w900,
           letterSpacing: 0.4,
@@ -473,11 +442,7 @@ class _MiniLine extends StatelessWidget {
   final String text;
   final bool muted;
 
-  const _MiniLine({
-    required this.icon,
-    required this.text,
-    this.muted = false,
-  });
+  const _MiniLine({required this.icon, required this.text, this.muted = false});
 
   @override
   Widget build(BuildContext context) {
@@ -488,7 +453,7 @@ class _MiniLine extends StatelessWidget {
           size: 15,
           color: muted
               ? Colors.white.withOpacity(0.28)
-              : const Color(0xFF7DD3FC),
+              : const Color(0xFF20C7C2),
         ),
         const SizedBox(width: 7),
         Expanded(
@@ -569,26 +534,20 @@ class _KpiCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.fromLTRB(12, 14, 12, 14),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.075),
+        color: Colors.white,
         borderRadius: BorderRadius.circular(22),
-        border: Border.all(
-          color: Colors.white.withOpacity(0.10),
-        ),
+        border: Border.all(color: Colors.white),
       ),
       child: Column(
         children: [
-          Icon(
-            icon,
-            color: const Color(0xFF7DD3FC),
-            size: 24,
-          ),
+          Icon(icon, color: const Color(0xFF20C7C2), size: 24),
           const SizedBox(height: 9),
           Text(
             value,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: const TextStyle(
-              color: Colors.white,
+              color: const Color(0xFF071A3A),
               fontSize: 18,
               fontWeight: FontWeight.w900,
             ),
@@ -599,7 +558,7 @@ class _KpiCard extends StatelessWidget {
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
-              color: Colors.white.withOpacity(0.55),
+              color: const Color(0xFF53627A),
               fontSize: 11.5,
               fontWeight: FontWeight.w700,
             ),
@@ -614,10 +573,7 @@ class _SectionTitle extends StatelessWidget {
   final String title;
   final String subtitle;
 
-  const _SectionTitle({
-    required this.title,
-    required this.subtitle,
-  });
+  const _SectionTitle({required this.title, required this.subtitle});
 
   @override
   Widget build(BuildContext context) {
@@ -627,7 +583,7 @@ class _SectionTitle extends StatelessWidget {
         Text(
           title,
           style: const TextStyle(
-            color: Colors.white,
+            color: const Color(0xFF071A3A),
             fontSize: 19,
             fontWeight: FontWeight.w900,
             letterSpacing: -0.4,
@@ -637,7 +593,7 @@ class _SectionTitle extends StatelessWidget {
         Text(
           subtitle,
           style: TextStyle(
-            color: Colors.white.withOpacity(0.55),
+            color: const Color(0xFF53627A),
             fontSize: 13,
             fontWeight: FontWeight.w500,
           ),
@@ -662,29 +618,21 @@ class _InfoRowData {
 class _InfoPanel extends StatelessWidget {
   final List<_InfoRowData> rows;
 
-  const _InfoPanel({
-    required this.rows,
-  });
+  const _InfoPanel({required this.rows});
 
   @override
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.075),
+        color: Colors.white,
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(
-          color: Colors.white.withOpacity(0.10),
-        ),
+        border: Border.all(color: Colors.white),
       ),
       child: Column(
         children: [
           for (int i = 0; i < rows.length; i++) ...[
             _InfoRow(row: rows[i]),
-            if (i != rows.length - 1)
-              Divider(
-                height: 1,
-                color: Colors.white.withOpacity(0.08),
-              ),
+            if (i != rows.length - 1) Divider(height: 1, color: Colors.white),
           ],
         ],
       ),
@@ -695,26 +643,21 @@ class _InfoPanel extends StatelessWidget {
 class _InfoRow extends StatelessWidget {
   final _InfoRowData row;
 
-  const _InfoRow({
-    required this.row,
-  });
+  const _InfoRow({required this.row});
 
   @override
   Widget build(BuildContext context) {
     final muted = row.value == "No informado";
 
     return Padding(
-      padding: const EdgeInsets.symmetric(
-        horizontal: 15,
-        vertical: 14,
-      ),
+      padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 14),
       child: Row(
         children: [
           Icon(
             row.icon,
             color: muted
                 ? Colors.white.withOpacity(0.30)
-                : const Color(0xFF7DD3FC),
+                : const Color(0xFF20C7C2),
             size: 21,
           ),
           const SizedBox(width: 12),
@@ -722,7 +665,7 @@ class _InfoRow extends StatelessWidget {
             child: Text(
               row.label,
               style: TextStyle(
-                color: Colors.white.withOpacity(0.55),
+                color: const Color(0xFF53627A),
                 fontSize: 13,
                 fontWeight: FontWeight.w700,
               ),
@@ -753,9 +696,7 @@ class _InfoRow extends StatelessWidget {
 class _SaleCard extends StatelessWidget {
   final Map<String, dynamic> v;
 
-  const _SaleCard({
-    required this.v,
-  });
+  const _SaleCard({required this.v});
 
   String _text(dynamic value, {String fallback = "No informado"}) {
     final text = (value ?? '').toString().trim();
@@ -780,11 +721,9 @@ class _SaleCard extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 14),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.075),
+        color: Colors.white,
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(
-          color: Colors.white.withOpacity(0.10),
-        ),
+        border: Border.all(color: Colors.white),
       ),
       child: Row(
         children: [
@@ -794,16 +733,10 @@ class _SaleCard extends StatelessWidget {
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(18),
               gradient: const LinearGradient(
-                colors: [
-                  Color(0xFF22C55E),
-                  Color(0xFF38BDF8),
-                ],
+                colors: [Color(0xFF0AAEAE), Color(0xFF20C7C2)],
               ),
             ),
-            child: const Icon(
-              Icons.shield_rounded,
-              color: Colors.white,
-            ),
+            child: const Icon(Icons.shield_rounded, color: Colors.white),
           ),
           const SizedBox(width: 14),
           Expanded(
@@ -815,7 +748,7 @@ class _SaleCard extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
-                    color: Colors.white,
+                    color: const Color(0xFF071A3A),
                     fontSize: 16,
                     fontWeight: FontWeight.w900,
                   ),
@@ -826,7 +759,7 @@ class _SaleCard extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    color: Colors.white.withOpacity(0.58),
+                    color: const Color(0xFF53627A),
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
                   ),
@@ -836,21 +769,18 @@ class _SaleCard extends StatelessWidget {
           ),
           const SizedBox(width: 12),
           Container(
-            padding: const EdgeInsets.symmetric(
-              horizontal: 11,
-              vertical: 8,
-            ),
+            padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 8),
             decoration: BoxDecoration(
-              color: const Color(0xFF38BDF8).withOpacity(0.13),
+              color: const Color(0xFF20C7C2).withOpacity(0.13),
               borderRadius: BorderRadius.circular(999),
               border: Border.all(
-                color: const Color(0xFF38BDF8).withOpacity(0.25),
+                color: const Color(0xFF20C7C2).withOpacity(0.25),
               ),
             ),
             child: Text(
               precio,
               style: const TextStyle(
-                color: Color(0xFFBAE6FD),
+                color: Color(0xFFEAF8F8),
                 fontSize: 13,
                 fontWeight: FontWeight.w900,
               ),
@@ -870,11 +800,9 @@ class _EmptySalesState extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(26),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.065),
+        color: Colors.white,
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(
-          color: Colors.white.withOpacity(0.08),
-        ),
+        border: Border.all(color: Colors.white),
       ),
       child: Column(
         children: [
@@ -887,7 +815,7 @@ class _EmptySalesState extends StatelessWidget {
           const Text(
             "Sin pólizas registradas",
             style: TextStyle(
-              color: Colors.white,
+              color: const Color(0xFF071A3A),
               fontSize: 17,
               fontWeight: FontWeight.w900,
             ),
@@ -897,7 +825,7 @@ class _EmptySalesState extends StatelessWidget {
             "Pulsa en “Nueva póliza” para crear la primera venta de este cliente.",
             textAlign: TextAlign.center,
             style: TextStyle(
-              color: Colors.white.withOpacity(0.55),
+              color: const Color(0xFF53627A),
               fontSize: 13,
               height: 1.4,
             ),
@@ -912,10 +840,7 @@ class _NotFoundState extends StatelessWidget {
   final String message;
   final VoidCallback onRetry;
 
-  const _NotFoundState({
-    required this.message,
-    required this.onRetry,
-  });
+  const _NotFoundState({required this.message, required this.onRetry});
 
   @override
   Widget build(BuildContext context) {
@@ -935,7 +860,7 @@ class _NotFoundState extends StatelessWidget {
               message,
               textAlign: TextAlign.center,
               style: const TextStyle(
-                color: Colors.white,
+                color: const Color(0xFF071A3A),
                 fontSize: 18,
                 fontWeight: FontWeight.w900,
               ),
@@ -957,10 +882,7 @@ class _ErrorBox extends StatelessWidget {
   final String message;
   final VoidCallback onRetry;
 
-  const _ErrorBox({
-    required this.message,
-    required this.onRetry,
-  });
+  const _ErrorBox({required this.message, required this.onRetry});
 
   @override
   Widget build(BuildContext context) {
@@ -969,30 +891,22 @@ class _ErrorBox extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.redAccent.withOpacity(0.12),
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: Colors.redAccent.withOpacity(0.25),
-        ),
+        border: Border.all(color: Colors.redAccent.withOpacity(0.25)),
       ),
       child: Row(
         children: [
-          const Icon(
-            Icons.error_outline_rounded,
-            color: Colors.redAccent,
-          ),
+          const Icon(Icons.error_outline_rounded, color: Colors.redAccent),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
               message,
               style: const TextStyle(
-                color: Colors.white,
+                color: const Color(0xFF071A3A),
                 fontWeight: FontWeight.w700,
               ),
             ),
           ),
-          TextButton(
-            onPressed: onRetry,
-            child: const Text("Reintentar"),
-          ),
+          TextButton(onPressed: onRetry, child: const Text("Reintentar")),
         ],
       ),
     );

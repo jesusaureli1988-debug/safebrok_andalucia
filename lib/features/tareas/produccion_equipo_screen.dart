@@ -1,5 +1,6 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import '../../core/production/premium_weighting.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class ProduccionEquipoScreen extends StatefulWidget {
@@ -55,6 +56,9 @@ class _ProduccionEquipoScreenState extends State<ProduccionEquipoScreen> {
       final jefe = await supabase
           .from('usuarios')
           .select('id')
+          .or(
+            'estado.is.null,estado.not.in.(inactivo,Inactivo,INACTIVO,baja,Baja,BAJA,desactivado,Desactivado,DESACTIVADO,bloqueado,Bloqueado,BLOQUEADO,suspendido,Suspendido,SUSPENDIDO)',
+          )
           .eq('auth_id', user.id)
           .maybeSingle();
 
@@ -73,6 +77,9 @@ class _ProduccionEquipoScreenState extends State<ProduccionEquipoScreen> {
       final agentes = await supabase
           .from('usuarios')
           .select('auth_id,nombre')
+          .or(
+            'estado.is.null,estado.not.in.(inactivo,Inactivo,INACTIVO,baja,Baja,BAJA,desactivado,Desactivado,DESACTIVADO,bloqueado,Bloqueado,BLOQUEADO,suspendido,Suspendido,SUSPENDIDO)',
+          )
           .eq('parent_id', jefeId)
           .order('nombre', ascending: true);
 
@@ -92,7 +99,7 @@ class _ProduccionEquipoScreenState extends State<ProduccionEquipoScreen> {
 
       final ventas = await supabase
           .from('ventas')
-          .select('agente_auth_id, prima_anual_neta, fecha_efecto')
+          .select('agente_auth_id, prima_anual_neta, producto, fecha_efecto')
           .inFilter('agente_auth_id', agentesIds);
 
       double total = 0;
@@ -102,10 +109,7 @@ class _ProduccionEquipoScreenState extends State<ProduccionEquipoScreen> {
       final ahora = DateTime.now();
 
       for (final venta in ventas) {
-        final primaRaw = venta['prima_anual_neta'];
-        final prima = primaRaw is num
-            ? primaRaw.toDouble()
-            : double.tryParse(primaRaw?.toString() ?? '0') ?? 0;
+        final prima = PremiumWeighting.net(Map<String, dynamic>.from(venta));
 
         total += prima;
 
@@ -138,9 +142,7 @@ class _ProduccionEquipoScreenState extends State<ProduccionEquipoScreen> {
         });
       }
 
-      rankingTemp.sort(
-        (a, b) => b['produccion'].compareTo(a['produccion']),
-      );
+      rankingTemp.sort((a, b) => b['produccion'].compareTo(a['produccion']));
 
       if (!mounted) return;
 
@@ -177,14 +179,14 @@ class _ProduccionEquipoScreenState extends State<ProduccionEquipoScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF07111B),
+      backgroundColor: const Color(0xFFF2FCFD),
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
         title: const Text(
           "Producción equipo",
           style: TextStyle(
-            color: Colors.white,
+            color: const Color(0xFF071A3A),
             fontWeight: FontWeight.w900,
             letterSpacing: -0.4,
           ),
@@ -212,8 +214,8 @@ class _ProduccionEquipoScreenState extends State<ProduccionEquipoScreen> {
                     child: CircularProgressIndicator(color: Colors.white),
                   )
                 : RefreshIndicator(
-                    color: const Color(0xFF38BDF8),
-                    backgroundColor: const Color(0xFF0F172A),
+                    color: const Color(0xFF20C7C2),
+                    backgroundColor: const Color(0xFFEAF8F8),
                     onRefresh: () => cargarDatos(isRefresh: true),
                     child: ListView(
                       physics: const AlwaysScrollableScrollPhysics(),
@@ -247,13 +249,13 @@ class _ProduccionEquipoScreenState extends State<ProduccionEquipoScreen> {
                           const _EmptyState()
                         else
                           ...ranking.asMap().entries.map(
-                                (entry) => _RankingCard(
-                                  position: entry.key + 1,
-                                  nombre: entry.value['nombre'],
-                                  produccion: entry.value['produccion'],
-                                  maxProduccion: mejorProduccion,
-                                ),
-                              ),
+                            (entry) => _RankingCard(
+                              position: entry.key + 1,
+                              nombre: entry.value['nombre'],
+                              produccion: entry.value['produccion'],
+                              maxProduccion: mejorProduccion,
+                            ),
+                          ),
                       ],
                     ),
                   ),
@@ -276,11 +278,7 @@ class _PremiumBackground extends StatelessWidget {
             gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
-              colors: [
-                Color(0xFF07111B),
-                Color(0xFF0B1F2E),
-                Color(0xFF12384E),
-              ],
+              colors: [Color(0xFFF2FCFD), Color(0xFFFFFFFF), Color(0xFFFFFFFF)],
             ),
           ),
         ),
@@ -289,7 +287,7 @@ class _PremiumBackground extends StatelessWidget {
           right: -80,
           child: _GlowCircle(
             size: 230,
-            color: const Color(0xFF38BDF8).withOpacity(0.24),
+            color: const Color(0xFF20C7C2).withOpacity(0.24),
           ),
         ),
         Positioned(
@@ -297,14 +295,12 @@ class _PremiumBackground extends StatelessWidget {
           left: -90,
           child: _GlowCircle(
             size: 260,
-            color: const Color(0xFF22C55E).withOpacity(0.16),
+            color: const Color(0xFF0AAEAE).withOpacity(0.16),
           ),
         ),
         BackdropFilter(
           filter: ImageFilter.blur(sigmaX: 34, sigmaY: 34),
-          child: Container(
-            color: Colors.black.withOpacity(0.08),
-          ),
+          child: Container(color: Colors.black.withOpacity(0.08)),
         ),
       ],
     );
@@ -315,20 +311,14 @@ class _GlowCircle extends StatelessWidget {
   final double size;
   final Color color;
 
-  const _GlowCircle({
-    required this.size,
-    required this.color,
-  });
+  const _GlowCircle({required this.size, required this.color});
 
   @override
   Widget build(BuildContext context) {
     return Container(
       width: size,
       height: size,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: color,
-      ),
+      decoration: BoxDecoration(shape: BoxShape.circle, color: color),
     );
   }
 }
@@ -337,10 +327,7 @@ class _HeaderCard extends StatelessWidget {
   final double produccionEquipo;
   final int ventasHoy;
 
-  const _HeaderCard({
-    required this.produccionEquipo,
-    required this.ventasHoy,
-  });
+  const _HeaderCard({required this.produccionEquipo, required this.ventasHoy});
 
   @override
   Widget build(BuildContext context) {
@@ -348,10 +335,8 @@ class _HeaderCard extends StatelessWidget {
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(30),
-        color: Colors.white.withOpacity(0.08),
-        border: Border.all(
-          color: Colors.white.withOpacity(0.10),
-        ),
+        color: Colors.white,
+        border: Border.all(color: Colors.white),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.28),
@@ -371,10 +356,7 @@ class _HeaderCard extends StatelessWidget {
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(20),
                   gradient: const LinearGradient(
-                    colors: [
-                      Color(0xFF38BDF8),
-                      Color(0xFF2563EB),
-                    ],
+                    colors: [Color(0xFF20C7C2), Color(0xFF0A7F91)],
                   ),
                 ),
                 child: const Icon(
@@ -391,7 +373,7 @@ class _HeaderCard extends StatelessWidget {
                     Text(
                       "Producción total",
                       style: TextStyle(
-                        color: Colors.white60,
+                        color: const Color(0xFF64748B),
                         fontSize: 13,
                         fontWeight: FontWeight.w700,
                       ),
@@ -400,7 +382,7 @@ class _HeaderCard extends StatelessWidget {
                     Text(
                       "Equipo comercial",
                       style: TextStyle(
-                        color: Colors.white,
+                        color: const Color(0xFF071A3A),
                         fontSize: 20,
                         fontWeight: FontWeight.w900,
                         letterSpacing: -0.5,
@@ -415,17 +397,14 @@ class _HeaderCard extends StatelessWidget {
           Text(
             "${produccionEquipo.toStringAsFixed(0)} €",
             style: const TextStyle(
-              color: Colors.white,
+              color: const Color(0xFF071A3A),
               fontSize: 38,
               fontWeight: FontWeight.w900,
               letterSpacing: -1,
             ),
           ),
           const SizedBox(height: 10),
-          _MiniChip(
-            icon: Icons.today_rounded,
-            text: "$ventasHoy ventas hoy",
-          ),
+          _MiniChip(icon: Icons.today_rounded, text: "$ventasHoy ventas hoy"),
         ],
       ),
     );
@@ -436,38 +415,26 @@ class _MiniChip extends StatelessWidget {
   final IconData icon;
   final String text;
 
-  const _MiniChip({
-    required this.icon,
-    required this.text,
-  });
+  const _MiniChip({required this.icon, required this.text});
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: 11,
-        vertical: 7,
-      ),
+      padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
       decoration: BoxDecoration(
-        color: const Color(0xFF22C55E).withOpacity(0.14),
+        color: const Color(0xFF0AAEAE).withOpacity(0.14),
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(
-          color: const Color(0xFF22C55E).withOpacity(0.25),
-        ),
+        border: Border.all(color: const Color(0xFF0AAEAE).withOpacity(0.25)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(
-            icon,
-            color: const Color(0xFF86EFAC),
-            size: 15,
-          ),
+          Icon(icon, color: const Color(0xFF20C7C2), size: 15),
           const SizedBox(width: 6),
           Text(
             text,
             style: const TextStyle(
-              color: Color(0xFFBBF7D0),
+              color: Color(0xFFEAF8F8),
               fontSize: 12,
               fontWeight: FontWeight.w900,
             ),
@@ -539,26 +506,20 @@ class _KpiCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.fromLTRB(10, 14, 10, 14),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.075),
+        color: Colors.white,
         borderRadius: BorderRadius.circular(22),
-        border: Border.all(
-          color: Colors.white.withOpacity(0.10),
-        ),
+        border: Border.all(color: Colors.white),
       ),
       child: Column(
         children: [
-          Icon(
-            icon,
-            color: const Color(0xFF7DD3FC),
-            size: 23,
-          ),
+          Icon(icon, color: const Color(0xFF20C7C2), size: 23),
           const SizedBox(height: 8),
           Text(
             value,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: const TextStyle(
-              color: Colors.white,
+              color: const Color(0xFF071A3A),
               fontSize: 17,
               fontWeight: FontWeight.w900,
             ),
@@ -567,7 +528,7 @@ class _KpiCard extends StatelessWidget {
           Text(
             title,
             style: TextStyle(
-              color: Colors.white.withOpacity(0.52),
+              color: const Color(0xFF53627A),
               fontSize: 11,
               fontWeight: FontWeight.w700,
             ),
@@ -582,10 +543,7 @@ class _SectionTitle extends StatelessWidget {
   final String title;
   final String subtitle;
 
-  const _SectionTitle({
-    required this.title,
-    required this.subtitle,
-  });
+  const _SectionTitle({required this.title, required this.subtitle});
 
   @override
   Widget build(BuildContext context) {
@@ -593,7 +551,7 @@ class _SectionTitle extends StatelessWidget {
       children: [
         const Icon(
           Icons.emoji_events_rounded,
-          color: Color(0xFF7DD3FC),
+          color: Color(0xFF20C7C2),
           size: 23,
         ),
         const SizedBox(width: 9),
@@ -604,7 +562,7 @@ class _SectionTitle extends StatelessWidget {
               Text(
                 title,
                 style: const TextStyle(
-                  color: Colors.white,
+                  color: const Color(0xFF071A3A),
                   fontSize: 19,
                   fontWeight: FontWeight.w900,
                   letterSpacing: -0.4,
@@ -614,7 +572,7 @@ class _SectionTitle extends StatelessWidget {
               Text(
                 subtitle,
                 style: TextStyle(
-                  color: Colors.white.withOpacity(0.55),
+                  color: const Color(0xFF53627A),
                   fontSize: 13,
                   fontWeight: FontWeight.w500,
                 ),
@@ -648,12 +606,12 @@ class _RankingCard extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 13),
       padding: const EdgeInsets.all(15),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.075),
+        color: Colors.white,
         borderRadius: BorderRadius.circular(24),
         border: Border.all(
           color: position == 1
-              ? const Color(0xFF38BDF8).withOpacity(0.28)
-              : Colors.white.withOpacity(0.10),
+              ? const Color(0xFF20C7C2).withOpacity(0.28)
+              : Colors.white,
         ),
       ),
       child: Column(
@@ -668,7 +626,7 @@ class _RankingCard extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
-                    color: Colors.white,
+                    color: const Color(0xFF071A3A),
                     fontSize: 15.5,
                     fontWeight: FontWeight.w900,
                   ),
@@ -678,7 +636,7 @@ class _RankingCard extends StatelessWidget {
               Text(
                 "${produccion.toStringAsFixed(0)} €",
                 style: const TextStyle(
-                  color: Color(0xFFBBF7D0),
+                  color: Color(0xFFEAF8F8),
                   fontSize: 15,
                   fontWeight: FontWeight.w900,
                 ),
@@ -691,9 +649,9 @@ class _RankingCard extends StatelessWidget {
             child: LinearProgressIndicator(
               minHeight: 7,
               value: percent.clamp(0.0, 1.0),
-              backgroundColor: Colors.white.withOpacity(0.08),
+              backgroundColor: Colors.white,
               valueColor: const AlwaysStoppedAnimation<Color>(
-                Color(0xFF38BDF8),
+                Color(0xFF20C7C2),
               ),
             ),
           ),
@@ -706,9 +664,7 @@ class _RankingCard extends StatelessWidget {
 class _PositionBadge extends StatelessWidget {
   final int position;
 
-  const _PositionBadge({
-    required this.position,
-  });
+  const _PositionBadge({required this.position});
 
   @override
   Widget build(BuildContext context) {
@@ -721,22 +677,17 @@ class _PositionBadge extends StatelessWidget {
         shape: BoxShape.circle,
         gradient: isFirst
             ? const LinearGradient(
-                colors: [
-                  Color(0xFF38BDF8),
-                  Color(0xFF2563EB),
-                ],
+                colors: [Color(0xFF20C7C2), Color(0xFF0A7F91)],
               )
             : null,
-        color: isFirst ? null : Colors.white.withOpacity(0.08),
-        border: Border.all(
-          color: Colors.white.withOpacity(0.10),
-        ),
+        color: isFirst ? null : Colors.white,
+        border: Border.all(color: Colors.white),
       ),
       child: Center(
         child: Text(
           "$position",
           style: const TextStyle(
-            color: Colors.white,
+            color: const Color(0xFF071A3A),
             fontSize: 15,
             fontWeight: FontWeight.w900,
           ),
@@ -754,11 +705,9 @@ class _EmptyState extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(26),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.065),
+        color: Colors.white,
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(
-          color: Colors.white.withOpacity(0.08),
-        ),
+        border: Border.all(color: Colors.white),
       ),
       child: Column(
         children: [
@@ -771,7 +720,7 @@ class _EmptyState extends StatelessWidget {
           const Text(
             "Sin agentes o producción",
             style: TextStyle(
-              color: Colors.white,
+              color: const Color(0xFF071A3A),
               fontSize: 17,
               fontWeight: FontWeight.w900,
             ),
@@ -781,7 +730,7 @@ class _EmptyState extends StatelessWidget {
             "Cuando tu equipo tenga agentes y ventas registradas aparecerá aquí el ranking de producción.",
             textAlign: TextAlign.center,
             style: TextStyle(
-              color: Colors.white.withOpacity(0.55),
+              color: const Color(0xFF53627A),
               fontSize: 13,
               height: 1.4,
             ),
@@ -796,10 +745,7 @@ class _ErrorBox extends StatelessWidget {
   final String message;
   final VoidCallback onRetry;
 
-  const _ErrorBox({
-    required this.message,
-    required this.onRetry,
-  });
+  const _ErrorBox({required this.message, required this.onRetry});
 
   @override
   Widget build(BuildContext context) {
@@ -808,30 +754,22 @@ class _ErrorBox extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.redAccent.withOpacity(0.12),
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: Colors.redAccent.withOpacity(0.25),
-        ),
+        border: Border.all(color: Colors.redAccent.withOpacity(0.25)),
       ),
       child: Row(
         children: [
-          const Icon(
-            Icons.error_outline_rounded,
-            color: Colors.redAccent,
-          ),
+          const Icon(Icons.error_outline_rounded, color: Colors.redAccent),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
               message,
               style: const TextStyle(
-                color: Colors.white,
+                color: const Color(0xFF071A3A),
                 fontWeight: FontWeight.w700,
               ),
             ),
           ),
-          TextButton(
-            onPressed: onRetry,
-            child: const Text("Reintentar"),
-          ),
+          TextButton(onPressed: onRetry, child: const Text("Reintentar")),
         ],
       ),
     );

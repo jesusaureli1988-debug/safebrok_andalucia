@@ -61,6 +61,9 @@ class _ContactosDiariosEquipoScreenState
       final jefe = await supabase
           .from('usuarios')
           .select('id')
+          .or(
+            'estado.is.null,estado.not.in.(inactivo,Inactivo,INACTIVO,baja,Baja,BAJA,desactivado,Desactivado,DESACTIVADO,bloqueado,Bloqueado,BLOQUEADO,suspendido,Suspendido,SUSPENDIDO)',
+          )
           .eq('auth_id', user.id)
           .single();
 
@@ -69,6 +72,9 @@ class _ContactosDiariosEquipoScreenState
       final usuarios = await supabase
           .from('usuarios')
           .select('id, auth_id, nombre, apellidos')
+          .or(
+            'estado.is.null,estado.not.in.(inactivo,Inactivo,INACTIVO,baja,Baja,BAJA,desactivado,Desactivado,DESACTIVADO,bloqueado,Bloqueado,BLOQUEADO,suspendido,Suspendido,SUSPENDIDO)',
+          )
           .eq('parent_id', jefeId)
           .order('nombre', ascending: true);
 
@@ -113,10 +119,7 @@ class _ContactosDiariosEquipoScreenState
 
         final agente = agentesList.firstWhere(
           (a) => a['auth_id'] == r['auth_id'],
-          orElse: () => {
-            'nombre': 'Agente',
-            'apellidos': 'no encontrado',
-          },
+          orElse: () => {'nombre': 'Agente', 'apellidos': 'no encontrado'},
         );
 
         final positivosRaw = r['contactos_positivos'];
@@ -215,14 +218,14 @@ class _ContactosDiariosEquipoScreenState
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF07111B),
+      backgroundColor: const Color(0xFFF2FCFD),
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
         title: const Text(
           "Contactos diarios equipo",
           style: TextStyle(
-            color: Colors.white,
+            color: const Color(0xFF071A3A),
             fontWeight: FontWeight.w900,
             letterSpacing: -0.4,
           ),
@@ -250,8 +253,8 @@ class _ContactosDiariosEquipoScreenState
                     child: CircularProgressIndicator(color: Colors.white),
                   )
                 : RefreshIndicator(
-                    color: const Color(0xFF38BDF8),
-                    backgroundColor: const Color(0xFF0F172A),
+                    color: const Color(0xFF20C7C2),
+                    backgroundColor: const Color(0xFFEAF8F8),
                     onRefresh: () => cargarDatos(isRefresh: true),
                     child: ListView(
                       physics: const AlwaysScrollableScrollPhysics(),
@@ -300,9 +303,7 @@ class _ContactosDiariosEquipoScreenState
                         if (agentes.isEmpty)
                           const _EmptyState()
                         else
-                          ...agentes.map(
-                            (dia) => _DayCard(dia: dia),
-                          ),
+                          ...agentes.map((dia) => _DayCard(dia: dia)),
                       ],
                     ),
                   ),
@@ -325,11 +326,7 @@ class _PremiumBackground extends StatelessWidget {
             gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
-              colors: [
-                Color(0xFF07111B),
-                Color(0xFF0B1F2E),
-                Color(0xFF12384E),
-              ],
+              colors: [Color(0xFFF2FCFD), Color(0xFFFFFFFF), Color(0xFFFFFFFF)],
             ),
           ),
         ),
@@ -338,7 +335,7 @@ class _PremiumBackground extends StatelessWidget {
           right: -80,
           child: _GlowCircle(
             size: 230,
-            color: const Color(0xFF38BDF8).withOpacity(0.24),
+            color: const Color(0xFF20C7C2).withOpacity(0.24),
           ),
         ),
         Positioned(
@@ -346,14 +343,12 @@ class _PremiumBackground extends StatelessWidget {
           left: -90,
           child: _GlowCircle(
             size: 260,
-            color: const Color(0xFF22C55E).withOpacity(0.16),
+            color: const Color(0xFF0AAEAE).withOpacity(0.16),
           ),
         ),
         BackdropFilter(
           filter: ImageFilter.blur(sigmaX: 34, sigmaY: 34),
-          child: Container(
-            color: Colors.black.withOpacity(0.08),
-          ),
+          child: Container(color: Colors.black.withOpacity(0.08)),
         ),
       ],
     );
@@ -364,20 +359,14 @@ class _GlowCircle extends StatelessWidget {
   final double size;
   final Color color;
 
-  const _GlowCircle({
-    required this.size,
-    required this.color,
-  });
+  const _GlowCircle({required this.size, required this.color});
 
   @override
   Widget build(BuildContext context) {
     return Container(
       width: size,
       height: size,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: color,
-      ),
+      decoration: BoxDecoration(shape: BoxShape.circle, color: color),
     );
   }
 }
@@ -405,10 +394,8 @@ class _HeaderPanel extends StatelessWidget {
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(30),
-        color: Colors.white.withOpacity(0.08),
-        border: Border.all(
-          color: Colors.white.withOpacity(0.10),
-        ),
+        color: Colors.white,
+        border: Border.all(color: Colors.white),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.28),
@@ -428,10 +415,7 @@ class _HeaderPanel extends StatelessWidget {
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(20),
                   gradient: const LinearGradient(
-                    colors: [
-                      Color(0xFF38BDF8),
-                      Color(0xFF2563EB),
-                    ],
+                    colors: [Color(0xFF20C7C2), Color(0xFF0A7F91)],
                   ),
                 ),
                 child: const Icon(
@@ -448,7 +432,7 @@ class _HeaderPanel extends StatelessWidget {
                     const Text(
                       "Contactos positivos",
                       style: TextStyle(
-                        color: Colors.white,
+                        color: const Color(0xFF071A3A),
                         fontSize: 20,
                         fontWeight: FontWeight.w900,
                         letterSpacing: -0.5,
@@ -460,7 +444,7 @@ class _HeaderPanel extends StatelessWidget {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                        color: Colors.white.withOpacity(0.58),
+                        color: const Color(0xFF53627A),
                         fontSize: 13,
                         fontWeight: FontWeight.w600,
                       ),
@@ -474,7 +458,7 @@ class _HeaderPanel extends StatelessWidget {
           Text(
             "$totalContactos",
             style: const TextStyle(
-              color: Colors.white,
+              color: const Color(0xFF071A3A),
               fontSize: 42,
               fontWeight: FontWeight.w900,
               letterSpacing: -1,
@@ -484,7 +468,7 @@ class _HeaderPanel extends StatelessWidget {
           Text(
             "Objetivo equipo diario: $objetivoEquipo contactos",
             style: const TextStyle(
-              color: Color(0xFFBAE6FD),
+              color: Color(0xFFEAF8F8),
               fontSize: 13,
               fontWeight: FontWeight.w800,
             ),
@@ -495,9 +479,9 @@ class _HeaderPanel extends StatelessWidget {
             child: LinearProgressIndicator(
               minHeight: 8,
               value: progress,
-              backgroundColor: Colors.white.withOpacity(0.10),
+              backgroundColor: Colors.white,
               valueColor: const AlwaysStoppedAnimation<Color>(
-                Color(0xFF38BDF8),
+                Color(0xFF20C7C2),
               ),
             ),
           ),
@@ -545,17 +529,11 @@ class _MiniMetric extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.black.withOpacity(0.18),
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: Colors.white.withOpacity(0.08),
-        ),
+        border: Border.all(color: Colors.white),
       ),
       child: Row(
         children: [
-          Icon(
-            icon,
-            color: const Color(0xFF7DD3FC),
-            size: 20,
-          ),
+          Icon(icon, color: const Color(0xFF20C7C2), size: 20),
           const SizedBox(width: 9),
           Expanded(
             child: Column(
@@ -564,7 +542,7 @@ class _MiniMetric extends StatelessWidget {
                 Text(
                   value,
                   style: const TextStyle(
-                    color: Colors.white,
+                    color: const Color(0xFF071A3A),
                     fontSize: 16,
                     fontWeight: FontWeight.w900,
                   ),
@@ -572,7 +550,7 @@ class _MiniMetric extends StatelessWidget {
                 Text(
                   title,
                   style: TextStyle(
-                    color: Colors.white.withOpacity(0.48),
+                    color: const Color(0xFF53627A),
                     fontSize: 11,
                     fontWeight: FontWeight.w700,
                   ),
@@ -610,16 +588,16 @@ class _FiltersPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final hasFilters =
-        filtroAgente != null || filtroMes != null || filtroAnio != DateTime.now().year;
+        filtroAgente != null ||
+        filtroMes != null ||
+        filtroAnio != DateTime.now().year;
 
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.075),
+        color: Colors.white,
         borderRadius: BorderRadius.circular(26),
-        border: Border.all(
-          color: Colors.white.withOpacity(0.10),
-        ),
+        border: Border.all(color: Colors.white),
       ),
       child: Column(
         children: [
@@ -629,7 +607,7 @@ class _FiltersPanel extends StatelessWidget {
                 child: Text(
                   "Filtros",
                   style: TextStyle(
-                    color: Colors.white,
+                    color: const Color(0xFF071A3A),
                     fontSize: 17,
                     fontWeight: FontWeight.w900,
                   ),
@@ -649,14 +627,14 @@ class _FiltersPanel extends StatelessWidget {
               child: DropdownButton<String?>(
                 value: filtroAgente,
                 isExpanded: true,
-                dropdownColor: const Color(0xFF102331),
-                iconEnabledColor: Colors.white70,
+                dropdownColor: const Color(0xFFFFFFFF),
+                iconEnabledColor: const Color(0xFF53627A),
                 hint: const Text(
                   "Todo el equipo",
-                  style: TextStyle(color: Colors.white),
+                  style: TextStyle(color: const Color(0xFF071A3A)),
                 ),
                 style: const TextStyle(
-                  color: Colors.white,
+                  color: const Color(0xFF071A3A),
                   fontWeight: FontWeight.w700,
                 ),
                 items: [
@@ -687,14 +665,14 @@ class _FiltersPanel extends StatelessWidget {
                     child: DropdownButton<int?>(
                       value: filtroMes,
                       isExpanded: true,
-                      dropdownColor: const Color(0xFF102331),
-                      iconEnabledColor: Colors.white70,
+                      dropdownColor: const Color(0xFFFFFFFF),
+                      iconEnabledColor: const Color(0xFF53627A),
                       hint: const Text(
                         "Mes",
-                        style: TextStyle(color: Colors.white),
+                        style: TextStyle(color: const Color(0xFF071A3A)),
                       ),
                       style: const TextStyle(
-                        color: Colors.white,
+                        color: const Color(0xFF071A3A),
                         fontWeight: FontWeight.w700,
                       ),
                       items: [
@@ -722,20 +700,18 @@ class _FiltersPanel extends StatelessWidget {
                     child: DropdownButton<int?>(
                       value: filtroAnio,
                       isExpanded: true,
-                      dropdownColor: const Color(0xFF102331),
-                      iconEnabledColor: Colors.white70,
+                      dropdownColor: const Color(0xFFFFFFFF),
+                      iconEnabledColor: const Color(0xFF53627A),
                       style: const TextStyle(
-                        color: Colors.white,
+                        color: const Color(0xFF071A3A),
                         fontWeight: FontWeight.w700,
                       ),
-                      items: [2025, 2026, 2027].map(
-                        (y) {
-                          return DropdownMenuItem<int?>(
-                            value: y,
-                            child: Text("$y"),
-                          );
-                        },
-                      ).toList(),
+                      items: [2025, 2026, 2027].map((y) {
+                        return DropdownMenuItem<int?>(
+                          value: y,
+                          child: Text("$y"),
+                        );
+                      }).toList(),
                       onChanged: onAnioChanged,
                     ),
                   ),
@@ -752,9 +728,7 @@ class _FiltersPanel extends StatelessWidget {
 class _DropContainer extends StatelessWidget {
   final Widget child;
 
-  const _DropContainer({
-    required this.child,
-  });
+  const _DropContainer({required this.child});
 
   @override
   Widget build(BuildContext context) {
@@ -763,9 +737,7 @@ class _DropContainer extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.black.withOpacity(0.18),
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: Colors.white.withOpacity(0.08),
-        ),
+        border: Border.all(color: Colors.white),
       ),
       child: child,
     );
@@ -776,20 +748,13 @@ class _SectionTitle extends StatelessWidget {
   final String title;
   final String subtitle;
 
-  const _SectionTitle({
-    required this.title,
-    required this.subtitle,
-  });
+  const _SectionTitle({required this.title, required this.subtitle});
 
   @override
   Widget build(BuildContext context) {
     return Row(
       children: [
-        const Icon(
-          Icons.view_day_rounded,
-          color: Color(0xFF7DD3FC),
-          size: 23,
-        ),
+        const Icon(Icons.view_day_rounded, color: Color(0xFF20C7C2), size: 23),
         const SizedBox(width: 9),
         Expanded(
           child: Column(
@@ -798,7 +763,7 @@ class _SectionTitle extends StatelessWidget {
               Text(
                 title,
                 style: const TextStyle(
-                  color: Colors.white,
+                  color: const Color(0xFF071A3A),
                   fontSize: 19,
                   fontWeight: FontWeight.w900,
                   letterSpacing: -0.4,
@@ -808,7 +773,7 @@ class _SectionTitle extends StatelessWidget {
               Text(
                 subtitle,
                 style: TextStyle(
-                  color: Colors.white.withOpacity(0.55),
+                  color: const Color(0xFF53627A),
                   fontSize: 13,
                   fontWeight: FontWeight.w500,
                 ),
@@ -824,9 +789,7 @@ class _SectionTitle extends StatelessWidget {
 class _DayCard extends StatelessWidget {
   final Map<String, dynamic> dia;
 
-  const _DayCard({
-    required this.dia,
-  });
+  const _DayCard({required this.dia});
 
   @override
   Widget build(BuildContext context) {
@@ -837,11 +800,9 @@ class _DayCard extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 14),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.075),
+        color: Colors.white,
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(
-          color: Colors.white.withOpacity(0.10),
-        ),
+        border: Border.all(color: Colors.white),
       ),
       child: Column(
         children: [
@@ -853,10 +814,7 @@ class _DayCard extends StatelessWidget {
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(16),
                   gradient: const LinearGradient(
-                    colors: [
-                      Color(0xFF2563EB),
-                      Color(0xFF38BDF8),
-                    ],
+                    colors: [Color(0xFF0A7F91), Color(0xFF20C7C2)],
                   ),
                 ),
                 child: const Icon(
@@ -873,7 +831,7 @@ class _DayCard extends StatelessWidget {
                     Text(
                       dia['fecha'] ?? '',
                       style: const TextStyle(
-                        color: Colors.white,
+                        color: const Color(0xFF071A3A),
                         fontSize: 17,
                         fontWeight: FontWeight.w900,
                       ),
@@ -882,7 +840,7 @@ class _DayCard extends StatelessWidget {
                     Text(
                       "Total del día: $total contactos",
                       style: const TextStyle(
-                        color: Color(0xFFBAE6FD),
+                        color: Color(0xFFEAF8F8),
                         fontSize: 12.5,
                         fontWeight: FontWeight.w800,
                       ),
@@ -909,10 +867,7 @@ class _AgentContactRow extends StatelessWidget {
   final String nombre;
   final int positivos;
 
-  const _AgentContactRow({
-    required this.nombre,
-    required this.positivos,
-  });
+  const _AgentContactRow({required this.nombre, required this.positivos});
 
   @override
   Widget build(BuildContext context) {
@@ -926,7 +881,7 @@ class _AgentContactRow extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
           color: cumplido
-              ? const Color(0xFF22C55E).withOpacity(0.20)
+              ? const Color(0xFF0AAEAE).withOpacity(0.20)
               : Colors.redAccent.withOpacity(0.18),
         ),
       ),
@@ -934,7 +889,7 @@ class _AgentContactRow extends StatelessWidget {
         children: [
           Icon(
             cumplido ? Icons.check_circle_rounded : Icons.cancel_rounded,
-            color: cumplido ? const Color(0xFF86EFAC) : Colors.redAccent,
+            color: cumplido ? const Color(0xFF20C7C2) : Colors.redAccent,
             size: 20,
           ),
           const SizedBox(width: 10),
@@ -944,7 +899,7 @@ class _AgentContactRow extends StatelessWidget {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
-                color: Colors.white.withOpacity(0.78),
+                color: const Color(0xFF53627A),
                 fontSize: 13,
                 fontWeight: FontWeight.w700,
               ),
@@ -954,7 +909,7 @@ class _AgentContactRow extends StatelessWidget {
           Text(
             "$positivos",
             style: TextStyle(
-              color: cumplido ? const Color(0xFFBBF7D0) : Colors.redAccent,
+              color: cumplido ? const Color(0xFFEAF8F8) : Colors.redAccent,
               fontSize: 15,
               fontWeight: FontWeight.w900,
             ),
@@ -973,11 +928,9 @@ class _EmptyState extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(26),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.065),
+        color: Colors.white,
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(
-          color: Colors.white.withOpacity(0.08),
-        ),
+        border: Border.all(color: Colors.white),
       ),
       child: Column(
         children: [
@@ -990,7 +943,7 @@ class _EmptyState extends StatelessWidget {
           const Text(
             "Sin contactos en este filtro",
             style: TextStyle(
-              color: Colors.white,
+              color: const Color(0xFF071A3A),
               fontSize: 17,
               fontWeight: FontWeight.w900,
             ),
@@ -1000,7 +953,7 @@ class _EmptyState extends StatelessWidget {
             "Cuando el equipo registre contactos diarios aparecerán agrupados por fecha.",
             textAlign: TextAlign.center,
             style: TextStyle(
-              color: Colors.white.withOpacity(0.55),
+              color: const Color(0xFF53627A),
               fontSize: 13,
               height: 1.4,
             ),
@@ -1015,10 +968,7 @@ class _ErrorBox extends StatelessWidget {
   final String message;
   final VoidCallback onRetry;
 
-  const _ErrorBox({
-    required this.message,
-    required this.onRetry,
-  });
+  const _ErrorBox({required this.message, required this.onRetry});
 
   @override
   Widget build(BuildContext context) {
@@ -1027,30 +977,22 @@ class _ErrorBox extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.redAccent.withOpacity(0.12),
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: Colors.redAccent.withOpacity(0.25),
-        ),
+        border: Border.all(color: Colors.redAccent.withOpacity(0.25)),
       ),
       child: Row(
         children: [
-          const Icon(
-            Icons.error_outline_rounded,
-            color: Colors.redAccent,
-          ),
+          const Icon(Icons.error_outline_rounded, color: Colors.redAccent),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
               message,
               style: const TextStyle(
-                color: Colors.white,
+                color: const Color(0xFF071A3A),
                 fontWeight: FontWeight.w700,
               ),
             ),
           ),
-          TextButton(
-            onPressed: onRetry,
-            child: const Text("Reintentar"),
-          ),
+          TextButton(onPressed: onRetry, child: const Text("Reintentar")),
         ],
       ),
     );

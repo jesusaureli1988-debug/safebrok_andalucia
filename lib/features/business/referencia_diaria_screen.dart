@@ -39,13 +39,17 @@ class _ReferenciaDiariaScreenState extends State<ReferenciaDiariaScreen> {
     "RC",
     "Accidente",
     "Ahorro",
+    "Transportes construcción",
+    "Caución",
+    "Camión",
+    "Decenal",
+    "Pymes",
+    "Accidentes colectivos",
+    "Salud colectivo",
+    "Transportes",
   ];
 
-  final List<String> prioridades = const [
-    "Alta",
-    "Media",
-    "Baja",
-  ];
+  final List<String> prioridades = const ["Alta", "Media", "Baja"];
 
   @override
   void dispose() {
@@ -112,11 +116,9 @@ class _ReferenciaDiariaScreenState extends State<ReferenciaDiariaScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(text),
-        backgroundColor: const Color(0xFFE11D48),
+        backgroundColor: const Color(0xFFE74646),
         behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(14),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       ),
     );
   }
@@ -153,8 +155,8 @@ class _ReferenciaDiariaScreenState extends State<ReferenciaDiariaScreen> {
     return Theme(
       data: ThemeData.dark().copyWith(
         colorScheme: const ColorScheme.dark(
-          primary: Color(0xFF22D3EE),
-          surface: Color(0xFF0F172A),
+          primary: Color(0xFF20C7C2),
+          surface: Color(0xFFEAF8F8),
         ),
       ),
       child: child!,
@@ -164,7 +166,7 @@ class _ReferenciaDiariaScreenState extends State<ReferenciaDiariaScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF07111B),
+      backgroundColor: const Color(0xFFF2FCFD),
       appBar: AppBar(
         title: const Text(
           "Nueva referencia",
@@ -320,14 +322,9 @@ class _ReferenciaDiariaScreenState extends State<ReferenciaDiariaScreen> {
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(30),
         gradient: const LinearGradient(
-          colors: [
-            Color(0xFF0F172A),
-            Color(0xFF123044),
-          ],
+          colors: [Color(0xFFEAF8F8), Color(0xFFFFFFFF)],
         ),
-        border: Border.all(
-          color: Colors.white.withOpacity(0.10),
-        ),
+        border: Border.all(color: Colors.white),
         boxShadow: [
           BoxShadow(
             color: Colors.cyanAccent.withOpacity(0.10),
@@ -344,10 +341,7 @@ class _ReferenciaDiariaScreenState extends State<ReferenciaDiariaScreen> {
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               gradient: const LinearGradient(
-                colors: [
-                  Color(0xFF22D3EE),
-                  Color(0xFF2563EB),
-                ],
+                colors: [Color(0xFF20C7C2), Color(0xFF0A7F91)],
               ),
               boxShadow: [
                 BoxShadow(
@@ -370,7 +364,7 @@ class _ReferenciaDiariaScreenState extends State<ReferenciaDiariaScreen> {
                 Text(
                   "Referencia viable",
                   style: TextStyle(
-                    color: Colors.white,
+                    color: const Color(0xFF071A3A),
                     fontSize: 23,
                     fontWeight: FontWeight.w900,
                   ),
@@ -379,7 +373,7 @@ class _ReferenciaDiariaScreenState extends State<ReferenciaDiariaScreen> {
                 Text(
                   "Registra oportunidades con vencimiento, llamada y prioridad comercial.",
                   style: TextStyle(
-                    color: Colors.white60,
+                    color: const Color(0xFF64748B),
                     fontSize: 13,
                     height: 1.35,
                   ),
@@ -404,23 +398,21 @@ class _ReferenciaDiariaScreenState extends State<ReferenciaDiariaScreen> {
         child: Container(
           padding: const EdgeInsets.all(18),
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.055),
+            color: Colors.white,
             borderRadius: BorderRadius.circular(26),
-            border: Border.all(
-              color: Colors.white.withOpacity(0.10),
-            ),
+            border: Border.all(color: Colors.white),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
                 children: [
-                  Icon(icon, color: const Color(0xFF22D3EE), size: 20),
+                  Icon(icon, color: const Color(0xFF20C7C2), size: 20),
                   const SizedBox(width: 10),
                   Text(
                     title,
                     style: const TextStyle(
-                      color: Colors.white,
+                      color: const Color(0xFF071A3A),
                       fontWeight: FontWeight.w900,
                       fontSize: 15,
                     ),
@@ -453,7 +445,7 @@ class _ReferenciaDiariaScreenState extends State<ReferenciaDiariaScreen> {
         maxLines: maxLines,
         keyboardType: keyboardType,
         style: const TextStyle(
-          color: Colors.white,
+          color: const Color(0xFF071A3A),
           fontWeight: FontWeight.w700,
         ),
         onChanged: (_) {
@@ -462,40 +454,30 @@ class _ReferenciaDiariaScreenState extends State<ReferenciaDiariaScreen> {
         decoration: InputDecoration(
           labelText: label,
           errorText: error ? "Campo obligatorio" : null,
-          prefixIcon: Icon(icon, color: const Color(0xFF22D3EE)),
-          labelStyle: const TextStyle(color: Colors.white54),
-          errorStyle: const TextStyle(color: Color(0xFFFF6B81)),
+          prefixIcon: Icon(icon, color: const Color(0xFF20C7C2)),
+          labelStyle: const TextStyle(color: const Color(0xFF64748B)),
+          errorStyle: const TextStyle(color: Color(0xFFE74646)),
           filled: true,
-          fillColor: const Color(0xFF0B1724),
+          fillColor: const Color(0xFFFFFFFF),
           contentPadding: const EdgeInsets.symmetric(
             horizontal: 16,
             vertical: 16,
           ),
           enabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(18),
-            borderSide: BorderSide(
-              color: Colors.white.withOpacity(0.10),
-            ),
+            borderSide: BorderSide(color: Colors.white),
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(18),
-            borderSide: const BorderSide(
-              color: Color(0xFF22D3EE),
-              width: 1.4,
-            ),
+            borderSide: const BorderSide(color: Color(0xFF20C7C2), width: 1.4),
           ),
           errorBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(18),
-            borderSide: const BorderSide(
-              color: Color(0xFFE11D48),
-            ),
+            borderSide: const BorderSide(color: Color(0xFFE74646)),
           ),
           focusedErrorBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(18),
-            borderSide: const BorderSide(
-              color: Color(0xFFE11D48),
-              width: 1.4,
-            ),
+            borderSide: const BorderSide(color: Color(0xFFE74646), width: 1.4),
           ),
         ),
       ),
@@ -514,7 +496,7 @@ class _ReferenciaDiariaScreenState extends State<ReferenciaDiariaScreen> {
         Text(
           title,
           style: const TextStyle(
-            color: Colors.white54,
+            color: const Color(0xFF64748B),
             fontSize: 12,
             fontWeight: FontWeight.w800,
           ),
@@ -537,13 +519,11 @@ class _ReferenciaDiariaScreenState extends State<ReferenciaDiariaScreen> {
                 ),
                 decoration: BoxDecoration(
                   color: active
-                      ? const Color(0xFF22D3EE)
-                      : const Color(0xFF0B1724),
+                      ? const Color(0xFF20C7C2)
+                      : const Color(0xFFFFFFFF),
                   borderRadius: BorderRadius.circular(999),
                   border: Border.all(
-                    color: active
-                        ? const Color(0xFF22D3EE)
-                        : Colors.white.withOpacity(0.10),
+                    color: active ? const Color(0xFF20C7C2) : Colors.white,
                   ),
                   boxShadow: [
                     if (active)
@@ -556,7 +536,9 @@ class _ReferenciaDiariaScreenState extends State<ReferenciaDiariaScreen> {
                 child: Text(
                   value,
                   style: TextStyle(
-                    color: active ? const Color(0xFF07111B) : Colors.white70,
+                    color: active
+                        ? const Color(0xFFF2FCFD)
+                        : const Color(0xFF53627A),
                     fontSize: 12,
                     fontWeight: FontWeight.w900,
                   ),
@@ -583,23 +565,21 @@ class _ReferenciaDiariaScreenState extends State<ReferenciaDiariaScreen> {
         duration: const Duration(milliseconds: 180),
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: const Color(0xFF0B1724),
+          color: const Color(0xFFFFFFFF),
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: error
-                ? const Color(0xFFE11D48)
-                : Colors.white.withOpacity(0.10),
+            color: error ? const Color(0xFFE74646) : Colors.white,
           ),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(icon, color: const Color(0xFF22D3EE)),
+            Icon(icon, color: const Color(0xFF20C7C2)),
             const SizedBox(height: 12),
             Text(
               title,
               style: const TextStyle(
-                color: Colors.white54,
+                color: const Color(0xFF64748B),
                 fontSize: 12,
                 fontWeight: FontWeight.w700,
               ),
@@ -608,7 +588,7 @@ class _ReferenciaDiariaScreenState extends State<ReferenciaDiariaScreen> {
             Text(
               value,
               style: const TextStyle(
-                color: Colors.white,
+                color: const Color(0xFF071A3A),
                 fontSize: 15,
                 fontWeight: FontWeight.w900,
               ),
@@ -618,7 +598,7 @@ class _ReferenciaDiariaScreenState extends State<ReferenciaDiariaScreen> {
               const Text(
                 "Obligatorio",
                 style: TextStyle(
-                  color: Color(0xFFFF6B81),
+                  color: Color(0xFFE74646),
                   fontSize: 11,
                   fontWeight: FontWeight.w700,
                 ),
@@ -636,9 +616,9 @@ class _ReferenciaDiariaScreenState extends State<ReferenciaDiariaScreen> {
       child: ElevatedButton(
         onPressed: loading ? null : guardarReferencia,
         style: ElevatedButton.styleFrom(
-          backgroundColor: const Color(0xFF22D3EE),
+          backgroundColor: const Color(0xFF20C7C2),
           disabledBackgroundColor: Colors.white12,
-          foregroundColor: const Color(0xFF07111B),
+          foregroundColor: const Color(0xFFF2FCFD),
           elevation: 0,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(20),
@@ -660,10 +640,7 @@ class _ReferenciaDiariaScreenState extends State<ReferenciaDiariaScreen> {
                   SizedBox(width: 10),
                   Text(
                     "Guardar referencia",
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w900,
-                    ),
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900),
                   ),
                 ],
               ),
@@ -686,27 +663,18 @@ class _PremiumBackground extends StatelessWidget {
         Positioned(
           top: -90,
           right: -70,
-          child: _glow(
-            color: const Color(0xFF22D3EE),
-            size: 230,
-          ),
+          child: _glow(color: const Color(0xFF20C7C2), size: 230),
         ),
         Positioned(
           bottom: -110,
           left: -80,
-          child: _glow(
-            color: const Color(0xFF2563EB),
-            size: 260,
-          ),
+          child: _glow(color: const Color(0xFF0A7F91), size: 260),
         ),
       ],
     );
   }
 
-  Widget _glow({
-    required Color color,
-    required double size,
-  }) {
+  Widget _glow({required Color color, required double size}) {
     return Container(
       width: size,
       height: size,

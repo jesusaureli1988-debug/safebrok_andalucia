@@ -16,10 +16,10 @@ class SafebrokAiScreen extends StatefulWidget {
 }
 
 class _SafebrokAiScreenState extends State<SafebrokAiScreen> {
-  static const _bg = Color(0xFF07111B);
+  static const _bg = Color(0xFFF4F6FB);
   static const _panel = Color(0xFF0D1924);
   static const _panelSoft = Color(0xFF122331);
-  static const _cyan = Color(0xFF67E8F9);
+  static const _cyan = Color(0xFF14B8A6);
 
   final _supabase = Supabase.instance.client;
   final _controller = TextEditingController();
@@ -108,14 +108,10 @@ class _SafebrokAiScreenState extends State<SafebrokAiScreen> {
     _scrollDown();
   }
 
-  Future<void> _abrirConversacion(
-    String id, {
-    bool cerrarDrawer = true,
-  }) async {
+  Future<void> _abrirConversacion(String id, {bool cerrarDrawer = true}) async {
     if (id.isEmpty || _cargandoMensajes) return;
 
-    if (cerrarDrawer &&
-        (_scaffoldKey.currentState?.isDrawerOpen ?? false)) {
+    if (cerrarDrawer && (_scaffoldKey.currentState?.isDrawerOpen ?? false)) {
       Navigator.of(context).pop();
     }
 
@@ -233,8 +229,7 @@ class _SafebrokAiScreenState extends State<SafebrokAiScreen> {
         ),
         headers: {
           'Content-Type': 'application/json',
-          if (session != null)
-            'Authorization': 'Bearer ${session.accessToken}',
+          if (session != null) 'Authorization': 'Bearer ${session.accessToken}',
         },
         body: jsonEncode({
           'pregunta': pregunta,
@@ -264,18 +259,17 @@ class _SafebrokAiScreenState extends State<SafebrokAiScreen> {
           ? Map<String, dynamic>.from(data['documento'] as Map)
           : <String, dynamic>{};
 
-      final pdfUrl = (
-        documento['url'] ??
-        accion['url'] ??
-        data['pdf_url']
-      )?.toString().trim();
+      final pdfUrl = (documento['url'] ?? accion['url'] ?? data['pdf_url'])
+          ?.toString()
+          .trim();
 
-      final pdfNombre = (
-        documento['nombre'] ??
-        accion['archivo'] ??
-        data['nombre_pdf'] ??
-        'informe_safebrok.pdf'
-      ).toString().trim();
+      final pdfNombre =
+          (documento['nombre'] ??
+                  accion['archivo'] ??
+                  data['nombre_pdf'] ??
+                  'informe_safebrok.pdf')
+              .toString()
+              .trim();
 
       final tienePdf = pdfUrl != null && pdfUrl.isNotEmpty;
 
@@ -345,24 +339,27 @@ class _SafebrokAiScreenState extends State<SafebrokAiScreen> {
     final nuevoTitulo = await showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: _panel,
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
         title: const Text(
           'Renombrar conversación',
-          style: TextStyle(color: Colors.white),
+          style: TextStyle(
+            color: Color(0xFF0F172A),
+            fontWeight: FontWeight.w900,
+          ),
         ),
         content: TextField(
           controller: controller,
           autofocus: true,
           maxLength: 60,
-          style: const TextStyle(color: Colors.white),
+          style: const TextStyle(color: Color(0xFF111827)),
           decoration: InputDecoration(
             hintText: 'Título',
-            hintStyle: const TextStyle(color: Colors.white38),
+            hintStyle: const TextStyle(color: Color(0xFF738198)),
             filled: true,
-            fillColor: Colors.white.withOpacity(.06),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(14),
-            ),
+            fillColor: const Color(0xFFF7FAFC),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
           ),
         ),
         actions: [
@@ -396,14 +393,19 @@ class _SafebrokAiScreenState extends State<SafebrokAiScreen> {
     final confirmado = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: _panel,
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
         title: const Text(
           'Eliminar conversación',
-          style: TextStyle(color: Colors.white),
+          style: TextStyle(
+            color: Color(0xFF0F172A),
+            fontWeight: FontWeight.w900,
+          ),
         ),
         content: const Text(
           'Se eliminarán todos sus mensajes.',
-          style: TextStyle(color: Colors.white70),
+          style: TextStyle(color: const Color(0xFF475569)),
         ),
         actions: [
           TextButton(
@@ -497,26 +499,26 @@ class _SafebrokAiScreenState extends State<SafebrokAiScreen> {
                   child: SafeArea(child: _sidebar()),
                 ),
           appBar: AppBar(
-  backgroundColor: _bg.withOpacity(.96),
-  elevation: 0,
-  iconTheme: const IconThemeData(
-    color: Colors.white,
-  ),
-  leading: escritorio
-      ? null
-      : IconButton(
-          onPressed: () => _scaffoldKey.currentState?.openDrawer(),
-          icon: const Icon(Icons.menu_rounded),
-        ),
+            backgroundColor: Colors.white.withOpacity(.97),
+            surfaceTintColor: Colors.transparent,
+            scrolledUnderElevation: 0,
+            elevation: 0,
+            iconTheme: const IconThemeData(color: Color(0xFF0F2747)),
+            leading: escritorio
+                ? null
+                : IconButton(
+                    onPressed: () => _scaffoldKey.currentState?.openDrawer(),
+                    icon: const Icon(Icons.menu_rounded),
+                  ),
             title: const Row(
               mainAxisSize: MainAxisSize.min,
               children: [
                 Icon(Icons.auto_awesome, color: _cyan, size: 20),
                 SizedBox(width: 9),
                 Text(
-                  'Safebrok IA',
+                  'SafeBrok IA',
                   style: TextStyle(
-                    color: Colors.white,
+                    color: Color(0xFF0F2747),
                     fontWeight: FontWeight.w900,
                   ),
                 ),
@@ -526,7 +528,7 @@ class _SafebrokAiScreenState extends State<SafebrokAiScreen> {
               IconButton(
                 tooltip: 'Nueva conversación',
                 onPressed: _nuevaConversacion,
-                icon: const Icon(Icons.edit_square, color: Colors.white),
+                icon: const Icon(Icons.edit_square, color: Color(0xFF0F2747)),
               ),
               const SizedBox(width: 6),
             ],
@@ -535,10 +537,7 @@ class _SafebrokAiScreenState extends State<SafebrokAiScreen> {
             children: [
               if (escritorio) SizedBox(width: 300, child: _sidebar()),
               if (escritorio)
-                VerticalDivider(
-                  width: 1,
-                  color: Colors.white.withOpacity(.08),
-                ),
+                VerticalDivider(width: 1, color: Color(0xFFDCE6F2)),
               Expanded(child: _chat()),
             ],
           ),
@@ -599,95 +598,95 @@ class _SafebrokAiScreenState extends State<SafebrokAiScreen> {
           ),
           Expanded(
             child: _cargandoConversaciones
-                ? const Center(
-                    child: CircularProgressIndicator(color: _cyan),
-                  )
+                ? const Center(child: CircularProgressIndicator(color: _cyan))
                 : _conversaciones.isEmpty
-                    ? const Center(
-                        child: Padding(
-                          padding: EdgeInsets.all(24),
-                          child: Text(
-                            'Todavía no hay conversaciones guardadas.',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(color: Colors.white38),
+                ? const Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(24),
+                      child: Text(
+                        'Todavía no hay conversaciones guardadas.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: Colors.white38),
+                      ),
+                    ),
+                  )
+                : ListView.builder(
+                    padding: const EdgeInsets.fromLTRB(8, 0, 8, 12),
+                    itemCount: _conversaciones.length,
+                    itemBuilder: (context, index) {
+                      final c = _conversaciones[index];
+                      final id = c['id'].toString();
+                      final seleccionada = id == _conversacionActualId;
+
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 3),
+                        decoration: BoxDecoration(
+                          color: seleccionada
+                              ? Colors.white.withOpacity(.09)
+                              : Colors.transparent,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: ListTile(
+                          dense: true,
+                          contentPadding: const EdgeInsets.only(
+                            left: 12,
+                            right: 4,
+                          ),
+                          onTap: () => _abrirConversacion(id),
+                          leading: Icon(
+                            Icons.chat_bubble_outline_rounded,
+                            color: seleccionada ? _cyan : Colors.white54,
+                            size: 19,
+                          ),
+                          title: Text(
+                            c['titulo']?.toString() ?? 'Nueva conversación',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: seleccionada
+                                  ? Colors.white
+                                  : Colors.white70,
+                              fontWeight: seleccionada
+                                  ? FontWeight.w800
+                                  : FontWeight.w600,
+                              fontSize: 13.5,
+                            ),
+                          ),
+                          trailing: PopupMenuButton<String>(
+                            color: _panelSoft,
+                            icon: const Icon(
+                              Icons.more_horiz_rounded,
+                              color: const Color(0xFF64748B),
+                              size: 19,
+                            ),
+                            onSelected: (value) {
+                              if (value == 'rename') _renombrar(c);
+                              if (value == 'delete') _eliminar(c);
+                            },
+                            itemBuilder: (_) => const [
+                              PopupMenuItem(
+                                value: 'rename',
+                                child: Text(
+                                  'Renombrar',
+                                  style: TextStyle(
+                                    color: Color(0xFF0F172A),
+                                    fontWeight: FontWeight.w900,
+                                  ),
+                                ),
+                              ),
+                              PopupMenuItem(
+                                value: 'delete',
+                                child: Text(
+                                  'Eliminar',
+                                  style: TextStyle(color: Color(0xFFF87171)),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                      )
-                    : ListView.builder(
-                        padding: const EdgeInsets.fromLTRB(8, 0, 8, 12),
-                        itemCount: _conversaciones.length,
-                        itemBuilder: (context, index) {
-                          final c = _conversaciones[index];
-                          final id = c['id'].toString();
-                          final seleccionada = id == _conversacionActualId;
-
-                          return Container(
-                            margin: const EdgeInsets.only(bottom: 3),
-                            decoration: BoxDecoration(
-                              color: seleccionada
-                                  ? Colors.white.withOpacity(.09)
-                                  : Colors.transparent,
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: ListTile(
-                              dense: true,
-                              contentPadding:
-                                  const EdgeInsets.only(left: 12, right: 4),
-                              onTap: () => _abrirConversacion(id),
-                              leading: Icon(
-                                Icons.chat_bubble_outline_rounded,
-                                color: seleccionada ? _cyan : Colors.white54,
-                                size: 19,
-                              ),
-                              title: Text(
-                                c['titulo']?.toString() ??
-                                    'Nueva conversación',
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  color: seleccionada
-                                      ? Colors.white
-                                      : Colors.white70,
-                                  fontWeight: seleccionada
-                                      ? FontWeight.w800
-                                      : FontWeight.w600,
-                                  fontSize: 13.5,
-                                ),
-                              ),
-                              trailing: PopupMenuButton<String>(
-                                color: _panelSoft,
-                                icon: const Icon(
-                                  Icons.more_horiz_rounded,
-                                  color: Colors.white54,
-                                  size: 19,
-                                ),
-                                onSelected: (value) {
-                                  if (value == 'rename') _renombrar(c);
-                                  if (value == 'delete') _eliminar(c);
-                                },
-                                itemBuilder: (_) => const [
-                                  PopupMenuItem(
-                                    value: 'rename',
-                                    child: Text(
-                                      'Renombrar',
-                                      style: TextStyle(color: Colors.white),
-                                    ),
-                                  ),
-                                  PopupMenuItem(
-                                    value: 'delete',
-                                    child: Text(
-                                      'Eliminar',
-                                      style: TextStyle(
-                                        color: Color(0xFFF87171),
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          );
-                        },
-                      ),
+                      );
+                    },
+                  ),
           ),
           Divider(height: 1, color: Colors.white.withOpacity(.08)),
           Padding(
@@ -710,7 +709,7 @@ class _SafebrokAiScreenState extends State<SafebrokAiScreen> {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
-                      color: Colors.white70,
+                      color: Color(0xFF475569),
                       fontWeight: FontWeight.w700,
                       fontSize: 12.5,
                     ),
@@ -733,9 +732,7 @@ class _SafebrokAiScreenState extends State<SafebrokAiScreen> {
             if (_mensajes.length <= 1 && !_cargandoMensajes) _welcome(),
             Expanded(
               child: _cargandoMensajes
-                  ? const Center(
-                      child: CircularProgressIndicator(color: _cyan),
-                    )
+                  ? const Center(child: CircularProgressIndicator(color: _cyan))
                   : ListView.builder(
                       controller: _scrollController,
                       padding: const EdgeInsets.fromLTRB(18, 10, 18, 18),
@@ -768,90 +765,145 @@ class _SafebrokAiScreenState extends State<SafebrokAiScreen> {
 
   Widget _welcome() {
     final acciones = [
-      ('Resumen de ventas', 'Hazme un resumen de las ventas de mi estructura'),
-      ('Ranking del equipo', 'Hazme un ranking de mi equipo por prima neta'),
-      ('Objetivo actual', '¿Cómo vamos respecto al objetivo actual?'),
-      ('Recibos pendientes', '¿Qué recibos pendientes tiene mi estructura?'),
+      (
+        Icons.insights_rounded,
+        'Resumen de ventas',
+        'Hazme un resumen de las ventas de mi estructura',
+      ),
+      (
+        Icons.emoji_events_rounded,
+        'Ranking del equipo',
+        'Hazme un ranking de mi equipo por prima neta',
+      ),
+      (
+        Icons.track_changes_rounded,
+        'Objetivo actual',
+        '¿Cómo vamos respecto al objetivo actual?',
+      ),
+      (
+        Icons.receipt_long_rounded,
+        'Recibos pendientes',
+        '¿Qué recibos pendientes tiene mi estructura?',
+      ),
     ];
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 18, 20, 6),
-      child: Column(
-        children: [
-          Container(
-            width: 58,
-            height: 58,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: const LinearGradient(
-                colors: [_cyan, Colors.blueAccent],
+      padding: const EdgeInsets.fromLTRB(18, 18, 18, 8),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.fromLTRB(24, 24, 24, 22),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Color(0xFF0F2747), Color(0xFF1D3F91), Color(0xFF2554D9)],
+          ),
+          borderRadius: BorderRadius.circular(28),
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0x261D4ED8),
+              blurRadius: 34,
+              offset: Offset(0, 16),
+            ),
+          ],
+        ),
+        child: Column(
+          children: [
+            Container(
+              width: 66,
+              height: 66,
+              padding: const EdgeInsets.all(15),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(.12),
+                borderRadius: BorderRadius.circular(22),
+                border: Border.all(color: Colors.white.withOpacity(.18)),
               ),
-              boxShadow: [
-                BoxShadow(color: _cyan.withOpacity(.24), blurRadius: 30),
-              ],
+              child: Image.asset(
+                'assets/images/safebrok_mark.png',
+                fit: BoxFit.contain,
+              ),
             ),
-            child: const Icon(
-              Icons.auto_awesome,
-              color: _bg,
-              size: 29,
+            const SizedBox(height: 16),
+            const Text(
+              'Tu inteligencia comercial',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 27,
+                fontWeight: FontWeight.w900,
+                letterSpacing: -.6,
+              ),
             ),
-          ),
-          const SizedBox(height: 14),
-          const Text(
-            '¿En qué puedo ayudarte?',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 25,
-              fontWeight: FontWeight.w900,
+            const SizedBox(height: 7),
+            Text(
+              'Pregunta, analiza y toma decisiones con la información de SafeBrok.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: Colors.white.withOpacity(.76),
+                height: 1.45,
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+              ),
             ),
-          ),
-          const SizedBox(height: 7),
-          const Text(
-            'Consulta información de Safebrok o pide ayuda con cualquier proceso.',
-            textAlign: TextAlign.center,
-            style: TextStyle(color: Colors.white54, height: 1.4),
-          ),
-          const SizedBox(height: 18),
-          Wrap(
-            spacing: 10,
-            runSpacing: 10,
-            alignment: WrapAlignment.center,
-            children: acciones.map((a) {
-              return InkWell(
-                onTap: () => enviarSugerencia(a.$2),
-                borderRadius: BorderRadius.circular(16),
-                child: Container(
-                  width: 220,
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(.055),
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: Colors.white.withOpacity(.10)),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(
-                        Icons.arrow_outward_rounded,
-                        color: _cyan,
-                        size: 18,
-                      ),
-                      const SizedBox(width: 9),
-                      Expanded(
-                        child: Text(
-                          a.$1,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w700,
+            const SizedBox(height: 20),
+            Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              alignment: WrapAlignment.center,
+              children: acciones.map((a) {
+                return InkWell(
+                  onTap: () => enviarSugerencia(a.$3),
+                  borderRadius: BorderRadius.circular(16),
+                  child: Container(
+                    width: 220,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 13,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(.10),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: Colors.white.withOpacity(.15)),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 34,
+                          height: 34,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF14B8A6).withOpacity(.20),
+                            borderRadius: BorderRadius.circular(11),
+                          ),
+                          child: Icon(
+                            a.$1,
+                            color: const Color(0xFF67E8F9),
+                            size: 18,
                           ),
                         ),
-                      ),
-                    ],
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            a.$2,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w800,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ),
+                        const Icon(
+                          Icons.arrow_outward_rounded,
+                          color: Colors.white70,
+                          size: 17,
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-              );
-            }).toList(),
-          ),
-        ],
+                );
+              }).toList(),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -862,10 +914,15 @@ class _SafebrokAiScreenState extends State<SafebrokAiScreen> {
       child: Container(
         padding: const EdgeInsets.fromLTRB(18, 10, 18, 16),
         decoration: BoxDecoration(
-          color: _bg.withOpacity(.94),
-          border: Border(
-            top: BorderSide(color: Colors.white.withOpacity(.06)),
-          ),
+          color: Colors.white.withOpacity(.97),
+          border: const Border(top: BorderSide(color: Color(0xFFDCE6F2))),
+          boxShadow: [
+            BoxShadow(
+              color: Color(0x120F2747),
+              blurRadius: 24,
+              offset: Offset(0, -8),
+            ),
+          ],
         ),
         child: Center(
           child: ConstrainedBox(
@@ -873,9 +930,16 @@ class _SafebrokAiScreenState extends State<SafebrokAiScreen> {
             child: Container(
               padding: const EdgeInsets.fromLTRB(16, 7, 7, 7),
               decoration: BoxDecoration(
-                color: _panelSoft,
+                color: const Color(0xFFF8FAFC),
                 borderRadius: BorderRadius.circular(24),
-                border: Border.all(color: Colors.white.withOpacity(.12)),
+                border: Border.all(color: const Color(0xFFD6E2EE)),
+                boxShadow: const [
+                  BoxShadow(
+                    color: Color(0x0D0F2747),
+                    blurRadius: 16,
+                    offset: Offset(0, 6),
+                  ),
+                ],
               ),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.end,
@@ -886,7 +950,7 @@ class _SafebrokAiScreenState extends State<SafebrokAiScreen> {
                       minLines: 1,
                       maxLines: 5,
                       style: const TextStyle(
-                        color: Colors.white,
+                        color: Color(0xFF111827),
                         fontSize: 15,
                         height: 1.35,
                       ),
@@ -894,7 +958,7 @@ class _SafebrokAiScreenState extends State<SafebrokAiScreen> {
                       onSubmitted: (_) => enviarPregunta(),
                       decoration: const InputDecoration(
                         hintText: 'Pregunta a Safebrok IA',
-                        hintStyle: TextStyle(color: Colors.white38),
+                        hintStyle: TextStyle(color: Color(0xFF738198)),
                         border: InputBorder.none,
                         contentPadding: EdgeInsets.symmetric(vertical: 11),
                       ),
@@ -912,9 +976,13 @@ class _SafebrokAiScreenState extends State<SafebrokAiScreen> {
                         gradient: _enviando
                             ? null
                             : const LinearGradient(
-                                colors: [_cyan, Colors.blueAccent],
+                                colors: [
+                                  Color(0xFF0F2747),
+                                  Color(0xFF1D4ED8),
+                                  _cyan,
+                                ],
                               ),
-                        color: _enviando ? Colors.white12 : null,
+                        color: _enviando ? const Color(0xFFCBD5E1) : null,
                       ),
                       child: _enviando
                           ? const Padding(
@@ -926,7 +994,7 @@ class _SafebrokAiScreenState extends State<SafebrokAiScreen> {
                             )
                           : const Icon(
                               Icons.arrow_upward_rounded,
-                              color: _bg,
+                              color: Colors.white,
                             ),
                     ),
                   ),
@@ -991,7 +1059,7 @@ class _MessageBubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const cyan = Color(0xFF67E8F9);
+    const cyan = Color(0xFF14B8A6);
 
     return Center(
       child: ConstrainedBox(
@@ -1000,8 +1068,9 @@ class _MessageBubble extends StatelessWidget {
           margin: const EdgeInsets.only(bottom: 18),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisAlignment:
-                isUser ? MainAxisAlignment.end : MainAxisAlignment.start,
+            mainAxisAlignment: isUser
+                ? MainAxisAlignment.end
+                : MainAxisAlignment.start,
             children: [
               if (!isUser) ...[
                 Container(
@@ -1009,9 +1078,7 @@ class _MessageBubble extends StatelessWidget {
                   height: 31,
                   decoration: const BoxDecoration(
                     shape: BoxShape.circle,
-                    gradient: LinearGradient(
-                      colors: [cyan, Colors.blueAccent],
-                    ),
+                    gradient: LinearGradient(colors: [cyan, Colors.blueAccent]),
                   ),
                   child: const Icon(
                     Icons.auto_awesome,
@@ -1023,19 +1090,33 @@ class _MessageBubble extends StatelessWidget {
               ],
               Flexible(
                 child: Container(
-                  padding: EdgeInsets.symmetric(
-                    horizontal: isUser ? 16 : 2,
-                    vertical: isUser ? 12 : 3,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 17,
+                    vertical: 13,
                   ),
-                  decoration: isUser
-                      ? BoxDecoration(
-                          color: const Color(0xFF1C3445),
-                          borderRadius: BorderRadius.circular(19),
-                          border: Border.all(
-                            color: Colors.white.withOpacity(.08),
-                          ),
-                        )
-                      : null,
+                  decoration: BoxDecoration(
+                    gradient: isUser
+                        ? const LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [Color(0xFF0F2747), Color(0xFF1D4ED8)],
+                          )
+                        : null,
+                    color: isUser ? null : Colors.white,
+                    borderRadius: BorderRadius.circular(19),
+                    border: Border.all(
+                      color: isUser
+                          ? const Color(0xFF315EBD)
+                          : const Color(0xFFDCE6F2),
+                    ),
+                    boxShadow: const [
+                      BoxShadow(
+                        color: Color(0x100F2747),
+                        blurRadius: 18,
+                        offset: Offset(0, 7),
+                      ),
+                    ],
+                  ),
                   child: isUser
                       ? Text(
                           text,
@@ -1056,55 +1137,53 @@ class _MessageBubble extends StatelessWidget {
                               },
                               styleSheet: MarkdownStyleSheet(
                                 h1: const TextStyle(
-                                  color: Colors.white,
+                                  color: Color(0xFF0F172A),
                                   fontSize: 23,
                                   fontWeight: FontWeight.w900,
                                 ),
                                 h2: const TextStyle(
-                                  color: cyan,
+                                  color: Color(0xFF0F766E),
                                   fontSize: 19,
                                   fontWeight: FontWeight.w900,
                                 ),
                                 h3: const TextStyle(
-                                  color: Colors.white,
+                                  color: Color(0xFF0F172A),
                                   fontSize: 16.5,
                                   fontWeight: FontWeight.w900,
                                 ),
                                 p: const TextStyle(
-                                  color: Colors.white,
+                                  color: Color(0xFF0F172A),
                                   fontSize: 15,
                                   height: 1.55,
                                   fontWeight: FontWeight.w500,
                                 ),
                                 listBullet: const TextStyle(
-                                  color: cyan,
+                                  color: Color(0xFF0F766E),
                                   fontSize: 15,
                                 ),
                                 strong: const TextStyle(
-                                  color: Colors.white,
+                                  color: Color(0xFF0F172A),
                                   fontWeight: FontWeight.w900,
                                 ),
                                 code: TextStyle(
                                   color: cyan,
-                                  backgroundColor:
-                                      Colors.white.withOpacity(.08),
+                                  backgroundColor: const Color(0xFFE8F8F6),
                                 ),
                                 tableHead: const TextStyle(
-                                  color: Colors.white,
+                                  color: Color(0xFF0F172A),
                                   fontWeight: FontWeight.w900,
                                 ),
-                                tableBody:
-                                    const TextStyle(color: Colors.white),
+                                tableBody: const TextStyle(
+                                  color: Color(0xFF334155),
+                                ),
                                 tableBorder: TableBorder.all(
-                                  color: Colors.white24,
+                                  color: Color(0xFFD8E3EF),
                                 ),
                               ),
                             ),
                             if (visualizacion != null) ...[
                               const SizedBox(height: 16),
-                              _DashboardVisual(
-                                data: visualizacion!,
-                              ),
+                              _DashboardVisual(data: visualizacion!),
                             ],
                             if ((pdfUrl ?? '').trim().isNotEmpty) ...[
                               const SizedBox(height: 14),
@@ -1156,7 +1235,7 @@ class _MessageBubble extends StatelessWidget {
                                 padding: EdgeInsets.all(6),
                                 child: Icon(
                                   Icons.copy_rounded,
-                                  color: Colors.white38,
+                                  color: Color(0xFF64748B),
                                   size: 17,
                                 ),
                               ),
@@ -1183,10 +1262,10 @@ class _DashboardVisual extends StatelessWidget {
     final tarjetasRaw = data['tarjetas'];
     final tarjetas = tarjetasRaw is List
         ? tarjetasRaw
-            .whereType<Map>()
-            .map((e) => Map<String, dynamic>.from(e))
-            .take(4)
-            .toList()
+              .whereType<Map>()
+              .map((e) => Map<String, dynamic>.from(e))
+              .take(4)
+              .toList()
         : <Map<String, dynamic>>[];
 
     final grafico = data['grafico'] is Map
@@ -1197,9 +1276,16 @@ class _DashboardVisual extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFF0D1924),
+        color: Colors.white,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.white.withOpacity(.10)),
+        border: Border.all(color: const Color(0xFFDCE6F2)),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x100F2747),
+            blurRadius: 22,
+            offset: Offset(0, 8),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1207,7 +1293,7 @@ class _DashboardVisual extends StatelessWidget {
           Text(
             data['titulo']?.toString() ?? 'Resumen visual',
             style: const TextStyle(
-              color: Colors.white,
+              color: Color(0xFF111827),
               fontSize: 18,
               fontWeight: FontWeight.w900,
             ),
@@ -1216,10 +1302,7 @@ class _DashboardVisual extends StatelessWidget {
             const SizedBox(height: 5),
             Text(
               data['subtitulo'].toString(),
-              style: const TextStyle(
-                color: Colors.white54,
-                height: 1.35,
-              ),
+              style: const TextStyle(color: Color(0xFF64748B), height: 1.35),
             ),
           ],
           if (tarjetas.isNotEmpty) ...[
@@ -1230,8 +1313,8 @@ class _DashboardVisual extends StatelessWidget {
                 final columnas = ancho >= 700
                     ? 4
                     : ancho >= 440
-                        ? 2
-                        : 1;
+                    ? 2
+                    : 1;
                 final separacion = 10.0;
                 final anchoTarjeta =
                     (ancho - (separacion * (columnas - 1))) / columnas;
@@ -1272,22 +1355,22 @@ class _KpiCard extends StatelessWidget {
     final icono = tendencia == 'positiva'
         ? Icons.trending_up_rounded
         : tendencia == 'negativa'
-            ? Icons.trending_down_rounded
-            : Icons.horizontal_rule_rounded;
+        ? Icons.trending_down_rounded
+        : Icons.horizontal_rule_rounded;
 
     final color = tendencia == 'positiva'
         ? const Color(0xFF4ADE80)
         : tendencia == 'negativa'
-            ? const Color(0xFFF87171)
-            : const Color(0xFF67E8F9);
+        ? const Color(0xFFF87171)
+        : const Color(0xFF67E8F9);
 
     return Container(
       constraints: const BoxConstraints(minHeight: 122),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(.045),
+        color: const Color(0xFFF7FAFC),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withOpacity(.08)),
+        border: Border.all(color: const Color(0xFFDCE6F2)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1300,7 +1383,7 @@ class _KpiCard extends StatelessWidget {
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
-                    color: Colors.white60,
+                    color: Color(0xFF64748B),
                     fontSize: 12,
                     fontWeight: FontWeight.w800,
                   ),
@@ -1316,7 +1399,7 @@ class _KpiCard extends StatelessWidget {
             child: Text(
               data['valor']?.toString() ?? '-',
               style: const TextStyle(
-                color: Colors.white,
+                color: Color(0xFF111827),
                 fontSize: 24,
                 fontWeight: FontWeight.w900,
               ),
@@ -1328,7 +1411,7 @@ class _KpiCard extends StatelessWidget {
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
             style: const TextStyle(
-              color: Colors.white54,
+              color: Color(0xFF64748B),
               fontSize: 11.5,
               height: 1.3,
             ),
@@ -1353,8 +1436,9 @@ class _AutomaticChart extends StatelessWidget {
         : <String>[];
     final valores = (data['valores'] is List)
         ? List<double>.from(
-            (data['valores'] as List)
-                .map((e) => double.tryParse(e.toString()) ?? 0),
+            (data['valores'] as List).map(
+              (e) => double.tryParse(e.toString()) ?? 0,
+            ),
           )
         : <double>[];
 
@@ -1370,7 +1454,7 @@ class _AutomaticChart extends StatelessWidget {
         Text(
           data['titulo']?.toString() ?? 'Gráfico',
           style: const TextStyle(
-            color: Colors.white,
+            color: Color(0xFF111827),
             fontSize: 15,
             fontWeight: FontWeight.w900,
           ),
@@ -1406,10 +1490,10 @@ class _SafeChartPainter extends CustomPainter {
     required this.unidad,
   });
 
-  final _cyan = const Color(0xFF67E8F9);
+  final _cyan = const Color(0xFF14B8A6);
   final _blue = const Color(0xFF3B82F6);
-  final _grid = Colors.white.withOpacity(.12);
-  final _text = Colors.white70;
+  final _grid = const Color(0xFFDCE6F2);
+  final _text = const Color(0xFF64748B);
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -1440,11 +1524,7 @@ class _SafeChartPainter extends CustomPainter {
 
     for (var i = 0; i <= 4; i++) {
       final y = top + chartHeight - (chartHeight * i / 4);
-      canvas.drawLine(
-        Offset(left, y),
-        Offset(left + chartWidth, y),
-        gridPaint,
-      );
+      canvas.drawLine(Offset(left, y), Offset(left + chartWidth, y), gridPaint);
       _drawText(
         canvas,
         _formatNumber(safeMax * i / 4),
@@ -1467,7 +1547,8 @@ class _SafeChartPainter extends CustomPainter {
         ..strokeJoin = StrokeJoin.round;
 
       for (var i = 0; i < valores.length; i++) {
-        final x = left +
+        final x =
+            left +
             (valores.length == 1
                 ? chartWidth / 2
                 : chartWidth * i / (valores.length - 1));
@@ -1478,20 +1559,24 @@ class _SafeChartPainter extends CustomPainter {
           path.lineTo(x, y);
         }
         canvas.drawCircle(Offset(x, y), 4, pointPaint);
-        _drawAxisLabel(canvas, etiquetas[i], x, top + chartHeight + 10, chartWidth);
+        _drawAxisLabel(
+          canvas,
+          etiquetas[i],
+          x,
+          top + chartHeight + 10,
+          chartWidth,
+        );
       }
       canvas.drawPath(path, linePaint);
     } else {
       final slot = chartWidth / valores.length;
       final barWidth = (slot * .58).clamp(12.0, 44.0);
       final barPaint = Paint()
-        ..shader =  LinearGradient(
+        ..shader = LinearGradient(
           begin: Alignment.bottomCenter,
           end: Alignment.topCenter,
           colors: [_blue, _cyan],
-        ).createShader(
-          Rect.fromLTWH(left, top, chartWidth, chartHeight),
-        );
+        ).createShader(Rect.fromLTWH(left, top, chartWidth, chartHeight));
 
       for (var i = 0; i < valores.length; i++) {
         final height = valores[i] / safeMax * chartHeight;
@@ -1517,7 +1602,7 @@ class _SafeChartPainter extends CustomPainter {
         unidad,
         Offset(left, 0),
         9.5,
-        Colors.white54,
+        const Color(0xFF64748B),
         maxWidth: chartWidth,
       );
     }
@@ -1531,12 +1616,12 @@ class _SafeChartPainter extends CustomPainter {
     final center = Offset(size.width * .34, size.height * .48);
     final rect = Rect.fromCircle(center: center, radius: radius);
     final colors = [
-      const Color(0xFF67E8F9),
-      const Color(0xFF3B82F6),
-      const Color(0xFF8B5CF6),
-      const Color(0xFF22C55E),
-      const Color(0xFFF59E0B),
-      const Color(0xFFEC4899),
+      const Color(0xFF14B8A6),
+      const Color(0xFF2563EB),
+      const Color(0xFF0F2747),
+      const Color(0xFF0891B2),
+      const Color(0xFF64748B),
+      const Color(0xFF4F46E5),
     ];
 
     var start = -1.5708;
@@ -1556,7 +1641,7 @@ class _SafeChartPainter extends CustomPainter {
       _formatNumber(total),
       Offset(center.dx - radius * .55, center.dy - 14),
       19,
-      Colors.white,
+      const Color(0xFF0F172A),
       maxWidth: radius * 1.1,
       align: TextAlign.center,
       fontWeight: FontWeight.w900,
@@ -1567,7 +1652,7 @@ class _SafeChartPainter extends CustomPainter {
         unidad,
         Offset(center.dx - radius * .55, center.dy + 10),
         10,
-        Colors.white54,
+        const Color(0xFF64748B),
         maxWidth: radius * 1.1,
         align: TextAlign.center,
       );
@@ -1679,7 +1764,7 @@ class _TypingBubble extends StatelessWidget {
           children: [
             CircleAvatar(
               radius: 15.5,
-              backgroundColor: Color(0xFF67E8F9),
+              backgroundColor: Color(0xFF14B8A6),
               child: Icon(
                 Icons.auto_awesome,
                 color: Color(0xFF07111B),
@@ -1688,9 +1773,9 @@ class _TypingBubble extends StatelessWidget {
             ),
             SizedBox(width: 12),
             Text(
-              'Safebrok IA está pensando…',
+              'SafeBrok IA está pensando…',
               style: TextStyle(
-                color: Colors.white54,
+                color: const Color(0xFF64748B),
                 fontWeight: FontWeight.w700,
               ),
             ),
@@ -1713,17 +1798,14 @@ class _AiBackground extends StatelessWidget {
             top: -140,
             right: -100,
             child: _Glow(
-              color: const Color(0xFF67E8F9).withOpacity(.15),
+              color: const Color(0xFF14B8A6).withOpacity(.13),
               size: 300,
             ),
           ),
           Positioned(
             bottom: -130,
             left: -100,
-            child: _Glow(
-              color: Colors.blueAccent.withOpacity(.11),
-              size: 280,
-            ),
+            child: _Glow(color: Colors.blueAccent.withOpacity(.11), size: 280),
           ),
         ],
       ),

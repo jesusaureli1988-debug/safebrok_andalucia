@@ -119,8 +119,11 @@ class _CandidatosCaptacionScreenState extends State<CandidatosCaptacionScreen> {
   Future<List<Map<String, dynamic>>> _cargarUsuariosPermitidos(
     String authIdLogueado,
   ) async {
-    final data = await supabase.from('usuarios').select(
-          'id, auth_id, parent_id, rol_usuario, nombre, apellidos',
+    final data = await supabase
+        .from('usuarios')
+        .select('id, auth_id, parent_id, rol_usuario, nombre, apellidos')
+        .or(
+          'estado.is.null,estado.not.in.(inactivo,Inactivo,INACTIVO,baja,Baja,BAJA,desactivado,Desactivado,DESACTIVADO,bloqueado,Bloqueado,BLOQUEADO,suspendido,Suspendido,SUSPENDIDO)',
         );
 
     final usuarios = List<Map<String, dynamic>>.from(data).map((u) {
@@ -149,7 +152,7 @@ class _CandidatosCaptacionScreenState extends State<CandidatosCaptacionScreen> {
           'rol_usuario': '',
           'nombre': '',
           'apellidos': '',
-        }
+        },
       ];
     }
 
@@ -157,9 +160,11 @@ class _CandidatosCaptacionScreenState extends State<CandidatosCaptacionScreen> {
 
     if (rolLogueado == 'director_nacional') {
       return usuarios
-          .where((u) =>
-              (u['auth_id']?.toString().isNotEmpty ?? false) &&
-              u['auth_id'].toString().toLowerCase() != 'null')
+          .where(
+            (u) =>
+                (u['auth_id']?.toString().isNotEmpty ?? false) &&
+                u['auth_id'].toString().toLowerCase() != 'null',
+          )
           .toList();
     }
 
@@ -185,10 +190,8 @@ class _CandidatosCaptacionScreenState extends State<CandidatosCaptacionScreen> {
       visitados.add(id);
       resultado.add(actual);
 
-      for (final hijo
-          in hijosPorParentId[id] ?? <Map<String, dynamic>>[]) {
-        final nivelHijo =
-            _nivelRol(hijo['rol_usuario']?.toString() ?? '');
+      for (final hijo in hijosPorParentId[id] ?? <Map<String, dynamic>>[]) {
+        final nivelHijo = _nivelRol(hijo['rol_usuario']?.toString() ?? '');
 
         if (nivelHijo > 0 && nivelHijo < nivelActual) {
           recorrer(hijo);
@@ -229,8 +232,7 @@ class _CandidatosCaptacionScreenState extends State<CandidatosCaptacionScreen> {
 
       if (authId.isNotEmpty) resultado.add(authId);
 
-      for (final hijo
-          in hijosPorParentId[id] ?? <Map<String, dynamic>>[]) {
+      for (final hijo in hijosPorParentId[id] ?? <Map<String, dynamic>>[]) {
         recorrer(hijo);
       }
     }
@@ -255,8 +257,7 @@ class _CandidatosCaptacionScreenState extends State<CandidatosCaptacionScreen> {
         return;
       }
 
-      final usuariosPermitidos =
-          await _cargarUsuariosPermitidos(user.id);
+      final usuariosPermitidos = await _cargarUsuariosPermitidos(user.id);
 
       final authIds = usuariosPermitidos
           .map((u) => u['auth_id']?.toString().trim() ?? '')
@@ -290,26 +291,24 @@ class _CandidatosCaptacionScreenState extends State<CandidatosCaptacionScreen> {
 
       final unicos = <String, Map<String, dynamic>>{};
 
-      for (final item
-          in List<Map<String, dynamic>>.from(asignadosData)) {
-        final id = item['id']?.toString() ??
+      for (final item in List<Map<String, dynamic>>.from(asignadosData)) {
+        final id =
+            item['id']?.toString() ??
             'asignado_${unicos.length}_${item['created_at']}';
         unicos[id] = item;
       }
 
-      for (final item
-          in List<Map<String, dynamic>>.from(antiguosData)) {
-        final id = item['id']?.toString() ??
+      for (final item in List<Map<String, dynamic>>.from(antiguosData)) {
+        final id =
+            item['id']?.toString() ??
             'antiguo_${unicos.length}_${item['created_at']}';
         unicos[id] = item;
       }
 
       final lista = unicos.values.toList()
         ..sort((a, b) {
-          final fechaA =
-              DateTime.tryParse(a['created_at']?.toString() ?? '');
-          final fechaB =
-              DateTime.tryParse(b['created_at']?.toString() ?? '');
+          final fechaA = DateTime.tryParse(a['created_at']?.toString() ?? '');
+          final fechaB = DateTime.tryParse(b['created_at']?.toString() ?? '');
 
           if (fechaA == null && fechaB == null) return 0;
           if (fechaA == null) return 1;
@@ -360,11 +359,8 @@ class _CandidatosCaptacionScreenState extends State<CandidatosCaptacionScreen> {
     return DateTime.tryParse(value.toString())?.toLocal();
   }
 
-  String _authIdResponsableCandidato(
-    Map<String, dynamic> candidato,
-  ) {
-    final asignado =
-        candidato['asignado_auth_id']?.toString().trim() ?? '';
+  String _authIdResponsableCandidato(Map<String, dynamic> candidato) {
+    final asignado = candidato['asignado_auth_id']?.toString().trim() ?? '';
 
     if (asignado.isNotEmpty && asignado.toLowerCase() != 'null') {
       return asignado;
@@ -377,8 +373,7 @@ class _CandidatosCaptacionScreenState extends State<CandidatosCaptacionScreen> {
     Set<String>? authIdsPermitidosPorFiltro;
 
     if (puedeFiltrarEstructura && authIdSeleccionado != null) {
-      authIdsPermitidosPorFiltro =
-          _authIdsSubestructura(authIdSeleccionado!);
+      authIdsPermitidosPorFiltro = _authIdsSubestructura(authIdSeleccionado!);
     }
 
     return candidatos.where((c) {
@@ -392,36 +387,33 @@ class _CandidatosCaptacionScreenState extends State<CandidatosCaptacionScreen> {
 
       final texto = busqueda.toLowerCase();
 
-      final coincideBusqueda = texto.isEmpty ||
+      final coincideBusqueda =
+          texto.isEmpty ||
           nombre.contains(texto) ||
           telefono.contains(texto) ||
           email.contains(texto) ||
           origen.contains(texto);
 
-      final coincideFiltro =
-          filtroActivo == 'TODOS' || estado == filtroActivo;
+      final coincideFiltro = filtroActivo == 'TODOS' || estado == filtroActivo;
 
       final usuarioResponsable = usuariosEstructura.firstWhere(
         (u) => u['auth_id'] == authIdResponsable,
         orElse: () => <String, dynamic>{},
       );
 
-      final coincideFigura = figuraSeleccionada == null ||
+      final coincideFigura =
+          figuraSeleccionada == null ||
           _normalizarRol(usuarioResponsable['rol_usuario']) ==
               figuraSeleccionada;
 
       final coincideEstructura =
           authIdsPermitidosPorFiltro == null ||
-              authIdsPermitidosPorFiltro.contains(authIdResponsable);
+          authIdsPermitidosPorFiltro.contains(authIdResponsable);
 
       final fecha = _fechaCandidato(c);
       final desde = fechaDesde == null
           ? null
-          : DateTime(
-              fechaDesde!.year,
-              fechaDesde!.month,
-              fechaDesde!.day,
-            );
+          : DateTime(fechaDesde!.year, fechaDesde!.month, fechaDesde!.day);
       final hasta = fechaHasta == null
           ? null
           : DateTime(
@@ -513,9 +505,10 @@ class _CandidatosCaptacionScreenState extends State<CandidatosCaptacionScreen> {
 
     if (i == -1 || i == flujo.length - 1) return;
 
-    await supabase.from('candidatos_captacion').update({
-      'estado': flujo[i + 1],
-    }).eq('id', c['id']);
+    await supabase
+        .from('candidatos_captacion')
+        .update({'estado': flujo[i + 1]})
+        .eq('id', c['id']);
 
     cargarTodo();
   }
@@ -523,9 +516,7 @@ class _CandidatosCaptacionScreenState extends State<CandidatosCaptacionScreen> {
   Future<void> abrirNuevoCandidato() async {
     final r = await Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (_) => const NuevoCandidatoScreen(),
-      ),
+      MaterialPageRoute(builder: (_) => const NuevoCandidatoScreen()),
     );
 
     if (r == true) cargarTodo();
@@ -535,9 +526,7 @@ class _CandidatosCaptacionScreenState extends State<CandidatosCaptacionScreen> {
     final r = await Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => DetalleCandidatoScreen(
-          candidato: candidato,
-        ),
+        builder: (_) => DetalleCandidatoScreen(candidato: candidato),
       ),
     );
 
@@ -565,9 +554,7 @@ class _CandidatosCaptacionScreenState extends State<CandidatosCaptacionScreen> {
           SafeArea(
             child: loading
                 ? const Center(
-                    child: CircularProgressIndicator(
-                      color: Color(0xFF111827),
-                    ),
+                    child: CircularProgressIndicator(color: Color(0xFF111827)),
                   )
                 : RefreshIndicator(
                     color: const Color(0xFF111827),
@@ -609,40 +596,38 @@ class _CandidatosCaptacionScreenState extends State<CandidatosCaptacionScreen> {
                           SliverPadding(
                             padding: const EdgeInsets.fromLTRB(18, 0, 18, 110),
                             sliver: SliverList(
-                              delegate: SliverChildListDelegate(
-                                [
-                                  _grupoEstado(
-                                    titulo: "CV recibidos",
-                                    estado: "CV_RECIBIDO",
-                                    icon: Icons.description_rounded,
-                                  ),
-                                  _grupoEstado(
-                                    titulo: "Contactados",
-                                    estado: "CONTACTADO",
-                                    icon: Icons.phone_in_talk_rounded,
-                                  ),
-                                  _grupoEstado(
-                                    titulo: "Entrevistas",
-                                    estado: "ENTREVISTAS",
-                                    icon: Icons.event_available_rounded,
-                                  ),
-                                  _grupoEstado(
-                                    titulo: "Seleccionados",
-                                    estado: "SELECCIONADO",
-                                    icon: Icons.star_rounded,
-                                  ),
-                                  _grupoEstado(
-                                    titulo: "Incorporados",
-                                    estado: "INCORPORADO",
-                                    icon: Icons.badge_rounded,
-                                  ),
-                                  _grupoEstado(
-                                    titulo: "Descartados",
-                                    estado: "DESCARTADO",
-                                    icon: Icons.close_rounded,
-                                  ),
-                                ],
-                              ),
+                              delegate: SliverChildListDelegate([
+                                _grupoEstado(
+                                  titulo: "CV recibidos",
+                                  estado: "CV_RECIBIDO",
+                                  icon: Icons.description_rounded,
+                                ),
+                                _grupoEstado(
+                                  titulo: "Contactados",
+                                  estado: "CONTACTADO",
+                                  icon: Icons.phone_in_talk_rounded,
+                                ),
+                                _grupoEstado(
+                                  titulo: "Entrevistas",
+                                  estado: "ENTREVISTAS",
+                                  icon: Icons.event_available_rounded,
+                                ),
+                                _grupoEstado(
+                                  titulo: "Seleccionados",
+                                  estado: "SELECCIONADO",
+                                  icon: Icons.star_rounded,
+                                ),
+                                _grupoEstado(
+                                  titulo: "Incorporados",
+                                  estado: "INCORPORADO",
+                                  icon: Icons.badge_rounded,
+                                ),
+                                _grupoEstado(
+                                  titulo: "Descartados",
+                                  estado: "DESCARTADO",
+                                  icon: Icons.close_rounded,
+                                ),
+                              ]),
                             ),
                           ),
                       ],
@@ -655,78 +640,74 @@ class _CandidatosCaptacionScreenState extends State<CandidatosCaptacionScreen> {
   }
 
   Widget _topBar() {
-  return Row(
-    children: [
-
-      MouseRegion(
-        cursor: SystemMouseCursors.click,
-        child: Material(
-          color: Colors.transparent,
-          child: InkWell(
-            borderRadius: BorderRadius.circular(16),
-            onTap: () => Navigator.pop(context),
-            child: Ink(
-              height: 44,
-              width: 44,
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.08),
-                    blurRadius: 18,
-                    offset: const Offset(0, 8),
-                  ),
-                ],
-              ),
-              child: const Icon(
-                Icons.arrow_back_ios_new_rounded,
-                color: Color(0xFF111827),
-                size: 18,
-              ),
-            ),
-          ),
-        ),
-      ),
-
-      const SizedBox(width: 14),
-
-      const Expanded(
-        child: Text(
-          "Talent Hub",
-          style: TextStyle(
-            color: Color(0xFF111827),
-            fontSize: 28,
-            fontWeight: FontWeight.w900,
-          ),
-        ),
-      ),
-
-      MouseRegion(
-        cursor: SystemMouseCursors.click,
-        child: Material(
-          color: Colors.transparent,
-          child: InkWell(
-            borderRadius: BorderRadius.circular(16),
-            onTap: cargarTodo,
-            child: Ink(
-              height: 44,
-              width: 44,
-              decoration: BoxDecoration(
-                color: const Color(0xFF111827),
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: const Icon(
-                Icons.refresh_rounded,
-                color: Colors.white,
+    return Row(
+      children: [
+        MouseRegion(
+          cursor: SystemMouseCursors.click,
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              borderRadius: BorderRadius.circular(16),
+              onTap: () => Navigator.pop(context),
+              child: Ink(
+                height: 44,
+                width: 44,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.08),
+                      blurRadius: 18,
+                      offset: const Offset(0, 8),
+                    ),
+                  ],
+                ),
+                child: const Icon(
+                  Icons.arrow_back_ios_new_rounded,
+                  color: Color(0xFF111827),
+                  size: 18,
+                ),
               ),
             ),
           ),
         ),
-      ),
-    ],
-  );
-}
+
+        const SizedBox(width: 14),
+
+        const Expanded(
+          child: Text(
+            "Talent Hub",
+            style: TextStyle(
+              color: Color(0xFF111827),
+              fontSize: 28,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ),
+
+        MouseRegion(
+          cursor: SystemMouseCursors.click,
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              borderRadius: BorderRadius.circular(16),
+              onTap: cargarTodo,
+              child: Ink(
+                height: 44,
+                width: 44,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF111827),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: const Icon(Icons.refresh_rounded, color: Colors.white),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
 
   Widget _heroTalent() {
     final incorporados = candidatosFiltrados
@@ -743,10 +724,7 @@ class _CandidatosCaptacionScreenState extends State<CandidatosCaptacionScreen> {
         gradient: const LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [
-            Color(0xFF111827),
-            Color(0xFF2563EB),
-          ],
+          colors: [Color(0xFF111827), Color(0xFF2563EB)],
         ),
         boxShadow: [
           BoxShadow(
@@ -771,8 +749,10 @@ class _CandidatosCaptacionScreenState extends State<CandidatosCaptacionScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 7,
+                ),
                 decoration: BoxDecoration(
                   color: Colors.white.withOpacity(0.14),
                   borderRadius: BorderRadius.circular(30),
@@ -814,10 +794,7 @@ class _CandidatosCaptacionScreenState extends State<CandidatosCaptacionScreen> {
                   const SizedBox(width: 10),
                   _heroKpi("Proceso", enProceso.toString()),
                   const SizedBox(width: 10),
-                  _heroKpi(
-                    "Éxito",
-                    "${(ratio * 100).toStringAsFixed(0)}%",
-                  ),
+                  _heroKpi("Éxito", "${(ratio * 100).toStringAsFixed(0)}%"),
                 ],
               ),
             ],
@@ -882,10 +859,7 @@ class _CandidatosCaptacionScreenState extends State<CandidatosCaptacionScreen> {
           calcularKPIs();
         },
         decoration: InputDecoration(
-          icon: const Icon(
-            Icons.search_rounded,
-            color: Color(0xFF64748B),
-          ),
+          icon: const Icon(Icons.search_rounded, color: Color(0xFF64748B)),
           hintText: "Buscar por nombre, teléfono, email u origen...",
           hintStyle: TextStyle(
             color: Colors.black.withOpacity(0.38),
@@ -943,9 +917,7 @@ class _CandidatosCaptacionScreenState extends State<CandidatosCaptacionScreen> {
                 color: selected ? color : Colors.white,
                 borderRadius: BorderRadius.circular(30),
                 border: Border.all(
-                  color: selected
-                      ? color
-                      : Colors.black.withOpacity(0.06),
+                  color: selected ? color : Colors.black.withOpacity(0.06),
                 ),
               ),
               alignment: Alignment.center,
@@ -978,13 +950,10 @@ class _CandidatosCaptacionScreenState extends State<CandidatosCaptacionScreen> {
   List<Map<String, dynamic>> get _usuariosParaSelector {
     final lista = usuariosEstructura.where((usuario) {
       if (figuraSeleccionada == null) return true;
-      return _normalizarRol(usuario['rol_usuario']) ==
-          figuraSeleccionada;
+      return _normalizarRol(usuario['rol_usuario']) == figuraSeleccionada;
     }).toList();
 
-    lista.sort(
-      (a, b) => _nombreCompleto(a).compareTo(_nombreCompleto(b)),
-    );
+    lista.sort((a, b) => _nombreCompleto(a).compareTo(_nombreCompleto(b)));
 
     return lista;
   }
@@ -1047,9 +1016,7 @@ class _CandidatosCaptacionScreenState extends State<CandidatosCaptacionScreen> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(
-          color: const Color(0xFF2563EB).withOpacity(0.12),
-        ),
+        border: Border.all(color: const Color(0xFF2563EB).withOpacity(0.12)),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.05),
@@ -1113,10 +1080,7 @@ class _CandidatosCaptacionScreenState extends State<CandidatosCaptacionScreen> {
           DropdownButtonFormField<String?>(
             value: figuraSeleccionada,
             isExpanded: true,
-            decoration: _decoracionFiltro(
-              'Figura',
-              Icons.badge_outlined,
-            ),
+            decoration: _decoracionFiltro('Figura', Icons.badge_outlined),
             items: [
               const DropdownMenuItem<String?>(
                 value: null,
@@ -1139,9 +1103,10 @@ class _CandidatosCaptacionScreenState extends State<CandidatosCaptacionScreen> {
           ),
           const SizedBox(height: 12),
           DropdownButtonFormField<String?>(
-            value: _usuariosParaSelector.any(
-              (u) => u['auth_id'] == authIdSeleccionado,
-            )
+            value:
+                _usuariosParaSelector.any(
+                  (u) => u['auth_id'] == authIdSeleccionado,
+                )
                 ? authIdSeleccionado
                 : null,
             isExpanded: true,
@@ -1195,30 +1160,20 @@ class _CandidatosCaptacionScreenState extends State<CandidatosCaptacionScreen> {
     );
   }
 
-  InputDecoration _decoracionFiltro(
-    String label,
-    IconData icono,
-  ) {
+  InputDecoration _decoracionFiltro(String label, IconData icono) {
     return InputDecoration(
       labelText: label,
       prefixIcon: Icon(icono, color: const Color(0xFF2563EB)),
       filled: true,
       fillColor: const Color(0xFFF8FAFC),
-      contentPadding: const EdgeInsets.symmetric(
-        horizontal: 14,
-        vertical: 13,
-      ),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(16),
-        borderSide: BorderSide(
-          color: Colors.black.withOpacity(0.07),
-        ),
+        borderSide: BorderSide(color: Colors.black.withOpacity(0.07)),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(16),
-        borderSide: const BorderSide(
-          color: Color(0xFF2563EB),
-        ),
+        borderSide: const BorderSide(color: Color(0xFF2563EB)),
       ),
     );
   }
@@ -1239,9 +1194,7 @@ class _CandidatosCaptacionScreenState extends State<CandidatosCaptacionScreen> {
           decoration: BoxDecoration(
             color: const Color(0xFFF8FAFC),
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: Colors.black.withOpacity(0.07),
-            ),
+            border: Border.all(color: Colors.black.withOpacity(0.07)),
           ),
           child: Row(
             children: [
@@ -1267,11 +1220,31 @@ class _CandidatosCaptacionScreenState extends State<CandidatosCaptacionScreen> {
 
   Widget _pipelineResumen() {
     final items = [
-      ['CV', candidatosPorEstado('CV_RECIBIDO').length, const Color(0xFF2563EB)],
-      ['Contacto', candidatosPorEstado('CONTACTADO').length, const Color(0xFFF97316)],
-      ['Entrev.', candidatosPorEstado('ENTREVISTAS').length, const Color(0xFFEAB308)],
-      ['Selec.', candidatosPorEstado('SELECCIONADO').length, const Color(0xFF22C55E)],
-      ['Incorp.', candidatosPorEstado('INCORPORADO').length, const Color(0xFF14B8A6)],
+      [
+        'CV',
+        candidatosPorEstado('CV_RECIBIDO').length,
+        const Color(0xFF2563EB),
+      ],
+      [
+        'Contacto',
+        candidatosPorEstado('CONTACTADO').length,
+        const Color(0xFFF97316),
+      ],
+      [
+        'Entrev.',
+        candidatosPorEstado('ENTREVISTAS').length,
+        const Color(0xFFEAB308),
+      ],
+      [
+        'Selec.',
+        candidatosPorEstado('SELECCIONADO').length,
+        const Color(0xFF22C55E),
+      ],
+      [
+        'Incorp.',
+        candidatosPorEstado('INCORPORADO').length,
+        const Color(0xFF14B8A6),
+      ],
     ];
 
     return Container(
@@ -1411,18 +1384,17 @@ class _CandidatosCaptacionScreenState extends State<CandidatosCaptacionScreen> {
                 ),
               ),
               Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 11,
+                  vertical: 6,
+                ),
                 decoration: BoxDecoration(
                   color: color.withOpacity(0.12),
                   borderRadius: BorderRadius.circular(30),
                 ),
                 child: Text(
                   "${lista.length}",
-                  style: TextStyle(
-                    color: color,
-                    fontWeight: FontWeight.w900,
-                  ),
+                  style: TextStyle(color: color, fontWeight: FontWeight.w900),
                 ),
               ),
             ],
@@ -1434,277 +1406,268 @@ class _CandidatosCaptacionScreenState extends State<CandidatosCaptacionScreen> {
   }
 
   Widget _candidateCard(Map<String, dynamic> c) {
-  final estado = c['estado']?.toString() ?? '';
-  final color = estadoColor(estado);
-  final nombre = c['nombre']?.toString() ?? 'Candidato sin nombre';
-  final telefono = c['telefono']?.toString() ?? 'Sin teléfono';
-  final email = c['email']?.toString() ?? '';
-  final origen = c['origen']?.toString() ?? 'Sin origen';
-  final progreso = progresoEstado(estado);
-  final puedeAvanzar = flujo.contains(estado) && estado != 'INCORPORADO';
-  final responsableNombre =
-      c['asignado_nombre']?.toString().trim() ?? '';
-  final responsableRol =
-      c['asignado_rol']?.toString().trim() ?? '';
+    final estado = c['estado']?.toString() ?? '';
+    final color = estadoColor(estado);
+    final nombre = c['nombre']?.toString() ?? 'Candidato sin nombre';
+    final telefono = c['telefono']?.toString() ?? 'Sin teléfono';
+    final email = c['email']?.toString() ?? '';
+    final origen = c['origen']?.toString() ?? 'Sin origen';
+    final progreso = progresoEstado(estado);
+    final puedeAvanzar = flujo.contains(estado) && estado != 'INCORPORADO';
+    final responsableNombre = c['asignado_nombre']?.toString().trim() ?? '';
+    final responsableRol = c['asignado_rol']?.toString().trim() ?? '';
 
-  return _HoverCandidateCard(
-    color: color,
-    onTap: () => abrirDetalle(c),
-    child: Container(
-      margin: const EdgeInsets.only(top: 10),
-      padding: const EdgeInsets.all(15),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF8FAFC),
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(
-          color: color.withOpacity(0.18),
+    return _HoverCandidateCard(
+      color: color,
+      onTap: () => abrirDetalle(c),
+      child: Container(
+        margin: const EdgeInsets.only(top: 10),
+        padding: const EdgeInsets.all(15),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF8FAFC),
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: color.withOpacity(0.18)),
         ),
-      ),
-      child: Column(
-        children: [
-          Row(
-            children: [
-              Container(
-                height: 56,
-                width: 56,
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      color,
-                      color.withOpacity(0.65),
+        child: Column(
+          children: [
+            Row(
+              children: [
+                Container(
+                  height: 56,
+                  width: 56,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [color, color.withOpacity(0.65)],
+                    ),
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: [
+                      BoxShadow(
+                        color: color.withOpacity(0.28),
+                        blurRadius: 18,
+                        offset: const Offset(0, 8),
+                      ),
                     ],
                   ),
-                  borderRadius: BorderRadius.circular(20),
-                  boxShadow: [
-                    BoxShadow(
-                      color: color.withOpacity(0.28),
-                      blurRadius: 18,
-                      offset: const Offset(0, 8),
-                    ),
-                  ],
-                ),
-                child: Center(
-                  child: Text(
-                    nombre.trim().isNotEmpty
-                        ? nombre.trim()[0].toUpperCase()
-                        : "?",
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 23,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                ),
-              ),
-
-              const SizedBox(width: 13),
-
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      nombre,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+                  child: Center(
+                    child: Text(
+                      nombre.trim().isNotEmpty
+                          ? nombre.trim()[0].toUpperCase()
+                          : "?",
                       style: const TextStyle(
-                        color: Color(0xFF111827),
-                        fontSize: 16,
+                        color: Colors.white,
+                        fontSize: 23,
                         fontWeight: FontWeight.w900,
                       ),
                     ),
-                    const SizedBox(height: 5),
-                    Row(
-                      children: [
-                        const Icon(
-                          Icons.phone_rounded,
-                          size: 13,
-                          color: Color(0xFF64748B),
+                  ),
+                ),
+
+                const SizedBox(width: 13),
+
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        nombre,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: Color(0xFF111827),
+                          fontSize: 16,
+                          fontWeight: FontWeight.w900,
                         ),
-                        const SizedBox(width: 5),
-                        Expanded(
-                          child: Text(
-                            telefono,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              color: Colors.black.withOpacity(0.50),
-                              fontSize: 12,
-                              fontWeight: FontWeight.w700,
+                      ),
+                      const SizedBox(height: 5),
+                      Row(
+                        children: [
+                          const Icon(
+                            Icons.phone_rounded,
+                            size: 13,
+                            color: Color(0xFF64748B),
+                          ),
+                          const SizedBox(width: 5),
+                          Expanded(
+                            child: Text(
+                              telefono,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: Colors.black.withOpacity(0.50),
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                              ),
                             ),
                           ),
+                        ],
+                      ),
+                      if (email.isNotEmpty) ...[
+                        const SizedBox(height: 3),
+                        Row(
+                          children: [
+                            const Icon(
+                              Icons.mail_rounded,
+                              size: 13,
+                              color: Color(0xFF94A3B8),
+                            ),
+                            const SizedBox(width: 5),
+                            Expanded(
+                              child: Text(
+                                email,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  color: Colors.black.withOpacity(0.38),
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ],
-                    ),
-                    if (email.isNotEmpty) ...[
-                      const SizedBox(height: 3),
-                      Row(
-                        children: [
-                          const Icon(
-                            Icons.mail_rounded,
-                            size: 13,
-                            color: Color(0xFF94A3B8),
-                          ),
-                          const SizedBox(width: 5),
-                          Expanded(
-                            child: Text(
-                              email,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                color: Colors.black.withOpacity(0.38),
-                                fontSize: 11,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                    if (responsableNombre.isNotEmpty) ...[
-                      const SizedBox(height: 4),
-                      Row(
-                        children: [
-                          const Icon(
-                            Icons.assignment_ind_rounded,
-                            size: 13,
-                            color: Color(0xFF2563EB),
-                          ),
-                          const SizedBox(width: 5),
-                          Expanded(
-                            child: Text(
-                              responsableRol.isEmpty
-                                  ? responsableNombre
-                                  : '$responsableNombre · '
-                                      '${_rolVisible(responsableRol)}',
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                color: Color(0xFF2563EB),
-                                fontSize: 11,
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-
-              const SizedBox(width: 10),
-
-              Container(
-                height: 34,
-                width: 34,
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: Colors.black.withOpacity(0.05),
-                  ),
-                ),
-                child: const Icon(
-                  Icons.arrow_forward_ios_rounded,
-                  size: 15,
-                  color: Color(0xFF94A3B8),
-                ),
-              ),
-            ],
-          ),
-
-          const SizedBox(height: 15),
-
-          Row(
-            children: [
-              Expanded(
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(20),
-                  child: LinearProgressIndicator(
-                    value: progreso,
-                    minHeight: 9,
-                    backgroundColor: Colors.black.withOpacity(0.06),
-                    color: color,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Text(
-                "${(progreso * 100).toStringAsFixed(0)}%",
-                style: TextStyle(
-                  color: color,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-            ],
-          ),
-
-          const SizedBox(height: 13),
-
-          Row(
-            children: [
-              _miniChip(estadoTexto(estado), color),
-              const SizedBox(width: 8),
-              _miniChip(origen, const Color(0xFF64748B)),
-              const Spacer(),
-              if (puedeAvanzar)
-                MouseRegion(
-                  cursor: SystemMouseCursors.click,
-                  child: Material(
-                    color: Colors.transparent,
-                    child: InkWell(
-                      borderRadius: BorderRadius.circular(30),
-                      splashColor: Colors.white.withOpacity(0.20),
-                      highlightColor: Colors.white.withOpacity(0.08),
-                      onTap: () => avanzar(c),
-                      child: Ink(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 8,
-                        ),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF111827),
-                          borderRadius: BorderRadius.circular(30),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.16),
-                              blurRadius: 12,
-                              offset: const Offset(0, 6),
-                            ),
-                          ],
-                        ),
-                        child: const Row(
-                          mainAxisSize: MainAxisSize.min,
+                      if (responsableNombre.isNotEmpty) ...[
+                        const SizedBox(height: 4),
+                        Row(
                           children: [
-                            Text(
-                              "Avanzar",
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 11,
-                                fontWeight: FontWeight.w900,
+                            const Icon(
+                              Icons.assignment_ind_rounded,
+                              size: 13,
+                              color: Color(0xFF2563EB),
+                            ),
+                            const SizedBox(width: 5),
+                            Expanded(
+                              child: Text(
+                                responsableRol.isEmpty
+                                    ? responsableNombre
+                                    : '$responsableNombre · '
+                                          '${_rolVisible(responsableRol)}',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  color: Color(0xFF2563EB),
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w800,
+                                ),
                               ),
                             ),
-                            SizedBox(width: 5),
-                            Icon(
-                              Icons.arrow_forward_rounded,
-                              color: Colors.white,
-                              size: 14,
-                            ),
                           ],
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+
+                const SizedBox(width: 10),
+
+                Container(
+                  height: 34,
+                  width: 34,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: Colors.black.withOpacity(0.05)),
+                  ),
+                  child: const Icon(
+                    Icons.arrow_forward_ios_rounded,
+                    size: 15,
+                    color: Color(0xFF94A3B8),
+                  ),
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 15),
+
+            Row(
+              children: [
+                Expanded(
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(20),
+                    child: LinearProgressIndicator(
+                      value: progreso,
+                      minHeight: 9,
+                      backgroundColor: Colors.black.withOpacity(0.06),
+                      color: color,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Text(
+                  "${(progreso * 100).toStringAsFixed(0)}%",
+                  style: TextStyle(
+                    color: color,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 13),
+
+            Row(
+              children: [
+                _miniChip(estadoTexto(estado), color),
+                const SizedBox(width: 8),
+                _miniChip(origen, const Color(0xFF64748B)),
+                const Spacer(),
+                if (puedeAvanzar)
+                  MouseRegion(
+                    cursor: SystemMouseCursors.click,
+                    child: Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(30),
+                        splashColor: Colors.white.withOpacity(0.20),
+                        highlightColor: Colors.white.withOpacity(0.08),
+                        onTap: () => avanzar(c),
+                        child: Ink(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 8,
+                          ),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF111827),
+                            borderRadius: BorderRadius.circular(30),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.16),
+                                blurRadius: 12,
+                                offset: const Offset(0, 6),
+                              ),
+                            ],
+                          ),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                "Avanzar",
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w900,
+                                ),
+                              ),
+                              SizedBox(width: 5),
+                              Icon(
+                                Icons.arrow_forward_rounded,
+                                color: Colors.white,
+                                size: 14,
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     ),
                   ),
-                ),
-            ],
-          ),
-        ],
+              ],
+            ),
+          ],
+        ),
       ),
-    ),
-  );
-}
+    );
+  }
 
   Widget _miniChip(String text, Color color) {
     return Flexible(
@@ -1811,8 +1774,8 @@ class _HoverCandidateCardState extends State<_HoverCandidateCard> {
     final scale = pressing
         ? 0.985
         : hovering
-            ? 1.018
-            : 1.0;
+        ? 1.018
+        : 1.0;
 
     return MouseRegion(
       cursor: SystemMouseCursors.click,

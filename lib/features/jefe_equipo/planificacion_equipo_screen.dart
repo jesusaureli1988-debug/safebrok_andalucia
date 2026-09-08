@@ -37,6 +37,9 @@ class _PlanificacionEquipoScreenState extends State<PlanificacionEquipoScreen> {
       final jefe = await supabase
           .from('usuarios')
           .select('id')
+          .or(
+            'estado.is.null,estado.not.in.(inactivo,Inactivo,INACTIVO,baja,Baja,BAJA,desactivado,Desactivado,DESACTIVADO,bloqueado,Bloqueado,BLOQUEADO,suspendido,Suspendido,SUSPENDIDO)',
+          )
           .eq('auth_id', user.id)
           .single();
 
@@ -45,6 +48,9 @@ class _PlanificacionEquipoScreenState extends State<PlanificacionEquipoScreen> {
       final agentesData = await supabase
           .from('usuarios')
           .select()
+          .or(
+            'estado.is.null,estado.not.in.(inactivo,Inactivo,INACTIVO,baja,Baja,BAJA,desactivado,Desactivado,DESACTIVADO,bloqueado,Bloqueado,BLOQUEADO,suspendido,Suspendido,SUSPENDIDO)',
+          )
           .eq('parent_id', jefeId)
           .eq('rol_usuario', 'agente');
 
@@ -53,9 +59,9 @@ class _PlanificacionEquipoScreenState extends State<PlanificacionEquipoScreen> {
       final planData = idsAgentes.isEmpty
           ? []
           : await supabase
-              .from('planificacion_equipo')
-              .select()
-              .inFilter('agente_id', idsAgentes);
+                .from('planificacion_equipo')
+                .select()
+                .inFilter('agente_id', idsAgentes);
 
       if (!mounted) return;
 
@@ -74,9 +80,7 @@ class _PlanificacionEquipoScreenState extends State<PlanificacionEquipoScreen> {
 
   Map<String, dynamic>? getPlan(dynamic agenteId) {
     try {
-      return planificaciones.firstWhere(
-        (p) => p['agente_id'] == agenteId,
-      );
+      return planificaciones.firstWhere((p) => p['agente_id'] == agenteId);
     } catch (_) {
       return null;
     }
@@ -111,10 +115,7 @@ class _PlanificacionEquipoScreenState extends State<PlanificacionEquipoScreen> {
   double get promedioCumplimiento {
     if (agentes.isEmpty) return 0;
 
-    final total = agentes.fold<double>(
-      0,
-      (sum, a) => sum + progresoAgente(a),
-    );
+    final total = agentes.fold<double>(0, (sum, a) => sum + progresoAgente(a));
 
     return total / agentes.length;
   }
@@ -124,10 +125,10 @@ class _PlanificacionEquipoScreenState extends State<PlanificacionEquipoScreen> {
   }
 
   Color colorProgreso(double progreso) {
-    if (progreso >= 1) return const Color(0xFF22C55E);
-    if (progreso >= 0.75) return const Color(0xFF22D3EE);
-    if (progreso >= 0.50) return const Color(0xFFF59E0B);
-    return const Color(0xFFEF4444);
+    if (progreso >= 1) return const Color(0xFF0AAEAE);
+    if (progreso >= 0.75) return const Color(0xFF20C7C2);
+    if (progreso >= 0.50) return const Color(0xFF0A7F91);
+    return const Color(0xFFE74646);
   }
 
   String estadoTexto(double progreso) {
@@ -156,17 +157,15 @@ class _PlanificacionEquipoScreenState extends State<PlanificacionEquipoScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF020B1F),
+      backgroundColor: const Color(0xFFF2FCFD),
       body: loading
           ? const Center(
-              child: CircularProgressIndicator(
-                color: Color(0xFF22D3EE),
-              ),
+              child: CircularProgressIndicator(color: Color(0xFF20C7C2)),
             )
           : RefreshIndicator(
               onRefresh: cargarDatos,
-              color: const Color(0xFF22D3EE),
-              backgroundColor: const Color(0xFF071A3A),
+              color: const Color(0xFF20C7C2),
+              backgroundColor: const Color(0xFFFFFFFF),
               child: CustomScrollView(
                 physics: const AlwaysScrollableScrollPhysics(),
                 slivers: [
@@ -186,13 +185,13 @@ class _PlanificacionEquipoScreenState extends State<PlanificacionEquipoScreen> {
                         children: const [
                           Icon(
                             Icons.manage_accounts_rounded,
-                            color: Color(0xFF22D3EE),
+                            color: Color(0xFF20C7C2),
                           ),
                           SizedBox(width: 10),
                           Text(
                             "Agentes del equipo",
                             style: TextStyle(
-                              color: Colors.white,
+                              color: const Color(0xFF071A3A),
                               fontSize: 22,
                               fontWeight: FontWeight.w900,
                             ),
@@ -219,9 +218,7 @@ class _PlanificacionEquipoScreenState extends State<PlanificacionEquipoScreen> {
                       },
                     ),
 
-                  const SliverToBoxAdapter(
-                    child: SizedBox(height: 40),
-                  ),
+                  const SliverToBoxAdapter(child: SizedBox(height: 40)),
                 ],
               ),
             ),
@@ -233,11 +230,7 @@ class _PlanificacionEquipoScreenState extends State<PlanificacionEquipoScreen> {
       padding: const EdgeInsets.fromLTRB(20, 54, 20, 28),
       decoration: const BoxDecoration(
         gradient: LinearGradient(
-          colors: [
-            Color(0xFF020B1F),
-            Color(0xFF061A3D),
-            Color(0xFF020B1F),
-          ],
+          colors: [Color(0xFFF2FCFD), Color(0xFFFFFFFF), Color(0xFFF2FCFD)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
@@ -254,7 +247,7 @@ class _PlanificacionEquipoScreenState extends State<PlanificacionEquipoScreen> {
                 shape: BoxShape.circle,
                 gradient: RadialGradient(
                   colors: [
-                    const Color(0xFF22D3EE).withOpacity(0.30),
+                    const Color(0xFF20C7C2).withOpacity(0.30),
                     Colors.transparent,
                   ],
                 ),
@@ -274,7 +267,7 @@ class _PlanificacionEquipoScreenState extends State<PlanificacionEquipoScreen> {
                       color: Colors.white,
                     ),
                     style: IconButton.styleFrom(
-                      backgroundColor: Colors.white.withOpacity(0.08),
+                      backgroundColor: Colors.white,
                       fixedSize: const Size(48, 48),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(18),
@@ -289,7 +282,7 @@ class _PlanificacionEquipoScreenState extends State<PlanificacionEquipoScreen> {
                       color: Colors.white,
                     ),
                     style: IconButton.styleFrom(
-                      backgroundColor: Colors.white.withOpacity(0.08),
+                      backgroundColor: Colors.white,
                       fixedSize: const Size(48, 48),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(18),
@@ -310,16 +303,16 @@ class _PlanificacionEquipoScreenState extends State<PlanificacionEquipoScreen> {
                       shape: BoxShape.circle,
                       gradient: const LinearGradient(
                         colors: [
-                          Color(0xFF22D3EE),
-                          Color(0xFF2563EB),
-                          Color(0xFF7C3AED),
+                          Color(0xFF20C7C2),
+                          Color(0xFF0A7F91),
+                          Color(0xFF0A7F91),
                         ],
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
                       ),
                       boxShadow: [
                         BoxShadow(
-                          color: const Color(0xFF22D3EE).withOpacity(0.35),
+                          color: const Color(0xFF20C7C2).withOpacity(0.35),
                           blurRadius: 24,
                           offset: const Offset(0, 10),
                         ),
@@ -339,7 +332,7 @@ class _PlanificacionEquipoScreenState extends State<PlanificacionEquipoScreen> {
                           TextSpan(
                             text: "Planificación\n",
                             style: TextStyle(
-                              color: Colors.white,
+                              color: const Color(0xFF071A3A),
                               fontSize: 36,
                               fontWeight: FontWeight.w900,
                               height: 1,
@@ -348,7 +341,7 @@ class _PlanificacionEquipoScreenState extends State<PlanificacionEquipoScreen> {
                           TextSpan(
                             text: "del equipo",
                             style: TextStyle(
-                              color: Color(0xFF22D3EE),
+                              color: Color(0xFF20C7C2),
                               fontSize: 34,
                               fontWeight: FontWeight.w900,
                               height: 1,
@@ -366,7 +359,7 @@ class _PlanificacionEquipoScreenState extends State<PlanificacionEquipoScreen> {
               const Text(
                 "Revisa el progreso y objetivos semanales de cada agente",
                 style: TextStyle(
-                  color: Color(0xFFCBD5E1),
+                  color: Color(0xFF64748B),
                   fontSize: 16,
                   fontWeight: FontWeight.w600,
                   height: 1.35,
@@ -389,7 +382,7 @@ class _PlanificacionEquipoScreenState extends State<PlanificacionEquipoScreen> {
             icono: Icons.groups_rounded,
             valor: "${agentes.length}",
             titulo: "Agentes\nen equipo",
-            color: const Color(0xFF2563EB),
+            color: const Color(0xFF0A7F91),
           ),
         ),
         const SizedBox(width: 12),
@@ -398,7 +391,7 @@ class _PlanificacionEquipoScreenState extends State<PlanificacionEquipoScreen> {
             icono: Icons.track_changes_rounded,
             valor: "$promedio%",
             titulo: "Promedio\ncumplimiento",
-            color: const Color(0xFF14B8A6),
+            color: const Color(0xFF0AAEAE),
           ),
         ),
         const SizedBox(width: 12),
@@ -407,7 +400,7 @@ class _PlanificacionEquipoScreenState extends State<PlanificacionEquipoScreen> {
             icono: Icons.trending_up_rounded,
             valor: "$objetivosActivos",
             titulo: "Objetivos\nactivos",
-            color: const Color(0xFF8B5CF6),
+            color: const Color(0xFF0A7F91),
           ),
         ),
       ],
@@ -425,10 +418,7 @@ class _PlanificacionEquipoScreenState extends State<PlanificacionEquipoScreen> {
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [
-            color.withOpacity(0.32),
-            const Color(0xFF061329),
-          ],
+          colors: [color.withOpacity(0.32), const Color(0xFFFFFFFF)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
@@ -459,7 +449,7 @@ class _PlanificacionEquipoScreenState extends State<PlanificacionEquipoScreen> {
           Text(
             valor,
             style: const TextStyle(
-              color: Colors.white,
+              color: const Color(0xFF071A3A),
               fontSize: 27,
               fontWeight: FontWeight.w900,
               height: 1,
@@ -469,7 +459,7 @@ class _PlanificacionEquipoScreenState extends State<PlanificacionEquipoScreen> {
           Text(
             titulo,
             style: const TextStyle(
-              color: Color(0xFFE2E8F0),
+              color: Color(0xFFC7ECEC),
               fontSize: 12,
               fontWeight: FontWeight.w700,
               height: 1.2,
@@ -481,8 +471,8 @@ class _PlanificacionEquipoScreenState extends State<PlanificacionEquipoScreen> {
   }
 
   Widget _agenteCard(Map<String, dynamic> agente) {
-    final nombre =
-        "${agente['nombre'] ?? ''} ${agente['apellidos'] ?? ''}".trim();
+    final nombre = "${agente['nombre'] ?? ''} ${agente['apellidos'] ?? ''}"
+        .trim();
 
     final objetivo = objetivoAgente(agente);
     final realizado = realizadoAgente(agente);
@@ -514,10 +504,7 @@ class _PlanificacionEquipoScreenState extends State<PlanificacionEquipoScreen> {
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
               gradient: const LinearGradient(
-                colors: [
-                  Color(0xFF071A3A),
-                  Color(0xFF061329),
-                ],
+                colors: [Color(0xFFFFFFFF), Color(0xFFFFFFFF)],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
@@ -546,10 +533,7 @@ class _PlanificacionEquipoScreenState extends State<PlanificacionEquipoScreen> {
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         gradient: const LinearGradient(
-                          colors: [
-                            Color(0xFF2563EB),
-                            Color(0xFF7C3AED),
-                          ],
+                          colors: [Color(0xFF0A7F91), Color(0xFF0A7F91)],
                           begin: Alignment.topLeft,
                           end: Alignment.bottomRight,
                         ),
@@ -561,7 +545,7 @@ class _PlanificacionEquipoScreenState extends State<PlanificacionEquipoScreen> {
                         child: Text(
                           iniciales(agente),
                           style: const TextStyle(
-                            color: Colors.white,
+                            color: const Color(0xFF071A3A),
                             fontSize: 20,
                             fontWeight: FontWeight.w900,
                           ),
@@ -578,7 +562,7 @@ class _PlanificacionEquipoScreenState extends State<PlanificacionEquipoScreen> {
                           color: color,
                           shape: BoxShape.circle,
                           border: Border.all(
-                            color: const Color(0xFF061329),
+                            color: const Color(0xFFFFFFFF),
                             width: 2,
                           ),
                         ),
@@ -598,7 +582,7 @@ class _PlanificacionEquipoScreenState extends State<PlanificacionEquipoScreen> {
                       CircularProgressIndicator(
                         value: progreso.clamp(0.0, 1.4),
                         strokeWidth: 6,
-                        backgroundColor: Colors.white.withOpacity(0.10),
+                        backgroundColor: Colors.white,
                         color: color,
                       ),
                       Text(
@@ -624,7 +608,7 @@ class _PlanificacionEquipoScreenState extends State<PlanificacionEquipoScreen> {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
-                          color: Colors.white,
+                          color: const Color(0xFF071A3A),
                           fontSize: 17,
                           fontWeight: FontWeight.w900,
                         ),
@@ -633,7 +617,7 @@ class _PlanificacionEquipoScreenState extends State<PlanificacionEquipoScreen> {
                       Text(
                         "Objetivo: $objetivo contactos",
                         style: const TextStyle(
-                          color: Color(0xFFCBD5E1),
+                          color: Color(0xFF64748B),
                           fontSize: 13,
                           fontWeight: FontWeight.w600,
                         ),
@@ -644,7 +628,7 @@ class _PlanificacionEquipoScreenState extends State<PlanificacionEquipoScreen> {
                         child: LinearProgressIndicator(
                           value: progreso.clamp(0.0, 1.0),
                           minHeight: 7,
-                          backgroundColor: Colors.white.withOpacity(0.10),
+                          backgroundColor: Colors.white,
                           color: color,
                         ),
                       ),
@@ -663,7 +647,7 @@ class _PlanificacionEquipoScreenState extends State<PlanificacionEquipoScreen> {
                             TextSpan(
                               text: " / $objetivo contactos",
                               style: const TextStyle(
-                                color: Color(0xFFE2E8F0),
+                                color: Color(0xFFC7ECEC),
                                 fontSize: 13,
                                 fontWeight: FontWeight.w600,
                               ),
@@ -692,11 +676,7 @@ class _PlanificacionEquipoScreenState extends State<PlanificacionEquipoScreen> {
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(
-                            estadoIcono(progreso),
-                            color: color,
-                            size: 15,
-                          ),
+                          Icon(estadoIcono(progreso), color: color, size: 15),
                           const SizedBox(width: 5),
                           Text(
                             estado,
@@ -715,8 +695,8 @@ class _PlanificacionEquipoScreenState extends State<PlanificacionEquipoScreen> {
                       height: 38,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: Colors.white.withOpacity(0.07),
-                        border: Border.all(color: Colors.white.withOpacity(0.10)),
+                        color: Colors.white,
+                        border: Border.all(color: Colors.white),
                       ),
                       child: const Icon(
                         Icons.chevron_right_rounded,
@@ -746,14 +726,14 @@ class _PlanificacionEquipoScreenState extends State<PlanificacionEquipoScreen> {
               height: 86,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: const Color(0xFF22D3EE).withOpacity(0.12),
+                color: const Color(0xFF20C7C2).withOpacity(0.12),
                 border: Border.all(
-                  color: const Color(0xFF22D3EE).withOpacity(0.35),
+                  color: const Color(0xFF20C7C2).withOpacity(0.35),
                 ),
               ),
               child: const Icon(
                 Icons.groups_rounded,
-                color: Color(0xFF22D3EE),
+                color: Color(0xFF20C7C2),
                 size: 42,
               ),
             ),
@@ -762,7 +742,7 @@ class _PlanificacionEquipoScreenState extends State<PlanificacionEquipoScreen> {
               "No hay agentes asignados",
               textAlign: TextAlign.center,
               style: TextStyle(
-                color: Colors.white,
+                color: const Color(0xFF071A3A),
                 fontSize: 21,
                 fontWeight: FontWeight.w900,
               ),
@@ -772,7 +752,7 @@ class _PlanificacionEquipoScreenState extends State<PlanificacionEquipoScreen> {
               "Cuando tengas agentes en tu equipo, aparecerán aquí con su planificación y progreso semanal.",
               textAlign: TextAlign.center,
               style: TextStyle(
-                color: Color(0xFF94A3B8),
+                color: Color(0xFF64748B),
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
                 height: 1.4,

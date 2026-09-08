@@ -1,4 +1,36 @@
 
+[auth]
+site_url = "http://localhost:3000"
+additional_redirect_urls = ["com.safebrok.andalucia://reset-password", "https://ytmxjavihwylrswphczc.supabase.co/functions/v1/crear-password", "https://ytmxjavihwylrswphczc.supabase.co/storage/v1/object/public/password-pages/crear-password.html", "https://safebrok-acceso-47f45.web.app/crear-password.html"]
+
+[auth.rate_limit]
+sign_in_sign_ups = 2000
+token_verifications = 31
+
+[auth.mfa.totp]
+enroll_enabled = true
+verify_enabled = true
+
+[auth.email]
+max_frequency = "1m"
+otp_length = 8
+
+[auth.email.template.invite]
+subject = "Tu acceso a SafeBrok está listo"
+content_path = "./supabase/templates/invite.html"
+
+[auth.email.template.recovery]
+subject = "Crea o restablece tu contraseña de SafeBrok"
+content_path = "./supabase/templates/recovery.html"
+
+[storage.vector]
+enabled = false
+
+[functions.crear-password]
+enabled = true
+verify_jwt = false
+entrypoint = "./functions/crear-password/index.ts"
+
 [functions.enviar-tpv-recibo]
 enabled = true
 # Valida el JWT actual con auth.getUser() dentro de la función.

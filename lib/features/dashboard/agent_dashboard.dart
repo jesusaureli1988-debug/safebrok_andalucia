@@ -11,7 +11,7 @@ class _AgentDashboardState extends State<AgentDashboard> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF08121C),
+      backgroundColor: const Color(0xFFF2FCFD),
       appBar: AppBar(
         title: const Text("Mi Panel Agente"),
         backgroundColor: Colors.transparent,
@@ -19,7 +19,7 @@ class _AgentDashboardState extends State<AgentDashboard> {
       body: const Center(
         child: Text(
           "Aquí van tus clientes + ventas",
-          style: TextStyle(color: Colors.white),
+          style: TextStyle(color: const Color(0xFF071A3A)),
         ),
       ),
     );

@@ -14,6 +14,13 @@ const MAX_CARACTERES_CONTEXTO = 150_000;
 const MAX_LONGITUD_PREGUNTA = 8000;
 const ZONA_HORARIA_NEGOCIO = "Europe/Madrid";
 const CAMPO_PRIMA_VENTAS = "prima_anual_neta";
+const AUTO_COMPUTE_FROM = "2026-08-27";
+function primaComputableVenta(fila: any, campo = CAMPO_PRIMA_VENTAS): number {
+  const producto = String(fila?.producto ?? fila?.ramo ?? fila?.tipo_seguro ?? "").trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  const esAuto = producto.includes("auto") || producto.includes("coche") || producto.includes("vehicul") || producto.includes("turismo") || producto.includes("moto");
+  const fecha = String(fila?.fecha_efecto ?? fila?.FECHA_EFECTO ?? "").slice(0, 10);
+  return convertirNumero(fila?.[campo]) * (esAuto && fecha >= AUTO_COMPUTE_FROM ? 0.5 : 1);
+}
 const CAMPOS_FECHA_VENTA = [
   "created_at",
   "fecha_venta",
@@ -1620,8 +1627,8 @@ async function construirContextoFinanciero({
     );
     if (!tarifa) return 0;
     const base = tarifa.base_calculo === "prima_bruta"
-      ? convertirNumero(venta.prima_anual_bruta)
-      : convertirNumero(venta.prima_anual_neta);
+      ? primaComputableVenta(venta, "prima_anual_bruta")
+      : primaComputableVenta(venta, "prima_anual_neta");
     return base * convertirNumero(tarifa.porcentaje_comision) / 100;
   };
   const resumir = (ventas: any[], facturas: any[]) => {
@@ -5388,7 +5395,7 @@ function agruparVentasPor(
   for (const fila of filas) {
     const nombre = obtenerNombre(fila).trim() || "Sin clasificar";
     const actual = mapa.get(nombre) ?? { importe: 0, operaciones: 0 };
-    actual.importe += convertirNumero(fila?.[CAMPO_PRIMA_VENTAS]);
+    actual.importe += primaComputableVenta(fila);
     actual.operaciones += 1;
     mapa.set(nombre, actual);
   }
@@ -5415,7 +5422,7 @@ function agruparVentasPorMes(filas: any[]) {
       operaciones: 0,
       fecha: new Date(Date.UTC(fecha.getUTCFullYear(), fecha.getUTCMonth(), 1)),
     };
-    actual.importe += convertirNumero(fila?.[CAMPO_PRIMA_VENTAS]);
+    actual.importe += primaComputableVenta(fila);
     actual.operaciones += 1;
     mapa.set(clave, actual);
   }
@@ -5465,7 +5472,7 @@ function calcularUltimaVentaPorPersona(
 
 function sumarCampoExacto(filas: any[], nombre: string): number {
   return filas.reduce(
-    (total, fila) => total + convertirNumero(fila?.[nombre]),
+    (total, fila) => total + (nombre === CAMPO_PRIMA_VENTAS ? primaComputableVenta(fila, nombre) : convertirNumero(fila?.[nombre])),
     0,
   );
 }

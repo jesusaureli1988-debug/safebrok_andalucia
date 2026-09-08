@@ -34,10 +34,7 @@ class UpdateService {
   static Future<void> downloadAndInstall(String url) async {
     final uri = Uri.parse(url);
 
-    if (!await launchUrl(
-      uri,
-      mode: LaunchMode.externalApplication,
-    )) {
+    if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
       throw 'No se pudo abrir el enlace de actualización';
     }
   }

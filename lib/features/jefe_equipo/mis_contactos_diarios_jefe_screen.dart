@@ -27,159 +27,158 @@ class _MisContactosDiariosJefeScreenState
   String _formatearFecha(DateTime date) {
     return "${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}";
   }
- bool _esDiaLaborable(DateTime date) {
-  return date.weekday >= DateTime.monday &&
-      date.weekday <= DateTime.friday;
-}
 
-int get totalDias => tareas.length;
-
-int get diasRealizados =>
-    tareas.where((t) => t['realizada'] == true).length;
-
-int get diasPendientes =>
-    tareas.where((t) => t['realizada'] != true).length;
-
-int get contactosTotales => tareas.fold<int>(
-      0,
-      (sum, t) => sum + ((t['total_contactos'] ?? 0) as num).toInt(),
-    );
-
-int get contactosEquipo => tareas.fold<int>(
-      0,
-      (sum, t) => sum + ((t['contactos_equipo'] ?? 0) as num).toInt(),
-    );
-
-int get contactosPropios => tareas.fold<int>(
-      0,
-      (sum, t) => sum + ((t['contactos_propios'] ?? 0) as num).toInt(),
-    );
-
-double get porcentajeCompletado {
-  if (totalDias == 0) return 0;
-  return diasRealizados / totalDias;
-}
-
-String _fechaBonita(dynamic value) {
-  try {
-    final fecha = DateTime.parse(value.toString());
-    return "${fecha.day.toString().padLeft(2, '0')}/"
-        "${fecha.month.toString().padLeft(2, '0')}/"
-        "${fecha.year}";
-  } catch (_) {
-    return "Sin fecha";
+  bool _esDiaLaborable(DateTime date) {
+    return date.weekday >= DateTime.monday && date.weekday <= DateTime.friday;
   }
-}
 
+  int get totalDias => tareas.length;
 
+  int get diasRealizados => tareas.where((t) => t['realizada'] == true).length;
 
- Future<void> cargarTareas() async {
-  try {
-    setState(() => loading = true);
+  int get diasPendientes => tareas.where((t) => t['realizada'] != true).length;
 
-    final user = supabase.auth.currentUser;
+  int get contactosTotales => tareas.fold<int>(
+    0,
+    (sum, t) => sum + ((t['total_contactos'] ?? 0) as num).toInt(),
+  );
 
-    if (user == null) {
+  int get contactosEquipo => tareas.fold<int>(
+    0,
+    (sum, t) => sum + ((t['contactos_equipo'] ?? 0) as num).toInt(),
+  );
+
+  int get contactosPropios => tareas.fold<int>(
+    0,
+    (sum, t) => sum + ((t['contactos_propios'] ?? 0) as num).toInt(),
+  );
+
+  double get porcentajeCompletado {
+    if (totalDias == 0) return 0;
+    return diasRealizados / totalDias;
+  }
+
+  String _fechaBonita(dynamic value) {
+    try {
+      final fecha = DateTime.parse(value.toString());
+      return "${fecha.day.toString().padLeft(2, '0')}/"
+          "${fecha.month.toString().padLeft(2, '0')}/"
+          "${fecha.year}";
+    } catch (_) {
+      return "Sin fecha";
+    }
+  }
+
+  Future<void> cargarTareas() async {
+    try {
+      setState(() => loading = true);
+
+      final user = supabase.auth.currentUser;
+
+      if (user == null) {
+        setState(() {
+          tareas = [];
+          loading = false;
+        });
+        return;
+      }
+
+      final hoy = DateTime.now();
+
+      // 1. Cargamos primero las tareas existentes
+      final tareasExistentes = await supabase
+          .from('contactos_diarios_jefe_equipo')
+          .select()
+          .eq('auth_id', user.id)
+          .order('fecha', ascending: true);
+
+      final listaExistente = List<Map<String, dynamic>>.from(
+        tareasExistentes as List,
+      );
+
+      // 2. Intentamos sacar la fecha de alta del usuario
+      DateTime inicioDiario;
+
+      try {
+        final userData = await supabase
+            .from('usuarios')
+            .select('fecha_alta, created_at')
+            .or(
+              'estado.is.null,estado.not.in.(inactivo,Inactivo,INACTIVO,baja,Baja,BAJA,desactivado,Desactivado,DESACTIVADO,bloqueado,Bloqueado,BLOQUEADO,suspendido,Suspendido,SUSPENDIDO)',
+            )
+            .eq('auth_id', user.id)
+            .maybeSingle();
+
+        final fechaAltaRaw = userData?['fecha_alta'] ?? userData?['created_at'];
+
+        inicioDiario = DateTime.parse(fechaAltaRaw.toString());
+      } catch (_) {
+        // Si falla, usamos la primera tarea existente
+        if (listaExistente.isNotEmpty) {
+          inicioDiario = DateTime.parse(
+            listaExistente.first['fecha'].toString(),
+          );
+        } else {
+          inicioDiario = DateTime(hoy.year, hoy.month, 1);
+        }
+      }
+
+      final fechasExistentes = listaExistente
+          .map((e) => e['fecha'].toString().substring(0, 10))
+          .toSet();
+
+      final List<Map<String, dynamic>> insertar = [];
+
+      DateTime dia = DateTime(
+        inicioDiario.year,
+        inicioDiario.month,
+        inicioDiario.day,
+      );
+
+      while (!dia.isAfter(hoy)) {
+        if (_esDiaLaborable(dia)) {
+          final fecha = _formatearFecha(dia);
+
+          if (!fechasExistentes.contains(fecha)) {
+            insertar.add({
+              'auth_id': user.id,
+              'fecha': fecha,
+              'contactos_equipo': 0,
+              'contactos_propios': 0,
+              'total_contactos': 0,
+              'realizada': false,
+            });
+          }
+        }
+
+        dia = dia.add(const Duration(days: 1));
+      }
+
+      if (insertar.isNotEmpty) {
+        await supabase.from('contactos_diarios_jefe_equipo').insert(insertar);
+      }
+
+      // 3. Volvemos a cargar todo, ya con los días creados
+      final data = await supabase
+          .from('contactos_diarios_jefe_equipo')
+          .select()
+          .eq('auth_id', user.id)
+          .order('fecha', ascending: false);
+
+      setState(() {
+        tareas = List<Map<String, dynamic>>.from(data as List);
+        loading = false;
+      });
+    } catch (e) {
       setState(() {
         tareas = [];
         loading = false;
       });
-      return;
+
+      debugPrint("❌ ERROR CARGANDO CONTACTOS DIARIOS JEFE: $e");
     }
-
-    final hoy = DateTime.now();
-
-    // 1. Cargamos primero las tareas existentes
-    final tareasExistentes = await supabase
-        .from('contactos_diarios_jefe_equipo')
-        .select()
-        .eq('auth_id', user.id)
-        .order('fecha', ascending: true);
-
-    final listaExistente =
-        List<Map<String, dynamic>>.from(tareasExistentes as List);
-
-    // 2. Intentamos sacar la fecha de alta del usuario
-    DateTime inicioDiario;
-
-    try {
-      final userData = await supabase
-          .from('usuarios')
-          .select('fecha_alta, created_at')
-          .eq('auth_id', user.id)
-          .maybeSingle();
-
-      final fechaAltaRaw =
-          userData?['fecha_alta'] ?? userData?['created_at'];
-
-      inicioDiario = DateTime.parse(fechaAltaRaw.toString());
-    } catch (_) {
-      // Si falla, usamos la primera tarea existente
-      if (listaExistente.isNotEmpty) {
-        inicioDiario =
-            DateTime.parse(listaExistente.first['fecha'].toString());
-      } else {
-        inicioDiario = DateTime(hoy.year, hoy.month, 1);
-      }
-    }
-
-    final fechasExistentes = listaExistente
-        .map((e) => e['fecha'].toString().substring(0, 10))
-        .toSet();
-
-    final List<Map<String, dynamic>> insertar = [];
-
-    DateTime dia = DateTime(
-      inicioDiario.year,
-      inicioDiario.month,
-      inicioDiario.day,
-    );
-
-    while (!dia.isAfter(hoy)) {
-      if (_esDiaLaborable(dia)) {
-        final fecha = _formatearFecha(dia);
-
-        if (!fechasExistentes.contains(fecha)) {
-          insertar.add({
-            'auth_id': user.id,
-            'fecha': fecha,
-            'contactos_equipo': 0,
-            'contactos_propios': 0,
-            'total_contactos': 0,
-            'realizada': false,
-          });
-        }
-      }
-
-      dia = dia.add(const Duration(days: 1));
-    }
-
-    if (insertar.isNotEmpty) {
-      await supabase
-          .from('contactos_diarios_jefe_equipo')
-          .insert(insertar);
-    }
-
-    // 3. Volvemos a cargar todo, ya con los días creados
-    final data = await supabase
-        .from('contactos_diarios_jefe_equipo')
-        .select()
-        .eq('auth_id', user.id)
-        .order('fecha', ascending: false);
-
-    setState(() {
-      tareas = List<Map<String, dynamic>>.from(data as List);
-      loading = false;
-    });
-  } catch (e) {
-    setState(() {
-      tareas = [];
-      loading = false;
-    });
-
-    debugPrint("❌ ERROR CARGANDO CONTACTOS DIARIOS JEFE: $e");
   }
-}
+
   bool _esHoy(dynamic value) {
     try {
       final fecha = DateTime.parse(value.toString());
@@ -195,7 +194,7 @@ String _fechaBonita(dynamic value) {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF050816),
+      backgroundColor: const Color(0xFFF2FCFD),
       body: Stack(
         children: [
           const _BackgroundGlow(),
@@ -203,13 +202,11 @@ String _fechaBonita(dynamic value) {
           SafeArea(
             child: loading
                 ? const Center(
-                    child: CircularProgressIndicator(
-                      color: Color(0xFF38BDF8),
-                    ),
+                    child: CircularProgressIndicator(color: Color(0xFF20C7C2)),
                   )
                 : RefreshIndicator(
-                    color: const Color(0xFF38BDF8),
-                    backgroundColor: const Color(0xFF0F172A),
+                    color: const Color(0xFF20C7C2),
+                    backgroundColor: const Color(0xFFEAF8F8),
                     onRefresh: cargarTareas,
                     child: CustomScrollView(
                       physics: const AlwaysScrollableScrollPhysics(),
@@ -229,7 +226,7 @@ String _fechaBonita(dynamic value) {
                                 const Text(
                                   "Historial de actividad",
                                   style: TextStyle(
-                                    color: Colors.white,
+                                    color: const Color(0xFF071A3A),
                                     fontSize: 21,
                                     fontWeight: FontWeight.w900,
                                   ),
@@ -238,7 +235,7 @@ String _fechaBonita(dynamic value) {
                                 Text(
                                   "Control diario de contactos del jefe de equipo",
                                   style: TextStyle(
-                                    color: Colors.white.withOpacity(0.55),
+                                    color: const Color(0xFF53627A),
                                     fontSize: 13,
                                   ),
                                 ),
@@ -253,7 +250,9 @@ String _fechaBonita(dynamic value) {
                             child: Center(
                               child: Text(
                                 "No hay registros todavía",
-                                style: TextStyle(color: Colors.white70),
+                                style: TextStyle(
+                                  color: const Color(0xFF53627A),
+                                ),
                               ),
                             ),
                           )
@@ -265,9 +264,7 @@ String _fechaBonita(dynamic value) {
                             },
                           ),
 
-                        const SliverToBoxAdapter(
-                          child: SizedBox(height: 30),
-                        ),
+                        const SliverToBoxAdapter(child: SizedBox(height: 30)),
                       ],
                     ),
                   ),
@@ -286,9 +283,9 @@ String _fechaBonita(dynamic value) {
             height: 44,
             width: 44,
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.08),
+              color: Colors.white,
               borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: Colors.white.withOpacity(0.10)),
+              border: Border.all(color: Colors.white),
             ),
             child: const Icon(
               Icons.arrow_back_ios_new_rounded,
@@ -305,7 +302,7 @@ String _fechaBonita(dynamic value) {
               Text(
                 "Contactos diarios",
                 style: TextStyle(
-                  color: Colors.white,
+                  color: const Color(0xFF071A3A),
                   fontSize: 24,
                   fontWeight: FontWeight.w900,
                 ),
@@ -313,10 +310,7 @@ String _fechaBonita(dynamic value) {
               SizedBox(height: 2),
               Text(
                 "Panel de seguimiento del jefe",
-                style: TextStyle(
-                  color: Colors.white54,
-                  fontSize: 13,
-                ),
+                style: TextStyle(color: const Color(0xFF64748B), fontSize: 13),
               ),
             ],
           ),
@@ -328,24 +322,18 @@ String _fechaBonita(dynamic value) {
             width: 44,
             decoration: BoxDecoration(
               gradient: const LinearGradient(
-                colors: [
-                  Color(0xFF38BDF8),
-                  Color(0xFF6366F1),
-                ],
+                colors: [Color(0xFF20C7C2), Color(0xFF0A7F91)],
               ),
               borderRadius: BorderRadius.circular(14),
               boxShadow: [
                 BoxShadow(
-                  color: const Color(0xFF38BDF8).withOpacity(0.35),
+                  color: const Color(0xFF20C7C2).withOpacity(0.35),
                   blurRadius: 20,
                   offset: const Offset(0, 8),
                 ),
               ],
             ),
-            child: const Icon(
-              Icons.refresh_rounded,
-              color: Colors.white,
-            ),
+            child: const Icon(Icons.refresh_rounded, color: Colors.white),
           ),
         ),
       ],
@@ -365,12 +353,9 @@ String _fechaBonita(dynamic value) {
             gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
-              colors: [
-                Colors.white.withOpacity(0.16),
-                Colors.white.withOpacity(0.05),
-              ],
+              colors: [Colors.white.withOpacity(0.16), Colors.white],
             ),
-            border: Border.all(color: Colors.white.withOpacity(0.12)),
+            border: Border.all(color: Colors.white),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -383,14 +368,11 @@ String _fechaBonita(dynamic value) {
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       gradient: const LinearGradient(
-                        colors: [
-                          Color(0xFF22C55E),
-                          Color(0xFF38BDF8),
-                        ],
+                        colors: [Color(0xFF0AAEAE), Color(0xFF20C7C2)],
                       ),
                       boxShadow: [
                         BoxShadow(
-                          color: const Color(0xFF22C55E).withOpacity(0.35),
+                          color: const Color(0xFF0AAEAE).withOpacity(0.35),
                           blurRadius: 24,
                         ),
                       ],
@@ -409,7 +391,7 @@ String _fechaBonita(dynamic value) {
                         const Text(
                           "Ritmo comercial",
                           style: TextStyle(
-                            color: Colors.white,
+                            color: const Color(0xFF071A3A),
                             fontSize: 20,
                             fontWeight: FontWeight.w900,
                           ),
@@ -418,7 +400,7 @@ String _fechaBonita(dynamic value) {
                         Text(
                           "$contactosTotales contactos acumulados",
                           style: TextStyle(
-                            color: Colors.white.withOpacity(0.65),
+                            color: const Color(0xFF53627A),
                             fontSize: 13,
                           ),
                         ),
@@ -435,8 +417,8 @@ String _fechaBonita(dynamic value) {
                 child: LinearProgressIndicator(
                   value: porcentajeCompletado,
                   minHeight: 11,
-                  backgroundColor: Colors.white.withOpacity(0.10),
-                  color: const Color(0xFF22C55E),
+                  backgroundColor: Colors.white,
+                  color: const Color(0xFF0AAEAE),
                 ),
               ),
 
@@ -448,14 +430,14 @@ String _fechaBonita(dynamic value) {
                   Text(
                     "${(porcentajeCompletado * 100).toStringAsFixed(0)}% completado",
                     style: const TextStyle(
-                      color: Colors.white,
+                      color: const Color(0xFF071A3A),
                       fontWeight: FontWeight.w800,
                     ),
                   ),
                   Text(
                     "$diasRealizados de $totalDias días",
                     style: TextStyle(
-                      color: Colors.white.withOpacity(0.55),
+                      color: const Color(0xFF53627A),
                       fontSize: 13,
                     ),
                   ),
@@ -476,7 +458,7 @@ String _fechaBonita(dynamic value) {
             title: "Equipo",
             value: contactosEquipo.toString(),
             icon: Icons.groups_rounded,
-            color: const Color(0xFF38BDF8),
+            color: const Color(0xFF20C7C2),
           ),
         ),
         const SizedBox(width: 10),
@@ -494,7 +476,7 @@ String _fechaBonita(dynamic value) {
             title: "Pendientes",
             value: diasPendientes.toString(),
             icon: Icons.pending_actions_rounded,
-            color: const Color(0xFFF59E0B),
+            color: const Color(0xFF0A7F91),
           ),
         ),
       ],
@@ -510,9 +492,9 @@ String _fechaBonita(dynamic value) {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.07),
+        color: Colors.white,
         borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: Colors.white.withOpacity(0.09)),
+        border: Border.all(color: Colors.white),
       ),
       child: Column(
         children: [
@@ -521,7 +503,7 @@ String _fechaBonita(dynamic value) {
           Text(
             value,
             style: const TextStyle(
-              color: Colors.white,
+              color: const Color(0xFF071A3A),
               fontSize: 21,
               fontWeight: FontWeight.w900,
             ),
@@ -529,10 +511,7 @@ String _fechaBonita(dynamic value) {
           const SizedBox(height: 2),
           Text(
             title,
-            style: TextStyle(
-              color: Colors.white.withOpacity(0.55),
-              fontSize: 12,
-            ),
+            style: TextStyle(color: const Color(0xFF53627A), fontSize: 12),
           ),
         ],
       ),
@@ -548,8 +527,9 @@ String _fechaBonita(dynamic value) {
     final propios = tarea['contactos_propios'] ?? 0;
     final total = tarea['total_contactos'] ?? 0;
 
-    final Color estadoColor =
-        realizada ? const Color(0xFF22C55E) : const Color(0xFFF59E0B);
+    final Color estadoColor = realizada
+        ? const Color(0xFF0AAEAE)
+        : const Color(0xFF0A7F91);
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
@@ -570,15 +550,12 @@ String _fechaBonita(dynamic value) {
             gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
-              colors: [
-                estadoColor.withOpacity(0.18),
-                Colors.white.withOpacity(0.055),
-              ],
+              colors: [estadoColor.withOpacity(0.18), Colors.white],
             ),
             border: Border.all(
               color: esHoy
-                  ? const Color(0xFF38BDF8).withOpacity(0.65)
-                  : Colors.white.withOpacity(0.09),
+                  ? const Color(0xFF20C7C2).withOpacity(0.65)
+                  : Colors.white,
             ),
             boxShadow: [
               BoxShadow(
@@ -619,7 +596,7 @@ String _fechaBonita(dynamic value) {
                           child: Text(
                             esHoy ? "Tarea de hoy" : "Contactos diarios",
                             style: const TextStyle(
-                              color: Colors.white,
+                              color: const Color(0xFF071A3A),
                               fontSize: 17,
                               fontWeight: FontWeight.w900,
                             ),
@@ -633,13 +610,13 @@ String _fechaBonita(dynamic value) {
                               vertical: 3,
                             ),
                             decoration: BoxDecoration(
-                              color: const Color(0xFF38BDF8).withOpacity(0.18),
+                              color: const Color(0xFF20C7C2).withOpacity(0.18),
                               borderRadius: BorderRadius.circular(30),
                             ),
                             child: const Text(
                               "HOY",
                               style: TextStyle(
-                                color: Color(0xFF7DD3FC),
+                                color: Color(0xFF20C7C2),
                                 fontSize: 10,
                                 fontWeight: FontWeight.w900,
                               ),
@@ -654,7 +631,7 @@ String _fechaBonita(dynamic value) {
                     Text(
                       fechaTexto,
                       style: TextStyle(
-                        color: Colors.white.withOpacity(0.58),
+                        color: const Color(0xFF53627A),
                         fontSize: 13,
                       ),
                     ),
@@ -707,12 +684,12 @@ String _fechaBonita(dynamic value) {
       decoration: BoxDecoration(
         color: Colors.black.withOpacity(0.20),
         borderRadius: BorderRadius.circular(30),
-        border: Border.all(color: Colors.white.withOpacity(0.08)),
+        border: Border.all(color: Colors.white),
       ),
       child: Text(
         "$label $value",
         style: TextStyle(
-          color: Colors.white.withOpacity(0.78),
+          color: const Color(0xFF53627A),
           fontSize: 12,
           fontWeight: FontWeight.w700,
         ),
@@ -731,17 +708,17 @@ class _BackgroundGlow extends StatelessWidget {
         Positioned(
           top: -90,
           left: -80,
-          child: _glow(const Color(0xFF38BDF8), 230),
+          child: _glow(const Color(0xFF20C7C2), 230),
         ),
         Positioned(
           top: 130,
           right: -100,
-          child: _glow(const Color(0xFF6366F1), 260),
+          child: _glow(const Color(0xFF0A7F91), 260),
         ),
         Positioned(
           bottom: -120,
           left: 40,
-          child: _glow(const Color(0xFF22C55E), 230),
+          child: _glow(const Color(0xFF0AAEAE), 230),
         ),
       ],
     );

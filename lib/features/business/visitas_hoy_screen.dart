@@ -24,10 +24,7 @@ class _VisitasHoyScreenState extends State<VisitasHoyScreen> {
     final user = supabase.auth.currentUser;
     if (user == null) return;
 
-    final data = await supabase
-        .from('visitas')
-        .select()
-        .eq('auth_id', user.id);
+    final data = await supabase.from('visitas').select().eq('auth_id', user.id);
 
     final now = DateTime.now();
 
@@ -50,7 +47,7 @@ class _VisitasHoyScreenState extends State<VisitasHoyScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF08121C),
+      backgroundColor: const Color(0xFFF2FCFD),
       appBar: AppBar(title: const Text("Visitas de hoy")),
       body: ListView.builder(
         padding: const EdgeInsets.all(16),
@@ -59,46 +56,44 @@ class _VisitasHoyScreenState extends State<VisitasHoyScreen> {
           final v = visitas[index];
 
           return InkWell(
-           onTap: () {
-  if (v['id'] == null) return;
+            onTap: () {
+              if (v['id'] == null) return;
 
-  Navigator.push(
-  context,
-  MaterialPageRoute(
-    builder: (_) => DetalleVisitaScreen(
-      visita: v,
-    ),
-  ),
-).then((_) {
-  cargarVisitasHoy();
-});
-},
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => DetalleVisitaScreen(visita: v),
+                ),
+              ).then((_) {
+                cargarVisitasHoy();
+              });
+            },
             child: Container(
               margin: const EdgeInsets.only(bottom: 12),
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.08),
+                color: Colors.white,
                 borderRadius: BorderRadius.circular(16),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                   "${v['nombre_cliente'] ?? ''}",
+                    "${v['nombre_cliente'] ?? ''}",
                     style: const TextStyle(
-                      color: Colors.white,
+                      color: const Color(0xFF071A3A),
                       fontWeight: FontWeight.bold,
                     ),
                   ),
                   const SizedBox(height: 6),
                   Text(
                     "📍 ${v['direccion']}",
-                    style: const TextStyle(color: Colors.white70),
+                    style: const TextStyle(color: const Color(0xFF53627A)),
                   ),
-                 Text(
-  "🕒 ${v['hora_visita'] ?? ''}",
-  style: const TextStyle(color: Colors.cyanAccent),
-),
+                  Text(
+                    "🕒 ${v['hora_visita'] ?? ''}",
+                    style: const TextStyle(color: Colors.cyanAccent),
+                  ),
                 ],
               ),
             ),
@@ -109,96 +104,96 @@ class _VisitasHoyScreenState extends State<VisitasHoyScreen> {
   }
 
   void gestionarVisita(Map<String, dynamic> visita) {
-  String resultado = "Realizada";
-  String estado = "Realizada";
-  String observaciones = "";
+    String resultado = "Realizada";
+    String estado = "Realizada";
+    String observaciones = "";
 
-  showModalBottomSheet(
-    context: context,
-    backgroundColor: const Color(0xFF102331),
-    builder: (_) {
-      return StatefulBuilder(
-        builder: (context, setModal) {
-          return Padding(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-
-                const Text(
-                  "Gestionar visita",
-                  style: TextStyle(color: Colors.white, fontSize: 18),
-                ),
-
-                const SizedBox(height: 15),
-
-                DropdownButtonFormField<String>(
-                  value: resultado,
-                  decoration: const InputDecoration(
-                    filled: true,
-                    fillColor: Colors.white,
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFFFFFFFF),
+      builder: (_) {
+        return StatefulBuilder(
+          builder: (context, setModal) {
+            return Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text(
+                    "Gestionar visita",
+                    style: TextStyle(
+                      color: const Color(0xFF071A3A),
+                      fontSize: 18,
+                    ),
                   ),
-                  items: const [
-                    DropdownMenuItem(
-                      value: "Venta realizada",
-                      child: Text("Venta realizada"),
-                    ),
-                    DropdownMenuItem(
-                      value: "Venta no realizada",
-                      child: Text("Venta no realizada"),
-                    ),
-                    DropdownMenuItem(
-                      value: "Venta pospuesta",
-                      child: Text("Venta pospuesta"),
-                    ),
-                  ],
-                  onChanged: (v) {
-                    setModal(() {
-                      resultado = v!;
-                    });
-                  },
-                ),
 
-                const SizedBox(height: 10),
+                  const SizedBox(height: 15),
 
-                TextField(
-                  onChanged: (v) => observaciones = v,
-                  decoration: const InputDecoration(
-                    filled: true,
-                    fillColor: Colors.white,
-                    hintText: "Observaciones",
+                  DropdownButtonFormField<String>(
+                    value: resultado,
+                    decoration: const InputDecoration(
+                      filled: true,
+                      fillColor: Colors.white,
+                    ),
+                    items: const [
+                      DropdownMenuItem(
+                        value: "Venta realizada",
+                        child: Text("Venta realizada"),
+                      ),
+                      DropdownMenuItem(
+                        value: "Venta no realizada",
+                        child: Text("Venta no realizada"),
+                      ),
+                      DropdownMenuItem(
+                        value: "Venta pospuesta",
+                        child: Text("Venta pospuesta"),
+                      ),
+                    ],
+                    onChanged: (v) {
+                      setModal(() {
+                        resultado = v!;
+                      });
+                    },
                   ),
-                  maxLines: 3,
-                ),
 
-                const SizedBox(height: 15),
+                  const SizedBox(height: 10),
 
-                ElevatedButton(
-               onPressed: () async {
+                  TextField(
+                    onChanged: (v) => observaciones = v,
+                    decoration: const InputDecoration(
+                      filled: true,
+                      fillColor: Colors.white,
+                      hintText: "Observaciones",
+                    ),
+                    maxLines: 3,
+                  ),
 
-               final v = visita;
-               
+                  const SizedBox(height: 15),
 
-  await supabase
-      .from('visitas')
-      .update({
-        'estado': estado,
-        'resultado': resultado,
-        'observaciones': observaciones,
-      })
-      .eq('id', v['id']);
+                  ElevatedButton(
+                    onPressed: () async {
+                      final v = visita;
 
-  Navigator.pop(context);
-  cargarVisitasHoy();
-},
-                  child: const Text("Guardar"),
-                ),
-              ],
-            ),
-          );
-        },
-      );
-    },
-  );
-}
+                      await supabase
+                          .from('visitas')
+                          .update({
+                            'estado': estado,
+                            'resultado': resultado,
+                            'observaciones': observaciones,
+                          })
+                          .eq('id', v['id']);
+
+                      Navigator.pop(context);
+                      cargarVisitasHoy();
+                    },
+                    child: const Text("Guardar"),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
 }

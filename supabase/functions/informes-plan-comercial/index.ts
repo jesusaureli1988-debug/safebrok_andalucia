@@ -9,6 +9,14 @@ const cors = {
 };
 const clean = (v: unknown) => String(v ?? '').trim();
 const num = (v: unknown) => Number(String(v ?? 0).replace(',', '.')) || 0;
+const AUTO_COMPUTE_FROM = '2026-08-27';
+const normalizeProduct = (v: unknown) => String(v ?? '').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+const autoWeighted = (sale: Record<string, unknown>, raw: unknown) => {
+  const product = normalizeProduct(sale.producto ?? sale.ramo ?? sale.tipo_seguro);
+  const isAuto = product.includes('auto') || product.includes('coche') || product.includes('vehicul') || product.includes('turismo') || product.includes('moto');
+  const effect = String(sale.fecha_efecto ?? sale.FECHA_EFECTO ?? '').slice(0, 10);
+  return num(raw) * (isAuto && effect >= AUTO_COMPUTE_FROM ? 0.5 : 1);
+};
 const json = (v: unknown, status = 200) => new Response(JSON.stringify(v), {
   status,
   headers: {...cors, 'Content-Type': 'application/json; charset=utf-8'},
@@ -255,7 +263,7 @@ async function makePdf(
     return y;
   };
 
-  const premium = sales.reduce((s, r) => s + num(r.prima_anual_neta), 0);
+  const premium = sales.reduce((s, r) => s + autoWeighted(r, r.prima_anual_neta), 0);
   const insured = sales.reduce((s, r) => s + num(r.numero_asegurados), 0);
   const pending = receipts.filter((r) =>
     `${clean(r.estado)} ${clean(r.estado_recibo)}`.toLowerCase()
@@ -349,7 +357,7 @@ async function makePdf(
   y = sectionTitle(summary, 'Rendimiento de la estructura', y);
   const teamRows = members.slice(0, 15).map((member) => {
     const own = sales.filter((s) => clean(s.agente_auth_id) === clean(member.auth_id));
-    const ownPremium = own.reduce((s, r) => s + num(r.prima_anual_neta), 0);
+    const ownPremium = own.reduce((s, r) => s + autoWeighted(r, r.prima_anual_neta), 0);
     return [name(member), role(member.rol_usuario), String(own.length), euros(ownPremium)];
   });
   drawTable(summary, ['Figura', 'Cargo', 'Ventas', 'Prima neta'], teamRows, [190, 120, 65, 116], y);

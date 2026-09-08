@@ -51,6 +51,9 @@ class _CierresProduccionScreenState extends State<CierresProduccionScreen> {
       final profile = await _supabase
           .from('usuarios')
           .select('rol_usuario')
+          .or(
+            'estado.is.null,estado.not.in.(inactivo,Inactivo,INACTIVO,baja,Baja,BAJA,desactivado,Desactivado,DESACTIVADO,bloqueado,Bloqueado,BLOQUEADO,suspendido,Suspendido,SUSPENDIDO)',
+          )
           .eq('auth_id', user.id)
           .maybeSingle();
 

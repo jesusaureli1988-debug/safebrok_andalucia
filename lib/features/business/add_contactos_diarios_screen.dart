@@ -10,8 +10,7 @@ class AddContactosDiariosScreen extends StatefulWidget {
       _AddContactosDiariosScreenState();
 }
 
-class _AddContactosDiariosScreenState
-    extends State<AddContactosDiariosScreen> {
+class _AddContactosDiariosScreenState extends State<AddContactosDiariosScreen> {
   final supabase = Supabase.instance.client;
   final _formKey = GlobalKey<FormState>();
 
@@ -71,8 +70,7 @@ class _AddContactosDiariosScreenState
 
   bool validarPositivos() {
     for (int i = 0; i < positivos; i++) {
-      if (nombres[i].text.trim().isEmpty ||
-          telefonos[i].text.trim().isEmpty) {
+      if (nombres[i].text.trim().isEmpty || telefonos[i].text.trim().isEmpty) {
         return false;
       }
     }
@@ -138,10 +136,7 @@ class _AddContactosDiariosScreenState
         behavior: SnackBarBehavior.floating,
         content: Text(
           text,
-          style: TextStyle(
-            color: color,
-            fontWeight: FontWeight.w800,
-          ),
+          style: TextStyle(color: color, fontWeight: FontWeight.w800),
         ),
       ),
     );
@@ -160,7 +155,7 @@ class _AddContactosDiariosScreenState
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF061018),
+      backgroundColor: const Color(0xFFFFFFFF),
       extendBodyBehindAppBar: true,
 
       appBar: AppBar(
@@ -168,10 +163,7 @@ class _AddContactosDiariosScreenState
         elevation: 0,
         title: const Text(
           'Nuevo registro',
-          style: TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.w900,
-          ),
+          style: TextStyle(color: const Color(0xFF071A3A), fontWeight: FontWeight.w900),
         ),
       ),
 
@@ -258,8 +250,7 @@ class _AddContactosDiariosScreenState
                           const SizedBox(height: 12),
                         ],
 
-                        for (int i = 0; i < positivos; i++)
-                          _positivoCard(i),
+                        for (int i = 0; i < positivos; i++) _positivoCard(i),
                       ],
                     ),
                   ),
@@ -299,10 +290,7 @@ class _AddContactosDiariosScreenState
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   gradient: const LinearGradient(
-                    colors: [
-                      Colors.cyanAccent,
-                      Color(0xFF2D7DFF),
-                    ],
+                    colors: [Colors.cyanAccent, Color(0xFF2D7DFF)],
                   ),
                   boxShadow: [
                     BoxShadow(
@@ -328,7 +316,7 @@ class _AddContactosDiariosScreenState
                     const Text(
                       'Registro diario',
                       style: TextStyle(
-                        color: Colors.white,
+                        color: const Color(0xFF071A3A),
                         fontSize: 22,
                         fontWeight: FontWeight.w900,
                         letterSpacing: -0.5,
@@ -425,12 +413,7 @@ class _AddContactosDiariosScreenState
     );
   }
 
-  Widget _miniKpi(
-    String label,
-    String value,
-    IconData icon,
-    Color color,
-  ) {
+  Widget _miniKpi(String label, String value, IconData icon, Color color) {
     return Column(
       children: [
         Icon(icon, color: color, size: 22),
@@ -438,7 +421,7 @@ class _AddContactosDiariosScreenState
         Text(
           value,
           style: const TextStyle(
-            color: Colors.white,
+            color: const Color(0xFF071A3A),
             fontWeight: FontWeight.w900,
             fontSize: 18,
           ),
@@ -462,7 +445,7 @@ class _AddContactosDiariosScreenState
         Text(
           title,
           style: const TextStyle(
-            color: Colors.white,
+            color: const Color(0xFF071A3A),
             fontSize: 17,
             fontWeight: FontWeight.w900,
           ),
@@ -492,7 +475,7 @@ class _AddContactosDiariosScreenState
         controller: controller,
         keyboardType: TextInputType.number,
         style: const TextStyle(
-          color: Colors.white,
+          color: const Color(0xFF071A3A),
           fontWeight: FontWeight.w800,
         ),
         onChanged: onChanged,
@@ -540,7 +523,8 @@ class _AddContactosDiariosScreenState
   }
 
   Widget _positivoCard(int index) {
-    final hasError = showErrors &&
+    final hasError =
+        showErrors &&
         (nombres[index].text.trim().isEmpty ||
             telefonos[index].text.trim().isEmpty);
 
@@ -583,7 +567,7 @@ class _AddContactosDiariosScreenState
                 child: Text(
                   'Positivo ${index + 1}',
                   style: const TextStyle(
-                    color: Colors.white,
+                    color: const Color(0xFF071A3A),
                     fontWeight: FontWeight.w900,
                     fontSize: 15,
                   ),
@@ -623,10 +607,7 @@ class _AddContactosDiariosScreenState
     return TextFormField(
       controller: controller,
       keyboardType: keyboardType,
-      style: const TextStyle(
-        color: Colors.white,
-        fontWeight: FontWeight.w700,
-      ),
+      style: const TextStyle(color: const Color(0xFF071A3A), fontWeight: FontWeight.w700),
       onChanged: (_) => setState(() {}),
       validator: (value) {
         if (value == null || value.trim().isEmpty) {
@@ -676,7 +657,7 @@ class _AddContactosDiariosScreenState
           child: Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: const Color(0xFF061018).withOpacity(0.76),
+              color: const Color(0xFFFFFFFF).withOpacity(0.76),
               border: Border.all(color: Colors.white.withOpacity(0.08)),
               borderRadius: BorderRadius.circular(22),
             ),
@@ -725,7 +706,7 @@ class _PremiumBackground extends StatelessWidget {
   Widget build(BuildContext context) {
     return Stack(
       children: [
-        Container(color: const Color(0xFF061018)),
+        Container(color: const Color(0xFFFFFFFF)),
 
         Positioned(
           top: -120,
@@ -757,23 +738,14 @@ class _PremiumBackground extends StatelessWidget {
     );
   }
 
-  Widget _blurCircle({
-    required Color color,
-    required double size,
-  }) {
+  Widget _blurCircle({required Color color, required double size}) {
     return Container(
       width: size,
       height: size,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         color: color,
-        boxShadow: [
-          BoxShadow(
-            color: color,
-            blurRadius: 90,
-            spreadRadius: 35,
-          ),
-        ],
+        boxShadow: [BoxShadow(color: color, blurRadius: 90, spreadRadius: 35)],
       ),
     );
   }

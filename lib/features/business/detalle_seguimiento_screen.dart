@@ -6,10 +6,7 @@ import 'package:safebrok_andalucia/features/business/referencia_diaria_screen.da
 class DetalleSeguimientoScreen extends StatefulWidget {
   final Map<String, dynamic> seguimiento;
 
-  const DetalleSeguimientoScreen({
-    super.key,
-    required this.seguimiento,
-  });
+  const DetalleSeguimientoScreen({super.key, required this.seguimiento});
 
   @override
   State<DetalleSeguimientoScreen> createState() =>
@@ -60,11 +57,9 @@ class _DetalleSeguimientoScreenState extends State<DetalleSeguimientoScreen> {
           text,
           style: const TextStyle(fontWeight: FontWeight.w800),
         ),
-        backgroundColor: ok ? const Color(0xFF16A34A) : const Color(0xFFE11D48),
+        backgroundColor: ok ? const Color(0xFF16A34A) : const Color(0xFFE74646),
         behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(14),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       ),
     );
   }
@@ -103,15 +98,15 @@ class _DetalleSeguimientoScreenState extends State<DetalleSeguimientoScreen> {
     final fechaEfecto = _fechaBonita(widget.seguimiento['fecha_efecto']);
 
     return Scaffold(
-      backgroundColor: const Color(0xFF050B12),
+      backgroundColor: const Color(0xFFF2FCFD),
       body: Stack(
         children: [
           const _PremiumBackground(),
 
           SafeArea(
             child: RefreshIndicator(
-              color: const Color(0xFF22D3EE),
-              backgroundColor: const Color(0xFF102331),
+              color: const Color(0xFF20C7C2),
+              backgroundColor: const Color(0xFFFFFFFF),
               onRefresh: cargarHistorico,
               child: ListView(
                 padding: const EdgeInsets.fromLTRB(18, 12, 18, 120),
@@ -134,7 +129,7 @@ class _DetalleSeguimientoScreenState extends State<DetalleSeguimientoScreen> {
                       padding: EdgeInsets.only(top: 34),
                       child: Center(
                         child: CircularProgressIndicator(
-                          color: Color(0xFF22D3EE),
+                          color: Color(0xFF20C7C2),
                         ),
                       ),
                     )
@@ -142,12 +137,12 @@ class _DetalleSeguimientoScreenState extends State<DetalleSeguimientoScreen> {
                     _emptyHistorico()
                   else
                     ...historico.asMap().entries.map(
-                          (entry) => _historicoCard(
-                            entry.value,
-                            entry.key,
-                            historico.length,
-                          ),
-                        ),
+                      (entry) => _historicoCard(
+                        entry.value,
+                        entry.key,
+                        historico.length,
+                      ),
+                    ),
                 ],
               ),
             ),
@@ -157,9 +152,7 @@ class _DetalleSeguimientoScreenState extends State<DetalleSeguimientoScreen> {
             left: 18,
             right: 18,
             bottom: 18,
-            child: SafeArea(
-              child: _bottomAction(),
-            ),
+            child: SafeArea(child: _bottomAction()),
           ),
         ],
       ),
@@ -178,7 +171,7 @@ class _DetalleSeguimientoScreenState extends State<DetalleSeguimientoScreen> {
           child: Text(
             "Contacto diario",
             style: TextStyle(
-              color: Colors.white,
+              color: const Color(0xFF071A3A),
               fontSize: 28,
               fontWeight: FontWeight.w900,
               letterSpacing: -0.8,
@@ -207,18 +200,18 @@ class _DetalleSeguimientoScreenState extends State<DetalleSeguimientoScreen> {
         width: 48,
         decoration: BoxDecoration(
           color: accent
-              ? const Color(0xFF22D3EE).withOpacity(0.12)
-              : Colors.white.withOpacity(0.07),
+              ? const Color(0xFF20C7C2).withOpacity(0.12)
+              : Colors.white,
           borderRadius: BorderRadius.circular(18),
           border: Border.all(
             color: accent
-                ? const Color(0xFF22D3EE).withOpacity(0.35)
-                : Colors.white.withOpacity(0.10),
+                ? const Color(0xFF20C7C2).withOpacity(0.35)
+                : Colors.white,
           ),
         ),
         child: Icon(
           icon,
-          color: accent ? const Color(0xFF22D3EE) : Colors.white,
+          color: accent ? const Color(0xFF20C7C2) : Colors.white,
           size: 22,
         ),
       ),
@@ -237,16 +230,16 @@ class _DetalleSeguimientoScreenState extends State<DetalleSeguimientoScreen> {
         borderRadius: BorderRadius.circular(32),
         gradient: LinearGradient(
           colors: [
-            const Color(0xFF22D3EE).withOpacity(0.75),
-            const Color(0xFF2563EB).withOpacity(0.30),
-            Colors.white.withOpacity(0.06),
+            const Color(0xFF20C7C2).withOpacity(0.75),
+            const Color(0xFF0A7F91).withOpacity(0.30),
+            Colors.white,
           ],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF22D3EE).withOpacity(0.22),
+            color: const Color(0xFF20C7C2).withOpacity(0.22),
             blurRadius: 38,
             offset: const Offset(0, 18),
           ),
@@ -257,11 +250,7 @@ class _DetalleSeguimientoScreenState extends State<DetalleSeguimientoScreen> {
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(30),
           gradient: const LinearGradient(
-            colors: [
-              Color(0xFF101E2D),
-              Color(0xFF07111B),
-              Color(0xFF050B12),
-            ],
+            colors: [Color(0xFF101E2D), Color(0xFFF2FCFD), Color(0xFFF2FCFD)],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
@@ -272,14 +261,14 @@ class _DetalleSeguimientoScreenState extends State<DetalleSeguimientoScreen> {
             _statusPill(
               text: "CONTACTO EN SEGUIMIENTO",
               icon: Icons.radar_rounded,
-              color: const Color(0xFF22D3EE),
+              color: const Color(0xFF20C7C2),
             ),
             const SizedBox(height: 20),
 
             Text(
               nombre,
               style: const TextStyle(
-                color: Colors.white,
+                color: const Color(0xFF071A3A),
                 fontSize: 31,
                 fontWeight: FontWeight.w900,
                 letterSpacing: -1,
@@ -293,7 +282,7 @@ class _DetalleSeguimientoScreenState extends State<DetalleSeguimientoScreen> {
               children: [
                 const Icon(
                   Icons.workspace_premium_rounded,
-                  color: Color(0xFF22D3EE),
+                  color: Color(0xFF20C7C2),
                   size: 19,
                 ),
                 const SizedBox(width: 7),
@@ -301,7 +290,7 @@ class _DetalleSeguimientoScreenState extends State<DetalleSeguimientoScreen> {
                   child: Text(
                     producto,
                     style: const TextStyle(
-                      color: Color(0xFF22D3EE),
+                      color: Color(0xFF20C7C2),
                       fontSize: 16,
                       fontWeight: FontWeight.w900,
                     ),
@@ -319,7 +308,7 @@ class _DetalleSeguimientoScreenState extends State<DetalleSeguimientoScreen> {
                     icon: Icons.phone_rounded,
                     title: "Teléfono",
                     value: telefono,
-                    color: const Color(0xFF22D3EE),
+                    color: const Color(0xFF20C7C2),
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -379,7 +368,7 @@ class _DetalleSeguimientoScreenState extends State<DetalleSeguimientoScreen> {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.065),
+        color: Colors.white,
         borderRadius: BorderRadius.circular(22),
         border: Border.all(color: color.withOpacity(0.22)),
       ),
@@ -391,7 +380,7 @@ class _DetalleSeguimientoScreenState extends State<DetalleSeguimientoScreen> {
           Text(
             title,
             style: const TextStyle(
-              color: Colors.white54,
+              color: const Color(0xFF64748B),
               fontSize: 12,
               fontWeight: FontWeight.w700,
             ),
@@ -402,7 +391,7 @@ class _DetalleSeguimientoScreenState extends State<DetalleSeguimientoScreen> {
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: const TextStyle(
-              color: Colors.white,
+              color: const Color(0xFF071A3A),
               fontSize: 14.5,
               fontWeight: FontWeight.w900,
             ),
@@ -446,15 +435,13 @@ class _DetalleSeguimientoScreenState extends State<DetalleSeguimientoScreen> {
         child: Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.055),
+            color: Colors.white,
             borderRadius: BorderRadius.circular(24),
-            border: Border.all(
-              color: Colors.white.withOpacity(0.10),
-            ),
+            border: Border.all(color: Colors.white),
           ),
           child: Row(
             children: [
-              Icon(icon, color: const Color(0xFF22D3EE), size: 26),
+              Icon(icon, color: const Color(0xFF20C7C2), size: 26),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
@@ -465,7 +452,7 @@ class _DetalleSeguimientoScreenState extends State<DetalleSeguimientoScreen> {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
-                        color: Colors.white,
+                        color: const Color(0xFF071A3A),
                         fontSize: 19,
                         fontWeight: FontWeight.w900,
                       ),
@@ -473,7 +460,7 @@ class _DetalleSeguimientoScreenState extends State<DetalleSeguimientoScreen> {
                     Text(
                       title,
                       style: const TextStyle(
-                        color: Colors.white54,
+                        color: const Color(0xFF64748B),
                         fontSize: 12,
                         fontWeight: FontWeight.w700,
                       ),
@@ -487,14 +474,15 @@ class _DetalleSeguimientoScreenState extends State<DetalleSeguimientoScreen> {
       ),
     );
   }
-    Widget _sectionTitle() {
+
+  Widget _sectionTitle() {
     return Row(
       children: [
         const Expanded(
           child: Text(
             "Histórico de llamadas",
             style: TextStyle(
-              color: Colors.white,
+              color: const Color(0xFF071A3A),
               fontSize: 22,
               fontWeight: FontWeight.w900,
               letterSpacing: -0.4,
@@ -504,14 +492,14 @@ class _DetalleSeguimientoScreenState extends State<DetalleSeguimientoScreen> {
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.07),
+            color: Colors.white,
             borderRadius: BorderRadius.circular(999),
-            border: Border.all(color: Colors.white.withOpacity(0.10)),
+            border: Border.all(color: Colors.white),
           ),
           child: Text(
             "${historico.length}",
             style: const TextStyle(
-              color: Color(0xFF22D3EE),
+              color: Color(0xFF20C7C2),
               fontWeight: FontWeight.w900,
               fontSize: 12,
             ),
@@ -521,11 +509,7 @@ class _DetalleSeguimientoScreenState extends State<DetalleSeguimientoScreen> {
     );
   }
 
-  Widget _historicoCard(
-    Map<String, dynamic> h,
-    int index,
-    int total,
-  ) {
+  Widget _historicoCard(Map<String, dynamic> h, int index, int total) {
     final resultado = _txt(h['resultado']);
     final observaciones = _txt(
       h['observaciones'],
@@ -574,7 +558,7 @@ class _DetalleSeguimientoScreenState extends State<DetalleSeguimientoScreen> {
                   width: 2,
                   height: 64,
                   margin: const EdgeInsets.only(top: 8),
-                  color: Colors.white.withOpacity(0.10),
+                  color: Colors.white,
                 ),
             ],
           ),
@@ -611,14 +595,14 @@ class _DetalleSeguimientoScreenState extends State<DetalleSeguimientoScreen> {
                     children: [
                       const Icon(
                         Icons.calendar_today_rounded,
-                        color: Colors.white54,
+                        color: const Color(0xFF64748B),
                         size: 15,
                       ),
                       const SizedBox(width: 6),
                       Text(
                         fecha,
                         style: const TextStyle(
-                          color: Colors.white70,
+                          color: const Color(0xFF53627A),
                           fontSize: 13,
                           fontWeight: FontWeight.w700,
                         ),
@@ -629,7 +613,7 @@ class _DetalleSeguimientoScreenState extends State<DetalleSeguimientoScreen> {
                   Text(
                     observaciones,
                     style: const TextStyle(
-                      color: Colors.white60,
+                      color: const Color(0xFF64748B),
                       fontSize: 13,
                       height: 1.3,
                     ),
@@ -648,9 +632,9 @@ class _DetalleSeguimientoScreenState extends State<DetalleSeguimientoScreen> {
       margin: const EdgeInsets.only(top: 16),
       padding: const EdgeInsets.all(25),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.055),
+        color: Colors.white,
         borderRadius: BorderRadius.circular(28),
-        border: Border.all(color: Colors.white.withOpacity(0.10)),
+        border: Border.all(color: Colors.white),
       ),
       child: Column(
         children: [
@@ -663,7 +647,7 @@ class _DetalleSeguimientoScreenState extends State<DetalleSeguimientoScreen> {
           const Text(
             "Sin llamadas realizadas",
             style: TextStyle(
-              color: Colors.white,
+              color: const Color(0xFF071A3A),
               fontSize: 20,
               fontWeight: FontWeight.w900,
             ),
@@ -672,10 +656,7 @@ class _DetalleSeguimientoScreenState extends State<DetalleSeguimientoScreen> {
           const Text(
             "Cuando gestiones este contacto, aparecerá aquí el histórico de llamadas.",
             textAlign: TextAlign.center,
-            style: TextStyle(
-              color: Colors.white60,
-              height: 1.35,
-            ),
+            style: TextStyle(color: const Color(0xFF64748B), height: 1.35),
           ),
         ],
       ),
@@ -688,7 +669,7 @@ class _DetalleSeguimientoScreenState extends State<DetalleSeguimientoScreen> {
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF22D3EE).withOpacity(0.25),
+            color: const Color(0xFF20C7C2).withOpacity(0.25),
             blurRadius: 26,
             offset: const Offset(0, 12),
           ),
@@ -699,17 +680,14 @@ class _DetalleSeguimientoScreenState extends State<DetalleSeguimientoScreen> {
         icon: const Icon(Icons.edit_note_rounded),
         label: const Text("Gestionar llamada"),
         style: ElevatedButton.styleFrom(
-          backgroundColor: const Color(0xFF22D3EE),
-          foregroundColor: const Color(0xFF061018),
+          backgroundColor: const Color(0xFF20C7C2),
+          foregroundColor: const Color(0xFFFFFFFF),
           elevation: 0,
           minimumSize: const Size(double.infinity, 60),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(24),
           ),
-          textStyle: const TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w900,
-          ),
+          textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900),
         ),
       ),
     );
@@ -743,10 +721,10 @@ class _DetalleSeguimientoScreenState extends State<DetalleSeguimientoScreen> {
                   child: Container(
                     padding: const EdgeInsets.fromLTRB(20, 18, 20, 24),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF07111B).withOpacity(0.98),
+                      color: const Color(0xFFF2FCFD).withOpacity(0.98),
                       borderRadius: BorderRadius.circular(34),
                       border: Border.all(
-                        color: const Color(0xFF22D3EE).withOpacity(0.28),
+                        color: const Color(0xFF20C7C2).withOpacity(0.28),
                       ),
                     ),
                     child: SafeArea(
@@ -758,7 +736,7 @@ class _DetalleSeguimientoScreenState extends State<DetalleSeguimientoScreen> {
                             width: 48,
                             height: 5,
                             decoration: BoxDecoration(
-                              color: Colors.white24,
+                              color: const Color(0xFFB7D7DA),
                               borderRadius: BorderRadius.circular(999),
                             ),
                           ),
@@ -769,7 +747,7 @@ class _DetalleSeguimientoScreenState extends State<DetalleSeguimientoScreen> {
                             children: [
                               Icon(
                                 Icons.phone_callback_rounded,
-                                color: Color(0xFF22D3EE),
+                                color: Color(0xFF20C7C2),
                                 size: 30,
                               ),
                               SizedBox(width: 12),
@@ -777,7 +755,7 @@ class _DetalleSeguimientoScreenState extends State<DetalleSeguimientoScreen> {
                                 child: Text(
                                   "Gestionar llamada",
                                   style: TextStyle(
-                                    color: Colors.white,
+                                    color: const Color(0xFF071A3A),
                                     fontSize: 22,
                                     fontWeight: FontWeight.w900,
                                   ),
@@ -808,10 +786,7 @@ class _DetalleSeguimientoScreenState extends State<DetalleSeguimientoScreen> {
                             value: estadoFinal,
                             label: "Estado final",
                             icon: Icons.flag_rounded,
-                            items: const [
-                              "Realizada",
-                              "En curso",
-                            ],
+                            items: const ["Realizada", "En curso"],
                             onChanged: (v) {
                               setModal(() => estadoFinal = v);
                             },
@@ -824,12 +799,12 @@ class _DetalleSeguimientoScreenState extends State<DetalleSeguimientoScreen> {
                             decoration: BoxDecoration(
                               color: aportaReferencia
                                   ? Colors.greenAccent.withOpacity(0.10)
-                                  : Colors.white.withOpacity(0.055),
+                                  : Colors.white,
                               borderRadius: BorderRadius.circular(20),
                               border: Border.all(
                                 color: aportaReferencia
                                     ? Colors.greenAccent.withOpacity(0.42)
-                                    : Colors.white.withOpacity(0.10),
+                                    : Colors.white,
                               ),
                             ),
                             child: SwitchListTile(
@@ -838,14 +813,14 @@ class _DetalleSeguimientoScreenState extends State<DetalleSeguimientoScreen> {
                               title: const Text(
                                 "¿Aporta referencia?",
                                 style: TextStyle(
-                                  color: Colors.white,
+                                  color: const Color(0xFF071A3A),
                                   fontWeight: FontWeight.w900,
                                 ),
                               ),
                               subtitle: const Text(
                                 "Si aporta referencia, se abrirá la pantalla para crearla.",
                                 style: TextStyle(
-                                  color: Colors.white54,
+                                  color: const Color(0xFF64748B),
                                   fontSize: 12,
                                 ),
                               ),
@@ -860,25 +835,25 @@ class _DetalleSeguimientoScreenState extends State<DetalleSeguimientoScreen> {
                           TextField(
                             maxLines: 4,
                             style: const TextStyle(
-                              color: Colors.white,
+                              color: const Color(0xFF071A3A),
                               fontWeight: FontWeight.w700,
                             ),
                             onChanged: (v) => observaciones = v,
                             decoration: InputDecoration(
                               labelText: "Observaciones",
-                              labelStyle: const TextStyle(color: Colors.white60),
+                              labelStyle: const TextStyle(
+                                color: const Color(0xFF64748B),
+                              ),
                               filled: true,
-                              fillColor: const Color(0xFF0B1724),
+                              fillColor: const Color(0xFFFFFFFF),
                               enabledBorder: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(20),
-                                borderSide: BorderSide(
-                                  color: Colors.white.withOpacity(0.10),
-                                ),
+                                borderSide: BorderSide(color: Colors.white),
                               ),
                               focusedBorder: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(20),
                                 borderSide: const BorderSide(
-                                  color: Color(0xFF22D3EE),
+                                  color: Color(0xFF20C7C2),
                                   width: 1.4,
                                 ),
                               ),
@@ -900,14 +875,12 @@ class _DetalleSeguimientoScreenState extends State<DetalleSeguimientoScreen> {
                                         await supabase
                                             .from('seguimiento_clientes')
                                             .update({
-                                          'estado': estadoFinal,
-                                          'resultado': resultado,
-                                          'observaciones': observaciones,
-                                          'referencia': aportaReferencia,
-                                        }).eq(
-                                          'id',
-                                          widget.seguimiento['id'],
-                                        );
+                                              'estado': estadoFinal,
+                                              'resultado': resultado,
+                                              'observaciones': observaciones,
+                                              'referencia': aportaReferencia,
+                                            })
+                                            .eq('id', widget.seguimiento['id']);
 
                                         if (!mounted) return;
 
@@ -944,7 +917,7 @@ class _DetalleSeguimientoScreenState extends State<DetalleSeguimientoScreen> {
                                       height: 18,
                                       child: CircularProgressIndicator(
                                         strokeWidth: 2,
-                                        color: Color(0xFF061018),
+                                        color: Color(0xFFFFFFFF),
                                       ),
                                     )
                                   : const Icon(Icons.save_rounded),
@@ -954,9 +927,9 @@ class _DetalleSeguimientoScreenState extends State<DetalleSeguimientoScreen> {
                                     : "Guardar seguimiento",
                               ),
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFF22D3EE),
+                                backgroundColor: const Color(0xFF20C7C2),
                                 disabledBackgroundColor: Colors.white12,
-                                foregroundColor: const Color(0xFF061018),
+                                foregroundColor: const Color(0xFFFFFFFF),
                                 elevation: 0,
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(22),
@@ -986,37 +959,29 @@ class _DetalleSeguimientoScreenState extends State<DetalleSeguimientoScreen> {
   }) {
     return DropdownButtonFormField<String>(
       value: value,
-      dropdownColor: const Color(0xFF102331),
+      dropdownColor: const Color(0xFFFFFFFF),
       style: const TextStyle(
-        color: Colors.white,
+        color: const Color(0xFF071A3A),
         fontWeight: FontWeight.w800,
       ),
       decoration: InputDecoration(
         labelText: label,
-        labelStyle: const TextStyle(color: Colors.white60),
-        prefixIcon: Icon(icon, color: const Color(0xFF22D3EE)),
+        labelStyle: const TextStyle(color: const Color(0xFF64748B)),
+        prefixIcon: Icon(icon, color: const Color(0xFF20C7C2)),
         filled: true,
-        fillColor: const Color(0xFF0B1724),
+        fillColor: const Color(0xFFFFFFFF),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(20),
-          borderSide: BorderSide(color: Colors.white.withOpacity(0.10)),
+          borderSide: BorderSide(color: Colors.white),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(20),
-          borderSide: const BorderSide(
-            color: Color(0xFF22D3EE),
-            width: 1.4,
-          ),
+          borderSide: const BorderSide(color: Color(0xFF20C7C2), width: 1.4),
         ),
       ),
-      iconEnabledColor: const Color(0xFF22D3EE),
+      iconEnabledColor: const Color(0xFF20C7C2),
       items: items
-          .map(
-            (e) => DropdownMenuItem<String>(
-              value: e,
-              child: Text(e),
-            ),
-          )
+          .map((e) => DropdownMenuItem<String>(value: e, child: Text(e)))
           .toList(),
       onChanged: (v) {
         if (v == null) return;
@@ -1036,11 +1001,7 @@ class _PremiumBackground extends StatelessWidget {
         Container(
           decoration: const BoxDecoration(
             gradient: LinearGradient(
-              colors: [
-                Color(0xFF02060A),
-                Color(0xFF061018),
-                Color(0xFF071827),
-              ],
+              colors: [Color(0xFF02060A), Color(0xFFFFFFFF), Color(0xFF071827)],
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
             ),
@@ -1049,18 +1010,12 @@ class _PremiumBackground extends StatelessWidget {
         Positioned(
           top: -90,
           right: -80,
-          child: _blurCircle(
-            240,
-            const Color(0xFF22D3EE).withOpacity(0.18),
-          ),
+          child: _blurCircle(240, const Color(0xFF20C7C2).withOpacity(0.18)),
         ),
         Positioned(
           bottom: -120,
           left: -110,
-          child: _blurCircle(
-            280,
-            Colors.blueAccent.withOpacity(0.12),
-          ),
+          child: _blurCircle(280, Colors.blueAccent.withOpacity(0.12)),
         ),
       ],
     );
@@ -1073,15 +1028,8 @@ class _PremiumBackground extends StatelessWidget {
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         color: color,
-        boxShadow: [
-          BoxShadow(
-            color: color,
-            blurRadius: 90,
-            spreadRadius: 45,
-          ),
-        ],
+        boxShadow: [BoxShadow(color: color, blurRadius: 90, spreadRadius: 45)],
       ),
     );
   }
 }
-  

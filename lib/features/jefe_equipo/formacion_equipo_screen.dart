@@ -8,12 +8,10 @@ class FormacionEquipoScreen extends StatefulWidget {
   const FormacionEquipoScreen({super.key});
 
   @override
-  State<FormacionEquipoScreen> createState() =>
-      _FormacionEquipoScreenState();
+  State<FormacionEquipoScreen> createState() => _FormacionEquipoScreenState();
 }
 
-class _FormacionEquipoScreenState
-    extends State<FormacionEquipoScreen> {
+class _FormacionEquipoScreenState extends State<FormacionEquipoScreen> {
   final supabase = Supabase.instance.client;
 
   bool loading = true;
@@ -22,8 +20,7 @@ class _FormacionEquipoScreenState
   String filtroEstado = 'todos';
   String busqueda = '';
 
-  final TextEditingController searchController =
-      TextEditingController();
+  final TextEditingController searchController = TextEditingController();
 
   Map<String, dynamic>? usuarioLogueado;
 
@@ -67,18 +64,15 @@ class _FormacionEquipoScreenState
   String _nombreCompleto(Map<String, dynamic>? usuario) {
     if (usuario == null) return 'Sin nombre';
 
-    final nombre =
-        usuario['nombre']?.toString().trim() ?? '';
+    final nombre = usuario['nombre']?.toString().trim() ?? '';
 
-    final apellidos =
-        usuario['apellidos']?.toString().trim() ?? '';
+    final apellidos = usuario['apellidos']?.toString().trim() ?? '';
 
     final completo = '$nombre $apellidos'.trim();
 
     if (completo.isNotEmpty) return completo;
 
-    final email =
-        usuario['email']?.toString().trim() ?? '';
+    final email = usuario['email']?.toString().trim() ?? '';
 
     return email.isNotEmpty ? email : 'Sin nombre';
   }
@@ -105,10 +99,7 @@ class _FormacionEquipoScreenState
     }
   }
 
-  bool _relacionPermitida({
-    required String rolPadre,
-    required String rolHijo,
-  }) {
+  bool _relacionPermitida({required String rolPadre, required String rolHijo}) {
     final padre = _normalizarRol(rolPadre);
     final hijo = _normalizarRol(rolHijo);
 
@@ -125,8 +116,7 @@ class _FormacionEquipoScreenState
             hijo == 'agente';
 
       case 'jefe_ventas':
-        return hijo == 'jefe_equipo' ||
-            hijo == 'agente';
+        return hijo == 'jefe_equipo' || hijo == 'agente';
 
       case 'jefe_equipo':
         return hijo == 'agente';
@@ -140,8 +130,7 @@ class _FormacionEquipoScreenState
     required Map<String, dynamic> perfil,
     required List<Map<String, dynamic>> todosUsuarios,
   }) {
-    final rolPerfil =
-        _normalizarRol(perfil['rol_usuario']);
+    final rolPerfil = _normalizarRol(perfil['rol_usuario']);
 
     if (rolPerfil == 'administracion' ||
         rolPerfil == 'administrador' ||
@@ -152,20 +141,15 @@ class _FormacionEquipoScreenState
       }).toList();
     }
 
-    final hijosPorParentId =
-        <String, List<Map<String, dynamic>>>{};
+    final hijosPorParentId = <String, List<Map<String, dynamic>>>{};
 
     for (final usuario in todosUsuarios) {
-      final parentId =
-          _idTexto(usuario['parent_id']);
+      final parentId = _idTexto(usuario['parent_id']);
 
       if (parentId.isEmpty) continue;
 
       hijosPorParentId
-          .putIfAbsent(
-            parentId,
-            () => <Map<String, dynamic>>[],
-          )
+          .putIfAbsent(parentId, () => <Map<String, dynamic>>[])
           .add(usuario);
     }
 
@@ -175,28 +159,22 @@ class _FormacionEquipoScreenState
     void recorrer(Map<String, dynamic> actual) {
       final idActual = _idTexto(actual['id']);
 
-      if (idActual.isEmpty ||
-          visitados.contains(idActual)) {
+      if (idActual.isEmpty || visitados.contains(idActual)) {
         return;
       }
 
       visitados.add(idActual);
       resultado.add(actual);
 
-      final rolActual =
-          _normalizarRol(actual['rol_usuario']);
+      final rolActual = _normalizarRol(actual['rol_usuario']);
 
-      final hijos = hijosPorParentId[idActual] ??
-          const <Map<String, dynamic>>[];
+      final hijos =
+          hijosPorParentId[idActual] ?? const <Map<String, dynamic>>[];
 
       for (final hijo in hijos) {
-        final rolHijo =
-            _normalizarRol(hijo['rol_usuario']);
+        final rolHijo = _normalizarRol(hijo['rol_usuario']);
 
-        if (!_relacionPermitida(
-          rolPadre: rolActual,
-          rolHijo: rolHijo,
-        )) {
+        if (!_relacionPermitida(rolPadre: rolActual, rolHijo: rolHijo)) {
           debugPrint(
             'FORMACIÓN: usuario bloqueado '
             '${_nombreCompleto(hijo)} '
@@ -248,29 +226,29 @@ class _FormacionEquipoScreenState
             'id, auth_id, parent_id, rol_usuario, '
             'nombre, apellidos, email',
           )
+          .or(
+            'estado.is.null,estado.not.in.(inactivo,Inactivo,INACTIVO,baja,Baja,BAJA,desactivado,Desactivado,DESACTIVADO,bloqueado,Bloqueado,BLOQUEADO,suspendido,Suspendido,SUSPENDIDO)',
+          )
           .eq('auth_id', authUser.id)
           .maybeSingle();
 
       if (perfilData == null) {
-        throw Exception(
-          'No se encontró el perfil del usuario conectado.',
-        );
+        throw Exception('No se encontró el perfil del usuario conectado.');
       }
 
-      final perfil =
-          Map<String, dynamic>.from(perfilData);
+      final perfil = Map<String, dynamic>.from(perfilData);
 
       final usuariosData = await supabase
           .from('usuarios')
           .select(
             'id, auth_id, parent_id, rol_usuario, '
             'nombre, apellidos, email',
+          )
+          .or(
+            'estado.is.null,estado.not.in.(inactivo,Inactivo,INACTIVO,baja,Baja,BAJA,desactivado,Desactivado,DESACTIVADO,bloqueado,Bloqueado,BLOQUEADO,suspendido,Suspendido,SUSPENDIDO)',
           );
 
-      final todosUsuarios =
-          List<Map<String, dynamic>>.from(
-        usuariosData,
-      );
+      final todosUsuarios = List<Map<String, dynamic>>.from(usuariosData);
 
       final estructura = _construirEstructura(
         perfil: perfil,
@@ -293,11 +271,11 @@ class _FormacionEquipoScreenState
        * - agentes de sus jefes de equipo;
        * - agentes que dependan directamente de un director de zona.
        */
-      final agentesPermitidos = estructura.where(
-        (usuario) =>
-            _normalizarRol(usuario['rol_usuario']) ==
-            'agente',
-      ).toList();
+      final agentesPermitidos = estructura
+          .where(
+            (usuario) => _normalizarRol(usuario['rol_usuario']) == 'agente',
+          )
+          .toList();
 
       final agentesIds = agentesPermitidos
           .map((agente) => agente['id'])
@@ -312,37 +290,24 @@ class _FormacionEquipoScreenState
             .select()
             .inFilter('agente_id', agentesIds);
 
-        formacionData =
-            List<Map<String, dynamic>>.from(response);
+        formacionData = List<Map<String, dynamic>>.from(response);
       }
 
       agentesPermitidos.sort((a, b) {
-        return _nombreCompleto(a)
-            .toLowerCase()
-            .compareTo(
-              _nombreCompleto(b).toLowerCase(),
-            );
+        return _nombreCompleto(
+          a,
+        ).toLowerCase().compareTo(_nombreCompleto(b).toLowerCase());
       });
 
-      debugPrint(
-        '======= FORMACIÓN ESTRUCTURA REAL =======',
-      );
+      debugPrint('======= FORMACIÓN ESTRUCTURA REAL =======');
 
-      debugPrint(
-        'USUARIO: ${_nombreCompleto(perfil)}',
-      );
+      debugPrint('USUARIO: ${_nombreCompleto(perfil)}');
 
-      debugPrint(
-        'ROL: ${perfil['rol_usuario']}',
-      );
+      debugPrint('ROL: ${perfil['rol_usuario']}');
 
-      debugPrint(
-        'PERSONAS EN ESTRUCTURA: ${estructura.length}',
-      );
+      debugPrint('PERSONAS EN ESTRUCTURA: ${estructura.length}');
 
-      debugPrint(
-        'AGENTES PERMITIDOS: ${agentesPermitidos.length}',
-      );
+      debugPrint('AGENTES PERMITIDOS: ${agentesPermitidos.length}');
 
       for (final agente in agentesPermitidos) {
         debugPrint(
@@ -353,9 +318,7 @@ class _FormacionEquipoScreenState
         );
       }
 
-      debugPrint(
-        '=========================================',
-      );
+      debugPrint('=========================================');
 
       if (!mounted) return;
 
@@ -367,9 +330,7 @@ class _FormacionEquipoScreenState
         loading = false;
       });
     } catch (e, stackTrace) {
-      debugPrint(
-        'ERROR CARGAR FORMACIÓN EQUIPO: $e',
-      );
+      debugPrint('ERROR CARGAR FORMACIÓN EQUIPO: $e');
 
       debugPrintStack(stackTrace: stackTrace);
 
@@ -385,23 +346,18 @@ class _FormacionEquipoScreenState
     }
   }
 
-  Map<String, dynamic>? obtenerFormacion(
-    dynamic agenteId,
-  ) {
+  Map<String, dynamic>? obtenerFormacion(dynamic agenteId) {
     try {
       return formaciones.firstWhere(
         (formacion) =>
-            formacion['agente_id']?.toString() ==
-            agenteId?.toString(),
+            formacion['agente_id']?.toString() == agenteId?.toString(),
       );
     } catch (_) {
       return null;
     }
   }
 
-  int calcularProgreso(
-    Map<String, dynamic>? formacion,
-  ) {
+  int calcularProgreso(Map<String, dynamic>? formacion) {
     if (formacion == null) return 0;
 
     int total = 0;
@@ -426,32 +382,23 @@ class _FormacionEquipoScreenState
   }
 
   List<Map<String, dynamic>> get agentesFiltrados {
-    final texto =
-        busqueda.trim().toLowerCase();
+    final texto = busqueda.trim().toLowerCase();
 
     return agentes.where((agente) {
-      final nombre =
-          _nombreCompleto(agente).toLowerCase();
+      final nombre = _nombreCompleto(agente).toLowerCase();
 
-      final email =
-          agente['email']?.toString().toLowerCase() ??
-              '';
+      final email = agente['email']?.toString().toLowerCase() ?? '';
 
-      final formacion =
-          obtenerFormacion(agente['id']);
+      final formacion = obtenerFormacion(agente['id']);
 
-      final progreso =
-          calcularProgreso(formacion);
+      final progreso = calcularProgreso(formacion);
 
       final coincideBusqueda =
-          texto.isEmpty ||
-          nombre.contains(texto) ||
-          email.contains(texto);
+          texto.isEmpty || nombre.contains(texto) || email.contains(texto);
 
       final coincideEstado = switch (filtroEstado) {
         'completados' => progreso == totalModulos,
-        'enCurso' =>
-          progreso > 0 && progreso < totalModulos,
+        'enCurso' => progreso > 0 && progreso < totalModulos,
         'pendientes' => progreso == 0,
         _ => true,
       };
@@ -462,9 +409,7 @@ class _FormacionEquipoScreenState
 
   int get totalCompletados {
     return agentes.where((agente) {
-      final progreso = calcularProgreso(
-        obtenerFormacion(agente['id']),
-      );
+      final progreso = calcularProgreso(obtenerFormacion(agente['id']));
 
       return progreso == totalModulos;
     }).length;
@@ -472,20 +417,15 @@ class _FormacionEquipoScreenState
 
   int get totalEnCurso {
     return agentes.where((agente) {
-      final progreso = calcularProgreso(
-        obtenerFormacion(agente['id']),
-      );
+      final progreso = calcularProgreso(obtenerFormacion(agente['id']));
 
-      return progreso > 0 &&
-          progreso < totalModulos;
+      return progreso > 0 && progreso < totalModulos;
     }).length;
   }
 
   int get totalPendientes {
     return agentes.where((agente) {
-      final progreso = calcularProgreso(
-        obtenerFormacion(agente['id']),
-      );
+      final progreso = calcularProgreso(obtenerFormacion(agente['id']));
 
       return progreso == 0;
     }).length;
@@ -494,16 +434,11 @@ class _FormacionEquipoScreenState
   double get progresoEquipo {
     if (agentes.isEmpty) return 0;
 
-    final realizado =
-        agentes.fold<int>(0, (total, agente) {
-      return total +
-          calcularProgreso(
-            obtenerFormacion(agente['id']),
-          );
+    final realizado = agentes.fold<int>(0, (total, agente) {
+      return total + calcularProgreso(obtenerFormacion(agente['id']));
     });
 
-    return realizado /
-        (agentes.length * totalModulos);
+    return realizado / (agentes.length * totalModulos);
   }
 
   Color colorProgreso(int progreso) {
@@ -546,29 +481,19 @@ class _FormacionEquipoScreenState
           SafeArea(
             child: loading
                 ? const Center(
-                    child: CircularProgressIndicator(
-                      color: Color(0xFF111827),
-                    ),
+                    child: CircularProgressIndicator(color: Color(0xFF111827)),
                   )
                 : RefreshIndicator(
                     color: const Color(0xFF111827),
                     onRefresh: cargarAgentes,
                     child: CustomScrollView(
-                      physics:
-                          const AlwaysScrollableScrollPhysics(),
+                      physics: const AlwaysScrollableScrollPhysics(),
                       slivers: [
                         SliverToBoxAdapter(
                           child: Padding(
-                            padding:
-                                const EdgeInsets.fromLTRB(
-                              18,
-                              12,
-                              18,
-                              10,
-                            ),
+                            padding: const EdgeInsets.fromLTRB(18, 12, 18, 10),
                             child: Column(
-                              crossAxisAlignment:
-                                  CrossAxisAlignment.start,
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 _topBar(),
                                 const SizedBox(height: 24),
@@ -580,9 +505,7 @@ class _FormacionEquipoScreenState
                                 const SizedBox(height: 18),
                                 _summaryPipeline(),
                                 const SizedBox(height: 22),
-                                _sectionTitle(
-                                  filtrados.length,
-                                ),
+                                _sectionTitle(filtrados.length),
                               ],
                             ),
                           ),
@@ -599,31 +522,18 @@ class _FormacionEquipoScreenState
                           )
                         else
                           SliverPadding(
-                            padding:
-                                const EdgeInsets.fromLTRB(
-                              18,
-                              0,
-                              18,
-                              32,
-                            ),
+                            padding: const EdgeInsets.fromLTRB(18, 0, 18, 32),
                             sliver: SliverList.builder(
                               itemCount: filtrados.length,
                               itemBuilder: (context, index) {
-                                final agente =
-                                    filtrados[index];
+                                final agente = filtrados[index];
 
-                                final progreso =
-                                    calcularProgreso(
-                                  obtenerFormacion(
-                                    agente['id'],
-                                  ),
+                                final progreso = calcularProgreso(
+                                  obtenerFormacion(agente['id']),
                                 );
 
                                 return Padding(
-                                  padding:
-                                      const EdgeInsets.only(
-                                    bottom: 14,
-                                  ),
+                                  padding: const EdgeInsets.only(bottom: 14),
                                   child: _agentCard(
                                     agente: agente,
                                     progreso: progreso,
@@ -648,11 +558,9 @@ class _FormacionEquipoScreenState
           color: Colors.white,
           borderRadius: BorderRadius.circular(18),
           elevation: 5,
-          shadowColor:
-              Colors.black.withOpacity(0.10),
+          shadowColor: Colors.black.withOpacity(0.10),
           child: InkWell(
-            onTap: () =>
-                Navigator.of(context).maybePop(),
+            onTap: () => Navigator.of(context).maybePop(),
             borderRadius: BorderRadius.circular(18),
             child: const SizedBox(
               width: 50,
@@ -668,8 +576,7 @@ class _FormacionEquipoScreenState
         const SizedBox(width: 14),
         const Expanded(
           child: Column(
-            crossAxisAlignment:
-                CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
                 'Formación del equipo',
@@ -702,17 +609,13 @@ class _FormacionEquipoScreenState
               borderRadius: BorderRadius.circular(18),
               boxShadow: [
                 BoxShadow(
-                  color: const Color(0xFF111827)
-                      .withOpacity(0.20),
+                  color: const Color(0xFF111827).withOpacity(0.20),
                   blurRadius: 18,
                   offset: const Offset(0, 8),
                 ),
               ],
             ),
-            child: const Icon(
-              Icons.refresh_rounded,
-              color: Colors.white,
-            ),
+            child: const Icon(Icons.refresh_rounded, color: Colors.white),
           ),
         ),
       ],
@@ -720,11 +623,9 @@ class _FormacionEquipoScreenState
   }
 
   Widget _heroFormation() {
-    final porcentaje =
-        (progresoEquipo * 100).round();
+    final porcentaje = (progresoEquipo * 100).round();
 
-    final nombre =
-        _nombreCompleto(usuarioLogueado);
+    final nombre = _nombreCompleto(usuarioLogueado);
 
     return Container(
       width: double.infinity,
@@ -732,11 +633,7 @@ class _FormacionEquipoScreenState
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(32),
         gradient: const LinearGradient(
-          colors: [
-            Color(0xFF2563EB),
-            Color(0xFF7C3AED),
-            Color(0xFFF59E0B),
-          ],
+          colors: [Color(0xFF2563EB), Color(0xFF7C3AED), Color(0xFFF59E0B)],
         ),
       ),
       child: Container(
@@ -744,11 +641,7 @@ class _FormacionEquipoScreenState
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(30),
           gradient: const LinearGradient(
-            colors: [
-              Color(0xFF111827),
-              Color(0xFF1E293B),
-              Color(0xFF172554),
-            ],
+            colors: [Color(0xFF111827), Color(0xFF1E293B), Color(0xFF172554)],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
@@ -765,8 +658,7 @@ class _FormacionEquipoScreenState
               ),
             ),
             Column(
-              crossAxisAlignment:
-                  CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text(
                   'CRECIMIENTO DEL EQUIPO',
@@ -799,13 +691,11 @@ class _FormacionEquipoScreenState
                 ),
                 const SizedBox(height: 18),
                 ClipRRect(
-                  borderRadius:
-                      BorderRadius.circular(99),
+                  borderRadius: BorderRadius.circular(99),
                   child: LinearProgressIndicator(
                     value: progresoEquipo,
                     minHeight: 11,
-                    backgroundColor:
-                        Colors.white.withOpacity(0.13),
+                    backgroundColor: Colors.white.withOpacity(0.13),
                     color: const Color(0xFF60A5FA),
                   ),
                 ),
@@ -851,11 +741,8 @@ class _FormacionEquipoScreenState
         ),
         cursorColor: const Color(0xFF2563EB),
         decoration: InputDecoration(
-          hintText:
-              'Buscar agente por nombre o email...',
-          hintStyle: const TextStyle(
-            color: Color(0xFF94A3B8),
-          ),
+          hintText: 'Buscar agente por nombre o email...',
+          hintStyle: const TextStyle(color: Color(0xFF94A3B8)),
           prefixIcon: const Icon(
             Icons.search_rounded,
             color: Color(0xFF64748B),
@@ -883,19 +770,13 @@ class _FormacionEquipoScreenState
           ),
           enabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(22),
-            borderSide: BorderSide(
-              color: Colors.black.withOpacity(0.045),
-            ),
+            borderSide: BorderSide(color: Colors.black.withOpacity(0.045)),
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(22),
-            borderSide: const BorderSide(
-              color: Color(0xFF2563EB),
-              width: 1.5,
-            ),
+            borderSide: const BorderSide(color: Color(0xFF2563EB), width: 1.5),
           ),
-          contentPadding:
-              const EdgeInsets.symmetric(
+          contentPadding: const EdgeInsets.symmetric(
             horizontal: 16,
             vertical: 18,
           ),
@@ -948,9 +829,7 @@ class _FormacionEquipoScreenState
         avatar: Icon(
           icon,
           size: 17,
-          color: selected
-              ? Colors.white
-              : const Color(0xFF64748B),
+          color: selected ? Colors.white : const Color(0xFF64748B),
         ),
         label: Text(label),
         onSelected: (_) {
@@ -961,9 +840,7 @@ class _FormacionEquipoScreenState
         selectedColor: const Color(0xFF111827),
         backgroundColor: Colors.white,
         labelStyle: TextStyle(
-          color: selected
-              ? Colors.white
-              : const Color(0xFF475569),
+          color: selected ? Colors.white : const Color(0xFF475569),
           fontWeight: FontWeight.w900,
         ),
         side: BorderSide(
@@ -971,13 +848,8 @@ class _FormacionEquipoScreenState
               ? const Color(0xFF111827)
               : Colors.black.withOpacity(0.055),
         ),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(99),
-        ),
-        padding: const EdgeInsets.symmetric(
-          horizontal: 11,
-          vertical: 10,
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(99)),
+        padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 10),
       ),
     );
   }
@@ -989,9 +861,7 @@ class _FormacionEquipoScreenState
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(26),
-        border: Border.all(
-          color: Colors.black.withOpacity(0.045),
-        ),
+        border: Border.all(color: Colors.black.withOpacity(0.045)),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.055),
@@ -1034,11 +904,7 @@ class _FormacionEquipoScreenState
   }
 
   Widget _separator() {
-    return Container(
-      width: 1,
-      height: 54,
-      color: const Color(0xFFE2E8F0),
-    );
+    return Container(width: 1, height: 54, color: const Color(0xFFE2E8F0));
   }
 
   Widget _summaryItem({
@@ -1080,20 +946,15 @@ class _FormacionEquipoScreenState
           width: 42,
           height: 42,
           decoration: BoxDecoration(
-            color:
-                const Color(0xFF2563EB).withOpacity(0.10),
+            color: const Color(0xFF2563EB).withOpacity(0.10),
             borderRadius: BorderRadius.circular(14),
           ),
-          child: const Icon(
-            Icons.school_rounded,
-            color: Color(0xFF2563EB),
-          ),
+          child: const Icon(Icons.school_rounded, color: Color(0xFF2563EB)),
         ),
         const SizedBox(width: 11),
         Expanded(
           child: Column(
-            crossAxisAlignment:
-                CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text(
                 'Agentes en formación',
@@ -1122,14 +983,12 @@ class _FormacionEquipoScreenState
     required Map<String, dynamic> agente,
     required int progreso,
   }) {
-    final porcentaje =
-        progreso / totalModulos;
+    final porcentaje = progreso / totalModulos;
 
     final color = colorProgreso(progreso);
     final nombre = _nombreCompleto(agente);
 
-    final email =
-        agente['email']?.toString().trim() ?? '';
+    final email = agente['email']?.toString().trim() ?? '';
 
     return Material(
       color: Colors.transparent,
@@ -1139,9 +998,7 @@ class _FormacionEquipoScreenState
           await Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (_) => FormacionAgenteScreen(
-                agente: agente,
-              ),
+              builder: (_) => FormacionAgenteScreen(agente: agente),
             ),
           );
 
@@ -1152,9 +1009,7 @@ class _FormacionEquipoScreenState
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(24),
-            border: Border.all(
-              color: Colors.black.withOpacity(0.045),
-            ),
+            border: Border.all(color: Colors.black.withOpacity(0.045)),
             boxShadow: [
               BoxShadow(
                 color: Colors.black.withOpacity(0.055),
@@ -1171,16 +1026,10 @@ class _FormacionEquipoScreenState
                 decoration: BoxDecoration(
                   color: color.withOpacity(0.11),
                   borderRadius: BorderRadius.circular(19),
-                  border: Border.all(
-                    color: color.withOpacity(0.22),
-                  ),
+                  border: Border.all(color: color.withOpacity(0.22)),
                 ),
                 child: progreso == totalModulos
-                    ? Icon(
-                        Icons.verified_rounded,
-                        color: color,
-                        size: 29,
-                      )
+                    ? Icon(Icons.verified_rounded, color: color, size: 29)
                     : Center(
                         child: Text(
                           '$progreso',
@@ -1195,14 +1044,12 @@ class _FormacionEquipoScreenState
               const SizedBox(width: 14),
               Expanded(
                 child: Column(
-                  crossAxisAlignment:
-                      CrossAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       nombre,
                       maxLines: 1,
-                      overflow:
-                          TextOverflow.ellipsis,
+                      overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                         color: Color(0xFF111827),
                         fontSize: 16,
@@ -1214,8 +1061,7 @@ class _FormacionEquipoScreenState
                       Text(
                         email,
                         maxLines: 1,
-                        overflow:
-                            TextOverflow.ellipsis,
+                        overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
                           color: Color(0xFF94A3B8),
                           fontSize: 12,
@@ -1225,13 +1071,11 @@ class _FormacionEquipoScreenState
                     ],
                     const SizedBox(height: 11),
                     ClipRRect(
-                      borderRadius:
-                          BorderRadius.circular(99),
+                      borderRadius: BorderRadius.circular(99),
                       child: LinearProgressIndicator(
                         value: porcentaje,
                         minHeight: 7,
-                        backgroundColor:
-                            const Color(0xFFE2E8F0),
+                        backgroundColor: const Color(0xFFE2E8F0),
                         color: color,
                       ),
                     ),
@@ -1248,16 +1092,13 @@ class _FormacionEquipoScreenState
                         ),
                         const SizedBox(width: 8),
                         Container(
-                          padding:
-                              const EdgeInsets.symmetric(
+                          padding: const EdgeInsets.symmetric(
                             horizontal: 9,
                             vertical: 4,
                           ),
                           decoration: BoxDecoration(
-                            color:
-                                color.withOpacity(0.10),
-                            borderRadius:
-                                BorderRadius.circular(99),
+                            color: color.withOpacity(0.10),
+                            borderRadius: BorderRadius.circular(99),
                           ),
                           child: Text(
                             textoEstado(progreso),
@@ -1306,11 +1147,7 @@ class _FormacionEquipoScreenState
           child: const Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(
-                Icons.school_outlined,
-                color: Color(0xFF94A3B8),
-                size: 58,
-              ),
+              Icon(Icons.school_outlined, color: Color(0xFF94A3B8), size: 58),
               SizedBox(height: 14),
               Text(
                 'No hay agentes con este filtro',
@@ -1349,8 +1186,7 @@ class _FormacionEquipoScreenState
             color: Colors.white,
             borderRadius: BorderRadius.circular(26),
             border: Border.all(
-              color: const Color(0xFFEF4444)
-                  .withOpacity(0.20),
+              color: const Color(0xFFEF4444).withOpacity(0.20),
             ),
           ),
           child: Column(
@@ -1375,9 +1211,7 @@ class _FormacionEquipoScreenState
               Text(
                 error ?? '',
                 textAlign: TextAlign.center,
-                style: const TextStyle(
-                  color: Color(0xFF64748B),
-                ),
+                style: const TextStyle(color: Color(0xFF64748B)),
               ),
             ],
           ),
@@ -1394,15 +1228,12 @@ class _FormationBackground extends StatelessWidget {
   Widget build(BuildContext context) {
     return Stack(
       children: [
-        Container(
-          color: const Color(0xFFF4F6FB),
-        ),
+        Container(color: const Color(0xFFF4F6FB)),
         Positioned(
           top: -110,
           right: -85,
           child: _Glow(
-            color:
-                const Color(0xFF2563EB).withOpacity(0.10),
+            color: const Color(0xFF2563EB).withOpacity(0.10),
             size: 270,
           ),
         ),
@@ -1410,8 +1241,7 @@ class _FormationBackground extends StatelessWidget {
           top: 310,
           left: -140,
           child: _Glow(
-            color:
-                const Color(0xFF7C3AED).withOpacity(0.07),
+            color: const Color(0xFF7C3AED).withOpacity(0.07),
             size: 310,
           ),
         ),
@@ -1419,17 +1249,13 @@ class _FormationBackground extends StatelessWidget {
           bottom: -130,
           right: -100,
           child: _Glow(
-            color:
-                const Color(0xFFF59E0B).withOpacity(0.07),
+            color: const Color(0xFFF59E0B).withOpacity(0.07),
             size: 290,
           ),
         ),
         BackdropFilter(
-          filter:
-              ImageFilter.blur(sigmaX: 55, sigmaY: 55),
-          child: Container(
-            color: Colors.white.withOpacity(0.02),
-          ),
+          filter: ImageFilter.blur(sigmaX: 55, sigmaY: 55),
+          child: Container(color: Colors.white.withOpacity(0.02)),
         ),
       ],
     );
@@ -1440,20 +1266,14 @@ class _Glow extends StatelessWidget {
   final Color color;
   final double size;
 
-  const _Glow({
-    required this.color,
-    required this.size,
-  });
+  const _Glow({required this.color, required this.size});
 
   @override
   Widget build(BuildContext context) {
     return Container(
       width: size,
       height: size,
-      decoration: BoxDecoration(
-        color: color,
-        shape: BoxShape.circle,
-      ),
+      decoration: BoxDecoration(color: color, shape: BoxShape.circle),
     );
   }
 }

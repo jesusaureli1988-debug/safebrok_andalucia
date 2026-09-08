@@ -29,181 +29,176 @@ class _ConsultarPolizaScreenState extends State<ConsultarPolizaScreen> {
   }
 
   Future<void> consultarPoliza() async {
-  setState(() {
-    loading = true;
-    venta = null;
-    cliente = null;
-  });
-
-  try {
-    final numeroPoliza = numeroPolizaCtrl.text.trim().toLowerCase();
-    final dni = dniCtrl.text.trim().toLowerCase();
-    final email = emailCtrl.text.trim().toLowerCase();
-
-    final ventasData = await supabase.from('ventas').select();
-    final clientesData = await supabase.from('clientes').select();
-
-    debugPrint('========================');
-debugPrint('VENTAS: ${(ventasData as List).length}');
-debugPrint('CLIENTES: ${(clientesData as List).length}');
-debugPrint('========================');
-
-    final ventas = (ventasData as List)
-        .map((e) => Map<String, dynamic>.from(e))
-        .toList();
-
-    final clientes = (clientesData as List)
-        .map((e) => Map<String, dynamic>.from(e))
-        .toList();
-
-        if (ventas.isNotEmpty) {
-  debugPrint('COLUMNAS VENTAS');
-  debugPrint(ventas.first.keys.toString());
-  debugPrint(ventas.first.toString());
-}
-
-if (clientes.isNotEmpty) {
-  debugPrint('COLUMNAS CLIENTES');
-  debugPrint(clientes.first.keys.toString());
-  debugPrint(clientes.first.toString());
-}
-
-    Map<String, dynamic>? ventaEncontrada;
-    Map<String, dynamic>? clienteEncontrado;
-
-    String normalizar(dynamic v) {
-      return (v ?? '').toString().trim().toLowerCase();
-    }
-
-    dynamic clienteIdVenta(Map<String, dynamic> v) {
-      return v['cliente_id'] ??
-          v['id_cliente'] ??
-          v['clienteId'] ??
-          v['CLIENTE_ID'];
-    }
-
-    String numeroPolizaVenta(Map<String, dynamic> v) {
-      return normalizar(
-        v['numero_poliza'] ??
-            v['poliza'] ??
-            v['POLIZA'] ??
-            v['N_POLIZA'] ??
-            v['n_poliza'] ??
-            v['numeroPoliza'],
-      );
-    }
-    debugPrint('BUSCANDO...');
-debugPrint('Poliza: $numeroPoliza');
-debugPrint('DNI: $dni');
-debugPrint('EMAIL: $email');
-
-    if (numeroPoliza.isNotEmpty) {
-      for (final v in ventas) {
-        if (numeroPolizaVenta(v) == numeroPoliza) {
-          ventaEncontrada = v;
-          debugPrint('VENTA ENCONTRADA');
-debugPrint(v.toString());
-          break;
-        }
-      }
-    }
-
-    if (ventaEncontrada == null && dni.isNotEmpty) {
-      for (final c in clientes) {
-        final dniCliente = normalizar(
-          c['dni'] ??
-              c['DNI'] ??
-              c['documento'] ??
-              c['numero_documento'],
-        );
-
-        if (dniCliente == dni) {
-          clienteEncontrado = c;
-          debugPrint('CLIENTE DNI ENCONTRADO');
-debugPrint(c.toString());
-          break;
-        }
-      }
-
-      if (clienteEncontrado != null) {
-        final idCliente = clienteEncontrado['id']?.toString();
-
-        for (final v in ventas) {
-          if (clienteIdVenta(v)?.toString() == idCliente) {
-            ventaEncontrada = v;
-            break;
-          }
-        }
-      }
-    }
-
-    if (ventaEncontrada == null && email.isNotEmpty) {
-      for (final c in clientes) {
-        final emailCliente = normalizar(
-          c['email'] ??
-              c['EMAIL'] ??
-              c['correo'] ??
-              c['correo_electronico'],
-        );
-
-        if (emailCliente == email) {
-          clienteEncontrado = c;
-          debugPrint('CLIENTE EMAIL ENCONTRADO');
-debugPrint(c.toString());
-          break;
-        }
-      }
-
-      if (clienteEncontrado != null) {
-        final idCliente = clienteEncontrado['id']?.toString();
-
-        for (final v in ventas) {
-          if (clienteIdVenta(v)?.toString() == idCliente) {
-            ventaEncontrada = v;
-            break;
-          }
-        }
-      }
-    }
-
-    if (ventaEncontrada != null && clienteEncontrado == null) {
-      final idCliente = clienteIdVenta(ventaEncontrada)?.toString();
-
-      if (idCliente != null) {
-        for (final c in clientes) {
-          if (c['id']?.toString() == idCliente) {
-            clienteEncontrado = c;
-            break;
-          }
-        }
-      }
-    }
-
     setState(() {
-      venta = ventaEncontrada;
-      cliente = clienteEncontrado;
-      loading = false;
+      loading = true;
+      venta = null;
+      cliente = null;
     });
 
-    if (ventaEncontrada == null && clienteEncontrado == null && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('No se ha encontrado ninguna póliza con esos datos'),
-        ),
-      );
+    try {
+      final numeroPoliza = numeroPolizaCtrl.text.trim().toLowerCase();
+      final dni = dniCtrl.text.trim().toLowerCase();
+      final email = emailCtrl.text.trim().toLowerCase();
+
+      final ventasData = await supabase.from('ventas').select();
+      final clientesData = await supabase.from('clientes').select();
+
+      debugPrint('========================');
+      debugPrint('VENTAS: ${(ventasData as List).length}');
+      debugPrint('CLIENTES: ${(clientesData as List).length}');
+      debugPrint('========================');
+
+      final ventas = (ventasData as List)
+          .map((e) => Map<String, dynamic>.from(e))
+          .toList();
+
+      final clientes = (clientesData as List)
+          .map((e) => Map<String, dynamic>.from(e))
+          .toList();
+
+      if (ventas.isNotEmpty) {
+        debugPrint('COLUMNAS VENTAS');
+        debugPrint(ventas.first.keys.toString());
+        debugPrint(ventas.first.toString());
+      }
+
+      if (clientes.isNotEmpty) {
+        debugPrint('COLUMNAS CLIENTES');
+        debugPrint(clientes.first.keys.toString());
+        debugPrint(clientes.first.toString());
+      }
+
+      Map<String, dynamic>? ventaEncontrada;
+      Map<String, dynamic>? clienteEncontrado;
+
+      String normalizar(dynamic v) {
+        return (v ?? '').toString().trim().toLowerCase();
+      }
+
+      dynamic clienteIdVenta(Map<String, dynamic> v) {
+        return v['cliente_id'] ??
+            v['id_cliente'] ??
+            v['clienteId'] ??
+            v['CLIENTE_ID'];
+      }
+
+      String numeroPolizaVenta(Map<String, dynamic> v) {
+        return normalizar(
+          v['numero_poliza'] ??
+              v['poliza'] ??
+              v['POLIZA'] ??
+              v['N_POLIZA'] ??
+              v['n_poliza'] ??
+              v['numeroPoliza'],
+        );
+      }
+
+      debugPrint('BUSCANDO...');
+      debugPrint('Poliza: $numeroPoliza');
+      debugPrint('DNI: $dni');
+      debugPrint('EMAIL: $email');
+
+      if (numeroPoliza.isNotEmpty) {
+        for (final v in ventas) {
+          if (numeroPolizaVenta(v) == numeroPoliza) {
+            ventaEncontrada = v;
+            debugPrint('VENTA ENCONTRADA');
+            debugPrint(v.toString());
+            break;
+          }
+        }
+      }
+
+      if (ventaEncontrada == null && dni.isNotEmpty) {
+        for (final c in clientes) {
+          final dniCliente = normalizar(
+            c['dni'] ?? c['DNI'] ?? c['documento'] ?? c['numero_documento'],
+          );
+
+          if (dniCliente == dni) {
+            clienteEncontrado = c;
+            debugPrint('CLIENTE DNI ENCONTRADO');
+            debugPrint(c.toString());
+            break;
+          }
+        }
+
+        if (clienteEncontrado != null) {
+          final idCliente = clienteEncontrado['id']?.toString();
+
+          for (final v in ventas) {
+            if (clienteIdVenta(v)?.toString() == idCliente) {
+              ventaEncontrada = v;
+              break;
+            }
+          }
+        }
+      }
+
+      if (ventaEncontrada == null && email.isNotEmpty) {
+        for (final c in clientes) {
+          final emailCliente = normalizar(
+            c['email'] ?? c['EMAIL'] ?? c['correo'] ?? c['correo_electronico'],
+          );
+
+          if (emailCliente == email) {
+            clienteEncontrado = c;
+            debugPrint('CLIENTE EMAIL ENCONTRADO');
+            debugPrint(c.toString());
+            break;
+          }
+        }
+
+        if (clienteEncontrado != null) {
+          final idCliente = clienteEncontrado['id']?.toString();
+
+          for (final v in ventas) {
+            if (clienteIdVenta(v)?.toString() == idCliente) {
+              ventaEncontrada = v;
+              break;
+            }
+          }
+        }
+      }
+
+      if (ventaEncontrada != null && clienteEncontrado == null) {
+        final idCliente = clienteIdVenta(ventaEncontrada)?.toString();
+
+        if (idCliente != null) {
+          for (final c in clientes) {
+            if (c['id']?.toString() == idCliente) {
+              clienteEncontrado = c;
+              break;
+            }
+          }
+        }
+      }
+
+      setState(() {
+        venta = ventaEncontrada;
+        cliente = clienteEncontrado;
+        loading = false;
+      });
+
+      if (ventaEncontrada == null && clienteEncontrado == null && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('No se ha encontrado ninguna póliza con esos datos'),
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('ERROR CONSULTAR POLIZA: $e');
+
+      if (!mounted) return;
+
+      setState(() => loading = false);
+
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error consultando póliza: $e')));
     }
-  } catch (e) {
-    debugPrint('ERROR CONSULTAR POLIZA: $e');
-
-    if (!mounted) return;
-
-    setState(() => loading = false);
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Error consultando póliza: $e')),
-    );
   }
-}
 
   String _text(dynamic value) {
     if (value == null) return '-';
@@ -224,142 +219,142 @@ debugPrint(c.toString());
   }
 
   void _abrirGestiones() {
-   showModalBottomSheet(
-  context: context,
-  isScrollControlled: true,
-  backgroundColor: Colors.transparent,
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
       ),
       builder: (_) {
-  return SafeArea(
-    child: Padding(
-      padding: const EdgeInsets.fromLTRB(18, 70, 18, 18),
-      child: Container(
-        decoration: BoxDecoration(
-          color: const Color(0xFF102331),
-          borderRadius: BorderRadius.circular(28),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: SingleChildScrollView(
-            child: Wrap(
-              runSpacing: 12,
-              children: [
-                const Text(
-                  'Gestiones del cliente',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 22,
-                    fontWeight: FontWeight.w900,
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(18, 70, 18, 18),
+            child: Container(
+              decoration: BoxDecoration(
+                color: const Color(0xFF102331),
+                borderRadius: BorderRadius.circular(28),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(20),
+                child: SingleChildScrollView(
+                  child: Wrap(
+                    runSpacing: 12,
+                    children: [
+                      const Text(
+                        'Gestiones del cliente',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 22,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+
+                      _gestionItem(
+                        Icons.email_rounded,
+                        'Enviar email',
+                        'Enviar comunicación al email del cliente.',
+                        () => _accionCliente('Enviar email'),
+                      ),
+
+                      _gestionItem(
+                        Icons.sms_rounded,
+                        'Enviar SMS',
+                        'Enviar aviso rápido al teléfono del cliente.',
+                        () => _accionCliente('Enviar SMS'),
+                      ),
+
+                      _gestionItem(
+                        Icons.assignment_turned_in_rounded,
+                        'Enviar consentimiento',
+                        'Preparar consentimiento digital.',
+                        () => _accionCliente('Enviar consentimiento'),
+                      ),
+
+                      _gestionItem(
+                        Icons.download_rounded,
+                        'Descargar fichón',
+                        'Generar y descargar el fichón completo del cliente.',
+                        () => _accionCliente('Descargar fichón'),
+                      ),
+
+                      _gestionItem(
+                        Icons.folder_zip_rounded,
+                        'Descargar documentación',
+                        'Descargar documentación vinculada al cliente.',
+                        () => _accionCliente('Descargar documentación'),
+                      ),
+
+                      _gestionItem(
+                        Icons.description_rounded,
+                        'Descargar póliza',
+                        'Descargar o preparar copia de la póliza.',
+                        () => _accionCliente('Descargar póliza'),
+                      ),
+
+                      _gestionItem(
+                        Icons.receipt_long_rounded,
+                        'Consultar recibos',
+                        'Revisar estado de cobro o incidencias.',
+                        () => _accionCliente('Consultar recibos'),
+                      ),
+
+                      _gestionItem(
+                        Icons.history_rounded,
+                        'Historial de gestiones',
+                        'Ver actividad comercial del cliente.',
+                        () => _accionCliente('Historial de gestiones'),
+                      ),
+
+                      _gestionItem(
+                        Icons.event_note_rounded,
+                        'Ver seguimientos',
+                        'Consultar llamadas y seguimientos programados.',
+                        () => _accionCliente('Ver seguimientos'),
+                      ),
+
+                      _gestionItem(
+                        Icons.person_search_rounded,
+                        'Abrir ficha completa',
+                        'Abrir la ficha completa del cliente.',
+                        () => _accionCliente('Abrir ficha completa'),
+                      ),
+
+                      _gestionItem(
+                        Icons.warning_amber_rounded,
+                        'Ver incidencias',
+                        'Consultar incidencias asociadas al cliente.',
+                        () => _accionCliente('Ver incidencias'),
+                      ),
+
+                      _gestionItem(
+                        Icons.edit_rounded,
+                        'Modificar datos',
+                        'Editar información del cliente o póliza.',
+                        () => _accionCliente('Modificar datos'),
+                      ),
+
+                      _gestionItem(
+                        Icons.cancel_rounded,
+                        'Solicitar baja',
+                        'Iniciar solicitud de baja o anulación.',
+                        () => _accionCliente('Solicitar baja'),
+                      ),
+
+                      _gestionItem(
+                        Icons.swap_horiz_rounded,
+                        'Cambiar mediador',
+                        'Reasignar cliente o póliza a otro mediador.',
+                        () => _accionCliente('Cambiar mediador'),
+                      ),
+                    ],
                   ),
                 ),
-
-                _gestionItem(
-                  Icons.email_rounded,
-                  'Enviar email',
-                  'Enviar comunicación al email del cliente.',
-                  () => _accionCliente('Enviar email'),
-                ),
-
-                _gestionItem(
-                  Icons.sms_rounded,
-                  'Enviar SMS',
-                  'Enviar aviso rápido al teléfono del cliente.',
-                  () => _accionCliente('Enviar SMS'),
-                ),
-
-                _gestionItem(
-                  Icons.assignment_turned_in_rounded,
-                  'Enviar consentimiento',
-                  'Preparar consentimiento digital.',
-                  () => _accionCliente('Enviar consentimiento'),
-                ),
-
-                _gestionItem(
-                  Icons.download_rounded,
-                  'Descargar fichón',
-                  'Generar y descargar el fichón completo del cliente.',
-                  () => _accionCliente('Descargar fichón'),
-                ),
-
-                _gestionItem(
-                  Icons.folder_zip_rounded,
-                  'Descargar documentación',
-                  'Descargar documentación vinculada al cliente.',
-                  () => _accionCliente('Descargar documentación'),
-                ),
-
-                _gestionItem(
-                  Icons.description_rounded,
-                  'Descargar póliza',
-                  'Descargar o preparar copia de la póliza.',
-                  () => _accionCliente('Descargar póliza'),
-                ),
-
-                _gestionItem(
-                  Icons.receipt_long_rounded,
-                  'Consultar recibos',
-                  'Revisar estado de cobro o incidencias.',
-                  () => _accionCliente('Consultar recibos'),
-                ),
-
-                _gestionItem(
-                  Icons.history_rounded,
-                  'Historial de gestiones',
-                  'Ver actividad comercial del cliente.',
-                  () => _accionCliente('Historial de gestiones'),
-                ),
-
-                _gestionItem(
-                  Icons.event_note_rounded,
-                  'Ver seguimientos',
-                  'Consultar llamadas y seguimientos programados.',
-                  () => _accionCliente('Ver seguimientos'),
-                ),
-
-                _gestionItem(
-                  Icons.person_search_rounded,
-                  'Abrir ficha completa',
-                  'Abrir la ficha completa del cliente.',
-                  () => _accionCliente('Abrir ficha completa'),
-                ),
-
-                _gestionItem(
-                  Icons.warning_amber_rounded,
-                  'Ver incidencias',
-                  'Consultar incidencias asociadas al cliente.',
-                  () => _accionCliente('Ver incidencias'),
-                ),
-
-                _gestionItem(
-                  Icons.edit_rounded,
-                  'Modificar datos',
-                  'Editar información del cliente o póliza.',
-                  () => _accionCliente('Modificar datos'),
-                ),
-
-                _gestionItem(
-                  Icons.cancel_rounded,
-                  'Solicitar baja',
-                  'Iniciar solicitud de baja o anulación.',
-                  () => _accionCliente('Solicitar baja'),
-                ),
-
-                _gestionItem(
-                  Icons.swap_horiz_rounded,
-                  'Cambiar mediador',
-                  'Reasignar cliente o póliza a otro mediador.',
-                  () => _accionCliente('Cambiar mediador'),
-                ),
-              ],
+              ),
             ),
           ),
-        ),
-      ),
-    ),
-  );
-},
+        );
+      },
     );
   }
 
@@ -427,14 +422,9 @@ debugPrint(c.toString());
                   Expanded(
                     child: Row(
                       children: [
-                        SizedBox(
-                          width: 390,
-                          child: _formularioConsulta(),
-                        ),
+                        SizedBox(width: 390, child: _formularioConsulta()),
                         const SizedBox(width: 20),
-                        Expanded(
-                          child: _resultadoConsulta(),
-                        ),
+                        Expanded(child: _resultadoConsulta()),
                       ],
                     ),
                   ),
@@ -507,7 +497,11 @@ debugPrint(c.toString());
             'Introduce uno de los datos para localizar la póliza.',
           ),
           const SizedBox(height: 22),
-          _input(numeroPolizaCtrl, 'Número de póliza', Icons.confirmation_number_rounded),
+          _input(
+            numeroPolizaCtrl,
+            'Número de póliza',
+            Icons.confirmation_number_rounded,
+          ),
           _input(dniCtrl, 'DNI / NIE', Icons.badge_rounded),
           _input(emailCtrl, 'Email', Icons.email_rounded),
           const SizedBox(height: 18),
@@ -615,12 +609,36 @@ debugPrint(c.toString());
                 spacing: 14,
                 runSpacing: 14,
                 children: [
-                  _dataCard('Póliza', _text(venta?['numero_poliza']), Icons.confirmation_number_rounded),
-                  _dataCard('Producto', _text(venta?['producto']), Icons.inventory_2_rounded),
-                  _dataCard('Compañía', _text(venta?['compania']), Icons.business_rounded),
-                  _dataCard('Forma de pago', _text(venta?['forma_pago']), Icons.payments_rounded),
-                  _dataCard('Fecha efecto', _text(venta?['fecha_efecto']).split('T').first, Icons.calendar_month_rounded),
-                  _dataCard('Asegurados', _text(venta?['numero_asegurados']), Icons.groups_rounded),
+                  _dataCard(
+                    'Póliza',
+                    _text(venta?['numero_poliza']),
+                    Icons.confirmation_number_rounded,
+                  ),
+                  _dataCard(
+                    'Producto',
+                    _text(venta?['producto']),
+                    Icons.inventory_2_rounded,
+                  ),
+                  _dataCard(
+                    'Compañía',
+                    _text(venta?['compania']),
+                    Icons.business_rounded,
+                  ),
+                  _dataCard(
+                    'Forma de pago',
+                    _text(venta?['forma_pago']),
+                    Icons.payments_rounded,
+                  ),
+                  _dataCard(
+                    'Fecha efecto',
+                    _text(venta?['fecha_efecto']).split('T').first,
+                    Icons.calendar_month_rounded,
+                  ),
+                  _dataCard(
+                    'Asegurados',
+                    _text(venta?['numero_asegurados']),
+                    Icons.groups_rounded,
+                  ),
                 ],
               ),
             ],
@@ -663,12 +681,32 @@ debugPrint(c.toString());
                 spacing: 14,
                 runSpacing: 14,
                 children: [
-                  _dataCard('Nombre', '${_text(cliente?['nombre'])} ${_text(cliente?['apellidos'])}', Icons.person_rounded),
+                  _dataCard(
+                    'Nombre',
+                    '${_text(cliente?['nombre'])} ${_text(cliente?['apellidos'])}',
+                    Icons.person_rounded,
+                  ),
                   _dataCard('DNI', _text(cliente?['dni']), Icons.badge_rounded),
-                  _dataCard('Teléfono', _text(cliente?['telefono']), Icons.phone_rounded),
-                  _dataCard('Email', _text(cliente?['email']), Icons.email_rounded),
-                  _dataCard('Dirección', '${_text(cliente?['direccion'])}, ${_text(cliente?['numero'])}', Icons.home_rounded),
-                  _dataCard('Población', '${_text(cliente?['poblacion'])} - ${_text(cliente?['provincia'])}', Icons.location_city_rounded),
+                  _dataCard(
+                    'Teléfono',
+                    _text(cliente?['telefono']),
+                    Icons.phone_rounded,
+                  ),
+                  _dataCard(
+                    'Email',
+                    _text(cliente?['email']),
+                    Icons.email_rounded,
+                  ),
+                  _dataCard(
+                    'Dirección',
+                    '${_text(cliente?['direccion'])}, ${_text(cliente?['numero'])}',
+                    Icons.home_rounded,
+                  ),
+                  _dataCard(
+                    'Población',
+                    '${_text(cliente?['poblacion'])} - ${_text(cliente?['provincia'])}',
+                    Icons.location_city_rounded,
+                  ),
                 ],
               ),
             ],
@@ -710,53 +748,50 @@ debugPrint(c.toString());
   }
 
   Widget _moduleTitle(IconData icon, String title, String subtitle) {
-  return Row(
-    mainAxisSize: MainAxisSize.min,
-    children: [
-      Container(
-        width: 58,
-        height: 58,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(20),
-          gradient: const LinearGradient(
-            colors: [
-              Color(0xFF0284C7),
-              Color(0xFF22D3EE),
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 58,
+          height: 58,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(20),
+            gradient: const LinearGradient(
+              colors: [Color(0xFF0284C7), Color(0xFF22D3EE)],
+            ),
+          ),
+          child: Icon(icon, color: Colors.white, size: 29),
+        ),
+        const SizedBox(width: 13),
+        Flexible(
+          fit: FlexFit.loose,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: Color(0xFF0F172A),
+                  fontSize: 22,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              Text(
+                subtitle,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: Color(0xFF64748B),
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
             ],
           ),
         ),
-        child: Icon(icon, color: Colors.white, size: 29),
-      ),
-      const SizedBox(width: 13),
-      Flexible(
-        fit: FlexFit.loose,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              title,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: Color(0xFF0F172A),
-                fontSize: 22,
-                fontWeight: FontWeight.w900,
-              ),
-            ),
-            Text(
-              subtitle,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: Color(0xFF64748B),
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
-        ),
-      ),
-    ],
-  );
-}
+      ],
+    );
+  }
 
   Widget _dataCard(String title, String value, IconData icon) {
     return Container(

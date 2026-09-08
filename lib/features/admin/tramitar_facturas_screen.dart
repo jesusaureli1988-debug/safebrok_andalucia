@@ -27,28 +27,28 @@ class _TramitarFacturasScreenState extends State<TramitarFacturasScreen> {
   Map<String, dynamic>? facturaSeleccionada;
 
   Future<void> cargarLineasFactura(Map<String, dynamic> factura) async {
-  try {
-    final data = await supabase
-        .from('nominas_facturas_lineas')
-        .select()
-        .eq('factura_id', factura['id'])
-        .order('created_at', ascending: true);
+    try {
+      final data = await supabase
+          .from('nominas_facturas_lineas')
+          .select()
+          .eq('factura_id', factura['id'])
+          .order('created_at', ascending: true);
 
-    setState(() {
-      facturaSeleccionada = factura;
-      lineasFactura = (data as List)
-          .map((e) => Map<String, dynamic>.from(e))
-          .toList();
-    });
-  } catch (e) {
-    debugPrint('ERROR CARGAR LINEAS FACTURA: $e');
+      setState(() {
+        facturaSeleccionada = factura;
+        lineasFactura = (data as List)
+            .map((e) => Map<String, dynamic>.from(e))
+            .toList();
+      });
+    } catch (e) {
+      debugPrint('ERROR CARGAR LINEAS FACTURA: $e');
 
-    setState(() {
-      facturaSeleccionada = factura;
-      lineasFactura = [];
-    });
+      setState(() {
+        facturaSeleccionada = factura;
+        lineasFactura = [];
+      });
+    }
   }
-}
 
   List<Map<String, dynamic>> facturas = [];
 
@@ -72,10 +72,7 @@ class _TramitarFacturasScreenState extends State<TramitarFacturasScreen> {
     return double.tryParse(normalizado) ?? 0;
   }
 
-  double _primerImporte(
-    Map<String, dynamic> fila,
-    List<String> columnas,
-  ) {
+  double _primerImporte(Map<String, dynamic> fila, List<String> columnas) {
     for (final columna in columnas) {
       if (!fila.containsKey(columna)) continue;
       final valor = _money(fila[columna]);
@@ -85,13 +82,14 @@ class _TramitarFacturasScreenState extends State<TramitarFacturasScreen> {
   }
 
   double _comisionFirmadaLinea(Map<String, dynamic> linea) {
-    final tipo = (linea['tipo_movimiento'] ??
-            linea['tipo'] ??
-            linea['movimiento'] ??
-            'VENTA')
-        .toString()
-        .trim()
-        .toUpperCase();
+    final tipo =
+        (linea['tipo_movimiento'] ??
+                linea['tipo'] ??
+                linea['movimiento'] ??
+                'VENTA')
+            .toString()
+            .trim()
+            .toUpperCase();
 
     final importe = _primerImporte(linea, const [
       'comision',
@@ -162,12 +160,13 @@ class _TramitarFacturasScreenState extends State<TramitarFacturasScreen> {
     if (comisiones.abs() < 0.001 && lineas.isNotEmpty) {
       double suma = 0;
       for (final linea in lineas) {
-        final tipo = (linea['tipo_movimiento'] ??
-                linea['tipo'] ??
-                linea['movimiento'] ??
-                'VENTA')
-            .toString()
-            .toUpperCase();
+        final tipo =
+            (linea['tipo_movimiento'] ??
+                    linea['tipo'] ??
+                    linea['movimiento'] ??
+                    'VENTA')
+                .toString()
+                .toUpperCase();
 
         // Los ajustes de rappel no forman parte de las comisiones.
         if (tipo.contains('RAPPEL') || tipo.contains('RAPEL')) {
@@ -230,8 +229,7 @@ class _TramitarFacturasScreenState extends State<TramitarFacturasScreen> {
     return salida;
   }
 
-  bool get esAdmin =>
-      role == 'administracion' || role == 'director_nacional';
+  bool get esAdmin => role == 'administracion' || role == 'director_nacional';
 
   bool _esFacturaEditable(Map<String, dynamic> factura) {
     return esAdmin &&
@@ -249,18 +247,31 @@ class _TramitarFacturasScreenState extends State<TramitarFacturasScreen> {
       base guardada y completamos el desglose sin destruir información.
     */
     double comisiones = _primerImporte(factura, const [
-      'comisiones', 'comision', 'total_comisiones', 'importe_comisiones'
+      'comisiones',
+      'comision',
+      'total_comisiones',
+      'importe_comisiones',
     ]);
     final rappel = _primerImporte(factura, const [
-      'rappel', 'rapel', 'importe_rappel', 'importe_rapel'
+      'rappel',
+      'rapel',
+      'importe_rappel',
+      'importe_rapel',
     ]);
     final fijo = _primerImporte(factura, const [
-      'fijo', 'importe_fijo', 'fijo_mensual'
+      'fijo',
+      'importe_fijo',
+      'fijo_mensual',
     ]);
 
     final baseGuardada = _primerImporte(factura, const [
-      'base_imponible', 'base', 'importe_bruto', 'total_bruto',
-      'total_devengado', 'importe_total', 'total_nomina'
+      'base_imponible',
+      'base',
+      'importe_bruto',
+      'total_bruto',
+      'total_devengado',
+      'importe_total',
+      'total_nomina',
     ]);
     final sumaDesglose = comisiones + rappel + fijo;
 
@@ -293,9 +304,7 @@ class _TramitarFacturasScreenState extends State<TramitarFacturasScreen> {
     final importeIrpf = importeIrpfGuardado.abs() > 0.001
         ? importeIrpfGuardado
         : importeIrpfCalculado;
-    final total = totalGuardado.abs() > 0.001
-        ? totalGuardado
-        : totalCalculado;
+    final total = totalGuardado.abs() > 0.001 ? totalGuardado : totalCalculado;
 
     return {
       'comisiones': comisiones,
@@ -316,7 +325,8 @@ class _TramitarFacturasScreenState extends State<TramitarFacturasScreen> {
     required double fijo,
     double? irpf,
   }) async {
-    final porcentajeIrpf = irpf ??
+    final porcentajeIrpf =
+        irpf ??
         (_money(factura['irpf_porcentaje']) == 0
             ? 15.0
             : _money(factura['irpf_porcentaje']));
@@ -333,15 +343,18 @@ class _TramitarFacturasScreenState extends State<TramitarFacturasScreen> {
     final importeIrpf = base * porcentajeIrpf / 100;
     final total = base - importeIrpf;
 
-    await supabase.from('nominas_facturas').update({
-      'comisiones': comisiones,
-      'rappel': rappel,
-      'fijo': fijo,
-      'base_imponible': base,
-      'irpf_porcentaje': porcentajeIrpf,
-      'importe_irpf': importeIrpf,
-      'total_factura': total,
-    }).eq('id', factura['id']);
+    await supabase
+        .from('nominas_facturas')
+        .update({
+          'comisiones': comisiones,
+          'rappel': rappel,
+          'fijo': fijo,
+          'base_imponible': base,
+          'irpf_porcentaje': porcentajeIrpf,
+          'importe_irpf': importeIrpf,
+          'total_factura': total,
+        })
+        .eq('id', factura['id']);
   }
 
   Future<void> _recargarFactura(dynamic facturaId) async {
@@ -451,7 +464,7 @@ class _TramitarFacturasScreenState extends State<TramitarFacturasScreen> {
         facturaSeleccionada = lista.isNotEmpty ? lista.first : null;
         lineasFactura = lista.isNotEmpty
             ? (lineasPorFactura[lista.first['id']?.toString() ?? ''] ??
-                <Map<String, dynamic>>[])
+                  <Map<String, dynamic>>[])
             : <Map<String, dynamic>>[];
         loading = false;
       });
@@ -496,12 +509,13 @@ class _TramitarFacturasScreenState extends State<TramitarFacturasScreen> {
   int get enviadas =>
       facturas.where((f) => f['estado'] == 'enviada_email').length;
 
-      double get totalPagado {
-  return facturas
-      .where((f) =>
-          f['estado'] == 'tramitada' || f['estado'] == 'enviada_email')
-      .fold(0.0, (s, f) => s + _money(f['total_factura']));
-}
+  double get totalPagado {
+    return facturas
+        .where(
+          (f) => f['estado'] == 'tramitada' || f['estado'] == 'enviada_email',
+        )
+        .fold(0.0, (s, f) => s + _money(f['total_factura']));
+  }
 
   double get importePendiente {
     return facturas
@@ -509,10 +523,7 @@ class _TramitarFacturasScreenState extends State<TramitarFacturasScreen> {
         .fold(0.0, (s, f) => s + _money(f['base_imponible']));
   }
 
-
-  Future<void> _abrirEditorFacturaManual(
-    Map<String, dynamic> factura,
-  ) async {
+  Future<void> _abrirEditorFacturaManual(Map<String, dynamic> factura) async {
     if (!_esFacturaEditable(factura)) return;
 
     String concepto = 'comisiones';
@@ -546,10 +557,7 @@ class _TramitarFacturasScreenState extends State<TramitarFacturasScreen> {
                         'Elige el concepto, indica si quieres añadir o quitar '
                         'importe y escribe la cantidad. Los totales, el IRPF y '
                         'el PDF se recalcularán automáticamente.',
-                        style: TextStyle(
-                          color: Color(0xFF64748B),
-                          height: 1.4,
-                        ),
+                        style: TextStyle(color: Color(0xFF64748B), height: 1.4),
                       ),
                       const SizedBox(height: 18),
                       DropdownButtonFormField<String>(
@@ -582,9 +590,7 @@ class _TramitarFacturasScreenState extends State<TramitarFacturasScreen> {
                           DropdownMenuItem(
                             value: 'sumar',
                             child: Text(
-                              esExtorno
-                                  ? 'Añadir extorno'
-                                  : 'Añadir cantidad',
+                              esExtorno ? 'Añadir extorno' : 'Añadir cantidad',
                             ),
                           ),
                           DropdownMenuItem(
@@ -627,9 +633,7 @@ class _TramitarFacturasScreenState extends State<TramitarFacturasScreen> {
                         decoration: BoxDecoration(
                           color: const Color(0xFFEFF6FF),
                           borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: const Color(0xFFBFDBFE),
-                          ),
+                          border: Border.all(color: const Color(0xFFBFDBFE)),
                         ),
                         child: const Text(
                           'El ajuste se añadirá al detalle de líneas para que '
@@ -765,9 +769,7 @@ class _TramitarFacturasScreenState extends State<TramitarFacturasScreen> {
         tipo == 'REVERSO_EXTORNO_MANUAL';
   }
 
-  Future<void> _eliminarAjusteManual(
-    Map<String, dynamic> linea,
-  ) async {
+  Future<void> _eliminarAjusteManual(Map<String, dynamic> linea) async {
     final factura = facturaSeleccionada;
     if (factura == null ||
         !_esFacturaEditable(factura) ||
@@ -833,9 +835,7 @@ class _TramitarFacturasScreenState extends State<TramitarFacturasScreen> {
     }
   }
 
-  Map<String, dynamic> _verificarFactura(
-    Map<String, dynamic> factura,
-  ) {
+  Map<String, dynamic> _verificarFactura(Map<String, dynamic> factura) {
     int ventas = 0;
     int extornos = 0;
     int ajustes = 0;
@@ -876,8 +876,7 @@ class _TramitarFacturasScreenState extends State<TramitarFacturasScreen> {
 
     final sinLineas = lineasFactura.isEmpty;
     final baseCorrecta = diferenciaBase.abs() < 0.02;
-    final comisionesCorrectas =
-        sinLineas || diferenciaComisiones.abs() < 0.02;
+    final comisionesCorrectas = sinLineas || diferenciaComisiones.abs() < 0.02;
 
     return {
       'ventas': ventas,
@@ -891,9 +890,7 @@ class _TramitarFacturasScreenState extends State<TramitarFacturasScreen> {
     };
   }
 
-  Future<void> _recalcularFactura(
-    Map<String, dynamic> factura,
-  ) async {
+  Future<void> _recalcularFactura(Map<String, dynamic> factura) async {
     if (!_esFacturaEditable(factura)) return;
 
     try {
@@ -914,510 +911,511 @@ class _TramitarFacturasScreenState extends State<TramitarFacturasScreen> {
   }
 
   Future<void> tramitarFactura(Map<String, dynamic> f) async {
-  if (!esAdmin) return;
+    if (!esAdmin) return;
 
-  final user = supabase.auth.currentUser;
-  if (user == null) return;
+    final user = supabase.auth.currentUser;
+    if (user == null) return;
 
-  try {
-    final calculos = _calculosFactura(f);
-    final comisiones = calculos['comisiones']!;
-    final rappel = calculos['rappel']!;
-    final fijo = calculos['fijo']!;
-    final base = calculos['base']!;
-    final irpf = calculos['irpf']!;
-    final importeIrpf = calculos['importe_irpf']!;
-    final total = calculos['total']!;
+    try {
+      final calculos = _calculosFactura(f);
+      final comisiones = calculos['comisiones']!;
+      final rappel = calculos['rappel']!;
+      final fijo = calculos['fijo']!;
+      final base = calculos['base']!;
+      final irpf = calculos['irpf']!;
+      final importeIrpf = calculos['importe_irpf']!;
+      final total = calculos['total']!;
 
-    await _guardarTotalesFactura(
-      factura: f,
-      comisiones: comisiones,
-      rappel: rappel,
-      fijo: fijo,
-      irpf: irpf,
-    );
+      await _guardarTotalesFactura(
+        factura: f,
+        comisiones: comisiones,
+        rappel: rappel,
+        fijo: fijo,
+        irpf: irpf,
+      );
 
-    final numeroFactura =
-        'FAC-${f['anio']}-${f['mes'].toString().padLeft(2, '0')}-${DateTime.now().millisecondsSinceEpoch}';
+      final numeroFactura =
+          'FAC-${f['anio']}-${f['mes'].toString().padLeft(2, '0')}-${DateTime.now().millisecondsSinceEpoch}';
 
-    final lineas = await supabase
-        .from('nominas_facturas_lineas')
-        .select()
-        .eq('factura_id', f['id']);
+      final lineas = await supabase
+          .from('nominas_facturas_lineas')
+          .select()
+          .eq('factura_id', f['id']);
 
-    final pdfBytes = await _generarPdfFactura(
-      factura: f,
-      lineas: (lineas as List)
-          .map((e) => Map<String, dynamic>.from(e))
-          .toList(),
-      numeroFactura: numeroFactura,
-      comisiones: comisiones,
-      rappel: rappel,
-      fijo: fijo,
-      base: base,
-      irpf: irpf,
-      importeIrpf: importeIrpf,
-     
-      total: total,
-    );
+      final pdfBytes = await _generarPdfFactura(
+        factura: f,
+        lineas: (lineas as List)
+            .map((e) => Map<String, dynamic>.from(e))
+            .toList(),
+        numeroFactura: numeroFactura,
+        comisiones: comisiones,
+        rappel: rappel,
+        fijo: fijo,
+        base: base,
+        irpf: irpf,
+        importeIrpf: importeIrpf,
 
-    final fileName = '$numeroFactura.pdf';
-    final path = 'facturas/${f['anio']}/${f['mes']}/$fileName';
+        total: total,
+      );
 
-    await supabase.storage.from('facturas').uploadBinary(
-          path,
-          pdfBytes,
-          fileOptions: const FileOptions(
-            contentType: 'application/pdf',
-            upsert: true,
-          ),
-        );
+      final fileName = '$numeroFactura.pdf';
+      final path = 'facturas/${f['anio']}/${f['mes']}/$fileName';
 
-    final signedUrl = await supabase.storage
-        .from('facturas')
-        .createSignedUrl(path, 60 * 60 * 24 * 365);
-
-    await supabase.from('nominas_facturas').update({
-      'estado': 'tramitada',
-      'numero_factura': numeroFactura,
-      'comisiones': comisiones,
-      'rappel': rappel,
-      'fijo': fijo,
-      'base_imponible': base,
-      'irpf_porcentaje': irpf,
-      'importe_irpf': importeIrpf,
-      'total_factura': total,
-      'factura_url': signedUrl,
-      'tramitada_por': user.id,
-      'fecha_tramitacion': DateTime.now().toIso8601String(),
-    }).eq('id', f['id']);
-
-    await supabase.functions.invoke(
-      'enviar-factura-nomina',
-      body: {
-        'factura_id': f['id'],
-        'email': f['usuario_email'],
-        'nombre': f['usuario_nombre'],
-        'mes': nombreMes(f['mes']),
-        'anio': f['anio'],
-        'numero_factura': numeroFactura,
-        'pdf_url': signedUrl,
-      },
-    );
-
-    await supabase.from('nominas_facturas').update({
-      'estado': 'enviada_email',
-      'fecha_envio_email': DateTime.now().toIso8601String(),
-    }).eq('id', f['id']);
-
-    await cargarFacturas();
-
-    if (!mounted) return;
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Factura generada y enviada por email correctamente'),
-        backgroundColor: Colors.green,
-      ),
-    );
-  } catch (e) {
-    debugPrint('ERROR TRAMITAR FACTURA: $e');
-
-    if (!mounted) return;
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Error generando/enviando factura: $e'),
-        backgroundColor: Colors.red,
-      ),
-    );
-  }
-}
-
-Future<Uint8List> _generarPdfFactura({
-  required Map<String, dynamic> factura,
-  required List<Map<String, dynamic>> lineas,
-  required String numeroFactura,
-  required double comisiones,
-  required double rappel,
-  required double fijo,
-  required double base,
-  required double irpf,
-  required double importeIrpf,
-  required double total,
-}) async {
-  final pdf = pw.Document();
-
-  String euros(double value) => '${value.toStringAsFixed(2)} EUR';
-
-  pdf.addPage(
-    pw.MultiPage(
-      pageFormat: PdfPageFormat.a4,
-      margin: const pw.EdgeInsets.all(34),
-      build: (context) {
-        return [
-          pw.Container(
-            padding: const pw.EdgeInsets.all(18),
-            decoration: pw.BoxDecoration(
-              color: PdfColors.blueGrey900,
-              borderRadius: pw.BorderRadius.circular(10),
+      await supabase.storage
+          .from('facturas')
+          .uploadBinary(
+            path,
+            pdfBytes,
+            fileOptions: const FileOptions(
+              contentType: 'application/pdf',
+              upsert: true,
             ),
-            child: pw.Row(
-              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+          );
+
+      final signedUrl = await supabase.storage
+          .from('facturas')
+          .createSignedUrl(path, 60 * 60 * 24 * 365);
+
+      await supabase
+          .from('nominas_facturas')
+          .update({
+            'estado': 'tramitada',
+            'numero_factura': numeroFactura,
+            'comisiones': comisiones,
+            'rappel': rappel,
+            'fijo': fijo,
+            'base_imponible': base,
+            'irpf_porcentaje': irpf,
+            'importe_irpf': importeIrpf,
+            'total_factura': total,
+            'factura_url': signedUrl,
+            'tramitada_por': user.id,
+            'fecha_tramitacion': DateTime.now().toIso8601String(),
+          })
+          .eq('id', f['id']);
+
+      await supabase.functions.invoke(
+        'enviar-factura-nomina',
+        body: {
+          'factura_id': f['id'],
+          'email': f['usuario_email'],
+          'nombre': f['usuario_nombre'],
+          'mes': nombreMes(f['mes']),
+          'anio': f['anio'],
+          'numero_factura': numeroFactura,
+          'pdf_url': signedUrl,
+        },
+      );
+
+      await supabase
+          .from('nominas_facturas')
+          .update({
+            'estado': 'enviada_email',
+            'fecha_envio_email': DateTime.now().toIso8601String(),
+          })
+          .eq('id', f['id']);
+
+      await cargarFacturas();
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Factura generada y enviada por email correctamente'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    } catch (e) {
+      debugPrint('ERROR TRAMITAR FACTURA: $e');
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error generando/enviando factura: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  Future<Uint8List> _generarPdfFactura({
+    required Map<String, dynamic> factura,
+    required List<Map<String, dynamic>> lineas,
+    required String numeroFactura,
+    required double comisiones,
+    required double rappel,
+    required double fijo,
+    required double base,
+    required double irpf,
+    required double importeIrpf,
+    required double total,
+  }) async {
+    final pdf = pw.Document();
+
+    String euros(double value) => '${value.toStringAsFixed(2)} EUR';
+
+    pdf.addPage(
+      pw.MultiPage(
+        pageFormat: PdfPageFormat.a4,
+        margin: const pw.EdgeInsets.all(34),
+        build: (context) {
+          return [
+            pw.Container(
+              padding: const pw.EdgeInsets.all(18),
+              decoration: pw.BoxDecoration(
+                color: PdfColors.blueGrey900,
+                borderRadius: pw.BorderRadius.circular(10),
+              ),
+              child: pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                children: [
+                  pw.Column(
+                    crossAxisAlignment: pw.CrossAxisAlignment.start,
+                    children: [
+                      pw.Text(
+                        'SAFEBROK',
+                        style: pw.TextStyle(
+                          color: PdfColors.white,
+                          fontSize: 22,
+                          fontWeight: pw.FontWeight.bold,
+                        ),
+                      ),
+                      pw.SizedBox(height: 4),
+                      pw.Text(
+                        'Documento de facturación',
+                        style: const pw.TextStyle(
+                          color: PdfColors.blueGrey100,
+                          fontSize: 10,
+                        ),
+                      ),
+                    ],
+                  ),
+                  pw.Column(
+                    crossAxisAlignment: pw.CrossAxisAlignment.end,
+                    children: [
+                      pw.Text(
+                        'FACTURA',
+                        style: pw.TextStyle(
+                          color: PdfColors.white,
+                          fontSize: 24,
+                          fontWeight: pw.FontWeight.bold,
+                        ),
+                      ),
+                      pw.SizedBox(height: 4),
+                      pw.Text(
+                        numeroFactura,
+                        style: const pw.TextStyle(
+                          color: PdfColors.blueGrey100,
+                          fontSize: 10,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+
+            pw.SizedBox(height: 22),
+
+            pw.Row(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
               children: [
-                pw.Column(
-                  crossAxisAlignment: pw.CrossAxisAlignment.start,
-                  children: [
-                    pw.Text(
-                      'SAFEBROK',
-                      style: pw.TextStyle(
-                        color: PdfColors.white,
-                        fontSize: 22,
-                        fontWeight: pw.FontWeight.bold,
-                      ),
-                    ),
-                    pw.SizedBox(height: 4),
-                    pw.Text(
-                      'Documento de facturación',
-                      style: const pw.TextStyle(
-                        color: PdfColors.blueGrey100,
-                        fontSize: 10,
-                      ),
-                    ),
-                  ],
+                pw.Expanded(
+                  child: _pdfInfoBox(
+                    title: 'Colaborador',
+                    lines: [
+                      'Nombre: ${factura['usuario_nombre'] ?? ''}',
+                      'Email: ${factura['usuario_email'] ?? ''}',
+                      'Rol: ${factura['usuario_rol'] ?? ''}',
+                    ],
+                  ),
                 ),
-                pw.Column(
-                  crossAxisAlignment: pw.CrossAxisAlignment.end,
-                  children: [
-                    pw.Text(
-                      'FACTURA',
-                      style: pw.TextStyle(
-                        color: PdfColors.white,
-                        fontSize: 24,
-                        fontWeight: pw.FontWeight.bold,
-                      ),
-                    ),
-                    pw.SizedBox(height: 4),
-                    pw.Text(
-                      numeroFactura,
-                      style: const pw.TextStyle(
-                        color: PdfColors.blueGrey100,
-                        fontSize: 10,
-                      ),
-                    ),
-                  ],
+                pw.SizedBox(width: 14),
+                pw.Expanded(
+                  child: _pdfInfoBox(
+                    title: 'Datos factura',
+                    lines: [
+                      'Fecha: ${DateTime.now().toString().split(' ').first}',
+                      'Periodo: ${nombreMes(factura['mes'])} ${factura['anio']}',
+                      'IRPF aplicado: ${irpf.toStringAsFixed(0)}%',
+                    ],
+                  ),
                 ),
               ],
             ),
-          ),
 
-          pw.SizedBox(height: 22),
+            pw.SizedBox(height: 24),
 
-          pw.Row(
-            crossAxisAlignment: pw.CrossAxisAlignment.start,
-            children: [
-              pw.Expanded(
-                child: _pdfInfoBox(
-                  title: 'Colaborador',
-                  lines: [
-                    'Nombre: ${factura['usuario_nombre'] ?? ''}',
-                    'Email: ${factura['usuario_email'] ?? ''}',
-                    'Rol: ${factura['usuario_rol'] ?? ''}',
+            pw.Text(
+              'Pólizas, extornos y ajustes aplicados',
+              style: pw.TextStyle(
+                fontSize: 15,
+                fontWeight: pw.FontWeight.bold,
+                color: PdfColors.blueGrey900,
+              ),
+            ),
+
+            pw.SizedBox(height: 10),
+
+            pw.Table(
+              border: pw.TableBorder.all(
+                color: PdfColors.blueGrey100,
+                width: 0.6,
+              ),
+              columnWidths: const {
+                0: pw.FlexColumnWidth(1.6),
+                1: pw.FlexColumnWidth(3.2),
+                2: pw.FlexColumnWidth(1.3),
+                3: pw.FlexColumnWidth(1.3),
+              },
+              children: [
+                pw.TableRow(
+                  decoration: const pw.BoxDecoration(color: PdfColors.blue700),
+                  children: [
+                    _pdfHeaderCell('Póliza'),
+                    _pdfHeaderCell('Cliente'),
+                    _pdfHeaderCell('Prima neta'),
+                    _pdfHeaderCell('Comisión'),
                   ],
                 ),
-              ),
-              pw.SizedBox(width: 14),
-              pw.Expanded(
-                child: _pdfInfoBox(
-                  title: 'Datos factura',
-                  lines: [
-                    'Fecha: ${DateTime.now().toString().split(' ').first}',
-                    'Periodo: ${nombreMes(factura['mes'])} ${factura['anio']}',
-                    'IRPF aplicado: ${irpf.toStringAsFixed(0)}%',
-                  ],
+                if (lineas.isEmpty)
+                  pw.TableRow(
+                    children: [
+                      _pdfCell('Sin detalle'),
+                      _pdfCell('-'),
+                      _pdfCell('-'),
+                      _pdfCell('-'),
+                    ],
+                  )
+                else
+                  ...lineas.map((l) {
+                    final numeroPoliza =
+                        (l['numero_poliza'] ??
+                                l['poliza'] ??
+                                l['numero'] ??
+                                'Sin póliza')
+                            .toString();
+
+                    final cliente =
+                        (l['cliente_nombre'] ??
+                                l['cliente'] ??
+                                l['nombre_cliente'] ??
+                                'Sin cliente')
+                            .toString();
+
+                    final prima = _money(
+                      l['prima_neta'] ??
+                          l['prima_anual_neta'] ??
+                          l['prima'] ??
+                          l['importe_prima'],
+                    );
+
+                    final comision = _money(
+                      l['comision'] ??
+                          l['importe_comision'] ??
+                          l['comision_total'] ??
+                          0,
+                    );
+
+                    final tipo = l['tipo_movimiento']?.toString() ?? 'VENTA';
+                    final esNegativo =
+                        tipo.contains('EXTORNO') || tipo.contains('NEGATIVO');
+                    final esPagoComercial =
+                        tipo == 'AJUSTE_COMISION_POSITIVO' ||
+                        tipo == 'AJUSTE_COMISION_NEGATIVO' ||
+                        tipo == 'AJUSTE_RAPPEL_POSITIVO' ||
+                        tipo == 'AJUSTE_RAPPEL_NEGATIVO' ||
+                        tipo == 'EXTORNO_MANUAL' ||
+                        tipo == 'REVERSO_EXTORNO_MANUAL';
+
+                    final detalleMovimiento = esPagoComercial
+                        ? 'Pago comercial - ${comision < 0 ? 'negativo' : 'positivo'}'
+                        : '$tipo · $numeroPoliza';
+
+                    return pw.TableRow(
+                      decoration: esNegativo
+                          ? const pw.BoxDecoration(color: PdfColors.red50)
+                          : null,
+                      children: [
+                        _pdfCell(detalleMovimiento),
+                        _pdfCell(cliente),
+                        _pdfCell(euros(prima), alignRight: true),
+                        _pdfCell(euros(comision), alignRight: true),
+                      ],
+                    );
+                  }),
+              ],
+            ),
+
+            pw.SizedBox(height: 26),
+
+            pw.Row(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                pw.Expanded(
+                  child: pw.Container(
+                    padding: const pw.EdgeInsets.all(12),
+                    decoration: pw.BoxDecoration(
+                      color: PdfColors.blueGrey50,
+                      borderRadius: pw.BorderRadius.circular(8),
+                    ),
+                    child: pw.Text(
+                      'Factura generada automáticamente desde el sistema interno de gestión. '
+                      'El detalle anterior recoge las pólizas incluidas en el periodo facturado.',
+                      style: const pw.TextStyle(
+                        fontSize: 9,
+                        color: PdfColors.blueGrey600,
+                        lineSpacing: 2,
+                      ),
+                    ),
+                  ),
                 ),
-              ),
-            ],
-          ),
+                pw.SizedBox(width: 18),
+                pw.Container(
+                  width: 260,
+                  padding: const pw.EdgeInsets.all(14),
+                  decoration: pw.BoxDecoration(
+                    border: pw.Border.all(color: PdfColors.blueGrey200),
+                    borderRadius: pw.BorderRadius.circular(10),
+                  ),
+                  child: pw.Column(
+                    children: [
+                      _pdfTotalLine('Comisiones', comisiones),
+                      _pdfTotalLine('Rappel', rappel),
+                      _pdfTotalLine('Fijo', fijo),
+                      pw.Divider(color: PdfColors.blueGrey200),
+                      _pdfTotalLine('Base imponible', base),
+                      _pdfTotalLine(
+                        'IRPF ${irpf.toStringAsFixed(0)}%',
+                        -importeIrpf,
+                      ),
+                      pw.Divider(color: PdfColors.blueGrey400),
+                      _pdfTotalLine('TOTAL A PERCIBIR', total, bold: true),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ];
+        },
+      ),
+    );
 
-          pw.SizedBox(height: 24),
+    return pdf.save();
+  }
 
+  pw.Widget _pdfInfoBox({required String title, required List<String> lines}) {
+    return pw.Container(
+      padding: const pw.EdgeInsets.all(13),
+      decoration: pw.BoxDecoration(
+        color: PdfColors.blue50,
+        borderRadius: pw.BorderRadius.circular(8),
+        border: pw.Border.all(color: PdfColors.blue100),
+      ),
+      child: pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        children: [
           pw.Text(
-           'Pólizas, extornos y ajustes aplicados',
+            title,
             style: pw.TextStyle(
-              fontSize: 15,
               fontWeight: pw.FontWeight.bold,
+              fontSize: 11,
               color: PdfColors.blueGrey900,
             ),
           ),
-
-          pw.SizedBox(height: 10),
-
-          pw.Table(
-            border: pw.TableBorder.all(
-              color: PdfColors.blueGrey100,
-              width: 0.6,
-            ),
-            columnWidths: const {
-              0: pw.FlexColumnWidth(1.6),
-              1: pw.FlexColumnWidth(3.2),
-              2: pw.FlexColumnWidth(1.3),
-              3: pw.FlexColumnWidth(1.3),
-            },
-            children: [
-              pw.TableRow(
-                decoration: const pw.BoxDecoration(
-                  color: PdfColors.blue700,
+          pw.SizedBox(height: 8),
+          ...lines.map(
+            (line) => pw.Padding(
+              padding: const pw.EdgeInsets.only(bottom: 4),
+              child: pw.Text(
+                line,
+                style: const pw.TextStyle(
+                  fontSize: 9,
+                  color: PdfColors.blueGrey700,
                 ),
-                children: [
-                  _pdfHeaderCell('Póliza'),
-                  _pdfHeaderCell('Cliente'),
-                  _pdfHeaderCell('Prima neta'),
-                  _pdfHeaderCell('Comisión'),
-                ],
-              ),
-              if (lineas.isEmpty)
-  pw.TableRow(
-    children: [
-      _pdfCell('Sin detalle'),
-      _pdfCell('-'),
-      _pdfCell('-'),
-      _pdfCell('-'),
-    ],
-  )
-else
-  ...lineas.map((l) {
-    final numeroPoliza =
-        (l['numero_poliza'] ?? l['poliza'] ?? l['numero'] ?? 'Sin póliza')
-            .toString();
-
-    final cliente =
-        (l['cliente_nombre'] ?? l['cliente'] ?? l['nombre_cliente'] ?? 'Sin cliente')
-            .toString();
-
-    final prima = _money(
-      l['prima_neta'] ??
-          l['prima_anual_neta'] ??
-          l['prima'] ??
-          l['importe_prima'],
-    );
-
-    final comision = _money(
-      l['comision'] ??
-          l['importe_comision'] ??
-          l['comision_total'] ??
-          0,
-    );
-
-final tipo = l['tipo_movimiento']?.toString() ?? 'VENTA';
-final esNegativo =
-    tipo.contains('EXTORNO') || tipo.contains('NEGATIVO');
-final esPagoComercial =
-    tipo == 'AJUSTE_COMISION_POSITIVO' ||
-    tipo == 'AJUSTE_COMISION_NEGATIVO' ||
-    tipo == 'AJUSTE_RAPPEL_POSITIVO' ||
-    tipo == 'AJUSTE_RAPPEL_NEGATIVO' ||
-    tipo == 'EXTORNO_MANUAL' ||
-    tipo == 'REVERSO_EXTORNO_MANUAL';
-
-final detalleMovimiento = esPagoComercial
-    ? 'Pago comercial - ${comision < 0 ? 'negativo' : 'positivo'}'
-    : '$tipo · $numeroPoliza';
-
-return pw.TableRow(
-  decoration: esNegativo
-      ? const pw.BoxDecoration(color: PdfColors.red50)
-      : null,
-  children: [
-    _pdfCell(detalleMovimiento),
-    _pdfCell(cliente),
-    _pdfCell(euros(prima), alignRight: true),
-    _pdfCell(euros(comision), alignRight: true),
-  ],
-);
-  }),
-            ],
-          ),
-
-          pw.SizedBox(height: 26),
-
-          pw.Row(
-            crossAxisAlignment: pw.CrossAxisAlignment.start,
-            children: [
-              pw.Expanded(
-                child: pw.Container(
-                  padding: const pw.EdgeInsets.all(12),
-                  decoration: pw.BoxDecoration(
-                    color: PdfColors.blueGrey50,
-                    borderRadius: pw.BorderRadius.circular(8),
-                  ),
-                  child: pw.Text(
-                    'Factura generada automáticamente desde el sistema interno de gestión. '
-                    'El detalle anterior recoge las pólizas incluidas en el periodo facturado.',
-                    style: const pw.TextStyle(
-                      fontSize: 9,
-                      color: PdfColors.blueGrey600,
-                      lineSpacing: 2,
-                    ),
-                  ),
-                ),
-              ),
-              pw.SizedBox(width: 18),
-              pw.Container(
-                width: 260,
-                padding: const pw.EdgeInsets.all(14),
-                decoration: pw.BoxDecoration(
-                  border: pw.Border.all(color: PdfColors.blueGrey200),
-                  borderRadius: pw.BorderRadius.circular(10),
-                ),
-                child: pw.Column(
-                  children: [
-                    _pdfTotalLine('Comisiones', comisiones),
-                    _pdfTotalLine('Rappel', rappel),
-                    _pdfTotalLine('Fijo', fijo),
-                    pw.Divider(color: PdfColors.blueGrey200),
-                    _pdfTotalLine('Base imponible', base),
-                    _pdfTotalLine(
-                      'IRPF ${irpf.toStringAsFixed(0)}%',
-                      -importeIrpf,
-                    ),
-                    pw.Divider(color: PdfColors.blueGrey400),
-                    _pdfTotalLine(
-                      'TOTAL A PERCIBIR',
-                      total,
-                      bold: true,
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ];
-      },
-    ),
-  );
-
-  return pdf.save();
-}
-
-pw.Widget _pdfInfoBox({
-  required String title,
-  required List<String> lines,
-}) {
-  return pw.Container(
-    padding: const pw.EdgeInsets.all(13),
-    decoration: pw.BoxDecoration(
-      color: PdfColors.blue50,
-      borderRadius: pw.BorderRadius.circular(8),
-      border: pw.Border.all(color: PdfColors.blue100),
-    ),
-    child: pw.Column(
-      crossAxisAlignment: pw.CrossAxisAlignment.start,
-      children: [
-        pw.Text(
-          title,
-          style: pw.TextStyle(
-            fontWeight: pw.FontWeight.bold,
-            fontSize: 11,
-            color: PdfColors.blueGrey900,
-          ),
-        ),
-        pw.SizedBox(height: 8),
-        ...lines.map(
-          (line) => pw.Padding(
-            padding: const pw.EdgeInsets.only(bottom: 4),
-            child: pw.Text(
-              line,
-              style: const pw.TextStyle(
-                fontSize: 9,
-                color: PdfColors.blueGrey700,
               ),
             ),
           ),
-        ),
-      ],
-    ),
-  );
-}
-
-pw.Widget _pdfHeaderCell(String text) {
-  return pw.Padding(
-    padding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 7),
-    child: pw.Text(
-      text,
-      style: pw.TextStyle(
-        color: PdfColors.white,
-        fontWeight: pw.FontWeight.bold,
-        fontSize: 9,
+        ],
       ),
-    ),
-  );
-}
-
-pw.Widget _pdfCell(String text, {bool alignRight = false}) {
-  return pw.Padding(
-    padding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 7),
-    child: pw.Text(
-      text,
-      textAlign: alignRight ? pw.TextAlign.right : pw.TextAlign.left,
-      maxLines: 2,
-      style: const pw.TextStyle(
-        fontSize: 8.5,
-        color: PdfColors.blueGrey800,
-      ),
-    ),
-  );
-}
-
-pw.Widget _pdfTotalLine(String title, double value, {bool bold = false}) {
-  return pw.Padding(
-    padding: const pw.EdgeInsets.only(bottom: 7),
-    child: pw.Row(
-      children: [
-        pw.Expanded(
-          child: pw.Text(
-            title,
-            style: pw.TextStyle(
-              fontSize: bold ? 11 : 9.5,
-              fontWeight: bold ? pw.FontWeight.bold : pw.FontWeight.normal,
-              color: bold ? PdfColors.blueGrey900 : PdfColors.blueGrey700,
-            ),
-          ),
-        ),
-        pw.Text(
-          '${value.toStringAsFixed(2)} EUR',
-          style: pw.TextStyle(
-            fontSize: bold ? 12 : 9.5,
-            fontWeight: bold ? pw.FontWeight.bold : pw.FontWeight.normal,
-            color: bold ? PdfColors.blue700 : PdfColors.blueGrey900,
-          ),
-        ),
-      ],
-    ),
-  );
-}
-
-
- Future<void> cambiarIrpf(Map<String, dynamic> f, double irpf) async {
-  if (!_esFacturaEditable(f)) return;
-
-  try {
-    final calculos = _calculosFactura(f);
-
-    await _guardarTotalesFactura(
-      factura: f,
-      comisiones: calculos['comisiones']!,
-      rappel: calculos['rappel']!,
-      fijo: calculos['fijo']!,
-      irpf: irpf,
     );
-
-    await _recargarFactura(f['id']);
-    _mensaje('IRPF actualizado correctamente.');
-  } catch (e) {
-    _mensaje('No se pudo actualizar el IRPF: $e', error: true);
   }
-}
+
+  pw.Widget _pdfHeaderCell(String text) {
+    return pw.Padding(
+      padding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 7),
+      child: pw.Text(
+        text,
+        style: pw.TextStyle(
+          color: PdfColors.white,
+          fontWeight: pw.FontWeight.bold,
+          fontSize: 9,
+        ),
+      ),
+    );
+  }
+
+  pw.Widget _pdfCell(String text, {bool alignRight = false}) {
+    return pw.Padding(
+      padding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 7),
+      child: pw.Text(
+        text,
+        textAlign: alignRight ? pw.TextAlign.right : pw.TextAlign.left,
+        maxLines: 2,
+        style: const pw.TextStyle(fontSize: 8.5, color: PdfColors.blueGrey800),
+      ),
+    );
+  }
+
+  pw.Widget _pdfTotalLine(String title, double value, {bool bold = false}) {
+    return pw.Padding(
+      padding: const pw.EdgeInsets.only(bottom: 7),
+      child: pw.Row(
+        children: [
+          pw.Expanded(
+            child: pw.Text(
+              title,
+              style: pw.TextStyle(
+                fontSize: bold ? 11 : 9.5,
+                fontWeight: bold ? pw.FontWeight.bold : pw.FontWeight.normal,
+                color: bold ? PdfColors.blueGrey900 : PdfColors.blueGrey700,
+              ),
+            ),
+          ),
+          pw.Text(
+            '${value.toStringAsFixed(2)} EUR',
+            style: pw.TextStyle(
+              fontSize: bold ? 12 : 9.5,
+              fontWeight: bold ? pw.FontWeight.bold : pw.FontWeight.normal,
+              color: bold ? PdfColors.blue700 : PdfColors.blueGrey900,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> cambiarIrpf(Map<String, dynamic> f, double irpf) async {
+    if (!_esFacturaEditable(f)) return;
+
+    try {
+      final calculos = _calculosFactura(f);
+
+      await _guardarTotalesFactura(
+        factura: f,
+        comisiones: calculos['comisiones']!,
+        rappel: calculos['rappel']!,
+        fijo: calculos['fijo']!,
+        irpf: irpf,
+      );
+
+      await _recargarFactura(f['id']);
+      _mensaje('IRPF actualizado correctamente.');
+    } catch (e) {
+      _mensaje('No se pudo actualizar el IRPF: $e', error: true);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -1431,47 +1429,34 @@ pw.Widget _pdfTotalLine(String title, double value, {bool bold = false}) {
                 child: CircularProgressIndicator(color: Color(0xFF2563EB)),
               )
             : Padding(
-    padding: const EdgeInsets.all(22),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _topBar(),
-        const SizedBox(height: 22),
-        _kpiRow(),
-        const SizedBox(height: 18),
-        _filters(),
-        const SizedBox(height: 18),
-       Expanded(
-  child: Row(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      SizedBox(
-        width: 280,
-        child: _colaTrabajoPanel(),
-      ),
-      const SizedBox(width: 16),
-      Expanded(
-        child: _tablaFacturas(lista),
-      ),
-      const SizedBox(width: 16),
-      SizedBox(
-        width: 320,
-        child: _detalleFactura(),
-      ),
-    ],
-  ),
-),
-      ],
-    ),
-  ),
+                padding: const EdgeInsets.all(22),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _topBar(),
+                    const SizedBox(height: 22),
+                    _kpiRow(),
+                    const SizedBox(height: 18),
+                    _filters(),
+                    const SizedBox(height: 18),
+                    Expanded(
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          SizedBox(width: 280, child: _colaTrabajoPanel()),
+                          const SizedBox(width: 16),
+                          Expanded(child: _tablaFacturas(lista)),
+                          const SizedBox(width: 16),
+                          SizedBox(width: 320, child: _detalleFactura()),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
       ),
     );
   }
-
- 
-
- 
-  
 
   Widget _topBar() {
     return Row(
@@ -1549,25 +1534,41 @@ pw.Widget _pdfTotalLine(String title, double value, {bool bold = false}) {
         const SizedBox(height: 22),
         Row(
           children: [
-            _kpiCard('Pendientes', pendientes.toString(), 'Por tramitar',
-                Icons.pending_actions_rounded, const Color(0xFF2563EB)),
-            _kpiCard('Tramitadas', tramitadas.toString(), 'Este mes',
-                Icons.verified_rounded, const Color(0xFF16A34A)),
             _kpiCard(
-                'Importe pendiente',
-                '${importePendiente.toStringAsFixed(0)} EUR',
-                'Base imponible',
-                Icons.euro_rounded,
-                const Color(0xFF7C3AED)),
-           _kpiCard(
-  'Total pagado',
-  '${totalPagado.toStringAsFixed(0)} EUR',
-  'Facturas tramitadas',
-  Icons.account_balance_wallet_rounded,
-  const Color(0xFF0284C7),
-),
-            _kpiCard('IRPF más usado', '15%', 'Este mes',
-                Icons.percent_rounded, const Color(0xFFEF4444)),
+              'Pendientes',
+              pendientes.toString(),
+              'Por tramitar',
+              Icons.pending_actions_rounded,
+              const Color(0xFF2563EB),
+            ),
+            _kpiCard(
+              'Tramitadas',
+              tramitadas.toString(),
+              'Este mes',
+              Icons.verified_rounded,
+              const Color(0xFF16A34A),
+            ),
+            _kpiCard(
+              'Importe pendiente',
+              '${importePendiente.toStringAsFixed(0)} EUR',
+              'Base imponible',
+              Icons.euro_rounded,
+              const Color(0xFF7C3AED),
+            ),
+            _kpiCard(
+              'Total pagado',
+              '${totalPagado.toStringAsFixed(0)} EUR',
+              'Facturas tramitadas',
+              Icons.account_balance_wallet_rounded,
+              const Color(0xFF0284C7),
+            ),
+            _kpiCard(
+              'IRPF más usado',
+              '15%',
+              'Este mes',
+              Icons.percent_rounded,
+              const Color(0xFFEF4444),
+            ),
           ],
         ),
       ],
@@ -1684,10 +1685,7 @@ pw.Widget _pdfTotalLine(String title, double value, {bool bold = false}) {
                       value: 'enviada_email',
                       child: Text('Enviadas'),
                     ),
-                    DropdownMenuItem(
-                      value: 'todas',
-                      child: Text('Todas'),
-                    ),
+                    DropdownMenuItem(value: 'todas', child: Text('Todas')),
                   ],
                   onChanged: (v) =>
                       setState(() => estadoFiltro = v ?? 'pendiente_tramitar'),
@@ -1724,7 +1722,10 @@ pw.Widget _pdfTotalLine(String title, double value, {bool bold = false}) {
                 icon: const Icon(Icons.filter_alt_off_rounded),
                 label: const Text('Limpiar filtros'),
                 style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 18),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 18,
+                    vertical: 18,
+                  ),
                 ),
               ),
             ],
@@ -1767,269 +1768,265 @@ pw.Widget _pdfTotalLine(String title, double value, {bool bold = false}) {
     );
   }
 
-  
+  Widget _colaTrabajoPanel() {
+    final pendientesLista = facturas
+        .where((f) => f['estado'] == 'pendiente_tramitar')
+        .toList();
 
-Widget _colaTrabajoPanel() {
-  final pendientesLista = facturas
-      .where((f) => f['estado'] == 'pendiente_tramitar')
-      .toList();
+    final tramitadasLista = facturas
+        .where((f) => f['estado'] == 'tramitada')
+        .toList();
 
-  final tramitadasLista = facturas
-      .where((f) => f['estado'] == 'tramitada')
-      .toList();
-
-  return SingleChildScrollView(
-    child: Column(
-      children: [
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: _cardDecoration(),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'COLA DE TRABAJO',
-                style: TextStyle(
-                  color: Color(0xFF0F172A),
-                  fontWeight: FontWeight.w900,
-                  fontSize: 12,
-                ),
-              ),
-              const SizedBox(height: 14),
-              _workQueueStat(
-                title: 'Pendientes',
-                value: pendientesLista.length.toString(),
-                icon: Icons.pending_actions_rounded,
-                color: const Color(0xFFF59E0B),
-              ),
-              const SizedBox(height: 8),
-              _workQueueStat(
-                title: 'Tramitadas',
-                value: tramitadasLista.length.toString(),
-                icon: Icons.verified_rounded,
-                color: const Color(0xFF16A34A),
-              ),
-              const SizedBox(height: 8),
-              _workQueueStat(
-                title: 'Total pagado',
-                value: '${totalPagado.toStringAsFixed(0)} €',
-                icon: Icons.account_balance_wallet_rounded,
-                color: const Color(0xFF2563EB),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 12),
-        Container(
-          padding: const EdgeInsets.all(14),
-          decoration: _cardDecoration(),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'PENDIENTES DE TRAMITAR',
-                style: TextStyle(
-                  color: Color(0xFF0F172A),
-                  fontWeight: FontWeight.w900,
-                  fontSize: 12,
-                ),
-              ),
-              const SizedBox(height: 12),
-              if (pendientesLista.isEmpty)
-                const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 35),
-                  child: Center(
-                    child: Text(
-                      'No hay facturas pendientes',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        color: Color(0xFF64748B),
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
-                )
-              else
-                ...pendientesLista
-                    .take(8)
-                    .toList()
-                    .asMap()
-                    .entries
-                    .map(
-                      (entry) => _workQueueFacturaCard(
-                        entry.value,
-                        urgente: entry.key <= 1,
-                      ),
-                    ),
-            ],
-          ),
-        ),
-      ],
-    ),
-  );
-}
-
-Widget _workQueueStat({
-  required String title,
-  required String value,
-  required IconData icon,
-  required Color color,
-}) {
-  return Container(
-    padding: const EdgeInsets.all(13),
-    decoration: BoxDecoration(
-      color: color.withOpacity(0.09),
-      borderRadius: BorderRadius.circular(16),
-      border: Border.all(color: color.withOpacity(0.16)),
-    ),
-    child: Row(
-      children: [
-        Container(
-          width: 38,
-          height: 38,
-          decoration: BoxDecoration(
-            color: color.withOpacity(0.13),
-            borderRadius: BorderRadius.circular(13),
-          ),
-          child: Icon(icon, color: color, size: 20),
-        ),
-        const SizedBox(width: 11),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                value,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  color: color,
-                  fontWeight: FontWeight.w900,
-                  fontSize: 18,
-                ),
-              ),
-              Text(
-                title,
-                style: const TextStyle(
-                  color: Color(0xFF64748B),
-                  fontWeight: FontWeight.w700,
-                  fontSize: 11,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    ),
-  );
-}
-
-Widget _workQueueFacturaCard(
-  Map<String, dynamic> f, {
-  required bool urgente,
-}) {
-  final selected = facturaSeleccionada?['id'] == f['id'];
-  final base = _money(f['base_imponible']);
-  final rappel = _money(f['rappel']);
-
-  return InkWell(
-    onTap: () => cargarLineasFactura(f),
-    borderRadius: BorderRadius.circular(18),
-    child: Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: selected ? const Color(0xFFEFF6FF) : const Color(0xFFF8FAFC),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: selected
-              ? const Color(0xFF2563EB)
-              : const Color(0xFFE2E8F0),
-        ),
-      ),
+    return SingleChildScrollView(
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              CircleAvatar(
-                radius: 17,
-                backgroundColor: urgente
-                    ? const Color(0xFFFFEDD5)
-                    : const Color(0xFFEFF6FF),
-                child: Icon(
-                  urgente
-                      ? Icons.priority_high_rounded
-                      : Icons.receipt_long_rounded,
-                  color: urgente
-                      ? const Color(0xFFF97316)
-                      : const Color(0xFF2563EB),
-                  size: 18,
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  f['usuario_nombre']?.toString() ?? 'Usuario',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: _cardDecoration(),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'COLA DE TRABAJO',
+                  style: TextStyle(
                     color: Color(0xFF0F172A),
                     fontWeight: FontWeight.w900,
-                    fontSize: 13,
+                    fontSize: 12,
                   ),
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          Text(
-            '${nombreMes(f['mes'])} ${f['anio']}',
-            style: const TextStyle(
-              color: Color(0xFF64748B),
-              fontWeight: FontWeight.w700,
-              fontSize: 12,
+                const SizedBox(height: 14),
+                _workQueueStat(
+                  title: 'Pendientes',
+                  value: pendientesLista.length.toString(),
+                  icon: Icons.pending_actions_rounded,
+                  color: const Color(0xFFF59E0B),
+                ),
+                const SizedBox(height: 8),
+                _workQueueStat(
+                  title: 'Tramitadas',
+                  value: tramitadasLista.length.toString(),
+                  icon: Icons.verified_rounded,
+                  color: const Color(0xFF16A34A),
+                ),
+                const SizedBox(height: 8),
+                _workQueueStat(
+                  title: 'Total pagado',
+                  value: '${totalPagado.toStringAsFixed(0)} €',
+                  icon: Icons.account_balance_wallet_rounded,
+                  color: const Color(0xFF2563EB),
+                ),
+              ],
             ),
           ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  '${base.toStringAsFixed(2)} €',
-                  style: const TextStyle(
-                    color: Color(0xFF16A34A),
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: _cardDecoration(),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'PENDIENTES DE TRAMITAR',
+                  style: TextStyle(
+                    color: Color(0xFF0F172A),
                     fontWeight: FontWeight.w900,
-                    fontSize: 15,
+                    fontSize: 12,
                   ),
                 ),
-              ),
-              if (urgente)
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 4,
-                  ),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFFFEDD5),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: const Text(
-                    'URGENTE',
-                    style: TextStyle(
-                      color: Color(0xFFF97316),
-                      fontWeight: FontWeight.w900,
-                      fontSize: 9,
+                const SizedBox(height: 12),
+                if (pendientesLista.isEmpty)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 35),
+                    child: Center(
+                      child: Text(
+                        'No hay facturas pendientes',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: Color(0xFF64748B),
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
                     ),
-                  ),
-                ),
-            ],
+                  )
+                else
+                  ...pendientesLista
+                      .take(8)
+                      .toList()
+                      .asMap()
+                      .entries
+                      .map(
+                        (entry) => _workQueueFacturaCard(
+                          entry.value,
+                          urgente: entry.key <= 1,
+                        ),
+                      ),
+              ],
+            ),
           ),
         ],
       ),
-    ),
-  );
-}
+    );
+  }
+
+  Widget _workQueueStat({
+    required String title,
+    required String value,
+    required IconData icon,
+    required Color color,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(13),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.09),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: color.withOpacity(0.16)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.13),
+              borderRadius: BorderRadius.circular(13),
+            ),
+            child: Icon(icon, color: color, size: 20),
+          ),
+          const SizedBox(width: 11),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  value,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: color,
+                    fontWeight: FontWeight.w900,
+                    fontSize: 18,
+                  ),
+                ),
+                Text(
+                  title,
+                  style: const TextStyle(
+                    color: Color(0xFF64748B),
+                    fontWeight: FontWeight.w700,
+                    fontSize: 11,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _workQueueFacturaCard(
+    Map<String, dynamic> f, {
+    required bool urgente,
+  }) {
+    final selected = facturaSeleccionada?['id'] == f['id'];
+    final base = _money(f['base_imponible']);
+    final rappel = _money(f['rappel']);
+
+    return InkWell(
+      onTap: () => cargarLineasFactura(f),
+      borderRadius: BorderRadius.circular(18),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 10),
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: selected ? const Color(0xFFEFF6FF) : const Color(0xFFF8FAFC),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+            color: selected ? const Color(0xFF2563EB) : const Color(0xFFE2E8F0),
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                CircleAvatar(
+                  radius: 17,
+                  backgroundColor: urgente
+                      ? const Color(0xFFFFEDD5)
+                      : const Color(0xFFEFF6FF),
+                  child: Icon(
+                    urgente
+                        ? Icons.priority_high_rounded
+                        : Icons.receipt_long_rounded,
+                    color: urgente
+                        ? const Color(0xFFF97316)
+                        : const Color(0xFF2563EB),
+                    size: 18,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    f['usuario_nombre']?.toString() ?? 'Usuario',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: Color(0xFF0F172A),
+                      fontWeight: FontWeight.w900,
+                      fontSize: 13,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Text(
+              '${nombreMes(f['mes'])} ${f['anio']}',
+              style: const TextStyle(
+                color: Color(0xFF64748B),
+                fontWeight: FontWeight.w700,
+                fontSize: 12,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    '${base.toStringAsFixed(2)} €',
+                    style: const TextStyle(
+                      color: Color(0xFF16A34A),
+                      fontWeight: FontWeight.w900,
+                      fontSize: 15,
+                    ),
+                  ),
+                ),
+                if (urgente)
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFFEDD5),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: const Text(
+                      'URGENTE',
+                      style: TextStyle(
+                        color: Color(0xFFF97316),
+                        fontWeight: FontWeight.w900,
+                        fontSize: 9,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
   Widget _treeLine(String text, int count, int level) {
     return Padding(
@@ -2076,16 +2073,14 @@ Widget _workQueueFacturaCard(
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
             decoration: const BoxDecoration(
-              border: Border(
-                bottom: BorderSide(color: Color(0xFFE2E8F0)),
-              ),
+              border: Border(bottom: BorderSide(color: Color(0xFFE2E8F0))),
             ),
             child: const Row(
               children: [
                 Expanded(flex: 3, child: _HeaderCell('USUARIO')),
                 Expanded(child: _HeaderCell('MES / AÑO')),
                 Expanded(child: _HeaderCell('RAPPEL')),
-Expanded(child: _HeaderCell('BASE')),
+                Expanded(child: _HeaderCell('BASE')),
                 Expanded(child: _HeaderCell('IRPF')),
                 Expanded(child: _HeaderCell('TOTAL')),
                 Expanded(child: _HeaderCell('ESTADO')),
@@ -2125,9 +2120,7 @@ Expanded(child: _HeaderCell('BASE')),
         padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
         decoration: BoxDecoration(
           color: selected ? const Color(0xFFEFF6FF) : Colors.white,
-          border: const Border(
-            bottom: BorderSide(color: Color(0xFFE2E8F0)),
-          ),
+          border: const Border(bottom: BorderSide(color: Color(0xFFE2E8F0))),
         ),
         child: Row(
           children: [
@@ -2183,10 +2176,24 @@ Expanded(child: _HeaderCell('BASE')),
                 ),
               ),
             ),
-            Expanded(child: _bodyText('${_money(f['rappel']).toStringAsFixed(2)} €')),
-Expanded(child: _bodyText('${_money(f['base_imponible']).toStringAsFixed(2)} €')),
-Expanded(child: _bodyText('${_money(f['irpf_porcentaje']).toStringAsFixed(0)}%')),
-            Expanded(child: _bodyText('${_money(f['total_factura']).toStringAsFixed(2)} €')),
+            Expanded(
+              child: _bodyText('${_money(f['rappel']).toStringAsFixed(2)} €'),
+            ),
+            Expanded(
+              child: _bodyText(
+                '${_money(f['base_imponible']).toStringAsFixed(2)} €',
+              ),
+            ),
+            Expanded(
+              child: _bodyText(
+                '${_money(f['irpf_porcentaje']).toStringAsFixed(0)}%',
+              ),
+            ),
+            Expanded(
+              child: _bodyText(
+                '${_money(f['total_factura']).toStringAsFixed(2)} €',
+              ),
+            ),
             Expanded(child: _estadoBadge(estado)),
             SizedBox(
               width: 50,
@@ -2234,356 +2241,350 @@ Expanded(child: _bodyText('${_money(f['irpf_porcentaje']).toStringAsFixed(0)}%')
     final verificacion = _verificarFactura(f);
 
     return Container(
-  padding: const EdgeInsets.all(20),
-  decoration: _cardDecoration(),
-  child: SingleChildScrollView(
-    child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Text(
-                'DETALLE DE FACTURA',
-                style: TextStyle(
-                  color: Color(0xFF0F172A),
-                  fontWeight: FontWeight.w900,
-                  fontSize: 12,
-                ),
-              ),
-              const Spacer(),
-              if (_esFacturaEditable(f))
-                Padding(
-                  padding: const EdgeInsets.only(right: 6),
-                  child: ElevatedButton.icon(
-                    onPressed: guardandoAjusteManual ? null : () => _abrirEditorFacturaManual(f),
-                    icon: const Icon(Icons.edit_rounded, size: 17),
-                    label: const Text('Editar'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF2563EB),
-                      foregroundColor: Colors.white,
-                    ),
-                  ),
-                ),
-              IconButton(
-                onPressed: () => setState(() => facturaSeleccionada = null),
-                icon: const Icon(Icons.close_rounded),
-              ),
-            ],
-          ),
-          const Divider(),
-          const SizedBox(height: 14),
-          CircleAvatar(
-            radius: 31,
-            backgroundColor: color.withOpacity(0.13),
-            child: Text(
-              _iniciales(f['usuario_nombre']),
-              style: TextStyle(
-                color: color,
-                fontWeight: FontWeight.w900,
-                fontSize: 22,
-              ),
-            ),
-          ),
-          const SizedBox(height: 18),
-          Text(
-            f['usuario_nombre']?.toString() ?? 'Usuario',
-            style: const TextStyle(
-              color: Color(0xFF0F172A),
-              fontSize: 22,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-          Text(
-            f['usuario_rol']?.toString() ?? '',
-            style: const TextStyle(
-              color: Color(0xFF64748B),
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            f['usuario_email']?.toString() ?? '',
-            style: const TextStyle(
-              color: Color(0xFF64748B),
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(height: 22),
-          _estadoBadge(estado),
-          const SizedBox(height: 14),
-          _tarjetaVerificacion(verificacion),
-          const SizedBox(height: 22),
-          Text(
-            '${nombreMes(f['mes']).toUpperCase()} ${f['anio']}',
-            style: const TextStyle(
-              color: Color(0xFF0F172A),
-              fontWeight: FontWeight.w900,
-              fontSize: 17,
-            ),
-          ),
-          const Text(
-            'Factura pendiente de tramitar',
-            style: TextStyle(
-              color: Color(0xFF64748B),
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(height: 18),
-          const Text(
-  'CONCEPTOS FACTURADOS',
-  style: TextStyle(
-    color: Color(0xFF0F172A),
-    fontWeight: FontWeight.w900,
-    fontSize: 12,
-  ),
-),
-
-const SizedBox(height: 14),
-
-_detailLine(
-  'Comisiones',
-  comisiones,
-  const Color(0xFF2563EB),
-),
-
-_detailLine(
-  'Rappel',
-  rappel,
-  const Color(0xFF7C3AED),
-),
-
-_detailLine(
-  'Fijo',
-  fijo,
-  const Color(0xFF16A34A),
-),
-
-const Divider(height: 28),
-
-_detailLine(
-  'BASE IMPONIBLE',
-  base,
-  const Color(0xFF0F172A),
-),
-
-_detailLine(
-  'IRPF (${irpf.toStringAsFixed(0)}%)',
-  -importeIrpf,
-  Colors.red,
-),
-
-const Divider(height: 28),
-
-_detailLine(
-  'TOTAL FACTURA',
-  total,
-  const Color(0xFF2563EB),
-  big: true,
-),
-          const SizedBox(height: 20),
-
-const Text(
-  'DETALLE DE PÓLIZAS Y EXTORNOS',
-  style: TextStyle(
-    color: Color(0xFF0F172A),
-    fontWeight: FontWeight.w900,
-    fontSize: 12,
-  ),
-),
-
-const SizedBox(height: 10),
-
-if (lineasFactura.isEmpty)
-  const Text(
-    'No hay líneas cargadas para esta factura.',
-    style: TextStyle(
-      color: Color(0xFF64748B),
-      fontWeight: FontWeight.w600,
-    ),
-  )
-else
-  ...lineasFactura.map((l) {
-    final tipo = l['tipo_movimiento']?.toString() ?? 'VENTA';
-    final esExtorno = tipo.contains('EXTORNO') || tipo.contains('NEGATIVO');
-    final esManual = _esLineaManual(l);
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        color: esExtorno
-            ? const Color(0xFFFFF1F2)
-            : const Color(0xFFF8FAFC),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: esExtorno
-              ? const Color(0xFFFCA5A5)
-              : const Color(0xFFE2E8F0),
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  '$tipo · ${l['numero_poliza'] ?? 'Sin póliza'}',
+      padding: const EdgeInsets.all(20),
+      decoration: _cardDecoration(),
+      child: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Text(
+                  'DETALLE DE FACTURA',
                   style: TextStyle(
-                    color: esExtorno
-                        ? const Color(0xFFDC2626)
-                        : const Color(0xFF0F172A),
+                    color: Color(0xFF0F172A),
                     fontWeight: FontWeight.w900,
                     fontSize: 12,
                   ),
                 ),
-              ),
-              Text(
-                '${_money(l['comision']).toStringAsFixed(2)} €',
-                style: TextStyle(
-                  color: esExtorno ? const Color(0xFFDC2626) : const Color(0xFF16A34A),
-                  fontWeight: FontWeight.w900,
-                  fontSize: 12,
-                ),
-              ),
-              if (esManual && _esFacturaEditable(f)) ...[
-                const SizedBox(width: 4),
+                const Spacer(),
+                if (_esFacturaEditable(f))
+                  Padding(
+                    padding: const EdgeInsets.only(right: 6),
+                    child: ElevatedButton.icon(
+                      onPressed: guardandoAjusteManual
+                          ? null
+                          : () => _abrirEditorFacturaManual(f),
+                      icon: const Icon(Icons.edit_rounded, size: 17),
+                      label: const Text('Editar'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF2563EB),
+                        foregroundColor: Colors.white,
+                      ),
+                    ),
+                  ),
                 IconButton(
-                  tooltip: 'Eliminar ajuste manual',
-                  onPressed: () => _eliminarAjusteManual(l),
-                  icon: const Icon(Icons.delete_outline_rounded, color: Colors.red, size: 20),
+                  onPressed: () => setState(() => facturaSeleccionada = null),
+                  icon: const Icon(Icons.close_rounded),
                 ),
               ],
+            ),
+            const Divider(),
+            const SizedBox(height: 14),
+            CircleAvatar(
+              radius: 31,
+              backgroundColor: color.withOpacity(0.13),
+              child: Text(
+                _iniciales(f['usuario_nombre']),
+                style: TextStyle(
+                  color: color,
+                  fontWeight: FontWeight.w900,
+                  fontSize: 22,
+                ),
+              ),
+            ),
+            const SizedBox(height: 18),
+            Text(
+              f['usuario_nombre']?.toString() ?? 'Usuario',
+              style: const TextStyle(
+                color: Color(0xFF0F172A),
+                fontSize: 22,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            Text(
+              f['usuario_rol']?.toString() ?? '',
+              style: const TextStyle(
+                color: Color(0xFF64748B),
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              f['usuario_email']?.toString() ?? '',
+              style: const TextStyle(
+                color: Color(0xFF64748B),
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 22),
+            _estadoBadge(estado),
+            const SizedBox(height: 14),
+            _tarjetaVerificacion(verificacion),
+            const SizedBox(height: 22),
+            Text(
+              '${nombreMes(f['mes']).toUpperCase()} ${f['anio']}',
+              style: const TextStyle(
+                color: Color(0xFF0F172A),
+                fontWeight: FontWeight.w900,
+                fontSize: 17,
+              ),
+            ),
+            const Text(
+              'Factura pendiente de tramitar',
+              style: TextStyle(
+                color: Color(0xFF64748B),
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 18),
+            const Text(
+              'CONCEPTOS FACTURADOS',
+              style: TextStyle(
+                color: Color(0xFF0F172A),
+                fontWeight: FontWeight.w900,
+                fontSize: 12,
+              ),
+            ),
+
+            const SizedBox(height: 14),
+
+            _detailLine('Comisiones', comisiones, const Color(0xFF2563EB)),
+
+            _detailLine('Rappel', rappel, const Color(0xFF7C3AED)),
+
+            _detailLine('Fijo', fijo, const Color(0xFF16A34A)),
+
+            const Divider(height: 28),
+
+            _detailLine('BASE IMPONIBLE', base, const Color(0xFF0F172A)),
+
+            _detailLine(
+              'IRPF (${irpf.toStringAsFixed(0)}%)',
+              -importeIrpf,
+              Colors.red,
+            ),
+
+            const Divider(height: 28),
+
+            _detailLine(
+              'TOTAL FACTURA',
+              total,
+              const Color(0xFF2563EB),
+              big: true,
+            ),
+            const SizedBox(height: 20),
+
+            const Text(
+              'DETALLE DE PÓLIZAS Y EXTORNOS',
+              style: TextStyle(
+                color: Color(0xFF0F172A),
+                fontWeight: FontWeight.w900,
+                fontSize: 12,
+              ),
+            ),
+
+            const SizedBox(height: 10),
+
+            if (lineasFactura.isEmpty)
+              const Text(
+                'No hay líneas cargadas para esta factura.',
+                style: TextStyle(
+                  color: Color(0xFF64748B),
+                  fontWeight: FontWeight.w600,
+                ),
+              )
+            else
+              ...lineasFactura.map((l) {
+                final tipo = l['tipo_movimiento']?.toString() ?? 'VENTA';
+                final esExtorno =
+                    tipo.contains('EXTORNO') || tipo.contains('NEGATIVO');
+                final esManual = _esLineaManual(l);
+
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: esExtorno
+                        ? const Color(0xFFFFF1F2)
+                        : const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: esExtorno
+                          ? const Color(0xFFFCA5A5)
+                          : const Color(0xFFE2E8F0),
+                    ),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              '$tipo · ${l['numero_poliza'] ?? 'Sin póliza'}',
+                              style: TextStyle(
+                                color: esExtorno
+                                    ? const Color(0xFFDC2626)
+                                    : const Color(0xFF0F172A),
+                                fontWeight: FontWeight.w900,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ),
+                          Text(
+                            '${_money(l['comision']).toStringAsFixed(2)} €',
+                            style: TextStyle(
+                              color: esExtorno
+                                  ? const Color(0xFFDC2626)
+                                  : const Color(0xFF16A34A),
+                              fontWeight: FontWeight.w900,
+                              fontSize: 12,
+                            ),
+                          ),
+                          if (esManual && _esFacturaEditable(f)) ...[
+                            const SizedBox(width: 4),
+                            IconButton(
+                              tooltip: 'Eliminar ajuste manual',
+                              onPressed: () => _eliminarAjusteManual(l),
+                              icon: const Icon(
+                                Icons.delete_outline_rounded,
+                                color: Colors.red,
+                                size: 20,
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        l['cliente_nombre']?.toString() ?? 'Sin cliente',
+                        style: const TextStyle(
+                          color: Color(0xFF64748B),
+                          fontWeight: FontWeight.w600,
+                          fontSize: 11,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Prima: ${_money(l['prima_neta']).toStringAsFixed(2)} €',
+                        style: TextStyle(
+                          color: esExtorno
+                              ? const Color(0xFFDC2626)
+                              : const Color(0xFF64748B),
+                          fontWeight: FontWeight.w700,
+                          fontSize: 11,
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }),
+            const SizedBox(height: 22),
+            const Text(
+              'CONFIGURACIÓN FISCAL',
+              style: TextStyle(
+                color: Color(0xFF0F172A),
+                fontWeight: FontWeight.w900,
+                fontSize: 12,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(child: _irpfButton(f, 7, irpf == 7)),
+                const SizedBox(width: 10),
+                Expanded(child: _irpfButton(f, 15, irpf == 15)),
+              ],
+            ),
+            if (_esFacturaEditable(f)) ...[
+              const SizedBox(height: 10),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: () => _recalcularFactura(f),
+                  icon: const Icon(Icons.calculate_rounded),
+                  label: const Text('Recalcular totales'),
+                ),
+              ),
             ],
-          ),
-          const SizedBox(height: 4),
-          Text(
-            l['cliente_nombre']?.toString() ?? 'Sin cliente',
-            style: const TextStyle(
-              color: Color(0xFF64748B),
-              fontWeight: FontWeight.w600,
-              fontSize: 11,
+            const SizedBox(height: 16),
+            TextField(
+              maxLines: 3,
+              decoration: _inputDecoration(
+                'Añade una observación...',
+                Icons.edit_note,
+              ),
             ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            'Prima: ${_money(l['prima_neta']).toStringAsFixed(2)} €',
-            style: TextStyle(
-              color: esExtorno
-                  ? const Color(0xFFDC2626)
-                  : const Color(0xFF64748B),
-              fontWeight: FontWeight.w700,
-              fontSize: 11,
+
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: estado == 'pendiente_tramitar' && esAdmin
+                    ? () => tramitarFactura(f)
+                    : null,
+                icon: const Icon(Icons.receipt_long_rounded),
+                label: const Text('Tramitar factura'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF2563EB),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  textStyle: const TextStyle(fontWeight: FontWeight.w900),
+                ),
+              ),
             ),
-          ),
-        ],
-      ),
-    );
-  }),
-          const SizedBox(height: 22),
-          const Text(
-            'CONFIGURACIÓN FISCAL',
-            style: TextStyle(
-              color: Color(0xFF0F172A),
-              fontWeight: FontWeight.w900,
-              fontSize: 12,
-            ),
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(child: _irpfButton(f, 7, irpf == 7)),
-              const SizedBox(width: 10),
-              Expanded(child: _irpfButton(f, 15, irpf == 15)),
-            ],
-          ),
-          if (_esFacturaEditable(f)) ...[
             const SizedBox(height: 10),
             SizedBox(
               width: double.infinity,
               child: OutlinedButton.icon(
-                onPressed: () => _recalcularFactura(f),
-                icon: const Icon(Icons.calculate_rounded),
-                label: const Text('Recalcular totales'),
+                onPressed: f == null
+                    ? null
+                    : () async {
+                        final calculosPreview = _calculosFactura(f);
+                        final base = calculosPreview['base']!;
+                        final rappel = calculosPreview['rappel']!;
+                        final irpf = calculosPreview['irpf']!;
+                        final importeIrpf = calculosPreview['importe_irpf']!;
+                        final total = calculosPreview['total']!;
+                        final comisiones = calculosPreview['comisiones']!;
+                        final fijo = calculosPreview['fijo']!;
+
+                        final lineasPreview = await supabase
+                            .from('nominas_facturas_lineas')
+                            .select()
+                            .eq('factura_id', f['id'])
+                            .order('created_at', ascending: true);
+
+                        final lineasPdf = (lineasPreview as List)
+                            .map((e) => Map<String, dynamic>.from(e))
+                            .toList();
+
+                        final bytes = await _generarPdfFactura(
+                          factura: f,
+                          lineas: lineasPdf,
+                          numeroFactura:
+                              f['numero_factura']?.toString() ?? 'BORRADOR',
+                          comisiones: comisiones,
+                          rappel: rappel,
+                          fijo: fijo,
+                          base: base,
+                          irpf: irpf,
+                          importeIrpf: importeIrpf,
+                          total: total,
+                        );
+
+                        await Printing.layoutPdf(onLayout: (_) async => bytes);
+                      },
+                icon: const Icon(Icons.remove_red_eye_rounded),
+                label: const Text('Vista previa PDF'),
               ),
             ),
           ],
-          const SizedBox(height: 16),
-          TextField(
-            maxLines: 3,
-            decoration: _inputDecoration('Añade una observación...', Icons.edit_note),
-          ),
-          
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton.icon(
-              onPressed: estado == 'pendiente_tramitar' && esAdmin
-                  ? () => tramitarFactura(f)
-                  : null,
-              icon: const Icon(Icons.receipt_long_rounded),
-              label: const Text('Tramitar factura'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF2563EB),
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                textStyle: const TextStyle(fontWeight: FontWeight.w900),
-              ),
-            ),
-          ),
-          const SizedBox(height: 10),
-          SizedBox(
-            width: double.infinity,
-            child: OutlinedButton.icon(
-              onPressed: f == null
-    ? null
-    : () async {
-    final calculosPreview = _calculosFactura(f);
-    final base = calculosPreview['base']!;
-    final rappel = calculosPreview['rappel']!;
-    final irpf = calculosPreview['irpf']!;
-    final importeIrpf = calculosPreview['importe_irpf']!;
-    final total = calculosPreview['total']!;
-    final comisiones = calculosPreview['comisiones']!;
-    final fijo = calculosPreview['fijo']!;
-
-final lineasPreview = await supabase
-    .from('nominas_facturas_lineas')
-    .select()
-    .eq('factura_id', f['id'])
-    .order('created_at', ascending: true);
-
-final lineasPdf = (lineasPreview as List)
-    .map((e) => Map<String, dynamic>.from(e))
-    .toList();
-
-final bytes = await _generarPdfFactura(
-  factura: f,
-  lineas: lineasPdf,
-  numeroFactura: f['numero_factura']?.toString() ?? 'BORRADOR',
-  comisiones: comisiones,
-  rappel: rappel,
-  fijo: fijo,
-  base: base,
-  irpf: irpf,
-  importeIrpf: importeIrpf,
-  total: total,
-);
-
-        await Printing.layoutPdf(
-          onLayout: (_) async => bytes,
-        );
-      },
-              icon: const Icon(Icons.remove_red_eye_rounded),
-              label: const Text('Vista previa PDF'),
-            ),
-          ),
-        ],
         ),
       ),
     );
   }
-
 
   Widget _tarjetaVerificacion(Map<String, dynamic> verificacion) {
     final sinLineas = verificacion['sin_lineas'] == true;
@@ -2592,14 +2593,14 @@ final bytes = await _generarPdfFactura(
     final color = sinLineas
         ? const Color(0xFFF59E0B)
         : correcta
-            ? const Color(0xFF16A34A)
-            : const Color(0xFFDC2626);
+        ? const Color(0xFF16A34A)
+        : const Color(0xFFDC2626);
 
     final titulo = sinLineas
         ? 'Sin líneas recibidas desde Nóminas'
         : correcta
-            ? 'Datos recibidos correctamente'
-            : 'Hay diferencias que revisar';
+        ? 'Datos recibidos correctamente'
+        : 'Hay diferencias que revisar';
 
     return Container(
       width: double.infinity,
@@ -2615,9 +2616,7 @@ final bytes = await _generarPdfFactura(
           Row(
             children: [
               Icon(
-                correcta
-                    ? Icons.verified_rounded
-                    : Icons.warning_amber_rounded,
+                correcta ? Icons.verified_rounded : Icons.warning_amber_rounded,
                 color: color,
                 size: 19,
               ),
@@ -2676,7 +2675,12 @@ final bytes = await _generarPdfFactura(
     );
   }
 
-  Widget _detailLine(String title, double value, Color color, {bool big = false}) {
+  Widget _detailLine(
+    String title,
+    double value,
+    Color color, {
+    bool big = false,
+  }) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 9),
       child: Row(
@@ -2747,7 +2751,9 @@ final bytes = await _generarPdfFactura(
 
     final partes = text.split(' ');
     if (partes.length == 1) {
-      return partes.first.substring(0, partes.first.length >= 2 ? 2 : 1).toUpperCase();
+      return partes.first
+          .substring(0, partes.first.length >= 2 ? 2 : 1)
+          .toUpperCase();
     }
 
     return '${partes[0][0]}${partes[1][0]}'.toUpperCase();

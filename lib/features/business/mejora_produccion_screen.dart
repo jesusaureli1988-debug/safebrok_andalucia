@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'package:safebrok_andalucia/core/production/premium_weighting.dart';
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
@@ -22,6 +23,14 @@ class _MejoraProduccionScreenState extends State<MejoraProduccionScreen> {
     'Salud',
     'Auto',
     'Prima única',
+    'Transportes construcción',
+    'Caución',
+    'Camión',
+    'Decenal',
+    'Pymes',
+    'Accidentes colectivos',
+    'Salud colectivo',
+    'Transportes',
   ];
 
   bool cargando = true;
@@ -212,6 +221,20 @@ class _MejoraProduccionScreenState extends State<MejoraProduccionScreen> {
       return 'Prima única';
     }
 
+    if (producto.contains('transporte') && producto.contains('construccion')) {
+      return 'Transportes construcción';
+    }
+    if (producto.contains('caucion')) return 'Caución';
+    if (producto.contains('camion')) return 'Camión';
+    if (producto.contains('decenal')) return 'Decenal';
+    if (producto.contains('pyme')) return 'Pymes';
+    if (producto.contains('accidente') && producto.contains('colectiv')) {
+      return 'Accidentes colectivos';
+    }
+    if (producto.contains('salud') && producto.contains('colectiv')) {
+      return 'Salud colectivo';
+    }
+    if (producto.contains('transporte')) return 'Transportes';
     if (producto.contains('deceso')) return 'Decesos';
     if (producto.contains('hogar')) return 'Hogar';
     if (producto.contains('vida')) return 'Vida';
@@ -293,6 +316,9 @@ class _MejoraProduccionScreenState extends State<MejoraProduccionScreen> {
       final hijosData = await supabase
           .from('usuarios')
           .select('id, auth_id, parent_id, rol_usuario')
+          .or(
+            'estado.is.null,estado.not.in.(inactivo,Inactivo,INACTIVO,baja,Baja,BAJA,desactivado,Desactivado,DESACTIVADO,bloqueado,Bloqueado,BLOQUEADO,suspendido,Suspendido,SUSPENDIDO)',
+          )
           .eq('parent_id', parentIdActual);
 
       final hijos = List<Map<String, dynamic>>.from(hijosData);
@@ -361,6 +387,9 @@ class _MejoraProduccionScreenState extends State<MejoraProduccionScreen> {
       final perfilData = await supabase
           .from('usuarios')
           .select('id, auth_id, parent_id, rol_usuario, email')
+          .or(
+            'estado.is.null,estado.not.in.(inactivo,Inactivo,INACTIVO,baja,Baja,BAJA,desactivado,Desactivado,DESACTIVADO,bloqueado,Bloqueado,BLOQUEADO,suspendido,Suspendido,SUSPENDIDO)',
+          )
           .eq('auth_id', authUser.id)
           .maybeSingle();
 
@@ -413,7 +442,7 @@ class _MejoraProduccionScreenState extends State<MejoraProduccionScreen> {
         final ventas = List<Map<String, dynamic>>.from(ventasData);
 
         for (final venta in ventas) {
-          final prima = _toDouble(venta['prima_anual_neta']);
+          final prima = PremiumWeighting.net(venta);
           final producto = _clasificarProducto(venta['producto']);
 
           produccion += prima;
@@ -444,7 +473,7 @@ class _MejoraProduccionScreenState extends State<MejoraProduccionScreen> {
         if (ventaIds.isNotEmpty) {
           final ventasOriginalesData = await supabase
               .from('ventas')
-              .select('id, agente_auth_id, producto')
+              .select('id, agente_auth_id, producto, fecha_efecto')
               .inFilter('id', ventaIds);
 
           final ventasOriginales = <String, Map<String, dynamic>>{
@@ -466,7 +495,10 @@ class _MejoraProduccionScreenState extends State<MejoraProduccionScreen> {
 
             final primaExtornada = math.max(
               0.0,
-              _toDouble(extorno['prima_extornada']),
+              PremiumWeighting.amount(
+                ventaOriginal,
+                extorno['prima_extornada'],
+              ),
             );
 
             if (primaExtornada <= 0) continue;
@@ -682,22 +714,22 @@ class _MejoraProduccionScreenState extends State<MejoraProduccionScreen> {
       case 'Prima única':
         return Colors.amberAccent;
       default:
-        return Colors.cyanAccent;
+        return const Color(0xFF2563EB);
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF020617),
+      backgroundColor: const Color(0xFFF4F6FB),
       body: Stack(
         children: [
           const _BackgroundGlow(),
           SafeArea(
             child: RefreshIndicator(
               onRefresh: cargarDatos,
-              backgroundColor: const Color(0xFF0F172A),
-              color: Colors.cyanAccent,
+              backgroundColor: const Color(0xFFF8FAFC),
+              color: const Color(0xFF2563EB),
               child: ListView(
                 physics: const AlwaysScrollableScrollPhysics(
                   parent: BouncingScrollPhysics(),
@@ -709,7 +741,7 @@ class _MejoraProduccionScreenState extends State<MejoraProduccionScreen> {
                     const SizedBox(height: 130),
                     const Center(
                       child: CircularProgressIndicator(
-                        color: Colors.cyanAccent,
+                        color: const Color(0xFF2563EB),
                       ),
                     ),
                   ] else if (error != null) ...[
@@ -739,76 +771,88 @@ class _MejoraProduccionScreenState extends State<MejoraProduccionScreen> {
   }
 
   Widget _header() {
-    return Row(
-      children: [
-        InkWell(
-          borderRadius: BorderRadius.circular(18),
-          onTap: () => Navigator.maybePop(context),
-          child: Container(
-            height: 54,
-            width: 54,
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.08),
-              borderRadius: BorderRadius.circular(18),
-              border: Border.all(color: Colors.cyanAccent.withOpacity(0.55)),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.cyanAccent.withOpacity(0.18),
-                  blurRadius: 22,
-                  spreadRadius: 1,
+    final fechaInicio =
+        '${inicioCiclo.day}/${inicioCiclo.month}/${inicioCiclo.year}';
+    final ultimoDia = finCiclo.subtract(const Duration(days: 1));
+    final fechaFin = '${ultimoDia.day}/${ultimoDia.month}/${ultimoDia.year}';
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(22),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF111827), Color(0xFF1D4ED8)],
+        ),
+        borderRadius: BorderRadius.circular(32),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF1D4ED8).withOpacity(0.20),
+            blurRadius: 28,
+            offset: const Offset(0, 14),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          InkWell(
+            borderRadius: BorderRadius.circular(18),
+            onTap: () => Navigator.maybePop(context),
+            child: Container(
+              height: 54,
+              width: 54,
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.14),
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: Colors.white.withOpacity(0.18)),
+              ),
+              child: const Icon(
+                Icons.arrow_back_rounded,
+                color: Colors.white,
+                size: 28,
+              ),
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Mejora tu producción',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 26,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: -0.6,
+                  ),
+                ),
+                const SizedBox(height: 5),
+                Text(
+                  'Ciclo del $fechaInicio al $fechaFin',
+                  style: const TextStyle(
+                    color: Color(0xFFD8E2F2),
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
               ],
             ),
-            child: const Icon(
-              Icons.arrow_back_rounded,
-              color: Colors.white,
-              size: 28,
+          ),
+          Container(
+            width: 52,
+            height: 52,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: Colors.white.withOpacity(0.14),
             ),
+            child: const Icon(Icons.query_stats_rounded, color: Colors.white),
           ),
-        ),
-        const SizedBox(width: 14),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      'Mejora tu producción',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 24,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: -0.5,
-                      ),
-                    ),
-                  ),
-                  Icon(
-                    Icons.query_stats_rounded,
-                    color: Colors.cyanAccent,
-                    size: 28,
-                  ),
-                ],
-              ),
-              const SizedBox(height: 4),
-              Text(
-                'Ciclo del ${inicioCiclo.day}/${inicioCiclo.month}/${inicioCiclo.year} '
-                'al ${finCiclo.subtract(const Duration(days: 1)).day}/'
-                '${finCiclo.subtract(const Duration(days: 1)).month}/'
-                '${finCiclo.subtract(const Duration(days: 1)).year}',
-                style: const TextStyle(
-                  color: Colors.white60,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
@@ -825,7 +869,7 @@ class _MejoraProduccionScreenState extends State<MejoraProduccionScreen> {
           const Text(
             'No se pudieron cargar los datos',
             style: TextStyle(
-              color: Colors.white,
+              color: const Color(0xFF111827),
               fontSize: 18,
               fontWeight: FontWeight.w900,
             ),
@@ -834,7 +878,7 @@ class _MejoraProduccionScreenState extends State<MejoraProduccionScreen> {
           Text(
             error!,
             textAlign: TextAlign.center,
-            style: const TextStyle(color: Colors.white60),
+            style: const TextStyle(color: const Color(0xFF64748B)),
           ),
           const SizedBox(height: 16),
           FilledButton.icon(
@@ -850,10 +894,14 @@ class _MejoraProduccionScreenState extends State<MejoraProduccionScreen> {
   Widget _scopeCard() {
     return _glassCard(
       padding: const EdgeInsets.all(15),
-      borderColor: Colors.cyanAccent.withOpacity(0.24),
+      borderColor: const Color(0xFF2563EB).withOpacity(0.24),
       child: Row(
         children: [
-          _circleIcon(Icons.account_tree_rounded, Colors.cyanAccent, size: 48),
+          _circleIcon(
+            Icons.account_tree_rounded,
+            const Color(0xFF2563EB),
+            size: 48,
+          ),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -864,7 +912,7 @@ class _MejoraProduccionScreenState extends State<MejoraProduccionScreen> {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
-                    color: Colors.white,
+                    color: const Color(0xFF111827),
                     fontWeight: FontWeight.w900,
                     fontSize: 16,
                   ),
@@ -875,7 +923,7 @@ class _MejoraProduccionScreenState extends State<MejoraProduccionScreen> {
                   '$usuariosIncluidos usuario${usuariosIncluidos == 1 ? '' : 's'} '
                   'incluido${usuariosIncluidos == 1 ? '' : 's'}',
                   style: const TextStyle(
-                    color: Colors.white60,
+                    color: const Color(0xFF64748B),
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
                   ),
@@ -898,7 +946,7 @@ class _MejoraProduccionScreenState extends State<MejoraProduccionScreen> {
           title: 'Producción actual',
           value: _euros(produccionActual),
           icon: Icons.trending_up_rounded,
-          accent: Colors.cyanAccent,
+          accent: const Color(0xFF2563EB),
           footer: objetivoCumplido
               ? 'Objetivo superado'
               : 'Faltan ${_euros(faltante)}',
@@ -940,7 +988,7 @@ class _MejoraProduccionScreenState extends State<MejoraProduccionScreen> {
           Text(
             title,
             style: const TextStyle(
-              color: Colors.white,
+              color: const Color(0xFF111827),
               fontSize: 15,
               fontWeight: FontWeight.w800,
             ),
@@ -988,7 +1036,7 @@ class _MejoraProduccionScreenState extends State<MejoraProduccionScreen> {
           Text(
             'Objetivo ${_rolBonito(rolLogueado).toLowerCase()}',
             style: const TextStyle(
-              color: Colors.white,
+              color: const Color(0xFF111827),
               fontSize: 15,
               fontWeight: FontWeight.w800,
             ),
@@ -1000,7 +1048,7 @@ class _MejoraProduccionScreenState extends State<MejoraProduccionScreen> {
             child: Text(
               _euros(objetivo),
               style: const TextStyle(
-                color: Colors.white,
+                color: const Color(0xFF111827),
                 fontSize: 34,
                 fontWeight: FontWeight.w900,
                 letterSpacing: -1.5,
@@ -1013,15 +1061,15 @@ class _MejoraProduccionScreenState extends State<MejoraProduccionScreen> {
             child: LinearProgressIndicator(
               value: porcentajeObjetivo,
               minHeight: 10,
-              backgroundColor: Colors.white.withOpacity(0.12),
-              valueColor: const AlwaysStoppedAnimation(Colors.cyanAccent),
+              backgroundColor: Colors.white,
+              valueColor: const AlwaysStoppedAnimation(const Color(0xFF2563EB)),
             ),
           ),
           const SizedBox(height: 8),
           Text(
             '${(porcentajeObjetivo * 100).toStringAsFixed(1)}% completado',
             style: const TextStyle(
-              color: Colors.cyanAccent,
+              color: const Color(0xFF2563EB),
               fontWeight: FontWeight.w800,
               fontSize: 12,
             ),
@@ -1069,7 +1117,7 @@ class _MejoraProduccionScreenState extends State<MejoraProduccionScreen> {
                       width: 1,
                       height: 360,
                       margin: const EdgeInsets.symmetric(horizontal: 18),
-                      color: Colors.white.withOpacity(0.12),
+                      color: Colors.white,
                     ),
                     SizedBox(width: 285, child: _mixCard()),
                   ],
@@ -1113,9 +1161,9 @@ class _MejoraProduccionScreenState extends State<MejoraProduccionScreen> {
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.055),
+        color: Colors.white,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: Colors.white.withOpacity(0.08)),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
       ),
       child: Row(
         children: [
@@ -1131,7 +1179,7 @@ class _MejoraProduccionScreenState extends State<MejoraProduccionScreen> {
                       child: Text(
                         producto,
                         style: const TextStyle(
-                          color: Colors.white,
+                          color: const Color(0xFF111827),
                           fontWeight: FontWeight.w800,
                           fontSize: 15,
                         ),
@@ -1153,7 +1201,7 @@ class _MejoraProduccionScreenState extends State<MejoraProduccionScreen> {
                   child: LinearProgressIndicator(
                     value: progreso,
                     minHeight: 8,
-                    backgroundColor: Colors.white.withOpacity(0.10),
+                    backgroundColor: Colors.white,
                     valueColor: AlwaysStoppedAnimation(color),
                   ),
                 ),
@@ -1161,7 +1209,7 @@ class _MejoraProduccionScreenState extends State<MejoraProduccionScreen> {
                 Text(
                   '$cantidad póliza${cantidad == 1 ? '' : 's'}',
                   style: const TextStyle(
-                    color: Colors.white54,
+                    color: const Color(0xFF64748B),
                     fontSize: 11,
                     fontWeight: FontWeight.w600,
                   ),
@@ -1182,7 +1230,7 @@ class _MejoraProduccionScreenState extends State<MejoraProduccionScreen> {
       width: double.infinity,
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.06),
+        color: Colors.white,
         borderRadius: BorderRadius.circular(24),
         border: Border.all(
           color: cumple
@@ -1204,7 +1252,7 @@ class _MejoraProduccionScreenState extends State<MejoraProduccionScreen> {
                 child: Text(
                   'Mix Decesos + Vida + Prima única',
                   style: TextStyle(
-                    color: Colors.white,
+                    color: const Color(0xFF111827),
                     fontWeight: FontWeight.w900,
                     fontSize: 16,
                   ),
@@ -1246,7 +1294,10 @@ class _MejoraProduccionScreenState extends State<MejoraProduccionScreen> {
                     ),
                     const Text(
                       'mínimo 30%',
-                      style: TextStyle(color: Colors.white60, fontSize: 12),
+                      style: TextStyle(
+                        color: const Color(0xFF64748B),
+                        fontSize: 12,
+                      ),
                     ),
                   ],
                 ),
@@ -1257,7 +1308,7 @@ class _MejoraProduccionScreenState extends State<MejoraProduccionScreen> {
           Text(
             _euros(primaMix),
             style: const TextStyle(
-              color: Colors.white,
+              color: const Color(0xFF111827),
               fontWeight: FontWeight.w900,
               fontSize: 20,
             ),
@@ -1265,7 +1316,7 @@ class _MejoraProduccionScreenState extends State<MejoraProduccionScreen> {
           const SizedBox(height: 4),
           const Text(
             'prima computable en el mix',
-            style: TextStyle(color: Colors.white54, fontSize: 11),
+            style: TextStyle(color: const Color(0xFF64748B), fontSize: 11),
           ),
           const SizedBox(height: 14),
           _pill(
@@ -1311,7 +1362,7 @@ class _MejoraProduccionScreenState extends State<MejoraProduccionScreen> {
               'Estimación orientativa basada en la prima media real del ciclo. '
               'Cuando no existe histórico se utiliza una prima de referencia.',
               style: TextStyle(
-                color: Colors.white.withOpacity(0.48),
+                color: const Color(0xFF64748B),
                 fontSize: 11,
                 height: 1.4,
               ),
@@ -1335,15 +1386,19 @@ class _MejoraProduccionScreenState extends State<MejoraProduccionScreen> {
         gradient: LinearGradient(
           colors: [
             Colors.purpleAccent.withOpacity(0.16),
-            Colors.cyanAccent.withOpacity(0.10),
+            const Color(0xFF2563EB).withOpacity(0.10),
           ],
         ),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.cyanAccent.withOpacity(0.22)),
+        border: Border.all(color: const Color(0xFF2563EB).withOpacity(0.22)),
       ),
       child: Row(
         children: [
-          const Icon(Icons.route_rounded, color: Colors.cyanAccent, size: 32),
+          const Icon(
+            Icons.route_rounded,
+            color: const Color(0xFF2563EB),
+            size: 32,
+          ),
           const SizedBox(width: 12),
           Expanded(
             child: Text(
@@ -1351,7 +1406,7 @@ class _MejoraProduccionScreenState extends State<MejoraProduccionScreen> {
               '${_euros(faltante)}. El plan propone aproximadamente '
               '$unidades póliza${unidades == 1 ? '' : 's'}.',
               style: const TextStyle(
-                color: Colors.white,
+                color: const Color(0xFF111827),
                 fontWeight: FontWeight.w700,
                 height: 1.45,
               ),
@@ -1372,7 +1427,7 @@ class _MejoraProduccionScreenState extends State<MejoraProduccionScreen> {
       width: double.infinity,
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.05),
+        color: Colors.white,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: color.withOpacity(0.24)),
       ),
@@ -1415,7 +1470,7 @@ class _MejoraProduccionScreenState extends State<MejoraProduccionScreen> {
                         '${recomendacion.cantidad} '
                         '${recomendacion.producto}',
                         style: const TextStyle(
-                          color: Colors.white,
+                          color: const Color(0xFF111827),
                           fontWeight: FontWeight.w900,
                           fontSize: 16,
                         ),
@@ -1427,7 +1482,7 @@ class _MejoraProduccionScreenState extends State<MejoraProduccionScreen> {
                 Text(
                   recomendacion.motivo,
                   style: const TextStyle(
-                    color: Colors.white60,
+                    color: const Color(0xFF64748B),
                     height: 1.35,
                     fontSize: 12,
                   ),
@@ -1471,7 +1526,7 @@ class _MejoraProduccionScreenState extends State<MejoraProduccionScreen> {
               'Objetivo conseguido. Mantén el ritmo, protege el mix y '
               'convierte las referencias activas en nueva producción.',
               style: TextStyle(
-                color: Colors.white,
+                color: const Color(0xFF111827),
                 fontWeight: FontWeight.w800,
                 height: 1.45,
               ),
@@ -1484,10 +1539,10 @@ class _MejoraProduccionScreenState extends State<MejoraProduccionScreen> {
 
   Widget _referencesCard() {
     return _glassCard(
-      borderColor: Colors.cyanAccent.withOpacity(0.32),
+      borderColor: const Color(0xFF2563EB).withOpacity(0.32),
       child: Row(
         children: [
-          _circleIcon(Icons.groups_rounded, Colors.cyanAccent, size: 58),
+          _circleIcon(Icons.groups_rounded, const Color(0xFF2563EB), size: 58),
           const SizedBox(width: 16),
           const Expanded(
             child: Column(
@@ -1496,7 +1551,7 @@ class _MejoraProduccionScreenState extends State<MejoraProduccionScreen> {
                 Text(
                   'Referencias activas',
                   style: TextStyle(
-                    color: Colors.white,
+                    color: const Color(0xFF111827),
                     fontSize: 19,
                     fontWeight: FontWeight.w900,
                   ),
@@ -1504,7 +1559,7 @@ class _MejoraProduccionScreenState extends State<MejoraProduccionScreen> {
                 SizedBox(height: 4),
                 Text(
                   'Oportunidades de tu estructura en curso',
-                  style: TextStyle(color: Colors.white60),
+                  style: TextStyle(color: const Color(0xFF64748B)),
                 ),
               ],
             ),
@@ -1512,7 +1567,7 @@ class _MejoraProduccionScreenState extends State<MejoraProduccionScreen> {
           Text(
             referenciasActivas.toString(),
             style: const TextStyle(
-              color: Colors.cyanAccent,
+              color: const Color(0xFF2563EB),
               fontSize: 44,
               fontWeight: FontWeight.w900,
               letterSpacing: -1,
@@ -1540,12 +1595,15 @@ class _MejoraProduccionScreenState extends State<MejoraProduccionScreen> {
         gradient: LinearGradient(
           colors: [
             Colors.purpleAccent.withOpacity(0.24),
-            Colors.cyanAccent.withOpacity(0.18),
+            const Color(0xFF2563EB).withOpacity(0.18),
           ],
         ),
-        border: Border.all(color: Colors.cyanAccent.withOpacity(0.45)),
+        border: Border.all(color: const Color(0xFF2563EB).withOpacity(0.45)),
         boxShadow: [
-          BoxShadow(color: Colors.cyanAccent.withOpacity(0.16), blurRadius: 28),
+          BoxShadow(
+            color: const Color(0xFF2563EB).withOpacity(0.16),
+            blurRadius: 28,
+          ),
         ],
       ),
       child: Row(
@@ -1556,7 +1614,7 @@ class _MejoraProduccionScreenState extends State<MejoraProduccionScreen> {
             child: Text(
               mensaje,
               style: const TextStyle(
-                color: Colors.white70,
+                color: const Color(0xFF64748B),
                 fontSize: 15,
                 fontWeight: FontWeight.w700,
                 height: 1.4,
@@ -1575,7 +1633,7 @@ class _MejoraProduccionScreenState extends State<MejoraProduccionScreen> {
   }) {
     return Row(
       children: [
-        _circleIcon(icon, Colors.cyanAccent, size: 52),
+        _circleIcon(icon, const Color(0xFF2563EB), size: 52),
         const SizedBox(width: 14),
         Expanded(
           child: Column(
@@ -1584,7 +1642,7 @@ class _MejoraProduccionScreenState extends State<MejoraProduccionScreen> {
               Text(
                 title,
                 style: const TextStyle(
-                  color: Colors.white,
+                  color: const Color(0xFF111827),
                   fontSize: 20,
                   fontWeight: FontWeight.w900,
                 ),
@@ -1593,7 +1651,7 @@ class _MejoraProduccionScreenState extends State<MejoraProduccionScreen> {
               Text(
                 subtitle,
                 style: const TextStyle(
-                  color: Colors.white60,
+                  color: const Color(0xFF64748B),
                   fontSize: 13,
                   fontWeight: FontWeight.w500,
                   height: 1.3,
@@ -1629,14 +1687,14 @@ class _MejoraProduccionScreenState extends State<MejoraProduccionScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.06),
+        color: Colors.white,
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: Colors.white.withOpacity(0.10)),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
       ),
       child: Text(
         text,
         style: const TextStyle(
-          color: Colors.white70,
+          color: const Color(0xFF64748B),
           fontSize: 10,
           fontWeight: FontWeight.w700,
         ),
@@ -1657,11 +1715,9 @@ class _MejoraProduccionScreenState extends State<MejoraProduccionScreen> {
           width: double.infinity,
           padding: padding,
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.075),
+            color: Colors.white,
             borderRadius: BorderRadius.circular(26),
-            border: Border.all(
-              color: borderColor ?? Colors.white.withOpacity(0.12),
-            ),
+            border: Border.all(color: borderColor ?? Colors.white),
             boxShadow: [
               BoxShadow(
                 color: Colors.black.withOpacity(0.28),
@@ -1725,47 +1781,6 @@ class _BackgroundGlow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Stack(
-      children: [
-        Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [Color(0xFF020617), Color(0xFF061A2D), Color(0xFF0B1026)],
-            ),
-          ),
-        ),
-        Positioned(top: -120, right: -90, child: _glow(260, Colors.cyanAccent)),
-        Positioned(
-          bottom: 180,
-          left: -120,
-          child: _glow(280, Colors.purpleAccent),
-        ),
-        Positioned(
-          bottom: -120,
-          right: -80,
-          child: _glow(240, Colors.blueAccent),
-        ),
-      ],
-    );
-  }
-
-  Widget _glow(double size, Color color) {
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: color.withOpacity(0.16),
-        boxShadow: [
-          BoxShadow(
-            color: color.withOpacity(0.20),
-            blurRadius: 120,
-            spreadRadius: 45,
-          ),
-        ],
-      ),
-    );
+    return const Positioned.fill(child: ColoredBox(color: Color(0xFFF4F6FB)));
   }
 }

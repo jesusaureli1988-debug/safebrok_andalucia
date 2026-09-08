@@ -57,12 +57,18 @@ class _PlanificacionSemanalEquipoScreenState
       final jefe = await supabase
           .from('usuarios')
           .select('id')
+          .or(
+            'estado.is.null,estado.not.in.(inactivo,Inactivo,INACTIVO,baja,Baja,BAJA,desactivado,Desactivado,DESACTIVADO,bloqueado,Bloqueado,BLOQUEADO,suspendido,Suspendido,SUSPENDIDO)',
+          )
           .eq('auth_id', user.id)
           .single();
 
       final data = await supabase
           .from('usuarios')
           .select()
+          .or(
+            'estado.is.null,estado.not.in.(inactivo,Inactivo,INACTIVO,baja,Baja,BAJA,desactivado,Desactivado,DESACTIVADO,bloqueado,Bloqueado,BLOQUEADO,suspendido,Suspendido,SUSPENDIDO)',
+          )
           .eq('parent_id', jefe['id'])
           .eq('rol_usuario', 'agente')
           .order('nombre', ascending: true);
@@ -84,7 +90,9 @@ class _PlanificacionSemanalEquipoScreenState
   Future<void> guardar() async {
     if (saving) return;
 
-    if (agenteSeleccionado == null || inicioSemana == null || finSemana == null) {
+    if (agenteSeleccionado == null ||
+        inicioSemana == null ||
+        finSemana == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text("Selecciona agente y semana"),
@@ -107,6 +115,9 @@ class _PlanificacionSemanalEquipoScreenState
       final jefe = await supabase
           .from('usuarios')
           .select('id')
+          .or(
+            'estado.is.null,estado.not.in.(inactivo,Inactivo,INACTIVO,baja,Baja,BAJA,desactivado,Desactivado,DESACTIVADO,bloqueado,Bloqueado,BLOQUEADO,suspendido,Suspendido,SUSPENDIDO)',
+          )
           .eq('auth_id', user.id)
           .single();
 
@@ -148,7 +159,7 @@ class _PlanificacionSemanalEquipoScreenState
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text("Planificación guardada correctamente"),
-          backgroundColor: Color(0xFF22C55E),
+          backgroundColor: Color(0xFF0AAEAE),
         ),
       );
 
@@ -178,8 +189,8 @@ class _PlanificacionSemanalEquipoScreenState
         return Theme(
           data: ThemeData.dark().copyWith(
             colorScheme: const ColorScheme.dark(
-              primary: Color(0xFF22D3EE),
-              surface: Color(0xFF071A3A),
+              primary: Color(0xFF20C7C2),
+              surface: Color(0xFFFFFFFF),
               onSurface: Colors.white,
             ),
           ),
@@ -229,7 +240,7 @@ class _PlanificacionSemanalEquipoScreenState
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF020B1F),
+      backgroundColor: const Color(0xFFF2FCFD),
       bottomNavigationBar: loading
           ? null
           : SafeArea(
@@ -241,16 +252,16 @@ class _PlanificacionSemanalEquipoScreenState
                     borderRadius: BorderRadius.circular(20),
                     gradient: const LinearGradient(
                       colors: [
-                        Color(0xFF22D3EE),
-                        Color(0xFF2563EB),
-                        Color(0xFF7C3AED),
+                        Color(0xFF20C7C2),
+                        Color(0xFF0A7F91),
+                        Color(0xFF0A7F91),
                       ],
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                     ),
                     boxShadow: [
                       BoxShadow(
-                        color: const Color(0xFF22D3EE).withOpacity(0.35),
+                        color: const Color(0xFF20C7C2).withOpacity(0.35),
                         blurRadius: 24,
                         offset: const Offset(0, 10),
                       ),
@@ -291,14 +302,12 @@ class _PlanificacionSemanalEquipoScreenState
             ),
       body: loading
           ? const Center(
-              child: CircularProgressIndicator(
-                color: Color(0xFF22D3EE),
-              ),
+              child: CircularProgressIndicator(color: Color(0xFF20C7C2)),
             )
           : RefreshIndicator(
               onRefresh: cargarAgentes,
-              color: const Color(0xFF22D3EE),
-              backgroundColor: const Color(0xFF071A3A),
+              color: const Color(0xFF20C7C2),
+              backgroundColor: const Color(0xFFFFFFFF),
               child: CustomScrollView(
                 physics: const AlwaysScrollableScrollPhysics(),
                 slivers: [
@@ -328,13 +337,13 @@ class _PlanificacionSemanalEquipoScreenState
                         children: const [
                           Icon(
                             Icons.edit_calendar_rounded,
-                            color: Color(0xFF22D3EE),
+                            color: Color(0xFF20C7C2),
                           ),
                           SizedBox(width: 10),
                           Text(
                             "Plan semanal",
                             style: TextStyle(
-                              color: Colors.white,
+                              color: const Color(0xFF071A3A),
                               fontSize: 22,
                               fontWeight: FontWeight.w900,
                             ),
@@ -353,35 +362,35 @@ class _PlanificacionSemanalEquipoScreenState
                             subtitulo: "Inicio de semana",
                             icono: Icons.looks_one_rounded,
                             controller: lunesController,
-                            color: const Color(0xFF22D3EE),
+                            color: const Color(0xFF20C7C2),
                           ),
                           _diaCard(
                             dia: "Martes",
                             subtitulo: "Prospección y llamadas",
                             icono: Icons.looks_two_rounded,
                             controller: martesController,
-                            color: const Color(0xFF2563EB),
+                            color: const Color(0xFF0A7F91),
                           ),
                           _diaCard(
                             dia: "Miércoles",
                             subtitulo: "Seguimiento comercial",
                             icono: Icons.looks_3_rounded,
                             controller: miercolesController,
-                            color: const Color(0xFF8B5CF6),
+                            color: const Color(0xFF0A7F91),
                           ),
                           _diaCard(
                             dia: "Jueves",
                             subtitulo: "Visitas y cierres",
                             icono: Icons.looks_4_rounded,
                             controller: juevesController,
-                            color: const Color(0xFFF59E0B),
+                            color: const Color(0xFF0A7F91),
                           ),
                           _diaCard(
                             dia: "Viernes",
                             subtitulo: "Revisión y objetivos",
                             icono: Icons.looks_5_rounded,
                             controller: viernesController,
-                            color: const Color(0xFF22C55E),
+                            color: const Color(0xFF0AAEAE),
                           ),
                         ],
                       ),
@@ -398,11 +407,7 @@ class _PlanificacionSemanalEquipoScreenState
       padding: const EdgeInsets.fromLTRB(20, 54, 20, 26),
       decoration: const BoxDecoration(
         gradient: LinearGradient(
-          colors: [
-            Color(0xFF020B1F),
-            Color(0xFF061A3D),
-            Color(0xFF020B1F),
-          ],
+          colors: [Color(0xFFF2FCFD), Color(0xFFFFFFFF), Color(0xFFF2FCFD)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
@@ -419,7 +424,7 @@ class _PlanificacionSemanalEquipoScreenState
                 shape: BoxShape.circle,
                 gradient: RadialGradient(
                   colors: [
-                    const Color(0xFF22D3EE).withOpacity(0.28),
+                    const Color(0xFF20C7C2).withOpacity(0.28),
                     Colors.transparent,
                   ],
                 ),
@@ -438,7 +443,7 @@ class _PlanificacionSemanalEquipoScreenState
                       color: Colors.white,
                     ),
                     style: IconButton.styleFrom(
-                      backgroundColor: Colors.white.withOpacity(0.08),
+                      backgroundColor: Colors.white,
                       fixedSize: const Size(48, 48),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(18),
@@ -453,7 +458,7 @@ class _PlanificacionSemanalEquipoScreenState
                       color: Colors.white,
                     ),
                     style: IconButton.styleFrom(
-                      backgroundColor: Colors.white.withOpacity(0.08),
+                      backgroundColor: Colors.white,
                       fixedSize: const Size(48, 48),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(18),
@@ -472,16 +477,16 @@ class _PlanificacionSemanalEquipoScreenState
                       shape: BoxShape.circle,
                       gradient: const LinearGradient(
                         colors: [
-                          Color(0xFF22D3EE),
-                          Color(0xFF2563EB),
-                          Color(0xFF7C3AED),
+                          Color(0xFF20C7C2),
+                          Color(0xFF0A7F91),
+                          Color(0xFF0A7F91),
                         ],
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
                       ),
                       boxShadow: [
                         BoxShadow(
-                          color: const Color(0xFF22D3EE).withOpacity(0.35),
+                          color: const Color(0xFF20C7C2).withOpacity(0.35),
                           blurRadius: 24,
                           offset: const Offset(0, 10),
                         ),
@@ -501,7 +506,7 @@ class _PlanificacionSemanalEquipoScreenState
                           TextSpan(
                             text: "Crear\n",
                             style: TextStyle(
-                              color: Colors.white,
+                              color: const Color(0xFF071A3A),
                               fontSize: 36,
                               fontWeight: FontWeight.w900,
                               height: 1,
@@ -510,7 +515,7 @@ class _PlanificacionSemanalEquipoScreenState
                           TextSpan(
                             text: "plan semanal",
                             style: TextStyle(
-                              color: Color(0xFF22D3EE),
+                              color: Color(0xFF20C7C2),
                               fontSize: 34,
                               fontWeight: FontWeight.w900,
                               height: 1,
@@ -526,7 +531,7 @@ class _PlanificacionSemanalEquipoScreenState
               const Text(
                 "Define la planificación semanal de trabajo para cada agente del equipo.",
                 style: TextStyle(
-                  color: Color(0xFFCBD5E1),
+                  color: Color(0xFF64748B),
                   fontSize: 16,
                   fontWeight: FontWeight.w600,
                   height: 1.35,
@@ -551,7 +556,7 @@ class _PlanificacionSemanalEquipoScreenState
             icono: Icons.person_rounded,
             valor: agenteSeleccionado == null ? "—" : "OK",
             titulo: nombreAgenteSeleccionado(),
-            color: const Color(0xFF2563EB),
+            color: const Color(0xFF0A7F91),
           ),
         ),
         const SizedBox(width: 12),
@@ -560,7 +565,7 @@ class _PlanificacionSemanalEquipoScreenState
             icono: Icons.date_range_rounded,
             valor: "${diasPlanificados}/5",
             titulo: semanaTexto,
-            color: const Color(0xFF14B8A6),
+            color: const Color(0xFF0AAEAE),
           ),
         ),
       ],
@@ -578,10 +583,7 @@ class _PlanificacionSemanalEquipoScreenState
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [
-            color.withOpacity(0.32),
-            const Color(0xFF061329),
-          ],
+          colors: [color.withOpacity(0.32), const Color(0xFFFFFFFF)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
@@ -598,7 +600,7 @@ class _PlanificacionSemanalEquipoScreenState
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: const TextStyle(
-              color: Colors.white,
+              color: const Color(0xFF071A3A),
               fontSize: 26,
               fontWeight: FontWeight.w900,
             ),
@@ -609,7 +611,7 @@ class _PlanificacionSemanalEquipoScreenState
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
             style: const TextStyle(
-              color: Color(0xFFE2E8F0),
+              color: Color(0xFFC7ECEC),
               fontSize: 12,
               fontWeight: FontWeight.w700,
               height: 1.2,
@@ -623,11 +625,11 @@ class _PlanificacionSemanalEquipoScreenState
   Widget _selectorAgente() {
     return Container(
       padding: const EdgeInsets.all(16),
-      decoration: _cardDecoration(const Color(0xFF22D3EE)),
+      decoration: _cardDecoration(const Color(0xFF20C7C2)),
       child: DropdownButtonFormField<String>(
         value: agenteSeleccionado,
-        dropdownColor: const Color(0xFF071A3A),
-        iconEnabledColor: const Color(0xFF22D3EE),
+        dropdownColor: const Color(0xFFFFFFFF),
+        iconEnabledColor: const Color(0xFF20C7C2),
         decoration: _inputDecoration(
           label: "Agente",
           icono: Icons.person_search_rounded,
@@ -640,7 +642,7 @@ class _PlanificacionSemanalEquipoScreenState
             child: Text(
               nombre.isEmpty ? "Agente sin nombre" : nombre,
               style: const TextStyle(
-                color: Colors.white,
+                color: const Color(0xFF071A3A),
                 fontWeight: FontWeight.w700,
               ),
             ),
@@ -665,22 +667,22 @@ class _PlanificacionSemanalEquipoScreenState
         onTap: seleccionarSemana,
         child: Ink(
           padding: const EdgeInsets.all(16),
-          decoration: _cardDecoration(const Color(0xFF8B5CF6)),
+          decoration: _cardDecoration(const Color(0xFF0A7F91)),
           child: Row(
             children: [
               Container(
                 width: 48,
                 height: 48,
                 decoration: BoxDecoration(
-                  color: const Color(0xFF8B5CF6).withOpacity(0.16),
+                  color: const Color(0xFF0A7F91).withOpacity(0.16),
                   borderRadius: BorderRadius.circular(16),
                   border: Border.all(
-                    color: const Color(0xFF8B5CF6).withOpacity(0.42),
+                    color: const Color(0xFF0A7F91).withOpacity(0.42),
                   ),
                 ),
                 child: const Icon(
                   Icons.date_range_rounded,
-                  color: Color(0xFF8B5CF6),
+                  color: Color(0xFF0A7F91),
                 ),
               ),
               const SizedBox(width: 14),
@@ -688,7 +690,7 @@ class _PlanificacionSemanalEquipoScreenState
                 child: Text(
                   texto,
                   style: const TextStyle(
-                    color: Colors.white,
+                    color: const Color(0xFF071A3A),
                     fontSize: 15,
                     fontWeight: FontWeight.w900,
                   ),
@@ -730,10 +732,7 @@ class _PlanificacionSemanalEquipoScreenState
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
             gradient: const LinearGradient(
-              colors: [
-                Color(0xFF071A3A),
-                Color(0xFF061329),
-              ],
+              colors: [Color(0xFFFFFFFF), Color(0xFFFFFFFF)],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
@@ -758,10 +757,7 @@ class _PlanificacionSemanalEquipoScreenState
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   gradient: LinearGradient(
-                    colors: [
-                      color.withOpacity(0.95),
-                      const Color(0xFF7C3AED),
-                    ],
+                    colors: [color.withOpacity(0.95), const Color(0xFF0A7F91)],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ),
@@ -775,7 +771,7 @@ class _PlanificacionSemanalEquipoScreenState
                   maxLines: 3,
                   onChanged: (_) => setState(() {}),
                   style: const TextStyle(
-                    color: Colors.white,
+                    color: const Color(0xFF071A3A),
                     fontWeight: FontWeight.w600,
                   ),
                   decoration: InputDecoration(
@@ -804,10 +800,7 @@ class _PlanificacionSemanalEquipoScreenState
   BoxDecoration _cardDecoration(Color color) {
     return BoxDecoration(
       gradient: const LinearGradient(
-        colors: [
-          Color(0xFF071A3A),
-          Color(0xFF061329),
-        ],
+        colors: [Color(0xFFFFFFFF), Color(0xFFFFFFFF)],
         begin: Alignment.topLeft,
         end: Alignment.bottomRight,
       ),
@@ -829,22 +822,19 @@ class _PlanificacionSemanalEquipoScreenState
   }) {
     return InputDecoration(
       labelText: label,
-      prefixIcon: Icon(icono, color: const Color(0xFF22D3EE)),
+      prefixIcon: Icon(icono, color: const Color(0xFF20C7C2)),
       labelStyle: const TextStyle(
-        color: Color(0xFFCBD5E1),
+        color: Color(0xFF64748B),
         fontWeight: FontWeight.w800,
       ),
       filled: true,
-      fillColor: Colors.white.withOpacity(0.04),
+      fillColor: Colors.white,
       enabledBorder: OutlineInputBorder(
-        borderSide: BorderSide(color: Colors.white.withOpacity(0.08)),
+        borderSide: BorderSide(color: Colors.white),
         borderRadius: BorderRadius.circular(18),
       ),
       focusedBorder: OutlineInputBorder(
-        borderSide: const BorderSide(
-          color: Color(0xFF22D3EE),
-          width: 1.6,
-        ),
+        borderSide: const BorderSide(color: Color(0xFF20C7C2), width: 1.6),
         borderRadius: BorderRadius.circular(18),
       ),
     );

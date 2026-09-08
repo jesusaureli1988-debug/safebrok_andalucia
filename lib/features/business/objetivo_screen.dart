@@ -1,4 +1,5 @@
 import 'dart:ui';
+import 'package:safebrok_andalucia/core/production/premium_weighting.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:safebrok_andalucia/core/production/production_period_service.dart';
@@ -136,7 +137,7 @@ class _ObjetivoScreenState extends State<ObjetivoScreen> {
 
     final ventasData = await supabase
         .from('ventas')
-        .select('id, agente_auth_id, producto')
+        .select('id, agente_auth_id, producto, fecha_efecto')
         .inFilter('id', ventaIds);
 
     final ventasMap = <String, Map<String, dynamic>>{};
@@ -169,7 +170,10 @@ class _ObjetivoScreenState extends State<ObjetivoScreen> {
         continue;
       }
 
-      final primaExtornada = _numero(anulacion['prima_extornada']);
+      final primaExtornada = PremiumWeighting.amount(
+        venta,
+        anulacion['prima_extornada'],
+      );
 
       primaTotal += primaExtornada;
 
@@ -271,6 +275,9 @@ class _ObjetivoScreenState extends State<ObjetivoScreen> {
           .select(
             'id, auth_id, parent_id, rol_usuario, nombre, apellidos, email',
           )
+          .or(
+            'estado.is.null,estado.not.in.(inactivo,Inactivo,INACTIVO,baja,Baja,BAJA,desactivado,Desactivado,DESACTIVADO,bloqueado,Bloqueado,BLOQUEADO,suspendido,Suspendido,SUSPENDIDO)',
+          )
           .eq('auth_id', authUser.id)
           .maybeSingle();
 
@@ -286,6 +293,9 @@ class _ObjetivoScreenState extends State<ObjetivoScreen> {
           .from('usuarios')
           .select(
             'id, auth_id, parent_id, rol_usuario, nombre, apellidos, email',
+          )
+          .or(
+            'estado.is.null,estado.not.in.(inactivo,Inactivo,INACTIVO,baja,Baja,BAJA,desactivado,Desactivado,DESACTIVADO,bloqueado,Bloqueado,BLOQUEADO,suspendido,Suspendido,SUSPENDIDO)',
           );
 
       final todosUsuarios = List<Map<String, dynamic>>.from(usuariosData);
@@ -330,7 +340,7 @@ class _ObjetivoScreenState extends State<ObjetivoScreen> {
       double totalEquipo = 0;
 
       for (final venta in ventas) {
-        final prima = _numero(venta['prima_anual_neta']);
+        final prima = PremiumWeighting.net(venta);
 
         final agenteAuthId = _limpiarId(venta['agente_auth_id']);
 
@@ -441,14 +451,16 @@ class _ObjetivoScreenState extends State<ObjetivoScreen> {
     final double progresoDV = (porcentajeDV / 30).clamp(0.0, 1.0);
 
     return Scaffold(
-      backgroundColor: const Color(0xFF050B12),
+      backgroundColor: const Color(0xFFF4F6FB),
       body: Stack(
         children: [
           const _ObjetivoBackground(),
           SafeArea(
             child: loading
                 ? const Center(
-                    child: CircularProgressIndicator(color: Colors.cyanAccent),
+                    child: CircularProgressIndicator(
+                      color: const Color(0xFF2563EB),
+                    ),
                   )
                 : ListView(
                     padding: const EdgeInsets.fromLTRB(20, 14, 20, 34),
@@ -467,7 +479,7 @@ class _ObjetivoScreenState extends State<ObjetivoScreen> {
                               title: "Propias",
                               value: "${primasPropias.toStringAsFixed(0)} €",
                               icon: Icons.person_rounded,
-                              color: Colors.cyanAccent,
+                              color: const Color(0xFF2563EB),
                             ),
                           ),
                           const SizedBox(width: 12),
@@ -489,7 +501,7 @@ class _ObjetivoScreenState extends State<ObjetivoScreen> {
                         progress: progresoPrimas,
                         ok: objetivoPrimasOk,
                         icon: Icons.trending_up_rounded,
-                        color: Colors.cyanAccent,
+                        color: const Color(0xFF2563EB),
                         description:
                             "Tienes que alcanzar el volumen de primas marcado para tu perfil.",
                       ),
@@ -531,13 +543,13 @@ class _ObjetivoScreenState extends State<ObjetivoScreen> {
               width: 48,
               height: 48,
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.07),
+                color: Colors.white,
                 borderRadius: BorderRadius.circular(18),
-                border: Border.all(color: Colors.white.withOpacity(0.10)),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
               ),
               child: const Icon(
                 Icons.arrow_back_ios_new_rounded,
-                color: Colors.white,
+                color: Color(0xFF111827),
                 size: 19,
               ),
             ),
@@ -551,7 +563,7 @@ class _ObjetivoScreenState extends State<ObjetivoScreen> {
               const Text(
                 "Objetivos",
                 style: TextStyle(
-                  color: Colors.white,
+                  color: const Color(0xFF111827),
                   fontSize: 29,
                   fontWeight: FontWeight.w900,
                   letterSpacing: -0.8,
@@ -560,7 +572,7 @@ class _ObjetivoScreenState extends State<ObjetivoScreen> {
               Text(
                 "Control de primas y Decesos + Vida",
                 style: TextStyle(
-                  color: Colors.white.withOpacity(0.58),
+                  color: const Color(0xFF64748B),
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
                 ),
@@ -605,9 +617,9 @@ class _ObjetivoScreenState extends State<ObjetivoScreen> {
         gradient: const LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [Color(0xFF062C68), Color(0xFF10114A), Color(0xFF050B12)],
+          colors: [Color(0xFF111827), Color(0xFF1D4ED8)],
         ),
-        border: Border.all(color: Colors.cyanAccent.withOpacity(0.24)),
+        border: Border.all(color: const Color(0xFF2563EB).withOpacity(0.24)),
         boxShadow: [
           BoxShadow(
             color: Colors.blueAccent.withOpacity(0.24),
@@ -627,7 +639,7 @@ class _ObjetivoScreenState extends State<ObjetivoScreen> {
                   : Icons.track_changes_rounded,
               color: objetivoGeneralOk
                   ? Colors.amberAccent.withOpacity(0.16)
-                  : Colors.cyanAccent.withOpacity(0.12),
+                  : const Color(0xFF2563EB).withOpacity(0.12),
               size: 145,
             ),
           ),
@@ -637,7 +649,7 @@ class _ObjetivoScreenState extends State<ObjetivoScreen> {
               Text(
                 roleLabel.toUpperCase(),
                 style: TextStyle(
-                  color: Colors.white.withOpacity(0.66),
+                  color: const Color(0xFFD8E2F2),
                   fontSize: 12,
                   fontWeight: FontWeight.w900,
                   letterSpacing: 0.8,
@@ -657,7 +669,7 @@ class _ObjetivoScreenState extends State<ObjetivoScreen> {
               Text(
                 "de ${objetivoPrimas.toStringAsFixed(0)} € en primas",
                 style: TextStyle(
-                  color: Colors.white.withOpacity(0.62),
+                  color: const Color(0xFFD8E2F2),
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
                 ),
@@ -668,9 +680,9 @@ class _ObjetivoScreenState extends State<ObjetivoScreen> {
                 child: LinearProgressIndicator(
                   value: progresoPrimas,
                   minHeight: 9,
-                  backgroundColor: Colors.white.withOpacity(0.10),
+                  backgroundColor: Colors.white,
                   valueColor: AlwaysStoppedAnimation<Color>(
-                    objetivoGeneralOk ? Colors.greenAccent : Colors.cyanAccent,
+                    objetivoGeneralOk ? Colors.greenAccent : Colors.white,
                   ),
                 ),
               ),
@@ -715,7 +727,7 @@ class _ObjetivoScreenState extends State<ObjetivoScreen> {
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(24),
         gradient: LinearGradient(
-          colors: [color.withOpacity(0.16), Colors.white.withOpacity(0.045)],
+          colors: [color.withOpacity(0.16), Colors.white],
         ),
         border: Border.all(color: color.withOpacity(0.24)),
       ),
@@ -732,7 +744,7 @@ class _ObjetivoScreenState extends State<ObjetivoScreen> {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
-                    color: Colors.white,
+                    color: const Color(0xFF111827),
                     fontWeight: FontWeight.w900,
                     fontSize: 18,
                   ),
@@ -741,7 +753,7 @@ class _ObjetivoScreenState extends State<ObjetivoScreen> {
                 Text(
                   title,
                   style: TextStyle(
-                    color: Colors.white.withOpacity(0.58),
+                    color: const Color(0xFF64748B),
                     fontWeight: FontWeight.w700,
                     fontSize: 12,
                   ),
@@ -767,12 +779,10 @@ class _ObjetivoScreenState extends State<ObjetivoScreen> {
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.065),
+        color: Colors.white,
         borderRadius: BorderRadius.circular(28),
         border: Border.all(
-          color: ok
-              ? Colors.greenAccent.withOpacity(0.24)
-              : Colors.white.withOpacity(0.09),
+          color: ok ? Colors.greenAccent.withOpacity(0.24) : Colors.white,
         ),
         boxShadow: [
           BoxShadow(
@@ -795,7 +805,7 @@ class _ObjetivoScreenState extends State<ObjetivoScreen> {
                     Text(
                       title,
                       style: const TextStyle(
-                        color: Colors.white,
+                        color: const Color(0xFF111827),
                         fontWeight: FontWeight.w900,
                         fontSize: 17,
                       ),
@@ -804,7 +814,7 @@ class _ObjetivoScreenState extends State<ObjetivoScreen> {
                     Text(
                       description,
                       style: TextStyle(
-                        color: Colors.white.withOpacity(0.55),
+                        color: const Color(0xFF64748B),
                         fontWeight: FontWeight.w600,
                         fontSize: 12,
                       ),
@@ -826,7 +836,7 @@ class _ObjetivoScreenState extends State<ObjetivoScreen> {
               Text(
                 current,
                 style: const TextStyle(
-                  color: Colors.white,
+                  color: const Color(0xFF111827),
                   fontSize: 23,
                   fontWeight: FontWeight.w900,
                   letterSpacing: -0.5,
@@ -836,7 +846,7 @@ class _ObjetivoScreenState extends State<ObjetivoScreen> {
               Text(
                 target,
                 style: TextStyle(
-                  color: Colors.white.withOpacity(0.55),
+                  color: const Color(0xFF64748B),
                   fontSize: 15,
                   fontWeight: FontWeight.w800,
                 ),
@@ -849,7 +859,7 @@ class _ObjetivoScreenState extends State<ObjetivoScreen> {
             child: LinearProgressIndicator(
               value: progress,
               minHeight: 9,
-              backgroundColor: Colors.white.withOpacity(0.10),
+              backgroundColor: Colors.white,
               valueColor: AlwaysStoppedAnimation<Color>(
                 ok ? Colors.greenAccent : color,
               ),
@@ -874,7 +884,7 @@ class _ObjetivoScreenState extends State<ObjetivoScreen> {
             objetivoGeneralOk
                 ? Colors.greenAccent.withOpacity(0.14)
                 : Colors.orangeAccent.withOpacity(0.12),
-            Colors.white.withOpacity(0.045),
+            Colors.white,
           ],
         ),
         border: Border.all(
@@ -899,7 +909,7 @@ class _ObjetivoScreenState extends State<ObjetivoScreen> {
                   ? "Perfecto. Cumples primas y el mínimo de Decesos + Vida."
                   : _mensajePendiente(objetivoPrimasOk, objetivoDVOk),
               style: const TextStyle(
-                color: Colors.white,
+                color: const Color(0xFF111827),
                 fontWeight: FontWeight.w800,
                 fontSize: 14,
                 height: 1.35,
@@ -982,48 +992,6 @@ class _ObjetivoBackground extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Stack(
-      children: [
-        Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [Color(0xFF050B12), Color(0xFF071A2E), Color(0xFF050B12)],
-            ),
-          ),
-        ),
-        Positioned(
-          top: -150,
-          right: -100,
-          child: _glow(Colors.cyanAccent, 330, 0.15),
-        ),
-        Positioned(
-          bottom: -170,
-          left: -110,
-          child: _glow(Colors.blueAccent, 370, 0.14),
-        ),
-        Positioned(
-          top: 310,
-          left: -130,
-          child: _glow(Colors.purpleAccent, 250, 0.08),
-        ),
-        BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 60, sigmaY: 60),
-          child: Container(color: Colors.black.withOpacity(0.05)),
-        ),
-      ],
-    );
-  }
-
-  Widget _glow(Color color, double size, double opacity) {
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: color.withOpacity(opacity),
-      ),
-    );
+    return const Positioned.fill(child: ColoredBox(color: Color(0xFFF4F6FB)));
   }
 }

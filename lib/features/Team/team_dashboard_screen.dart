@@ -20,8 +20,10 @@ class _TeamDashboardScreenState extends State<TeamDashboardScreen> {
 
   List<Map<String, dynamic>> agents = [];
 
-  int get totalClientes =>
-      agents.fold<int>(0, (sum, agent) => sum + ((agent['total_clientes'] ?? 0) as int));
+  int get totalClientes => agents.fold<int>(
+    0,
+    (sum, agent) => sum + ((agent['total_clientes'] ?? 0) as int),
+  );
 
   @override
   void initState() {
@@ -57,17 +59,23 @@ class _TeamDashboardScreenState extends State<TeamDashboardScreen> {
       final currentUser = await supabase
           .from('usuarios')
           .select('id')
+          .or(
+            'estado.is.null,estado.not.in.(inactivo,Inactivo,INACTIVO,baja,Baja,BAJA,desactivado,Desactivado,DESACTIVADO,bloqueado,Bloqueado,BLOQUEADO,suspendido,Suspendido,SUSPENDIDO)',
+          )
           .eq('auth_id', user.id)
           .single();
 
       final jefeId = currentUser['id'];
 
       final agentesResponse = await supabase
-    .from('usuarios')
-    .select()
-    .eq('parent_id', jefeId)
-    .eq('rol_usuario', 'agente')
-    .order('nombre', ascending: true);
+          .from('usuarios')
+          .select()
+          .or(
+            'estado.is.null,estado.not.in.(inactivo,Inactivo,INACTIVO,baja,Baja,BAJA,desactivado,Desactivado,DESACTIVADO,bloqueado,Bloqueado,BLOQUEADO,suspendido,Suspendido,SUSPENDIDO)',
+          )
+          .eq('parent_id', jefeId)
+          .eq('rol_usuario', 'agente')
+          .order('nombre', ascending: true);
 
       final List<Map<String, dynamic>> tempAgents = [];
 
@@ -106,7 +114,9 @@ class _TeamDashboardScreenState extends State<TeamDashboardScreen> {
   String _fullName(Map<String, dynamic> agent) {
     final nombre = (agent['nombre'] ?? '').toString().trim();
     final apellidos = (agent['apellidos'] ?? '').toString().trim();
-    return "$nombre $apellidos".trim().isEmpty ? "Agente sin nombre" : "$nombre $apellidos".trim();
+    return "$nombre $apellidos".trim().isEmpty
+        ? "Agente sin nombre"
+        : "$nombre $apellidos".trim();
   }
 
   String _initial(Map<String, dynamic> agent) {
@@ -118,14 +128,11 @@ class _TeamDashboardScreenState extends State<TeamDashboardScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF07111B),
+      backgroundColor: const Color(0xFFF2FCFD),
       appBar: AppBar(
         title: const Text(
           "Mi Equipo",
-          style: TextStyle(
-            fontWeight: FontWeight.w800,
-            letterSpacing: -0.3,
-          ),
+          style: TextStyle(fontWeight: FontWeight.w800, letterSpacing: -0.3),
         ),
         centerTitle: false,
         backgroundColor: Colors.transparent,
@@ -150,14 +157,12 @@ class _TeamDashboardScreenState extends State<TeamDashboardScreen> {
           SafeArea(
             child: loading
                 ? const Center(
-                    child: CircularProgressIndicator(
-                      color: Colors.white,
-                    ),
+                    child: CircularProgressIndicator(color: Colors.white),
                   )
                 : RefreshIndicator(
                     onRefresh: () => loadAgents(isRefresh: true),
-                    color: const Color(0xFF38BDF8),
-                    backgroundColor: const Color(0xFF0F172A),
+                    color: const Color(0xFF20C7C2),
+                    backgroundColor: const Color(0xFFEAF8F8),
                     child: CustomScrollView(
                       physics: const AlwaysScrollableScrollPhysics(),
                       slivers: [
@@ -182,7 +187,7 @@ class _TeamDashboardScreenState extends State<TeamDashboardScreen> {
                                 const Text(
                                   "Agentes asignados",
                                   style: TextStyle(
-                                    color: Colors.white,
+                                    color: const Color(0xFF071A3A),
                                     fontSize: 19,
                                     fontWeight: FontWeight.w800,
                                     letterSpacing: -0.4,
@@ -192,7 +197,7 @@ class _TeamDashboardScreenState extends State<TeamDashboardScreen> {
                                 Text(
                                   "Pulsa sobre un agente para ver su cartera de clientes.",
                                   style: TextStyle(
-                                    color: Colors.white.withOpacity(0.58),
+                                    color: const Color(0xFF53627A),
                                     fontSize: 13,
                                     fontWeight: FontWeight.w500,
                                   ),
@@ -212,7 +217,8 @@ class _TeamDashboardScreenState extends State<TeamDashboardScreen> {
                             padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
                             sliver: SliverList.separated(
                               itemCount: agents.length,
-                              separatorBuilder: (_, __) => const SizedBox(height: 14),
+                              separatorBuilder: (_, __) =>
+                                  const SizedBox(height: 14),
                               itemBuilder: (context, index) {
                                 final agent = agents[index];
 
@@ -259,11 +265,7 @@ class _DashboardBackground extends StatelessWidget {
             gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
-              colors: [
-                Color(0xFF07111B),
-                Color(0xFF0B1F2E),
-                Color(0xFF12384E),
-              ],
+              colors: [Color(0xFFF2FCFD), Color(0xFFFFFFFF), Color(0xFFFFFFFF)],
             ),
           ),
         ),
@@ -272,7 +274,7 @@ class _DashboardBackground extends StatelessWidget {
           right: -80,
           child: _GlowCircle(
             size: 230,
-            color: const Color(0xFF38BDF8).withOpacity(0.24),
+            color: const Color(0xFF20C7C2).withOpacity(0.24),
           ),
         ),
         Positioned(
@@ -280,14 +282,12 @@ class _DashboardBackground extends StatelessWidget {
           left: -90,
           child: _GlowCircle(
             size: 260,
-            color: const Color(0xFF22C55E).withOpacity(0.16),
+            color: const Color(0xFF0AAEAE).withOpacity(0.16),
           ),
         ),
         BackdropFilter(
           filter: ImageFilter.blur(sigmaX: 34, sigmaY: 34),
-          child: Container(
-            color: Colors.black.withOpacity(0.08),
-          ),
+          child: Container(color: Colors.black.withOpacity(0.08)),
         ),
       ],
     );
@@ -298,20 +298,14 @@ class _GlowCircle extends StatelessWidget {
   final double size;
   final Color color;
 
-  const _GlowCircle({
-    required this.size,
-    required this.color,
-  });
+  const _GlowCircle({required this.size, required this.color});
 
   @override
   Widget build(BuildContext context) {
     return Container(
       width: size,
       height: size,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: color,
-      ),
+      decoration: BoxDecoration(shape: BoxShape.circle, color: color),
     );
   }
 }
@@ -320,10 +314,7 @@ class _HeaderPanel extends StatelessWidget {
   final int totalAgents;
   final int totalClientes;
 
-  const _HeaderPanel({
-    required this.totalAgents,
-    required this.totalClientes,
-  });
+  const _HeaderPanel({required this.totalAgents, required this.totalClientes});
 
   @override
   Widget build(BuildContext context) {
@@ -331,10 +322,8 @@ class _HeaderPanel extends StatelessWidget {
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(28),
-        color: Colors.white.withOpacity(0.08),
-        border: Border.all(
-          color: Colors.white.withOpacity(0.10),
-        ),
+        color: Colors.white,
+        border: Border.all(color: Colors.white),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.28),
@@ -354,16 +343,10 @@ class _HeaderPanel extends StatelessWidget {
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(16),
                   gradient: const LinearGradient(
-                    colors: [
-                      Color(0xFF38BDF8),
-                      Color(0xFF2563EB),
-                    ],
+                    colors: [Color(0xFF20C7C2), Color(0xFF0A7F91)],
                   ),
                 ),
-                child: const Icon(
-                  Icons.groups_rounded,
-                  color: Colors.white,
-                ),
+                child: const Icon(Icons.groups_rounded, color: Colors.white),
               ),
               const SizedBox(width: 14),
               const Expanded(
@@ -373,7 +356,7 @@ class _HeaderPanel extends StatelessWidget {
                     Text(
                       "Panel de equipo",
                       style: TextStyle(
-                        color: Colors.white,
+                        color: const Color(0xFF071A3A),
                         fontSize: 18,
                         fontWeight: FontWeight.w900,
                         letterSpacing: -0.4,
@@ -383,7 +366,7 @@ class _HeaderPanel extends StatelessWidget {
                     Text(
                       "Control profesional de agentes y clientes",
                       style: TextStyle(
-                        color: Colors.white60,
+                        color: const Color(0xFF64748B),
                         fontSize: 12.5,
                         fontWeight: FontWeight.w500,
                       ),
@@ -437,17 +420,11 @@ class _MetricBox extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.black.withOpacity(0.18),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: Colors.white.withOpacity(0.08),
-        ),
+        border: Border.all(color: Colors.white),
       ),
       child: Row(
         children: [
-          Icon(
-            icon,
-            color: const Color(0xFF7DD3FC),
-            size: 22,
-          ),
+          Icon(icon, color: const Color(0xFF20C7C2), size: 22),
           const SizedBox(width: 10),
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -455,7 +432,7 @@ class _MetricBox extends StatelessWidget {
               Text(
                 value,
                 style: const TextStyle(
-                  color: Colors.white,
+                  color: const Color(0xFF071A3A),
                   fontSize: 21,
                   fontWeight: FontWeight.w900,
                 ),
@@ -463,7 +440,7 @@ class _MetricBox extends StatelessWidget {
               Text(
                 label,
                 style: const TextStyle(
-                  color: Colors.white54,
+                  color: const Color(0xFF64748B),
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
                 ),
@@ -503,11 +480,9 @@ class _AgentCard extends StatelessWidget {
         child: Ink(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.075),
+            color: Colors.white,
             borderRadius: BorderRadius.circular(24),
-            border: Border.all(
-              color: Colors.white.withOpacity(0.10),
-            ),
+            border: Border.all(color: Colors.white),
           ),
           child: Row(
             children: [
@@ -517,14 +492,11 @@ class _AgentCard extends StatelessWidget {
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   gradient: const LinearGradient(
-                    colors: [
-                      Color(0xFF2563EB),
-                      Color(0xFF38BDF8),
-                    ],
+                    colors: [Color(0xFF0A7F91), Color(0xFF20C7C2)],
                   ),
                   boxShadow: [
                     BoxShadow(
-                      color: const Color(0xFF38BDF8).withOpacity(0.22),
+                      color: const Color(0xFF20C7C2).withOpacity(0.22),
                       blurRadius: 18,
                       offset: const Offset(0, 8),
                     ),
@@ -534,7 +506,7 @@ class _AgentCard extends StatelessWidget {
                   child: Text(
                     initials,
                     style: const TextStyle(
-                      color: Colors.white,
+                      color: const Color(0xFF071A3A),
                       fontSize: 20,
                       fontWeight: FontWeight.w900,
                     ),
@@ -551,7 +523,7 @@ class _AgentCard extends StatelessWidget {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
-                        color: Colors.white,
+                        color: const Color(0xFF071A3A),
                         fontSize: 16,
                         fontWeight: FontWeight.w800,
                       ),
@@ -562,7 +534,7 @@ class _AgentCard extends StatelessWidget {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                        color: Colors.white.withOpacity(0.55),
+                        color: const Color(0xFF53627A),
                         fontSize: 12.5,
                         fontWeight: FontWeight.w500,
                       ),
@@ -584,12 +556,12 @@ class _AgentCard extends StatelessWidget {
                 width: 34,
                 height: 34,
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.08),
+                  color: Colors.white,
                   shape: BoxShape.circle,
                 ),
                 child: const Icon(
                   Icons.chevron_right_rounded,
-                  color: Colors.white70,
+                  color: const Color(0xFF53627A),
                 ),
               ),
             ],
@@ -604,35 +576,26 @@ class _SmallChip extends StatelessWidget {
   final String text;
   final IconData icon;
 
-  const _SmallChip({
-    required this.text,
-    required this.icon,
-  });
+  const _SmallChip({required this.text, required this.icon});
 
   @override
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: const Color(0xFF38BDF8).withOpacity(0.13),
+        color: const Color(0xFF20C7C2).withOpacity(0.13),
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(
-          color: const Color(0xFF38BDF8).withOpacity(0.25),
-        ),
+        border: Border.all(color: const Color(0xFF20C7C2).withOpacity(0.25)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(
-            icon,
-            size: 14,
-            color: const Color(0xFF7DD3FC),
-          ),
+          Icon(icon, size: 14, color: const Color(0xFF20C7C2)),
           const SizedBox(width: 6),
           Text(
             text,
             style: const TextStyle(
-              color: Color(0xFFBAE6FD),
+              color: Color(0xFFEAF8F8),
               fontSize: 12,
               fontWeight: FontWeight.w800,
             ),
@@ -664,7 +627,7 @@ class _EmptyState extends StatelessWidget {
               "No tienes agentes asignados",
               textAlign: TextAlign.center,
               style: TextStyle(
-                color: Colors.white,
+                color: const Color(0xFF071A3A),
                 fontSize: 18,
                 fontWeight: FontWeight.w800,
               ),
@@ -674,7 +637,7 @@ class _EmptyState extends StatelessWidget {
               "Cuando tengas agentes asociados a tu estructura aparecerán aquí.",
               textAlign: TextAlign.center,
               style: TextStyle(
-                color: Colors.white.withOpacity(0.55),
+                color: const Color(0xFF53627A),
                 fontSize: 13,
                 height: 1.4,
               ),
@@ -690,10 +653,7 @@ class _ErrorBox extends StatelessWidget {
   final String message;
   final VoidCallback onRetry;
 
-  const _ErrorBox({
-    required this.message,
-    required this.onRetry,
-  });
+  const _ErrorBox({required this.message, required this.onRetry});
 
   @override
   Widget build(BuildContext context) {
@@ -702,30 +662,22 @@ class _ErrorBox extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.redAccent.withOpacity(0.12),
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: Colors.redAccent.withOpacity(0.25),
-        ),
+        border: Border.all(color: Colors.redAccent.withOpacity(0.25)),
       ),
       child: Row(
         children: [
-          const Icon(
-            Icons.error_outline_rounded,
-            color: Colors.redAccent,
-          ),
+          const Icon(Icons.error_outline_rounded, color: Colors.redAccent),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
               message,
               style: const TextStyle(
-                color: Colors.white,
+                color: const Color(0xFF071A3A),
                 fontWeight: FontWeight.w700,
               ),
             ),
           ),
-          TextButton(
-            onPressed: onRetry,
-            child: const Text("Reintentar"),
-          ),
+          TextButton(onPressed: onRetry, child: const Text("Reintentar")),
         ],
       ),
     );

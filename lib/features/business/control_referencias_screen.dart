@@ -43,30 +43,135 @@ class _ControlReferenciasScreenState extends State<ControlReferenciasScreen> {
   bool sortAsc = true;
 
   final List<_CampoTabla> camposDisponibles = const [
-    _CampoTabla(key: 'agente_nombre', titulo: 'Agente', grupo: 'Estructura', ancho: 190),
-    _CampoTabla(key: 'jefe_equipo_nombre', titulo: 'Jefe equipo', grupo: 'Estructura', ancho: 190),
-    _CampoTabla(key: 'jefe_ventas_nombre', titulo: 'Jefe ventas', grupo: 'Estructura', ancho: 190),
-    _CampoTabla(key: 'director_zona_nombre', titulo: 'Director zona', grupo: 'Estructura', ancho: 190),
-    _CampoTabla(key: 'tipo_referencia', titulo: 'Tipo referencia', grupo: 'Referencia', ancho: 170),
-    _CampoTabla(key: 'nombre', titulo: 'Nombre cliente', grupo: 'Referencia', ancho: 220),
-    _CampoTabla(key: 'telefono', titulo: 'Teléfono', grupo: 'Referencia', ancho: 140),
-    _CampoTabla(key: 'producto', titulo: 'Producto', grupo: 'Referencia', ancho: 160),
-    _CampoTabla(key: 'prioridad', titulo: 'Prioridad', grupo: 'Gestión', ancho: 120),
+    _CampoTabla(
+      key: 'agente_nombre',
+      titulo: 'Agente',
+      grupo: 'Estructura',
+      ancho: 190,
+    ),
+    _CampoTabla(
+      key: 'jefe_equipo_nombre',
+      titulo: 'Jefe equipo',
+      grupo: 'Estructura',
+      ancho: 190,
+    ),
+    _CampoTabla(
+      key: 'jefe_ventas_nombre',
+      titulo: 'Jefe ventas',
+      grupo: 'Estructura',
+      ancho: 190,
+    ),
+    _CampoTabla(
+      key: 'director_zona_nombre',
+      titulo: 'Director zona',
+      grupo: 'Estructura',
+      ancho: 190,
+    ),
+    _CampoTabla(
+      key: 'tipo_referencia',
+      titulo: 'Tipo referencia',
+      grupo: 'Referencia',
+      ancho: 170,
+    ),
+    _CampoTabla(
+      key: 'nombre',
+      titulo: 'Nombre cliente',
+      grupo: 'Referencia',
+      ancho: 220,
+    ),
+    _CampoTabla(
+      key: 'telefono',
+      titulo: 'Teléfono',
+      grupo: 'Referencia',
+      ancho: 140,
+    ),
+    _CampoTabla(
+      key: 'producto',
+      titulo: 'Producto',
+      grupo: 'Referencia',
+      ancho: 160,
+    ),
+    _CampoTabla(
+      key: 'prioridad',
+      titulo: 'Prioridad',
+      grupo: 'Gestión',
+      ancho: 120,
+    ),
     _CampoTabla(key: 'estado', titulo: 'Estado', grupo: 'Gestión', ancho: 160),
-    _CampoTabla(key: 'resultados', titulo: 'Resultado', grupo: 'Gestión', ancho: 180),
-    _CampoTabla(key: 'requiere_visita', titulo: 'Requiere visita', grupo: 'Gestión', ancho: 150),
-    _CampoTabla(key: 'prima_potencial', titulo: 'Prima potencial', grupo: 'Negocio', ancho: 150),
-    _CampoTabla(key: 'campania_actual', titulo: 'Campaña actual', grupo: 'Origen', ancho: 180),
-    _CampoTabla(key: 'productos_actuales', titulo: 'Productos actuales', grupo: 'Origen', ancho: 220),
-    _CampoTabla(key: 'fecha_vencimiento', titulo: 'Fecha vencimiento', grupo: 'Fechas', ancho: 170),
-    _CampoTabla(key: 'fecha_seguimiento', titulo: 'Fecha seguimiento', grupo: 'Fechas', ancho: 170),
-    _CampoTabla(key: 'fecha_rellamada', titulo: 'Fecha rellamada', grupo: 'Fechas', ancho: 170),
-    _CampoTabla(key: 'fecha_llamada', titulo: 'Fecha llamada', grupo: 'Fechas', ancho: 170),
-    _CampoTabla(key: 'created_at', titulo: 'Fecha creación', grupo: 'Fechas', ancho: 170),
+    _CampoTabla(
+      key: 'resultados',
+      titulo: 'Resultado',
+      grupo: 'Gestión',
+      ancho: 180,
+    ),
+    _CampoTabla(
+      key: 'requiere_visita',
+      titulo: 'Requiere visita',
+      grupo: 'Gestión',
+      ancho: 150,
+    ),
+    _CampoTabla(
+      key: 'prima_potencial',
+      titulo: 'Prima potencial',
+      grupo: 'Negocio',
+      ancho: 150,
+    ),
+    _CampoTabla(
+      key: 'campania_actual',
+      titulo: 'Campaña actual',
+      grupo: 'Origen',
+      ancho: 180,
+    ),
+    _CampoTabla(
+      key: 'productos_actuales',
+      titulo: 'Productos actuales',
+      grupo: 'Origen',
+      ancho: 220,
+    ),
+    _CampoTabla(
+      key: 'fecha_vencimiento',
+      titulo: 'Fecha vencimiento',
+      grupo: 'Fechas',
+      ancho: 170,
+    ),
+    _CampoTabla(
+      key: 'fecha_seguimiento',
+      titulo: 'Fecha seguimiento',
+      grupo: 'Fechas',
+      ancho: 170,
+    ),
+    _CampoTabla(
+      key: 'fecha_rellamada',
+      titulo: 'Fecha rellamada',
+      grupo: 'Fechas',
+      ancho: 170,
+    ),
+    _CampoTabla(
+      key: 'fecha_llamada',
+      titulo: 'Fecha llamada',
+      grupo: 'Fechas',
+      ancho: 170,
+    ),
+    _CampoTabla(
+      key: 'created_at',
+      titulo: 'Fecha creación',
+      grupo: 'Fechas',
+      ancho: 170,
+    ),
     _CampoTabla(key: 'notas', titulo: 'Notas', grupo: 'Notas', ancho: 260),
-    _CampoTabla(key: 'nota_seguimiento', titulo: 'Nota seguimiento', grupo: 'Notas', ancho: 260),
+    _CampoTabla(
+      key: 'nota_seguimiento',
+      titulo: 'Nota seguimiento',
+      grupo: 'Notas',
+      ancho: 260,
+    ),
     _CampoTabla(key: 'id', titulo: 'ID', grupo: 'Sistema', ancho: 220),
-    _CampoTabla(key: 'auth_id', titulo: 'Auth agente', grupo: 'Sistema', ancho: 220),
+    _CampoTabla(
+      key: 'auth_id',
+      titulo: 'Auth agente',
+      grupo: 'Sistema',
+      ancho: 220,
+    ),
   ];
 
   late List<String> columnasActivas = [
@@ -99,7 +204,12 @@ class _ControlReferenciasScreenState extends State<ControlReferenciasScreen> {
     try {
       final perfil = await supabase
           .from('usuarios')
-          .select('id, auth_id, parent_id, rol_usuario, nombre, apellidos, email')
+          .select(
+            'id, auth_id, parent_id, rol_usuario, nombre, apellidos, email',
+          )
+          .or(
+            'estado.is.null,estado.not.in.(inactivo,Inactivo,INACTIVO,baja,Baja,BAJA,desactivado,Desactivado,DESACTIVADO,bloqueado,Bloqueado,BLOQUEADO,suspendido,Suspendido,SUSPENDIDO)',
+          )
           .eq('auth_id', user.id)
           .maybeSingle();
 
@@ -109,7 +219,12 @@ class _ControlReferenciasScreenState extends State<ControlReferenciasScreen> {
 
       final usuariosData = await supabase
           .from('usuarios')
-          .select('id, auth_id, parent_id, rol_usuario, nombre, apellidos, email')
+          .select(
+            'id, auth_id, parent_id, rol_usuario, nombre, apellidos, email',
+          )
+          .or(
+            'estado.is.null,estado.not.in.(inactivo,Inactivo,INACTIVO,baja,Baja,BAJA,desactivado,Desactivado,DESACTIVADO,bloqueado,Bloqueado,BLOQUEADO,suspendido,Suspendido,SUSPENDIDO)',
+          )
           .order('nombre', ascending: true);
 
       usuarios = List<Map<String, dynamic>>.from(usuariosData);
@@ -159,11 +274,17 @@ class _ControlReferenciasScreenState extends State<ControlReferenciasScreen> {
       ...r,
       'agente_nombre': agente == null ? 'Sin agente' : _nombreCompleto(agente),
       'agente_id': agente?['id']?.toString(),
-      'jefe_equipo_nombre': jefeEquipo == null ? '' : _nombreCompleto(jefeEquipo),
+      'jefe_equipo_nombre': jefeEquipo == null
+          ? ''
+          : _nombreCompleto(jefeEquipo),
       'jefe_equipo_id': jefeEquipo?['id']?.toString(),
-      'jefe_ventas_nombre': jefeVentas == null ? '' : _nombreCompleto(jefeVentas),
+      'jefe_ventas_nombre': jefeVentas == null
+          ? ''
+          : _nombreCompleto(jefeVentas),
       'jefe_ventas_id': jefeVentas?['id']?.toString(),
-      'director_zona_nombre': directorZona == null ? '' : _nombreCompleto(directorZona),
+      'director_zona_nombre': directorZona == null
+          ? ''
+          : _nombreCompleto(directorZona),
       'director_zona_id': directorZona?['id']?.toString(),
       'tipo_referencia': _tipoReferencia(r),
     };
@@ -215,7 +336,9 @@ class _ControlReferenciasScreenState extends State<ControlReferenciasScreen> {
     final nombre = u['nombre']?.toString() ?? '';
     final apellidos = u['apellidos']?.toString() ?? '';
     final completo = '$nombre $apellidos'.trim();
-    return completo.isEmpty ? (u['email']?.toString() ?? 'Sin nombre') : completo;
+    return completo.isEmpty
+        ? (u['email']?.toString() ?? 'Sin nombre')
+        : completo;
   }
 
   String _tipoReferencia(Map<String, dynamic> r) {
@@ -267,9 +390,11 @@ class _ControlReferenciasScreenState extends State<ControlReferenciasScreen> {
 
     if (filtroDirectorZonaId != null && filtroJefeVentasId == null) {
       final idsVentas = usuariosPermitidos
-          .where((u) =>
-              u['rol_usuario']?.toString() == 'jefe_ventas' &&
-              u['parent_id']?.toString() == filtroDirectorZonaId)
+          .where(
+            (u) =>
+                u['rol_usuario']?.toString() == 'jefe_ventas' &&
+                u['parent_id']?.toString() == filtroDirectorZonaId,
+          )
           .map((u) => u['id']?.toString())
           .whereType<String>()
           .toSet();
@@ -296,9 +421,11 @@ class _ControlReferenciasScreenState extends State<ControlReferenciasScreen> {
 
     if (filtroJefeVentasId != null && filtroJefeEquipoId == null) {
       final idsEquipo = usuariosPermitidos
-          .where((u) =>
-              u['rol_usuario']?.toString() == 'jefe_equipo' &&
-              u['parent_id']?.toString() == filtroJefeVentasId)
+          .where(
+            (u) =>
+                u['rol_usuario']?.toString() == 'jefe_equipo' &&
+                u['parent_id']?.toString() == filtroJefeVentasId,
+          )
           .map((u) => u['id']?.toString())
           .whereType<String>()
           .toSet();
@@ -312,17 +439,21 @@ class _ControlReferenciasScreenState extends State<ControlReferenciasScreen> {
         filtroJefeVentasId == null &&
         filtroJefeEquipoId == null) {
       final idsVentas = usuariosPermitidos
-          .where((u) =>
-              u['rol_usuario']?.toString() == 'jefe_ventas' &&
-              u['parent_id']?.toString() == filtroDirectorZonaId)
+          .where(
+            (u) =>
+                u['rol_usuario']?.toString() == 'jefe_ventas' &&
+                u['parent_id']?.toString() == filtroDirectorZonaId,
+          )
           .map((u) => u['id']?.toString())
           .whereType<String>()
           .toSet();
 
       final idsEquipo = usuariosPermitidos
-          .where((u) =>
-              u['rol_usuario']?.toString() == 'jefe_equipo' &&
-              idsVentas.contains(u['parent_id']?.toString()))
+          .where(
+            (u) =>
+                u['rol_usuario']?.toString() == 'jefe_equipo' &&
+                idsVentas.contains(u['parent_id']?.toString()),
+          )
           .map((u) => u['id']?.toString())
           .whereType<String>()
           .toSet();
@@ -350,7 +481,8 @@ class _ControlReferenciasScreenState extends State<ControlReferenciasScreen> {
     final value = r[key];
     if (value == null) return '';
 
-    if (key.startsWith('fecha') || key == 'created_at') return _formatDate(value);
+    if (key.startsWith('fecha') || key == 'created_at')
+      return _formatDate(value);
     if (key == 'requiere_visita') return value == true ? 'Sí' : 'No';
     if (key == 'prima_potencial') return _formatMoney(value);
 
@@ -368,8 +500,11 @@ class _ControlReferenciasScreenState extends State<ControlReferenciasScreen> {
 
     if (filtroJefeEquipoId != null) {
       return usuariosPermitidos
-          .where((u) =>
-              _esAgente(u) && u['parent_id']?.toString() == filtroJefeEquipoId)
+          .where(
+            (u) =>
+                _esAgente(u) &&
+                u['parent_id']?.toString() == filtroJefeEquipoId,
+          )
           .map((u) => u['auth_id']?.toString())
           .whereType<String>()
           .where((e) => e.isNotEmpty && e != 'null')
@@ -378,15 +513,20 @@ class _ControlReferenciasScreenState extends State<ControlReferenciasScreen> {
 
     if (filtroJefeVentasId != null) {
       final idsEquipo = usuariosPermitidos
-          .where((u) =>
-              u['rol_usuario']?.toString() == 'jefe_equipo' &&
-              u['parent_id']?.toString() == filtroJefeVentasId)
+          .where(
+            (u) =>
+                u['rol_usuario']?.toString() == 'jefe_equipo' &&
+                u['parent_id']?.toString() == filtroJefeVentasId,
+          )
           .map((u) => u['id']?.toString())
           .whereType<String>()
           .toSet();
 
       return usuariosPermitidos
-          .where((u) => _esAgente(u) && idsEquipo.contains(u['parent_id']?.toString()))
+          .where(
+            (u) =>
+                _esAgente(u) && idsEquipo.contains(u['parent_id']?.toString()),
+          )
           .map((u) => u['auth_id']?.toString())
           .whereType<String>()
           .where((e) => e.isNotEmpty && e != 'null')
@@ -395,23 +535,30 @@ class _ControlReferenciasScreenState extends State<ControlReferenciasScreen> {
 
     if (filtroDirectorZonaId != null) {
       final idsVentas = usuariosPermitidos
-          .where((u) =>
-              u['rol_usuario']?.toString() == 'jefe_ventas' &&
-              u['parent_id']?.toString() == filtroDirectorZonaId)
+          .where(
+            (u) =>
+                u['rol_usuario']?.toString() == 'jefe_ventas' &&
+                u['parent_id']?.toString() == filtroDirectorZonaId,
+          )
           .map((u) => u['id']?.toString())
           .whereType<String>()
           .toSet();
 
       final idsEquipo = usuariosPermitidos
-          .where((u) =>
-              u['rol_usuario']?.toString() == 'jefe_equipo' &&
-              idsVentas.contains(u['parent_id']?.toString()))
+          .where(
+            (u) =>
+                u['rol_usuario']?.toString() == 'jefe_equipo' &&
+                idsVentas.contains(u['parent_id']?.toString()),
+          )
           .map((u) => u['id']?.toString())
           .whereType<String>()
           .toSet();
 
       return usuariosPermitidos
-          .where((u) => _esAgente(u) && idsEquipo.contains(u['parent_id']?.toString()))
+          .where(
+            (u) =>
+                _esAgente(u) && idsEquipo.contains(u['parent_id']?.toString()),
+          )
           .map((u) => u['auth_id']?.toString())
           .whereType<String>()
           .where((e) => e.isNotEmpty && e != 'null')
@@ -442,10 +589,16 @@ class _ControlReferenciasScreenState extends State<ControlReferenciasScreen> {
     }
     if (filtroEstado == 'Pendientes') return e == 'pendiente' || e.isEmpty;
     if (filtroEstado == 'En gestión') {
-      return e == 'en gestion' || e == 'en gestión' || e == 'gestion' || e == 'en curso';
+      return e == 'en gestion' ||
+          e == 'en gestión' ||
+          e == 'gestion' ||
+          e == 'en curso';
     }
     if (filtroEstado == 'Cerradas') {
-      return e == 'cerrada' || e == 'cerrado' || e == 'resuelto' || e == 'contratado';
+      return e == 'cerrada' ||
+          e == 'cerrado' ||
+          e == 'resuelto' ||
+          e == 'contratado';
     }
     if (filtroEstado == 'Cerradas con éxito') {
       return e == 'contratado' ||
@@ -468,68 +621,83 @@ class _ControlReferenciasScreenState extends State<ControlReferenciasScreen> {
     return true;
   }
 
-  List<Map<String, dynamic>> get referenciasFiltradas => referenciasFiltradasCache;
+  List<Map<String, dynamic>> get referenciasFiltradas =>
+      referenciasFiltradasCache;
 
-void _aplicarFiltros() {
-  var lista = [...referencias];
+  void _aplicarFiltros() {
+    var lista = [...referencias];
 
-  final authFiltro = _authIdsSegunFiltros();
-  if (authFiltro.isNotEmpty) {
-    lista = lista.where((r) => authFiltro.contains(r['auth_id']?.toString())).toList();
-  }
+    final authFiltro = _authIdsSegunFiltros();
+    if (authFiltro.isNotEmpty) {
+      lista = lista
+          .where((r) => authFiltro.contains(r['auth_id']?.toString()))
+          .toList();
+    }
 
-  if (filtroTipoReferencia != 'Todos') {
-    lista = lista.where((r) => r['tipo_referencia'] == filtroTipoReferencia).toList();
-  }
+    if (filtroTipoReferencia != 'Todos') {
+      lista = lista
+          .where((r) => r['tipo_referencia'] == filtroTipoReferencia)
+          .toList();
+    }
 
-  if (filtroPrioridad != 'Todas') {
-    lista = lista.where((r) => r['prioridad']?.toString() == filtroPrioridad).toList();
-  }
+    if (filtroPrioridad != 'Todas') {
+      lista = lista
+          .where((r) => r['prioridad']?.toString() == filtroPrioridad)
+          .toList();
+    }
 
-  if (filtroRequiereVisita != 'Todos') {
-    final quiere = filtroRequiereVisita == 'Sí';
-    lista = lista.where((r) => r['requiere_visita'] == quiere).toList();
-  }
+    if (filtroRequiereVisita != 'Todos') {
+      final quiere = filtroRequiereVisita == 'Sí';
+      lista = lista.where((r) => r['requiere_visita'] == quiere).toList();
+    }
 
-  lista = lista.where(_estadoCoincide).toList();
+    lista = lista.where(_estadoCoincide).toList();
 
-  if (fechaDesde != null) {
-    final desde = DateTime(fechaDesde!.year, fechaDesde!.month, fechaDesde!.day);
-    lista = lista.where((r) {
-      final f = _parseDate(r['created_at']);
-      if (f == null) return false;
-      return !DateTime(f.year, f.month, f.day).isBefore(desde);
-    }).toList();
-  }
-
-  if (fechaHasta != null) {
-    final hasta = DateTime(fechaHasta!.year, fechaHasta!.month, fechaHasta!.day);
-    lista = lista.where((r) {
-      final f = _parseDate(r['created_at']);
-      if (f == null) return false;
-      return !DateTime(f.year, f.month, f.day).isAfter(hasta);
-    }).toList();
-  }
-
-  final q = busqueda.toLowerCase().trim();
-  if (q.isNotEmpty) {
-    lista = lista.where((r) {
-      return camposDisponibles.any(
-        (c) => _valueToString(r, c.key).toLowerCase().contains(q),
+    if (fechaDesde != null) {
+      final desde = DateTime(
+        fechaDesde!.year,
+        fechaDesde!.month,
+        fechaDesde!.day,
       );
-    }).toList();
-  }
+      lista = lista.where((r) {
+        final f = _parseDate(r['created_at']);
+        if (f == null) return false;
+        return !DateTime(f.year, f.month, f.day).isBefore(desde);
+      }).toList();
+    }
 
-  if (sortKey != null) {
-    lista.sort((a, b) {
-      final av = _valueToString(a, sortKey!).toLowerCase();
-      final bv = _valueToString(b, sortKey!).toLowerCase();
-      return sortAsc ? av.compareTo(bv) : bv.compareTo(av);
-    });
-  }
+    if (fechaHasta != null) {
+      final hasta = DateTime(
+        fechaHasta!.year,
+        fechaHasta!.month,
+        fechaHasta!.day,
+      );
+      lista = lista.where((r) {
+        final f = _parseDate(r['created_at']);
+        if (f == null) return false;
+        return !DateTime(f.year, f.month, f.day).isAfter(hasta);
+      }).toList();
+    }
 
-  referenciasFiltradasCache = lista;
-}
+    final q = busqueda.toLowerCase().trim();
+    if (q.isNotEmpty) {
+      lista = lista.where((r) {
+        return camposDisponibles.any(
+          (c) => _valueToString(r, c.key).toLowerCase().contains(q),
+        );
+      }).toList();
+    }
+
+    if (sortKey != null) {
+      lista.sort((a, b) {
+        final av = _valueToString(a, sortKey!).toLowerCase();
+        final bv = _valueToString(b, sortKey!).toLowerCase();
+        return sortAsc ? av.compareTo(bv) : bv.compareTo(av);
+      });
+    }
+
+    referenciasFiltradasCache = lista;
+  }
 
   void limpiarFiltros() {
     setState(() {
@@ -559,20 +727,20 @@ void _aplicarFiltros() {
 
     if (date == null) return;
     setState(() {
-  if (desde) {
-    fechaDesde = date;
-  } else {
-    fechaHasta = date;
-  }
+      if (desde) {
+        fechaDesde = date;
+      } else {
+        fechaHasta = date;
+      }
 
-  _aplicarFiltros();
-});
+      _aplicarFiltros();
+    });
   }
 
   _CampoTabla _campo(String key) => camposDisponibles.firstWhere(
-        (c) => c.key == key,
-        orElse: () => _CampoTabla(key: key, titulo: key, grupo: 'Otros'),
-      );
+    (c) => c.key == key,
+    orElse: () => _CampoTabla(key: key, titulo: key, grupo: 'Otros'),
+  );
 
   void _toggleColumna(String key) {
     setState(() {
@@ -600,7 +768,7 @@ void _aplicarFiltros() {
         sortKey = key;
         sortAsc = true;
       }
-       _aplicarFiltros();
+      _aplicarFiltros();
     });
   }
 
@@ -664,7 +832,10 @@ void _aplicarFiltros() {
     try {
       setState(() => guardando = true);
 
-      final ids = refs.map((r) => r['id']?.toString()).whereType<String>().toList();
+      final ids = refs
+          .map((r) => r['id']?.toString())
+          .whereType<String>()
+          .toList();
 
       await supabase
           .from('referencias_viables')
@@ -684,12 +855,18 @@ void _aplicarFiltros() {
   Future<void> _gestionarReferencias(List<Map<String, dynamic>> refs) async {
     String nuevoEstado = refs.length == 1
         ? (refs.first['estado']?.toString().isEmpty ?? true
-            ? 'Pendiente'
-            : refs.first['estado'].toString())
+              ? 'Pendiente'
+              : refs.first['estado'].toString())
         : 'En gestión';
-    String nuevoResultado = refs.length == 1 ? (refs.first['resultados']?.toString() ?? '') : '';
-    String nuevaNota = refs.length == 1 ? (refs.first['nota_seguimiento']?.toString() ?? '') : '';
-    bool? requiereVisita = refs.length == 1 ? refs.first['requiere_visita'] == true : null;
+    String nuevoResultado = refs.length == 1
+        ? (refs.first['resultados']?.toString() ?? '')
+        : '';
+    String nuevaNota = refs.length == 1
+        ? (refs.first['nota_seguimiento']?.toString() ?? '')
+        : '';
+    bool? requiereVisita = refs.length == 1
+        ? refs.first['requiere_visita'] == true
+        : null;
 
     await showModalBottomSheet(
       context: context,
@@ -708,14 +885,19 @@ void _aplicarFiltros() {
                     value: nuevoEstado,
                     isExpanded: true,
                     decoration: _inputDecoration('Estado'),
-                    items: const [
-                      'Pendiente',
-                      'En gestión',
-                      'Cerrada',
-                      'Cerrada con éxito',
-                      'Cerrada sin éxito',
-                      'Desechado',
-                    ].map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
+                    items:
+                        const [
+                              'Pendiente',
+                              'En gestión',
+                              'Cerrada',
+                              'Cerrada con éxito',
+                              'Cerrada sin éxito',
+                              'Desechado',
+                            ]
+                            .map(
+                              (e) => DropdownMenuItem(value: e, child: Text(e)),
+                            )
+                            .toList(),
                     onChanged: (v) => setModalState(() => nuevoEstado = v!),
                   ),
                   const SizedBox(height: 12),
@@ -737,7 +919,10 @@ void _aplicarFiltros() {
                     isExpanded: true,
                     decoration: _inputDecoration('Requiere visita'),
                     items: const [
-                      DropdownMenuItem<bool?>(value: null, child: Text('No modificar')),
+                      DropdownMenuItem<bool?>(
+                        value: null,
+                        child: Text('No modificar'),
+                      ),
                       DropdownMenuItem<bool?>(value: true, child: Text('Sí')),
                       DropdownMenuItem<bool?>(value: false, child: Text('No')),
                     ],
@@ -781,7 +966,10 @@ void _aplicarFiltros() {
     try {
       setState(() => guardando = true);
 
-      final ids = refs.map((r) => r['id']?.toString()).whereType<String>().toList();
+      final ids = refs
+          .map((r) => r['id']?.toString())
+          .whereType<String>()
+          .toList();
       final update = <String, dynamic>{
         'estado': estado,
         'resultados': resultado,
@@ -791,7 +979,10 @@ void _aplicarFiltros() {
 
       if (requiereVisita != null) update['requiere_visita'] = requiereVisita;
 
-      await supabase.from('referencias_viables').update(update).inFilter('id', ids);
+      await supabase
+          .from('referencias_viables')
+          .update(update)
+          .inFilter('id', ids);
 
       _snack('Referencias actualizadas correctamente');
       await cargarDatos();
@@ -932,7 +1123,10 @@ void _aplicarFiltros() {
                       color: const Color(0xFFE0F2FE),
                       borderRadius: BorderRadius.circular(16),
                     ),
-                    child: const Icon(Icons.hub_rounded, color: Color(0xFF0284C7)),
+                    child: const Icon(
+                      Icons.hub_rounded,
+                      color: Color(0xFF0284C7),
+                    ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -971,10 +1165,7 @@ void _aplicarFiltros() {
   void _snack(String text) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(text),
-        backgroundColor: const Color(0xFF0F172A),
-      ),
+      SnackBar(content: Text(text), backgroundColor: const Color(0xFF0F172A)),
     );
   }
 
@@ -1099,12 +1290,12 @@ void _aplicarFiltros() {
           const SizedBox(height: 18),
           TextField(
             onChanged: (v) => setState(() {
-  busqueda = v;
-  _aplicarFiltros();
-}),
-            decoration: _inputDecoration('Buscar en toda la tabla').copyWith(
-              prefixIcon: const Icon(Icons.search_rounded),
-            ),
+              busqueda = v;
+              _aplicarFiltros();
+            }),
+            decoration: _inputDecoration(
+              'Buscar en toda la tabla',
+            ).copyWith(prefixIcon: const Icon(Icons.search_rounded)),
           ),
           const SizedBox(height: 14),
           if (directoresZona.isNotEmpty)
@@ -1115,10 +1306,10 @@ void _aplicarFiltros() {
               onChanged: (v) {
                 setState(() {
                   filtroDirectorZonaId = v;
-filtroJefeVentasId = null;
-filtroJefeEquipoId = null;
-filtroAgenteAuthId = null;
-_aplicarFiltros();
+                  filtroJefeVentasId = null;
+                  filtroJefeEquipoId = null;
+                  filtroAgenteAuthId = null;
+                  _aplicarFiltros();
                 });
               },
             ),
@@ -1130,9 +1321,9 @@ _aplicarFiltros();
               onChanged: (v) {
                 setState(() {
                   filtroJefeVentasId = v;
-filtroJefeEquipoId = null;
-filtroAgenteAuthId = null;
-_aplicarFiltros();
+                  filtroJefeEquipoId = null;
+                  filtroAgenteAuthId = null;
+                  _aplicarFiltros();
                 });
               },
             ),
@@ -1144,8 +1335,8 @@ _aplicarFiltros();
               onChanged: (v) {
                 setState(() {
                   filtroJefeEquipoId = v;
-filtroAgenteAuthId = null;
-_aplicarFiltros();
+                  filtroAgenteAuthId = null;
+                  _aplicarFiltros();
                 });
               },
             ),
@@ -1155,18 +1346,23 @@ _aplicarFiltros();
               value: filtroAgenteAuthId,
               usuarios: agentes,
               onChanged: (v) => setState(() {
-  filtroAgenteAuthId = v;
-  _aplicarFiltros();
-}),
+                filtroAgenteAuthId = v;
+                _aplicarFiltros();
+              }),
             ),
           _dropdownSimple(
             label: 'Tipo referencia',
             value: filtroTipoReferencia,
-            items: const ['Todos', 'Propia agente', 'Seguimiento', 'Asignada compañía'],
+            items: const [
+              'Todos',
+              'Propia agente',
+              'Seguimiento',
+              'Asignada compañía',
+            ],
             onChanged: (v) => setState(() {
-  filtroTipoReferencia = v!;
-  _aplicarFiltros();
-}),
+              filtroTipoReferencia = v!;
+              _aplicarFiltros();
+            }),
           ),
           _dropdownSimple(
             label: 'Estado',
@@ -1181,30 +1377,38 @@ _aplicarFiltros();
               'Cerradas sin éxito',
             ],
             onChanged: (v) => setState(() {
-  filtroEstado = v!;
-  _aplicarFiltros();
-}),
+              filtroEstado = v!;
+              _aplicarFiltros();
+            }),
           ),
           _dropdownSimple(
             label: 'Prioridad',
             value: filtroPrioridad,
             items: const ['Todas', 'Alta', 'Media', 'Baja'],
-           onChanged: (v) => setState(() {
-  filtroPrioridad = v!;
-  _aplicarFiltros();
-}),
+            onChanged: (v) => setState(() {
+              filtroPrioridad = v!;
+              _aplicarFiltros();
+            }),
           ),
           _dropdownSimple(
             label: 'Requiere visita',
             value: filtroRequiereVisita,
             items: const ['Todos', 'Sí', 'No'],
-           onChanged: (v) => setState(() {
-  filtroRequiereVisita = v!;
-  _aplicarFiltros();
-}),
+            onChanged: (v) => setState(() {
+              filtroRequiereVisita = v!;
+              _aplicarFiltros();
+            }),
           ),
-          _dateButton(label: 'Fecha desde', value: fechaDesde, onTap: () => _pickFecha(true)),
-          _dateButton(label: 'Fecha hasta', value: fechaHasta, onTap: () => _pickFecha(false)),
+          _dateButton(
+            label: 'Fecha desde',
+            value: fechaDesde,
+            onTap: () => _pickFecha(true),
+          ),
+          _dateButton(
+            label: 'Fecha hasta',
+            value: fechaHasta,
+            onTap: () => _pickFecha(false),
+          ),
           const SizedBox(height: 10),
           ElevatedButton.icon(
             onPressed: limpiarFiltros,
@@ -1224,11 +1428,15 @@ _aplicarFiltros();
           const SizedBox(height: 8),
           ...grupos.entries.map((entry) {
             return ExpansionTile(
-              initiallyExpanded: entry.key == 'Estructura' || entry.key == 'Referencia',
+              initiallyExpanded:
+                  entry.key == 'Estructura' || entry.key == 'Referencia',
               tilePadding: EdgeInsets.zero,
               title: Text(
                 entry.key,
-                style: const TextStyle(fontWeight: FontWeight.w900, color: Color(0xFF0F172A)),
+                style: const TextStyle(
+                  fontWeight: FontWeight.w900,
+                  color: Color(0xFF0F172A),
+                ),
               ),
               children: entry.value.map((c) {
                 final active = columnasActivas.contains(c.key);
@@ -1236,7 +1444,10 @@ _aplicarFiltros();
                   dense: true,
                   contentPadding: EdgeInsets.zero,
                   value: active,
-                  title: Text(c.titulo, style: const TextStyle(fontWeight: FontWeight.w700)),
+                  title: Text(
+                    c.titulo,
+                    style: const TextStyle(fontWeight: FontWeight.w700),
+                  ),
                   controlAffinity: ListTileControlAffinity.leading,
                   onChanged: (_) => _toggleColumna(c.key),
                 );
@@ -1264,7 +1475,10 @@ _aplicarFiltros();
               borderRadius: BorderRadius.circular(18),
               border: Border.all(color: const Color(0xFFE2E8F0)),
             ),
-            child: const Icon(Icons.arrow_back_rounded, color: Color(0xFF0F172A)),
+            child: const Icon(
+              Icons.arrow_back_rounded,
+              color: Color(0xFF0F172A),
+            ),
           ),
         );
 
@@ -1336,7 +1550,11 @@ _aplicarFiltros();
       ),
       child: Text(
         role.replaceAll('_', ' ').toUpperCase(),
-        style: const TextStyle(color: Color(0xFF075985), fontWeight: FontWeight.w900, fontSize: 12),
+        style: const TextStyle(
+          color: Color(0xFF075985),
+          fontWeight: FontWeight.w900,
+          fontSize: 12,
+        ),
       ),
     );
   }
@@ -1362,7 +1580,10 @@ _aplicarFiltros();
             children: [
               Row(
                 children: [
-                  const Icon(Icons.table_chart_rounded, color: Color(0xFF0284C7)),
+                  const Icon(
+                    Icons.table_chart_rounded,
+                    color: Color(0xFF0284C7),
+                  ),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
@@ -1395,7 +1616,10 @@ _aplicarFiltros();
                       final key = columnasActivas[index];
                       final c = _campo(key);
                       return Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 8,
+                        ),
                         decoration: BoxDecoration(
                           color: const Color(0xFFF1F5F9),
                           borderRadius: BorderRadius.circular(14),
@@ -1404,13 +1628,26 @@ _aplicarFiltros();
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            const Icon(Icons.view_column_rounded, size: 17, color: Color(0xFF64748B)),
+                            const Icon(
+                              Icons.view_column_rounded,
+                              size: 17,
+                              color: Color(0xFF64748B),
+                            ),
                             const SizedBox(width: 4),
-                            Text(c.titulo, style: const TextStyle(fontWeight: FontWeight.w900)),
+                            Text(
+                              c.titulo,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
                             const SizedBox(width: 6),
                             InkWell(
                               onTap: () => _toggleColumna(key),
-                              child: const Icon(Icons.close_rounded, size: 17, color: Color(0xFF64748B)),
+                              child: const Icon(
+                                Icons.close_rounded,
+                                size: 17,
+                                color: Color(0xFF64748B),
+                              ),
                             ),
                           ],
                         ),
@@ -1447,160 +1684,160 @@ _aplicarFiltros();
   }
 
   Widget _tablaDinamica() {
-  final todas = referenciasFiltradas;
-  final lista = todas.take(150).toList();
+    final todas = referenciasFiltradas;
+    final lista = todas.take(150).toList();
 
-  return Container(
-    decoration: BoxDecoration(
-      color: Colors.white.withOpacity(0.94),
-      borderRadius: BorderRadius.circular(24),
-      border: Border.all(color: Colors.white),
-    ),
-    child: ClipRRect(
-      borderRadius: BorderRadius.circular(24),
-      child: lista.isEmpty
-          ? const Center(
-              child: Text(
-                'No hay referencias para los filtros seleccionados.',
-                style: TextStyle(
-                  color: Color(0xFF64748B),
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-            )
-          : Column(
-              children: [
-                Container(
-                  height: 46,
-                  padding: const EdgeInsets.symmetric(horizontal: 14),
-                  color: const Color(0xFFF1F5F9),
-                  child: Row(
-                    children: [
-                      Text(
-                        'Mostrando ${lista.length} de ${todas.length}',
-                        style: const TextStyle(
-                          color: Color(0xFF64748B),
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                      const Spacer(),
-                      Text(
-                        '${referenciasSeleccionadas.length} seleccionadas',
-                        style: const TextStyle(
-                          color: Color(0xFF0284C7),
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                    ],
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.94),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: Colors.white),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(24),
+        child: lista.isEmpty
+            ? const Center(
+                child: Text(
+                  'No hay referencias para los filtros seleccionados.',
+                  style: TextStyle(
+                    color: Color(0xFF64748B),
+                    fontWeight: FontWeight.w800,
                   ),
                 ),
-                Expanded(
-                  child: ListView.builder(
-                    itemCount: lista.length,
-                    itemBuilder: (context, index) {
-                      final r = lista[index];
-                      final id = r['id']?.toString() ?? '';
-                      final selected = referenciasSeleccionadas.contains(id);
-
-                      return Container(
-                        margin: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 5,
-                        ),
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: selected
-                              ? const Color(0xFFE0F2FE)
-                              : const Color(0xFFFFFFFF),
-                          borderRadius: BorderRadius.circular(18),
-                          border: Border.all(
-                            color: selected
-                                ? const Color(0xFF7DD3FC)
-                                : const Color(0xFFE2E8F0),
+              )
+            : Column(
+                children: [
+                  Container(
+                    height: 46,
+                    padding: const EdgeInsets.symmetric(horizontal: 14),
+                    color: const Color(0xFFF1F5F9),
+                    child: Row(
+                      children: [
+                        Text(
+                          'Mostrando ${lista.length} de ${todas.length}',
+                          style: const TextStyle(
+                            color: Color(0xFF64748B),
+                            fontWeight: FontWeight.w900,
                           ),
                         ),
-                        child: Row(
-                          children: [
-                            Checkbox(
-                              value: selected,
-                              onChanged: (v) {
-                                setState(() {
-                                  if (v == true) {
-                                    referenciasSeleccionadas.add(id);
-                                  } else {
-                                    referenciasSeleccionadas.remove(id);
-                                  }
-                                });
-                              },
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Wrap(
-                                spacing: 10,
-                                runSpacing: 8,
-                                children: columnasActivas.map((key) {
-                                  final c = _campo(key);
-                                  return SizedBox(
-                                    width: c.ancho,
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          c.titulo,
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: const TextStyle(
-                                            color: Color(0xFF64748B),
-                                            fontSize: 11,
-                                            fontWeight: FontWeight.w900,
-                                          ),
-                                        ),
-                                        const SizedBox(height: 3),
-                                        _cellValue(r, key),
-                                      ],
-                                    ),
-                                  );
-                                }).toList(),
-                              ),
-                            ),
-                            PopupMenuButton<String>(
-                              icon: const Icon(Icons.more_vert_rounded),
-                              onSelected: (value) {
-                                if (value == 'detalle') _verDetalle(r);
-                                if (value == 'reasignar') {
-                                  _reasignarReferencias([r]);
-                                }
-                                if (value == 'gestionar') {
-                                  _gestionarReferencias([r]);
-                                }
-                              },
-                              itemBuilder: (_) => const [
-                                PopupMenuItem(
-                                  value: 'detalle',
-                                  child: Text('Ver detalles'),
-                                ),
-                                PopupMenuItem(
-                                  value: 'reasignar',
-                                  child: Text('Reasignar referencia'),
-                                ),
-                                PopupMenuItem(
-                                  value: 'gestionar',
-                                  child: Text('Gestionar referencia'),
-                                ),
-                              ],
-                            ),
-                          ],
+                        const Spacer(),
+                        Text(
+                          '${referenciasSeleccionadas.length} seleccionadas',
+                          style: const TextStyle(
+                            color: Color(0xFF0284C7),
+                            fontWeight: FontWeight.w900,
+                          ),
                         ),
-                      );
-                    },
+                      ],
+                    ),
                   ),
-                ),
-              ],
-            ),
-    ),
-  );
-}
+                  Expanded(
+                    child: ListView.builder(
+                      itemCount: lista.length,
+                      itemBuilder: (context, index) {
+                        final r = lista[index];
+                        final id = r['id']?.toString() ?? '';
+                        final selected = referenciasSeleccionadas.contains(id);
+
+                        return Container(
+                          margin: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 5,
+                          ),
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: selected
+                                ? const Color(0xFFE0F2FE)
+                                : const Color(0xFFFFFFFF),
+                            borderRadius: BorderRadius.circular(18),
+                            border: Border.all(
+                              color: selected
+                                  ? const Color(0xFF7DD3FC)
+                                  : const Color(0xFFE2E8F0),
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Checkbox(
+                                value: selected,
+                                onChanged: (v) {
+                                  setState(() {
+                                    if (v == true) {
+                                      referenciasSeleccionadas.add(id);
+                                    } else {
+                                      referenciasSeleccionadas.remove(id);
+                                    }
+                                  });
+                                },
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Wrap(
+                                  spacing: 10,
+                                  runSpacing: 8,
+                                  children: columnasActivas.map((key) {
+                                    final c = _campo(key);
+                                    return SizedBox(
+                                      width: c.ancho,
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            c.titulo,
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: const TextStyle(
+                                              color: Color(0xFF64748B),
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.w900,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 3),
+                                          _cellValue(r, key),
+                                        ],
+                                      ),
+                                    );
+                                  }).toList(),
+                                ),
+                              ),
+                              PopupMenuButton<String>(
+                                icon: const Icon(Icons.more_vert_rounded),
+                                onSelected: (value) {
+                                  if (value == 'detalle') _verDetalle(r);
+                                  if (value == 'reasignar') {
+                                    _reasignarReferencias([r]);
+                                  }
+                                  if (value == 'gestionar') {
+                                    _gestionarReferencias([r]);
+                                  }
+                                },
+                                itemBuilder: (_) => const [
+                                  PopupMenuItem(
+                                    value: 'detalle',
+                                    child: Text('Ver detalles'),
+                                  ),
+                                  PopupMenuItem(
+                                    value: 'reasignar',
+                                    child: Text('Reasignar referencia'),
+                                  ),
+                                  PopupMenuItem(
+                                    value: 'gestionar',
+                                    child: Text('Gestionar referencia'),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
+      ),
+    );
+  }
 
   Widget _cellValue(Map<String, dynamic> r, String key) {
     final text = _valueToString(r, key);
@@ -1612,15 +1849,18 @@ _aplicarFiltros();
       final color = text == 'Alta'
           ? const Color(0xFFDC2626)
           : text == 'Media'
-              ? const Color(0xFFF97316)
-              : const Color(0xFF16A34A);
+          ? const Color(0xFFF97316)
+          : const Color(0xFF16A34A);
       return _pill(text.isEmpty ? '-' : text, color);
     }
     if (key == 'tipo_referencia') {
       return _pill(text, const Color(0xFF7C3AED));
     }
     if (key == 'requiere_visita') {
-      return _pill(text, text == 'Sí' ? const Color(0xFF16A34A) : const Color(0xFF64748B));
+      return _pill(
+        text,
+        text == 'Sí' ? const Color(0xFF16A34A) : const Color(0xFF64748B),
+      );
     }
 
     return Text(
@@ -1646,7 +1886,11 @@ _aplicarFiltros();
         text,
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
-        style: TextStyle(color: color, fontWeight: FontWeight.w900, fontSize: 12),
+        style: TextStyle(
+          color: color,
+          fontWeight: FontWeight.w900,
+          fontSize: 12,
+        ),
       ),
     );
   }
@@ -1665,7 +1909,12 @@ _aplicarFiltros();
         decoration: _inputDecoration(label),
         items: [
           const DropdownMenuItem<String>(value: null, child: Text('Todos')),
-          ...usuarios.map((u) => DropdownMenuItem<String>(value: u['id']?.toString(), child: Text(_nombreCompleto(u)))),
+          ...usuarios.map(
+            (u) => DropdownMenuItem<String>(
+              value: u['id']?.toString(),
+              child: Text(_nombreCompleto(u)),
+            ),
+          ),
         ],
         onChanged: onChanged,
       ),
@@ -1686,7 +1935,12 @@ _aplicarFiltros();
         decoration: _inputDecoration(label),
         items: [
           const DropdownMenuItem<String>(value: null, child: Text('Todos')),
-          ...usuarios.map((u) => DropdownMenuItem<String>(value: u['auth_id']?.toString(), child: Text(_nombreCompleto(u)))),
+          ...usuarios.map(
+            (u) => DropdownMenuItem<String>(
+              value: u['auth_id']?.toString(),
+              child: Text(_nombreCompleto(u)),
+            ),
+          ),
         ],
         onChanged: onChanged,
       ),
@@ -1705,7 +1959,9 @@ _aplicarFiltros();
         value: value,
         isExpanded: true,
         decoration: _inputDecoration(label),
-        items: items.map((e) => DropdownMenuItem<String>(value: e, child: Text(e))).toList(),
+        items: items
+            .map((e) => DropdownMenuItem<String>(value: e, child: Text(e)))
+            .toList(),
         onChanged: onChanged,
       ),
     );
@@ -1782,8 +2038,16 @@ class _FondoControlReferencias extends StatelessWidget {
     return Stack(
       children: [
         Container(color: const Color(0xFFF4F7FB)),
-        Positioned(top: -130, right: -120, child: _orb(330, const Color(0xFF7DD3FC))),
-        Positioned(bottom: -150, left: -130, child: _orb(360, const Color(0xFFC4B5FD))),
+        Positioned(
+          top: -130,
+          right: -120,
+          child: _orb(330, const Color(0xFF7DD3FC)),
+        ),
+        Positioned(
+          bottom: -150,
+          left: -130,
+          child: _orb(360, const Color(0xFFC4B5FD)),
+        ),
       ],
     );
   }

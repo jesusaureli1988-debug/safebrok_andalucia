@@ -77,6 +77,9 @@ class _MisGestionesScreenState extends State<MisGestionesScreen> {
       final perfil = await supabase
           .from('usuarios')
           .select('auth_id, nombre, apellidos, email')
+          .or(
+            'estado.is.null,estado.not.in.(inactivo,Inactivo,INACTIVO,baja,Baja,BAJA,desactivado,Desactivado,DESACTIVADO,bloqueado,Bloqueado,BLOQUEADO,suspendido,Suspendido,SUSPENDIDO)',
+          )
           .eq('auth_id', user.id)
           .maybeSingle();
 
@@ -86,7 +89,10 @@ class _MisGestionesScreenState extends State<MisGestionesScreen> {
 
       final usuariosData = await supabase
           .from('usuarios')
-          .select('auth_id, nombre, apellidos, email');
+          .select('auth_id, nombre, apellidos, email')
+          .or(
+            'estado.is.null,estado.not.in.(inactivo,Inactivo,INACTIVO,baja,Baja,BAJA,desactivado,Desactivado,DESACTIVADO,bloqueado,Bloqueado,BLOQUEADO,suspendido,Suspendido,SUSPENDIDO)',
+          );
 
       usuarios = List<Map<String, dynamic>>.from(usuariosData);
 

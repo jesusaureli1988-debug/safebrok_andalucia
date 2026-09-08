@@ -5,10 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 class IntegracionAgenteDetalleScreen extends StatefulWidget {
   final Map<String, dynamic> agente;
 
-  const IntegracionAgenteDetalleScreen({
-    super.key,
-    required this.agente,
-  });
+  const IntegracionAgenteDetalleScreen({super.key, required this.agente});
 
   @override
   State<IntegracionAgenteDetalleScreen> createState() =>
@@ -68,31 +65,23 @@ class _IntegracionAgenteDetalleScreenState
     return id;
   }
 
-  String _nombreCompleto(
-    Map<String, dynamic>? usuario,
-  ) {
+  String _nombreCompleto(Map<String, dynamic>? usuario) {
     if (usuario == null) return 'Sin nombre';
 
-    final nombre =
-        usuario['nombre']?.toString().trim() ?? '';
+    final nombre = usuario['nombre']?.toString().trim() ?? '';
 
-    final apellidos =
-        usuario['apellidos']?.toString().trim() ?? '';
+    final apellidos = usuario['apellidos']?.toString().trim() ?? '';
 
     final completo = '$nombre $apellidos'.trim();
 
     if (completo.isNotEmpty) return completo;
 
-    final email =
-        usuario['email']?.toString().trim() ?? '';
+    final email = usuario['email']?.toString().trim() ?? '';
 
     return email.isNotEmpty ? email : 'Sin nombre';
   }
 
-  bool _relacionPermitida({
-    required String rolPadre,
-    required String rolHijo,
-  }) {
+  bool _relacionPermitida({required String rolPadre, required String rolHijo}) {
     final padre = _normalizarRol(rolPadre);
     final hijo = _normalizarRol(rolHijo);
 
@@ -109,8 +98,7 @@ class _IntegracionAgenteDetalleScreenState
             hijo == 'agente';
 
       case 'jefe_ventas':
-        return hijo == 'jefe_equipo' ||
-            hijo == 'agente';
+        return hijo == 'jefe_equipo' || hijo == 'agente';
 
       case 'jefe_equipo':
         return hijo == 'agente';
@@ -124,8 +112,7 @@ class _IntegracionAgenteDetalleScreenState
     required Map<String, dynamic> perfil,
     required List<Map<String, dynamic>> todosUsuarios,
   }) {
-    final rolPerfil =
-        _normalizarRol(perfil['rol_usuario']);
+    final rolPerfil = _normalizarRol(perfil['rol_usuario']);
 
     if (rolPerfil == 'administracion' ||
         rolPerfil == 'administrador' ||
@@ -136,20 +123,15 @@ class _IntegracionAgenteDetalleScreenState
       }).toList();
     }
 
-    final hijosPorParentId =
-        <String, List<Map<String, dynamic>>>{};
+    final hijosPorParentId = <String, List<Map<String, dynamic>>>{};
 
     for (final usuario in todosUsuarios) {
-      final parentId =
-          _idTexto(usuario['parent_id']);
+      final parentId = _idTexto(usuario['parent_id']);
 
       if (parentId.isEmpty) continue;
 
       hijosPorParentId
-          .putIfAbsent(
-            parentId,
-            () => <Map<String, dynamic>>[],
-          )
+          .putIfAbsent(parentId, () => <Map<String, dynamic>>[])
           .add(usuario);
     }
 
@@ -159,28 +141,22 @@ class _IntegracionAgenteDetalleScreenState
     void recorrer(Map<String, dynamic> actual) {
       final idActual = _idTexto(actual['id']);
 
-      if (idActual.isEmpty ||
-          visitados.contains(idActual)) {
+      if (idActual.isEmpty || visitados.contains(idActual)) {
         return;
       }
 
       visitados.add(idActual);
       resultado.add(actual);
 
-      final rolActual =
-          _normalizarRol(actual['rol_usuario']);
+      final rolActual = _normalizarRol(actual['rol_usuario']);
 
-      final hijos = hijosPorParentId[idActual] ??
-          const <Map<String, dynamic>>[];
+      final hijos =
+          hijosPorParentId[idActual] ?? const <Map<String, dynamic>>[];
 
       for (final hijo in hijos) {
-        final rolHijo =
-            _normalizarRol(hijo['rol_usuario']);
+        final rolHijo = _normalizarRol(hijo['rol_usuario']);
 
-        if (!_relacionPermitida(
-          rolPadre: rolActual,
-          rolHijo: rolHijo,
-        )) {
+        if (!_relacionPermitida(rolPadre: rolActual, rolHijo: rolHijo)) {
           continue;
         }
 
@@ -206,6 +182,9 @@ class _IntegracionAgenteDetalleScreenState
           'id, auth_id, parent_id, rol_usuario, '
           'nombre, apellidos, email',
         )
+        .or(
+          'estado.is.null,estado.not.in.(inactivo,Inactivo,INACTIVO,baja,Baja,BAJA,desactivado,Desactivado,DESACTIVADO,bloqueado,Bloqueado,BLOQUEADO,suspendido,Suspendido,SUSPENDIDO)',
+        )
         .eq('auth_id', authUser.id)
         .maybeSingle();
 
@@ -218,21 +197,21 @@ class _IntegracionAgenteDetalleScreenState
         .select(
           'id, auth_id, parent_id, rol_usuario, '
           'nombre, apellidos, email',
+        )
+        .or(
+          'estado.is.null,estado.not.in.(inactivo,Inactivo,INACTIVO,baja,Baja,BAJA,desactivado,Desactivado,DESACTIVADO,bloqueado,Bloqueado,BLOQUEADO,suspendido,Suspendido,SUSPENDIDO)',
         );
 
     final estructura = _construirEstructura(
       perfil: Map<String, dynamic>.from(perfilData),
-      todosUsuarios:
-          List<Map<String, dynamic>>.from(usuariosData),
+      todosUsuarios: List<Map<String, dynamic>>.from(usuariosData),
     );
 
-    final agenteId =
-        _idTexto(widget.agente['id']);
+    final agenteId = _idTexto(widget.agente['id']);
 
     final autorizado = estructura.any((usuario) {
       return _idTexto(usuario['id']) == agenteId &&
-          _normalizarRol(usuario['rol_usuario']) ==
-              'agente';
+          _normalizarRol(usuario['rol_usuario']) == 'agente';
     });
 
     debugPrint(
@@ -252,8 +231,7 @@ class _IntegracionAgenteDetalleScreenState
         });
       }
 
-      final autorizado =
-          await _validarAgenteAutorizado();
+      final autorizado = await _validarAgenteAutorizado();
 
       if (!autorizado) {
         if (!mounted) return;
@@ -261,8 +239,7 @@ class _IntegracionAgenteDetalleScreenState
         setState(() {
           loading = false;
           agenteAutorizado = false;
-          error =
-              'Este agente no pertenece a tu estructura.';
+          error = 'Este agente no pertenece a tu estructura.';
         });
 
         return;
@@ -274,7 +251,8 @@ class _IntegracionAgenteDetalleScreenState
           .eq('agente_id', widget.agente['id'])
           .maybeSingle();
 
-      data = row ??
+      data =
+          row ??
           <String, dynamic>{
             'agente_id': widget.agente['id'],
             'bienvenida': false,
@@ -288,17 +266,13 @@ class _IntegracionAgenteDetalleScreenState
             'polizas': 0,
           };
 
-      contactosController.text =
-          '${data['contactos'] ?? 0}';
+      contactosController.text = '${data['contactos'] ?? 0}';
 
-      visitasController.text =
-          '${data['visitas'] ?? 0}';
+      visitasController.text = '${data['visitas'] ?? 0}';
 
-      presupuestosController.text =
-          '${data['presupuestos'] ?? 0}';
+      presupuestosController.text = '${data['presupuestos'] ?? 0}';
 
-      polizasController.text =
-          '${data['polizas'] ?? 0}';
+      polizasController.text = '${data['polizas'] ?? 0}';
 
       if (!mounted) return;
 
@@ -307,9 +281,7 @@ class _IntegracionAgenteDetalleScreenState
         agenteAutorizado = true;
       });
     } catch (e, stackTrace) {
-      debugPrint(
-        'ERROR CARGA INTEGRACIÓN DETALLE: $e',
-      );
+      debugPrint('ERROR CARGA INTEGRACIÓN DETALLE: $e');
       debugPrintStack(stackTrace: stackTrace);
 
       if (!mounted) return;
@@ -361,52 +333,30 @@ class _IntegracionAgenteDetalleScreenState
        * Así no se puede modificar un agente que haya sido
        * reasignado mientras esta pantalla seguía abierta.
        */
-      final autorizado =
-          await _validarAgenteAutorizado();
+      final autorizado = await _validarAgenteAutorizado();
 
       if (!autorizado) {
-        throw Exception(
-          'El agente ya no pertenece a tu estructura.',
-        );
+        throw Exception('El agente ya no pertenece a tu estructura.');
       }
 
       data['agente_id'] = widget.agente['id'];
 
-      data['contactos'] =
-          int.tryParse(
-            contactosController.text.trim(),
-          ) ??
-          0;
+      data['contactos'] = int.tryParse(contactosController.text.trim()) ?? 0;
 
-      data['visitas'] =
-          int.tryParse(
-            visitasController.text.trim(),
-          ) ??
-          0;
+      data['visitas'] = int.tryParse(visitasController.text.trim()) ?? 0;
 
       data['presupuestos'] =
-          int.tryParse(
-            presupuestosController.text.trim(),
-          ) ??
-          0;
+          int.tryParse(presupuestosController.text.trim()) ?? 0;
 
-      data['polizas'] =
-          int.tryParse(
-            polizasController.text.trim(),
-          ) ??
-          0;
+      data['polizas'] = int.tryParse(polizasController.text.trim()) ?? 0;
 
-      final payload =
-          Map<String, dynamic>.from(data);
+      final payload = Map<String, dynamic>.from(data);
 
       payload.remove('id');
 
       await supabase
           .from('integracion_agentes')
-          .upsert(
-            payload,
-            onConflict: 'agente_id',
-          );
+          .upsert(payload, onConflict: 'agente_id');
 
       if (!mounted) return;
 
@@ -414,12 +364,9 @@ class _IntegracionAgenteDetalleScreenState
         SnackBar(
           content: const Text(
             'Integración guardada correctamente',
-            style: TextStyle(
-              fontWeight: FontWeight.w800,
-            ),
+            style: TextStyle(fontWeight: FontWeight.w800),
           ),
-          backgroundColor:
-              const Color(0xFF16A34A),
+          backgroundColor: const Color(0xFF16A34A),
           behavior: SnackBarBehavior.floating,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
@@ -429,9 +376,7 @@ class _IntegracionAgenteDetalleScreenState
 
       Navigator.pop(context, true);
     } catch (e) {
-      debugPrint(
-        'ERROR GUARDAR INTEGRACIÓN: $e',
-      );
+      debugPrint('ERROR GUARDAR INTEGRACIÓN: $e');
 
       if (!mounted) return;
 
@@ -441,9 +386,7 @@ class _IntegracionAgenteDetalleScreenState
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(
-            'Error al guardar integración: $e',
-          ),
+          content: Text('Error al guardar integración: $e'),
           backgroundColor: Colors.redAccent,
           behavior: SnackBarBehavior.floating,
         ),
@@ -469,16 +412,15 @@ class _IntegracionAgenteDetalleScreenState
       appBar: AppBar(
         elevation: 0,
         backgroundColor: const Color(0xFFF4F7FB),
-        foregroundColor: const Color(0xFF0F172A),
+        foregroundColor: const Color(0xFFEAF8F8),
         title: const Text(
           "Detalle de integración",
           style: TextStyle(fontWeight: FontWeight.w900),
         ),
       ),
-      bottomNavigationBar:
-          loading || !agenteAutorizado
-              ? null
-              : SafeArea(
+      bottomNavigationBar: loading || !agenteAutorizado
+          ? null
+          : SafeArea(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(16, 8, 16, 14),
                 child: SizedBox(
@@ -516,105 +458,99 @@ class _IntegracionAgenteDetalleScreenState
             ),
       body: loading
           ? const Center(
-              child: CircularProgressIndicator(
-                color: Color(0xFF2563EB),
-              ),
+              child: CircularProgressIndicator(color: Color(0xFF2563EB)),
             )
           : error != null
-              ? _estadoError()
-              : RefreshIndicator(
-                  color: const Color(0xFF2563EB),
-                  onRefresh: cargar,
-                  child: ListView(
-                    physics:
-                        const AlwaysScrollableScrollPhysics(),
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
-              children: [
-                _cabeceraAgente(nombre, email),
-                const SizedBox(height: 16),
-                _panelProgreso(),
-                const SizedBox(height: 20),
+          ? _estadoError()
+          : RefreshIndicator(
+              color: const Color(0xFF2563EB),
+              onRefresh: cargar,
+              child: ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
+                children: [
+                  _cabeceraAgente(nombre, email),
+                  const SizedBox(height: 16),
+                  _panelProgreso(),
+                  const SizedBox(height: 20),
 
-                const Text(
-                  "Pasos de integración",
-                  style: TextStyle(
-                    color: Color(0xFF0F172A),
-                    fontSize: 18,
-                    fontWeight: FontWeight.w900,
+                  const Text(
+                    "Pasos de integración",
+                    style: TextStyle(
+                      color: Color(0xFFEAF8F8),
+                      fontSize: 18,
+                      fontWeight: FontWeight.w900,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 10),
+                  const SizedBox(height: 10),
 
-                _checkCard(
-                  keyData: "bienvenida",
-                  titulo: "Bienvenida realizada",
-                  descripcion: "Presentación inicial del equipo y explicación del método.",
-                  icono: Icons.waving_hand_rounded,
-                ),
-                _checkCard(
-                  keyData: "alta_sistema",
-                  titulo: "Alta en sistema",
-                  descripcion: "Usuario creado y acceso operativo a la plataforma.",
-                  icono: Icons.admin_panel_settings_rounded,
-                ),
-                _checkCard(
-                  keyData: "grupo_whatsapp",
-                  titulo: "Grupo WhatsApp",
-                  descripcion: "Agente añadido al canal de comunicación del equipo.",
-                  icono: Icons.groups_rounded,
-                ),
-                _checkCard(
-                  keyData: "primera_reunion",
-                  titulo: "Primera reunión",
-                  descripcion: "Primera sesión de seguimiento, formación o planificación.",
-                  icono: Icons.event_available_rounded,
-                ),
-                _checkCard(
-                  keyData: "primera_venta",
-                  titulo: "Primera venta",
-                  descripcion: "Primera póliza o venta conseguida por el agente.",
-                  icono: Icons.workspace_premium_rounded,
-                ),
-
-                const SizedBox(height: 20),
-
-                const Text(
-                  "Actividad inicial",
-                  style: TextStyle(
-                    color: Color(0xFF0F172A),
-                    fontSize: 18,
-                    fontWeight: FontWeight.w900,
+                  _checkCard(
+                    keyData: "bienvenida",
+                    titulo: "Bienvenida realizada",
+                    descripcion:
+                        "Presentación inicial del equipo y explicación del método.",
+                    icono: Icons.waving_hand_rounded,
                   ),
-                ),
-                const SizedBox(height: 10),
+                  _checkCard(
+                    keyData: "alta_sistema",
+                    titulo: "Alta en sistema",
+                    descripcion:
+                        "Usuario creado y acceso operativo a la plataforma.",
+                    icono: Icons.admin_panel_settings_rounded,
+                  ),
+                  _checkCard(
+                    keyData: "grupo_whatsapp",
+                    titulo: "Grupo WhatsApp",
+                    descripcion:
+                        "Agente añadido al canal de comunicación del equipo.",
+                    icono: Icons.groups_rounded,
+                  ),
+                  _checkCard(
+                    keyData: "primera_reunion",
+                    titulo: "Primera reunión",
+                    descripcion:
+                        "Primera sesión de seguimiento, formación o planificación.",
+                    icono: Icons.event_available_rounded,
+                  ),
+                  _checkCard(
+                    keyData: "primera_venta",
+                    titulo: "Primera venta",
+                    descripcion:
+                        "Primera póliza o venta conseguida por el agente.",
+                    icono: Icons.workspace_premium_rounded,
+                  ),
 
-                _actividadPanel(),
+                  const SizedBox(height: 20),
 
-                const SizedBox(height: 90),
-              ],
+                  const Text(
+                    "Actividad inicial",
+                    style: TextStyle(
+                      color: Color(0xFFEAF8F8),
+                      fontSize: 18,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+
+                  _actividadPanel(),
+
+                  const SizedBox(height: 90),
+                ],
+              ),
             ),
-          ),
     );
   }
 
   Widget _estadoError() {
     return ListView(
-      padding: const EdgeInsets.fromLTRB(
-        20,
-        40,
-        20,
-        28,
-      ),
+      padding: const EdgeInsets.fromLTRB(20, 40, 20, 28),
       children: [
         Container(
           padding: const EdgeInsets.all(25),
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(28),
-            border: Border.all(
-              color:
-                  Colors.redAccent.withOpacity(0.18),
-            ),
+            border: Border.all(color: Colors.redAccent.withOpacity(0.18)),
             boxShadow: [
               BoxShadow(
                 color: Colors.black.withOpacity(0.05),
@@ -635,15 +571,14 @@ class _IntegracionAgenteDetalleScreenState
                 'Acceso no autorizado',
                 textAlign: TextAlign.center,
                 style: TextStyle(
-                  color: Color(0xFF0F172A),
+                  color: Color(0xFFEAF8F8),
                   fontSize: 20,
                   fontWeight: FontWeight.w900,
                 ),
               ),
               const SizedBox(height: 8),
               Text(
-                error ??
-                    'No se pudo abrir la integración.',
+                error ?? 'No se pudo abrir la integración.',
                 textAlign: TextAlign.center,
                 style: const TextStyle(
                   color: Color(0xFF64748B),
@@ -653,24 +588,17 @@ class _IntegracionAgenteDetalleScreenState
               ),
               const SizedBox(height: 18),
               ElevatedButton.icon(
-                onPressed: () =>
-                    Navigator.of(context).maybePop(),
-                icon: const Icon(
-                  Icons.arrow_back_rounded,
-                ),
+                onPressed: () => Navigator.of(context).maybePop(),
+                icon: const Icon(Icons.arrow_back_rounded),
                 label: const Text(
                   'Volver',
-                  style: TextStyle(
-                    fontWeight: FontWeight.w900,
-                  ),
+                  style: TextStyle(fontWeight: FontWeight.w900),
                 ),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor:
-                      const Color(0xFF0F172A),
+                  backgroundColor: const Color(0xFFEAF8F8),
                   foregroundColor: Colors.white,
                   shape: RoundedRectangleBorder(
-                    borderRadius:
-                        BorderRadius.circular(16),
+                    borderRadius: BorderRadius.circular(16),
                   ),
                 ),
               ),
@@ -720,7 +648,7 @@ class _IntegracionAgenteDetalleScreenState
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
-                    color: Color(0xFF0F172A),
+                    color: Color(0xFFEAF8F8),
                     fontSize: 19,
                     fontWeight: FontWeight.w900,
                   ),
@@ -752,10 +680,7 @@ class _IntegracionAgenteDetalleScreenState
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
-          colors: [
-            Color(0xFF2563EB),
-            Color(0xFF1E40AF),
-          ],
+          colors: [Color(0xFF2563EB), Color(0xFF1E40AF)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
@@ -786,7 +711,7 @@ class _IntegracionAgenteDetalleScreenState
               Text(
                 "$porcentajeTexto%",
                 style: const TextStyle(
-                  color: Colors.white,
+                  color: const Color(0xFF071A3A),
                   fontWeight: FontWeight.w900,
                   fontSize: 18,
                 ),
@@ -801,7 +726,7 @@ class _IntegracionAgenteDetalleScreenState
                 Text(
                   textoEstado,
                   style: const TextStyle(
-                    color: Colors.white,
+                    color: const Color(0xFF071A3A),
                     fontSize: 19,
                     fontWeight: FontWeight.w900,
                   ),
@@ -810,7 +735,7 @@ class _IntegracionAgenteDetalleScreenState
                 Text(
                   "$p de $totalPasos pasos completados",
                   style: const TextStyle(
-                    color: Colors.white70,
+                    color: const Color(0xFF53627A),
                     fontWeight: FontWeight.w700,
                   ),
                 ),
@@ -827,7 +752,7 @@ class _IntegracionAgenteDetalleScreenState
                   child: const Text(
                     "Onboarding comercial",
                     style: TextStyle(
-                      color: Colors.white,
+                      color: const Color(0xFF071A3A),
                       fontSize: 12,
                       fontWeight: FontWeight.w900,
                     ),
@@ -894,7 +819,7 @@ class _IntegracionAgenteDetalleScreenState
                       Text(
                         titulo,
                         style: const TextStyle(
-                          color: Color(0xFF0F172A),
+                          color: Color(0xFFEAF8F8),
                           fontSize: 15,
                           fontWeight: FontWeight.w900,
                         ),
@@ -1012,9 +937,7 @@ class _IntegracionAgenteDetalleScreenState
     return TextField(
       controller: controller,
       keyboardType: TextInputType.number,
-      inputFormatters: [
-        FilteringTextInputFormatter.digitsOnly,
-      ],
+      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
       decoration: InputDecoration(
         labelText: label,
         prefixIcon: Icon(icono, color: const Color(0xFF2563EB)),
@@ -1034,10 +957,7 @@ class _IntegracionAgenteDetalleScreenState
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(18),
-          borderSide: const BorderSide(
-            color: Color(0xFF2563EB),
-            width: 1.6,
-          ),
+          borderSide: const BorderSide(color: Color(0xFF2563EB), width: 1.6),
         ),
       ),
     );

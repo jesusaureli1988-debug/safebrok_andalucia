@@ -90,14 +90,14 @@ Deno.serve(async (req) => {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        from: "SafeBrok Andalucía <onboarding@resend.dev>",
+        from: "SafeBrok <onboarding@resend.dev>",
         to: [email],
         subject: "Pago de recibo pendiente",
         html: `
           <div style="margin:0;padding:0;background:#f4f7fb;font-family:Arial,sans-serif;">
             <div style="max-width:620px;margin:0 auto;padding:28px;">
               <div style="background:#061018;border-radius:20px;padding:26px;color:white;">
-                <h1 style="margin:0;font-size:24px;">SafeBrok Andalucía</h1>
+                <h1 style="margin:0;font-size:24px;">SafeBrok</h1>
                 <p style="margin:8px 0 0;color:#9fb3c8;">Gestión de recibos</p>
               </div>
 
@@ -131,7 +131,7 @@ Deno.serve(async (req) => {
               </div>
 
               <p style="text-align:center;color:#64748b;font-size:12px;margin-top:18px;">
-                Este email ha sido generado desde SafeBrok Andalucía.
+                Este email ha sido generado desde SafeBrok.
               </p>
             </div>
           </div>

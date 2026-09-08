@@ -5,17 +5,14 @@ class CrearEventoScreen extends StatefulWidget {
   const CrearEventoScreen({super.key});
 
   @override
-  State<CrearEventoScreen> createState() =>
-      _CrearEventoScreenState();
+  State<CrearEventoScreen> createState() => _CrearEventoScreenState();
 }
 
-class _CrearEventoScreenState
-    extends State<CrearEventoScreen> {
+class _CrearEventoScreenState extends State<CrearEventoScreen> {
   final supabase = Supabase.instance.client;
 
   final tituloController = TextEditingController();
-  final descripcionController =
-      TextEditingController();
+  final descripcionController = TextEditingController();
 
   DateTime? fecha;
   TimeOfDay? hora;
@@ -23,15 +20,9 @@ class _CrearEventoScreenState
   bool loading = false;
 
   Future<void> guardar() async {
-    if (tituloController.text.trim().isEmpty ||
-        fecha == null ||
-        hora == null) {
+    if (tituloController.text.trim().isEmpty || fecha == null || hora == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            "Completa título, fecha y hora",
-          ),
-        ),
+        const SnackBar(content: Text("Completa título, fecha y hora")),
       );
       return;
     }
@@ -49,15 +40,12 @@ class _CrearEventoScreenState
         hora!.minute,
       );
 
-      final fin = inicio.add(
-        const Duration(hours: 1),
-      );
+      final fin = inicio.add(const Duration(hours: 1));
 
       await supabase.from('agenda_eventos').insert({
         'auth_id': user!.id,
         'titulo': tituloController.text.trim(),
-        'descripcion':
-            descripcionController.text.trim(),
+        'descripcion': descripcionController.text.trim(),
         'fecha_inicio': inicio.toIso8601String(),
         'fecha_fin': fin.toIso8601String(),
         'origen': 'manual',
@@ -76,8 +64,7 @@ class _CrearEventoScreenState
   Future<void> seleccionarFecha() async {
     final d = await showDatePicker(
       context: context,
-      firstDate: DateTime.now()
-          .subtract(const Duration(days: 365)),
+      firstDate: DateTime.now().subtract(const Duration(days: 365)),
       lastDate: DateTime(2035),
     );
 
@@ -100,17 +87,13 @@ class _CrearEventoScreenState
   InputDecoration deco(String texto) {
     return InputDecoration(
       labelText: texto,
-      labelStyle:
-          const TextStyle(color: Colors.white70),
+      labelStyle: const TextStyle(color: const Color(0xFF53627A)),
       enabledBorder: OutlineInputBorder(
-        borderSide:
-            const BorderSide(color: Colors.white24),
+        borderSide: const BorderSide(color: const Color(0xFFB7D7DA)),
         borderRadius: BorderRadius.circular(12),
       ),
       focusedBorder: OutlineInputBorder(
-        borderSide: const BorderSide(
-          color: Colors.cyanAccent,
-        ),
+        borderSide: const BorderSide(color: Colors.cyanAccent),
         borderRadius: BorderRadius.circular(12),
       ),
     );
@@ -119,15 +102,14 @@ class _CrearEventoScreenState
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF061018),
+      backgroundColor: const Color(0xFFFFFFFF),
 
       appBar: AppBar(
         backgroundColor: Colors.transparent,
-        iconTheme:
-            const IconThemeData(color: Colors.white),
+        iconTheme: const IconThemeData(color: Colors.white),
         title: const Text(
           "Nuevo evento",
-          style: TextStyle(color: Colors.white),
+          style: TextStyle(color: const Color(0xFF071A3A)),
         ),
       ),
 
@@ -135,11 +117,9 @@ class _CrearEventoScreenState
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
-
             TextField(
               controller: tituloController,
-              style:
-                  const TextStyle(color: Colors.white),
+              style: const TextStyle(color: const Color(0xFF071A3A)),
               decoration: deco("Título"),
             ),
 
@@ -147,8 +127,7 @@ class _CrearEventoScreenState
 
             TextField(
               controller: descripcionController,
-              style:
-                  const TextStyle(color: Colors.white),
+              style: const TextStyle(color: const Color(0xFF071A3A)),
               maxLines: 4,
               decoration: deco("Descripción"),
             ),
@@ -159,22 +138,16 @@ class _CrearEventoScreenState
               onTap: seleccionarFecha,
               child: Container(
                 width: double.infinity,
-                padding:
-                    const EdgeInsets.all(14),
+                padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
-                  border: Border.all(
-                    color: Colors.white24,
-                  ),
-                  borderRadius:
-                      BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFFB7D7DA)),
+                  borderRadius: BorderRadius.circular(12),
                 ),
                 child: Text(
                   fecha == null
                       ? "Seleccionar fecha"
                       : "${fecha!.day}/${fecha!.month}/${fecha!.year}",
-                  style: const TextStyle(
-                    color: Colors.white,
-                  ),
+                  style: const TextStyle(color: const Color(0xFF071A3A)),
                 ),
               ),
             ),
@@ -185,22 +158,14 @@ class _CrearEventoScreenState
               onTap: seleccionarHora,
               child: Container(
                 width: double.infinity,
-                padding:
-                    const EdgeInsets.all(14),
+                padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
-                  border: Border.all(
-                    color: Colors.white24,
-                  ),
-                  borderRadius:
-                      BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFFB7D7DA)),
+                  borderRadius: BorderRadius.circular(12),
                 ),
                 child: Text(
-                  hora == null
-                      ? "Seleccionar hora"
-                      : hora!.format(context),
-                  style: const TextStyle(
-                    color: Colors.white,
-                  ),
+                  hora == null ? "Seleccionar hora" : hora!.format(context),
+                  style: const TextStyle(color: const Color(0xFF071A3A)),
                 ),
               ),
             ),
@@ -211,11 +176,8 @@ class _CrearEventoScreenState
               width: double.infinity,
               height: 50,
               child: ElevatedButton(
-                onPressed:
-                    loading ? null : guardar,
-                child: const Text(
-                  "GUARDAR EVENTO",
-                ),
+                onPressed: loading ? null : guardar,
+                child: const Text("GUARDAR EVENTO"),
               ),
             ),
           ],

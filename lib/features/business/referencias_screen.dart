@@ -2,7 +2,6 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-
 class ReferenciasScreen extends StatefulWidget {
   const ReferenciasScreen({super.key});
 
@@ -23,7 +22,7 @@ class _ReferenciasScreenState extends State<ReferenciasScreen> {
 
   String? userRole;
   String? userAuthId;
- String? userInternalId;
+  String? userInternalId;
 
   @override
   void initState() {
@@ -31,193 +30,207 @@ class _ReferenciasScreenState extends State<ReferenciasScreen> {
     loadReferencias();
   }
 
- Future<void> loadReferencias() async {
-  final user = supabase.auth.currentUser;
+  Future<void> loadReferencias() async {
+    final user = supabase.auth.currentUser;
 
-  print('================ REFERENCIAS DEBUG ================');
-  print('USER AUTH ACTUAL: ${user?.id}');
+    print('================ REFERENCIAS DEBUG ================');
+    print('USER AUTH ACTUAL: ${user?.id}');
 
-  if (user == null) {
-    print('NO HAY USUARIO LOGUEADO');
-    setState(() => cargando = false);
-    return;
-  }
-
-  setState(() => cargando = true);
-
-  try {
-    final perfil = await supabase
-        .from('usuarios')
-        .select('id, auth_id, rol_usuario, parent_id')
-        .eq('auth_id', user.id)
-        .maybeSingle();
-
-    print('PERFIL USUARIO: $perfil');
-
-    userRole = perfil?['rol_usuario']?.toString();
-    userAuthId = perfil?['auth_id']?.toString();
-    userInternalId = perfil?['id']?.toString();
-
-    print('ROLE: $userRole');
-    print('USER AUTH ID PERFIL: $userAuthId');
-    print('USER INTERNAL ID: $userInternalId');
-
-    authIdsPermitidos = await _getAuthIdsEstructura(
-      internalId: userInternalId,
-      authId: userAuthId ?? user.id,
-      role: userRole ?? 'agente',
-    );
-
-    print('AUTH IDS PERMITIDOS: $authIdsPermitidos');
-    print('VE TODO: ${_veTodo(userRole)}');
-
-    dynamic query = supabase.from('referencias_viables').select();
-
-    if (!_veTodo(userRole)) {
-      print('APLICANDO FILTRO POR ESTRUCTURA');
-      query = query.inFilter('auth_id', authIdsPermitidos);
-    } else {
-      print('NO APLICA FILTRO, VE TODO');
+    if (user == null) {
+      print('NO HAY USUARIO LOGUEADO');
+      setState(() => cargando = false);
+      return;
     }
 
-    final data = await query;
+    setState(() => cargando = true);
 
-    final usuariosData = await supabase
-    .from('usuarios')
-    .select('auth_id, nombre');
+    try {
+      final perfil = await supabase
+          .from('usuarios')
+          .select('id, auth_id, rol_usuario, parent_id')
+          .or(
+            'estado.is.null,estado.not.in.(inactivo,Inactivo,INACTIVO,baja,Baja,BAJA,desactivado,Desactivado,DESACTIVADO,bloqueado,Bloqueado,BLOQUEADO,suspendido,Suspendido,SUSPENDIDO)',
+          )
+          .eq('auth_id', user.id)
+          .maybeSingle();
 
-final usuariosPorAuthId = {
-  for (final u in List<Map<String, dynamic>>.from(usuariosData))
-    if (u['auth_id'] != null)
-      u['auth_id'].toString(): u['nombre']?.toString() ?? 'Sin agente',
-};
+      print('PERFIL USUARIO: $perfil');
 
-    print('DATA RAW TIPO: ${data.runtimeType}');
-    print('DATA RAW TOTAL: ${data.length}');
-    print('DATA RAW PRIMEROS 3: ${List<Map<String, dynamic>>.from(data).take(3).toList()}');
+      userRole = perfil?['rol_usuario']?.toString();
+      userAuthId = perfil?['auth_id']?.toString();
+      userInternalId = perfil?['id']?.toString();
 
-    final listaRaw = List<Map<String, dynamic>>.from(data).map((r) {
-  final authIdRef = r['auth_id']?.toString();
+      print('ROLE: $userRole');
+      print('USER AUTH ID PERFIL: $userAuthId');
+      print('USER INTERNAL ID: $userInternalId');
 
-  return {
-    ...r,
-    'nombre_agente_ref': usuariosPorAuthId[authIdRef] ?? 'Sin agente',
-  };
-}).toList();
-
-    final filtradas = listaRaw.where((r) {
-      final estado = r['estado']?.toString().toLowerCase().trim() ?? '';
-
-      final activa = estado != 'resuelto' &&
-          estado != 'cerrado' &&
-          estado != 'contratado' &&
-          estado != 'desechado';
-
-      print(
-        'REF ${r['id']} | auth_id=${r['auth_id']} | estado=$estado | activa=$activa | nombre=${r['nombre']}',
+      authIdsPermitidos = await _getAuthIdsEstructura(
+        internalId: userInternalId,
+        authId: userAuthId ?? user.id,
+        role: userRole ?? 'agente',
       );
 
-      return activa;
-    }).toList();
+      print('AUTH IDS PERMITIDOS: $authIdsPermitidos');
+      print('VE TODO: ${_veTodo(userRole)}');
 
-    print('TOTAL DESPUES FILTRO ACTIVAS: ${filtradas.length}');
+      dynamic query = supabase.from('referencias_viables').select();
 
-    filtradas.sort((a, b) {
-      final scoreA = _scoreReferencia(a);
-      final scoreB = _scoreReferencia(b);
-      return scoreB.compareTo(scoreA);
-    });
+      if (!_veTodo(userRole)) {
+        print('APLICANDO FILTRO POR ESTRUCTURA');
+        query = query.inFilter('auth_id', authIdsPermitidos);
+      } else {
+        print('NO APLICA FILTRO, VE TODO');
+      }
 
-    if (!mounted) return;
+      final data = await query;
 
-    setState(() {
-      referencias = filtradas;
-      cargando = false;
-    });
+      final usuariosData = await supabase
+          .from('usuarios')
+          .select('auth_id, nombre')
+          .or(
+            'estado.is.null,estado.not.in.(inactivo,Inactivo,INACTIVO,baja,Baja,BAJA,desactivado,Desactivado,DESACTIVADO,bloqueado,Bloqueado,BLOQUEADO,suspendido,Suspendido,SUSPENDIDO)',
+          );
 
-    print('TOTAL FINAL EN STATE: ${referencias.length}');
-    print('================ FIN REFERENCIAS DEBUG ================');
-  } catch (e) {
-    print('ERROR LOAD REFERENCIAS: $e');
-    print('================ FIN REFERENCIAS DEBUG CON ERROR ================');
+      final usuariosPorAuthId = {
+        for (final u in List<Map<String, dynamic>>.from(usuariosData))
+          if (u['auth_id'] != null)
+            u['auth_id'].toString(): u['nombre']?.toString() ?? 'Sin agente',
+      };
 
-    if (!mounted) return;
-    setState(() => cargando = false);
-    _snack('Error cargando referencias: $e');
+      print('DATA RAW TIPO: ${data.runtimeType}');
+      print('DATA RAW TOTAL: ${data.length}');
+      print(
+        'DATA RAW PRIMEROS 3: ${List<Map<String, dynamic>>.from(data).take(3).toList()}',
+      );
+
+      final listaRaw = List<Map<String, dynamic>>.from(data).map((r) {
+        final authIdRef = r['auth_id']?.toString();
+
+        return {
+          ...r,
+          'nombre_agente_ref': usuariosPorAuthId[authIdRef] ?? 'Sin agente',
+        };
+      }).toList();
+
+      final filtradas = listaRaw.where((r) {
+        final estado = r['estado']?.toString().toLowerCase().trim() ?? '';
+
+        final activa =
+            estado != 'resuelto' &&
+            estado != 'cerrado' &&
+            estado != 'contratado' &&
+            estado != 'desechado';
+
+        print(
+          'REF ${r['id']} | auth_id=${r['auth_id']} | estado=$estado | activa=$activa | nombre=${r['nombre']}',
+        );
+
+        return activa;
+      }).toList();
+
+      print('TOTAL DESPUES FILTRO ACTIVAS: ${filtradas.length}');
+
+      filtradas.sort((a, b) {
+        final scoreA = _scoreReferencia(a);
+        final scoreB = _scoreReferencia(b);
+        return scoreB.compareTo(scoreA);
+      });
+
+      if (!mounted) return;
+
+      setState(() {
+        referencias = filtradas;
+        cargando = false;
+      });
+
+      print('TOTAL FINAL EN STATE: ${referencias.length}');
+      print('================ FIN REFERENCIAS DEBUG ================');
+    } catch (e) {
+      print('ERROR LOAD REFERENCIAS: $e');
+      print(
+        '================ FIN REFERENCIAS DEBUG CON ERROR ================',
+      );
+
+      if (!mounted) return;
+      setState(() => cargando = false);
+      _snack('Error cargando referencias: $e');
+    }
   }
-}
 
   bool _veTodo(String? role) {
     return role == 'director_nacional' || role == 'administracion';
   }
 
- Future<List<String>> _getAuthIdsEstructura({
-  required String? internalId,
-  required String authId,
-  required String role,
-}) async {
-  if (role == 'administracion' || role == 'director_nacional') {
-    return [];
-  }
+  Future<List<String>> _getAuthIdsEstructura({
+    required String? internalId,
+    required String authId,
+    required String role,
+  }) async {
+    if (role == 'administracion' || role == 'director_nacional') {
+      return [];
+    }
 
-  if (role == 'agente') {
-    return [authId];
-  }
+    if (role == 'agente') {
+      return [authId];
+    }
 
-  if (internalId == null || internalId.isEmpty) {
-    return [authId];
-  }
+    if (internalId == null || internalId.isEmpty) {
+      return [authId];
+    }
 
-  final usuarios = await supabase
-      .from('usuarios')
-      .select('id, auth_id, parent_id, rol_usuario');
+    final usuarios = await supabase
+        .from('usuarios')
+        .select('id, auth_id, parent_id, rol_usuario')
+        .or(
+          'estado.is.null,estado.not.in.(inactivo,Inactivo,INACTIVO,baja,Baja,BAJA,desactivado,Desactivado,DESACTIVADO,bloqueado,Bloqueado,BLOQUEADO,suspendido,Suspendido,SUSPENDIDO)',
+        );
 
-  final lista = List<Map<String, dynamic>>.from(usuarios);
+    final lista = List<Map<String, dynamic>>.from(usuarios);
 
-  final Set<String> idsPermitidos = {internalId};
-  final Set<String> authPermitidos = {};
+    final Set<String> idsPermitidos = {internalId};
+    final Set<String> authPermitidos = {};
 
-  bool added = true;
+    bool added = true;
 
-  while (added) {
-    added = false;
+    while (added) {
+      added = false;
+
+      for (final u in lista) {
+        final id = u['id']?.toString();
+        final parentId = u['parent_id']?.toString();
+
+        if (id != null &&
+            id.isNotEmpty &&
+            parentId != null &&
+            parentId.isNotEmpty &&
+            idsPermitidos.contains(parentId) &&
+            !idsPermitidos.contains(id)) {
+          idsPermitidos.add(id);
+          added = true;
+        }
+      }
+    }
 
     for (final u in lista) {
       final id = u['id']?.toString();
-      final parentId = u['parent_id']?.toString();
+      final auth = u['auth_id']?.toString();
 
       if (id != null &&
-          id.isNotEmpty &&
-          parentId != null &&
-          parentId.isNotEmpty &&
-          idsPermitidos.contains(parentId) &&
-          !idsPermitidos.contains(id)) {
-        idsPermitidos.add(id);
-        added = true;
+          idsPermitidos.contains(id) &&
+          auth != null &&
+          auth.isNotEmpty &&
+          auth != 'null') {
+        authPermitidos.add(auth);
       }
     }
+
+    authPermitidos.add(authId);
+
+    print('IDS INTERNOS PERMITIDOS: $idsPermitidos');
+    print('AUTH IDS FINALES PERMITIDOS: $authPermitidos');
+
+    return authPermitidos.toList();
   }
-
-  for (final u in lista) {
-    final id = u['id']?.toString();
-    final auth = u['auth_id']?.toString();
-
-    if (id != null &&
-        idsPermitidos.contains(id) &&
-        auth != null &&
-        auth.isNotEmpty &&
-        auth != 'null') {
-      authPermitidos.add(auth);
-    }
-  }
-
-  authPermitidos.add(authId);
-
-  print('IDS INTERNOS PERMITIDOS: $idsPermitidos');
-  print('AUTH IDS FINALES PERMITIDOS: $authPermitidos');
-
-  return authPermitidos.toList();
-}
 
   List<Map<String, dynamic>> get referenciasFiltradas {
     final now = DateTime.now();
@@ -236,15 +249,18 @@ final usuariosPorAuthId = {
       final fechaVencimiento = _parseDate(r['fecha_vencimiento']);
       final fechaRellamada = _parseDate(r['fecha_rellamada']);
 
-      final venceHoy = fechaVencimiento != null && _sameDay(fechaVencimiento, today);
-      final llamadaHoy = fechaRellamada != null && _sameDay(fechaRellamada, today);
+      final venceHoy =
+          fechaVencimiento != null && _sameDay(fechaVencimiento, today);
+      final llamadaHoy =
+          fechaRellamada != null && _sameDay(fechaRellamada, today);
 
-      final vence7Dias = fechaVencimiento != null &&
+      final vence7Dias =
+          fechaVencimiento != null &&
           !fechaVencimiento.isBefore(today) &&
           fechaVencimiento.difference(today).inDays <= 7;
 
-      final proximaLlamada = fechaRellamada != null &&
-          !fechaRellamada.isBefore(today);
+      final proximaLlamada =
+          fechaRellamada != null && !fechaRellamada.isBefore(today);
 
       final cumpleFiltro =
           filtro == "Todas" ||
@@ -255,7 +271,8 @@ final usuariosPorAuthId = {
           filtro == "Vencimientos" && vence7Dias ||
           filtro == prioridad;
 
-      final cumpleBusqueda = texto.isEmpty ||
+      final cumpleBusqueda =
+          texto.isEmpty ||
           nombre.contains(texto) ||
           telefono.contains(texto) ||
           compania.contains(texto);
@@ -424,7 +441,7 @@ final usuariosPorAuthId = {
       case 'Baja':
         return Colors.greenAccent;
       default:
-        return Colors.cyanAccent;
+        return const Color(0xFF2563EB);
     }
   }
 
@@ -444,10 +461,7 @@ final usuariosPorAuthId = {
     if (!mounted) return;
 
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(text),
-        backgroundColor: const Color(0xFF0F172A),
-      ),
+      SnackBar(content: Text(text), backgroundColor: const Color(0xFFF8FAFC)),
     );
   }
 
@@ -478,10 +492,10 @@ final usuariosPorAuthId = {
                   child: Container(
                     padding: const EdgeInsets.all(22),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF061018).withOpacity(0.96),
+                      color: const Color(0xFFFFFFFF).withOpacity(0.96),
                       borderRadius: BorderRadius.circular(28),
                       border: Border.all(
-                        color: Colors.cyanAccent.withOpacity(0.35),
+                        color: const Color(0xFF2563EB).withOpacity(0.35),
                       ),
                     ),
                     child: SingleChildScrollView(
@@ -493,14 +507,14 @@ final usuariosPorAuthId = {
                             children: [
                               Icon(
                                 Icons.person_add_alt_1_rounded,
-                                color: Colors.cyanAccent,
+                                color: const Color(0xFF2563EB),
                               ),
                               SizedBox(width: 10),
                               Expanded(
                                 child: Text(
                                   "Nueva referencia",
                                   style: TextStyle(
-                                    color: Colors.white,
+                                    color: const Color(0xFF111827),
                                     fontSize: 22,
                                     fontWeight: FontWeight.w900,
                                   ),
@@ -552,7 +566,7 @@ final usuariosPorAuthId = {
                           const Text(
                             "Productos actuales",
                             style: TextStyle(
-                              color: Colors.white,
+                              color: const Color(0xFF111827),
                               fontWeight: FontWeight.bold,
                             ),
                           ),
@@ -562,49 +576,58 @@ final usuariosPorAuthId = {
                           Wrap(
                             spacing: 8,
                             runSpacing: 8,
-                            children: [
-                              "Decesos",
-                              "Hogar",
-                              "Auto",
-                              "Vida",
-                              "Salud",
-                            ].map((p) {
-                              final selected = productos.contains(p);
+                            children:
+                                [
+                                  "Decesos",
+                                  "Hogar",
+                                  "Auto",
+                                  "Vida",
+                                  "Salud",
+                                  "Transportes construcción",
+                                  "Caución",
+                                  "Camión",
+                                  "Decenal",
+                                  "Pymes",
+                                  "Accidentes colectivos",
+                                  "Salud colectivo",
+                                  "Transportes",
+                                ].map((p) {
+                                  final selected = productos.contains(p);
 
-                              return FilterChip(
-                                label: Text(
-                                  p,
-                                  style: TextStyle(
-                                    color: selected
-                                        ? const Color(0xFF061018)
-                                        : Colors.white,
-                                    fontWeight: FontWeight.w800,
-                                  ),
-                                ),
-                                selected: selected,
-                                selectedColor: Colors.cyanAccent,
-                                backgroundColor: const Color(0xFF162033),
-                                checkmarkColor: const Color(0xFF061018),
-                                side: BorderSide(
-                                  color: selected
-                                      ? Colors.cyanAccent
-                                      : Colors.white.withOpacity(0.15),
-                                ),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(30),
-                                ),
-                                showCheckmark: false,
-                                onSelected: (v) {
-                                  setDialogState(() {
-                                    if (v) {
-                                      productos.add(p);
-                                    } else {
-                                      productos.remove(p);
-                                    }
-                                  });
-                                },
-                              );
-                            }).toList(),
+                                  return FilterChip(
+                                    label: Text(
+                                      p,
+                                      style: TextStyle(
+                                        color: selected
+                                            ? Colors.white
+                                            : const Color(0xFF111827),
+                                        fontWeight: FontWeight.w800,
+                                      ),
+                                    ),
+                                    selected: selected,
+                                    selectedColor: const Color(0xFF2563EB),
+                                    backgroundColor: const Color(0xFFFFFFFF),
+                                    checkmarkColor: const Color(0xFFFFFFFF),
+                                    side: BorderSide(
+                                      color: selected
+                                          ? const Color(0xFF2563EB)
+                                          : Colors.white.withOpacity(0.15),
+                                    ),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(30),
+                                    ),
+                                    showCheckmark: false,
+                                    onSelected: (v) {
+                                      setDialogState(() {
+                                        if (v) {
+                                          productos.add(p);
+                                        } else {
+                                          productos.remove(p);
+                                        }
+                                      });
+                                    },
+                                  );
+                                }).toList(),
                           ),
 
                           const SizedBox(height: 14),
@@ -633,8 +656,8 @@ final usuariosPorAuthId = {
                                   return Theme(
                                     data: ThemeData.dark().copyWith(
                                       colorScheme: const ColorScheme.dark(
-                                        primary: Colors.cyanAccent,
-                                        surface: Color(0xFF061018),
+                                        primary: const Color(0xFF2563EB),
+                                        surface: Color(0xFFFFFFFF),
                                       ),
                                     ),
                                     child: child!,
@@ -650,17 +673,19 @@ final usuariosPorAuthId = {
                               width: double.infinity,
                               padding: const EdgeInsets.all(15),
                               decoration: BoxDecoration(
-                                color: Colors.white.withOpacity(0.08),
+                                color: Colors.white,
                                 borderRadius: BorderRadius.circular(16),
                                 border: Border.all(
-                                  color: Colors.cyanAccent.withOpacity(0.35),
+                                  color: const Color(
+                                    0xFF2563EB,
+                                  ).withOpacity(0.35),
                                 ),
                               ),
                               child: Row(
                                 children: [
                                   const Icon(
                                     Icons.event_rounded,
-                                    color: Colors.cyanAccent,
+                                    color: const Color(0xFF2563EB),
                                   ),
                                   const SizedBox(width: 10),
                                   Expanded(
@@ -669,7 +694,7 @@ final usuariosPorAuthId = {
                                           ? "Seleccionar fecha de vencimiento"
                                           : "Vence: ${fechaVencimiento!.day}/${fechaVencimiento!.month}/${fechaVencimiento!.year}",
                                       style: const TextStyle(
-                                        color: Colors.white70,
+                                        color: const Color(0xFF64748B),
                                         fontWeight: FontWeight.w700,
                                       ),
                                     ),
@@ -683,15 +708,17 @@ final usuariosPorAuthId = {
 
                           Container(
                             decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.07),
+                              color: Colors.white,
                               borderRadius: BorderRadius.circular(16),
                             ),
                             child: SwitchListTile(
                               value: visita,
-                              activeColor: Colors.cyanAccent,
+                              activeColor: const Color(0xFF2563EB),
                               title: const Text(
                                 "Requiere visita",
-                                style: TextStyle(color: Colors.white),
+                                style: TextStyle(
+                                  color: const Color(0xFF111827),
+                                ),
                               ),
                               onChanged: (v) {
                                 setDialogState(() => visita = v);
@@ -716,7 +743,7 @@ final usuariosPorAuthId = {
                                 child: OutlinedButton(
                                   onPressed: () => Navigator.pop(context),
                                   style: OutlinedButton.styleFrom(
-                                    foregroundColor: Colors.white70,
+                                    foregroundColor: const Color(0xFF64748B),
                                     side: BorderSide(
                                       color: Colors.white.withOpacity(0.25),
                                     ),
@@ -745,21 +772,22 @@ final usuariosPorAuthId = {
                                     await supabase
                                         .from('referencias_viables')
                                         .insert({
-                                      'auth_id': user.id,
-                                      'nombre': nombreController.text.trim(),
-                                      'telefono':
-                                          telefonoController.text.trim(),
-                                      'compania_actual': compania,
-                                      'productos_actuales': productos,
-                                      'prioridad': prioridad,
-                                      'fecha_vencimiento':
-                                          fechaVencimiento?.toIso8601String(),
-                                      'requiere_visita': visita,
-                                      'notas': notasController.text.trim(),
-                                      'estado': 'Pendiente',
-                                      'created_at':
-                                          DateTime.now().toIso8601String(),
-                                    });
+                                          'auth_id': user.id,
+                                          'nombre': nombreController.text
+                                              .trim(),
+                                          'telefono': telefonoController.text
+                                              .trim(),
+                                          'compania_actual': compania,
+                                          'productos_actuales': productos,
+                                          'prioridad': prioridad,
+                                          'fecha_vencimiento': fechaVencimiento
+                                              ?.toIso8601String(),
+                                          'requiere_visita': visita,
+                                          'notas': notasController.text.trim(),
+                                          'estado': 'Pendiente',
+                                          'created_at': DateTime.now()
+                                              .toIso8601String(),
+                                        });
 
                                     if (!mounted) return;
 
@@ -769,8 +797,8 @@ final usuariosPorAuthId = {
                                   icon: const Icon(Icons.save_rounded),
                                   label: const Text("Guardar"),
                                   style: ElevatedButton.styleFrom(
-                                    backgroundColor: Colors.cyanAccent,
-                                    foregroundColor: const Color(0xFF031018),
+                                    backgroundColor: const Color(0xFF2563EB),
+                                    foregroundColor: const Color(0xFFFFFFFF),
                                     padding: const EdgeInsets.symmetric(
                                       vertical: 14,
                                     ),
@@ -804,11 +832,11 @@ final usuariosPorAuthId = {
     final lista = referenciasFiltradas;
 
     return Scaffold(
-      backgroundColor: const Color(0xFF020617),
+      backgroundColor: const Color(0xFFF4F6FB),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: crearReferencia,
-        backgroundColor: Colors.cyanAccent,
-        foregroundColor: const Color(0xFF031018),
+        backgroundColor: const Color(0xFF2563EB),
+        foregroundColor: const Color(0xFFFFFFFF),
         icon: const Icon(Icons.add_rounded),
         label: const Text(
           "Nueva",
@@ -821,8 +849,8 @@ final usuariosPorAuthId = {
           SafeArea(
             child: RefreshIndicator(
               onRefresh: loadReferencias,
-              color: Colors.cyanAccent,
-              backgroundColor: const Color(0xFF0F172A),
+              color: const Color(0xFF2563EB),
+              backgroundColor: const Color(0xFFF8FAFC),
               child: ListView(
                 padding: const EdgeInsets.fromLTRB(18, 12, 18, 95),
                 children: [
@@ -833,7 +861,7 @@ final usuariosPorAuthId = {
                       padding: EdgeInsets.only(top: 120),
                       child: Center(
                         child: CircularProgressIndicator(
-                          color: Colors.cyanAccent,
+                          color: const Color(0xFF2563EB),
                         ),
                       ),
                     )
@@ -863,74 +891,76 @@ final usuariosPorAuthId = {
         ? "CRM completo de toda la red"
         : "CRM de tu estructura comercial";
 
-    return Row(
-      children: [
-        InkWell(
-          borderRadius: BorderRadius.circular(18),
-          onTap: () => Navigator.pop(context),
-          child: Container(
-            height: 54,
-            width: 54,
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.08),
-              borderRadius: BorderRadius.circular(18),
-              border: Border.all(
-                color: Colors.cyanAccent.withOpacity(0.45),
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(22),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF111827), Color(0xFF1D4ED8)],
+        ),
+        borderRadius: BorderRadius.circular(32),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF1D4ED8).withOpacity(0.20),
+            blurRadius: 28,
+            offset: const Offset(0, 14),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          InkWell(
+            borderRadius: BorderRadius.circular(18),
+            onTap: () => Navigator.pop(context),
+            child: Container(
+              height: 54,
+              width: 54,
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.14),
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: Colors.white.withOpacity(0.18)),
               ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.cyanAccent.withOpacity(0.18),
-                  blurRadius: 24,
+              child: const Icon(Icons.arrow_back_rounded, color: Colors.white),
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  "Referencias viables",
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 27,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: -0.8,
+                  ),
+                ),
+                const SizedBox(height: 5),
+                Text(
+                  subtitle,
+                  style: const TextStyle(
+                    color: Color(0xFFD8E2F2),
+                    fontSize: 13,
+                  ),
                 ),
               ],
             ),
-            child: const Icon(
-              Icons.arrow_back_rounded,
-              color: Colors.white,
+          ),
+          Container(
+            width: 52,
+            height: 52,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: Colors.white.withOpacity(0.14),
             ),
+            child: const Icon(Icons.hub_rounded, color: Colors.white),
           ),
-        ),
-        const SizedBox(width: 14),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                "Referencias CRM",
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 27,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: -0.8,
-                ),
-              ),
-              const SizedBox(height: 3),
-              Text(
-                subtitle,
-                style: const TextStyle(
-                  color: Colors.white60,
-                  fontSize: 13,
-                ),
-              ),
-            ],
-          ),
-        ),
-        Container(
-          width: 52,
-          height: 52,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: Colors.cyanAccent.withOpacity(0.12),
-            border: Border.all(
-              color: Colors.cyanAccent.withOpacity(0.38),
-            ),
-          ),
-          child: const Icon(
-            Icons.hub_rounded,
-            color: Colors.cyanAccent,
-          ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
@@ -945,7 +975,7 @@ final usuariosPorAuthId = {
                   title: "Hoy",
                   value: totalHoy.toString(),
                   icon: Icons.today_rounded,
-                  color: Colors.cyanAccent,
+                  color: const Color(0xFF2563EB),
                 ),
               ),
               const SizedBox(width: 10),
@@ -999,13 +1029,18 @@ final usuariosPorAuthId = {
           const Text(
             "Embudo comercial",
             style: TextStyle(
-              color: Colors.white,
+              color: const Color(0xFF111827),
               fontSize: 19,
               fontWeight: FontWeight.w900,
             ),
           ),
           const SizedBox(height: 14),
-          _funnelLine("Referencias activas", total, total, Colors.cyanAccent),
+          _funnelLine(
+            "Referencias activas",
+            total,
+            total,
+            const Color(0xFF2563EB),
+          ),
           _funnelLine("Muy calientes", calientes, total, Colors.redAccent),
           _funnelLine("Con visita", visitas, total, Colors.orangeAccent),
           _funnelLine("Cerradas mes", cerradas, total, Colors.greenAccent),
@@ -1014,14 +1049,16 @@ final usuariosPorAuthId = {
             width: double.infinity,
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.06),
+              color: Colors.white,
               borderRadius: BorderRadius.circular(18),
-              border: Border.all(color: Colors.cyanAccent.withOpacity(0.20)),
+              border: Border.all(
+                color: const Color(0xFF2563EB).withOpacity(0.20),
+              ),
             ),
             child: Text(
               "Conversión estimada del mes: ${conversionMes.toStringAsFixed(1)}%",
               style: const TextStyle(
-                color: Colors.cyanAccent,
+                color: const Color(0xFF2563EB),
                 fontWeight: FontWeight.w900,
               ),
             ),
@@ -1043,7 +1080,7 @@ final usuariosPorAuthId = {
             child: Text(
               title,
               style: const TextStyle(
-                color: Colors.white70,
+                color: const Color(0xFF64748B),
                 fontWeight: FontWeight.w700,
                 fontSize: 12,
               ),
@@ -1055,7 +1092,7 @@ final usuariosPorAuthId = {
               child: LinearProgressIndicator(
                 minHeight: 10,
                 value: percent.clamp(0.0, 1.0),
-                backgroundColor: Colors.white.withOpacity(0.10),
+                backgroundColor: Colors.white,
                 valueColor: AlwaysStoppedAnimation(color),
               ),
             ),
@@ -1063,10 +1100,7 @@ final usuariosPorAuthId = {
           const SizedBox(width: 10),
           Text(
             value.toString(),
-            style: TextStyle(
-              color: color,
-              fontWeight: FontWeight.w900,
-            ),
+            style: TextStyle(color: color, fontWeight: FontWeight.w900),
           ),
         ],
       ),
@@ -1092,16 +1126,16 @@ final usuariosPorAuthId = {
         children: [
           TextField(
             onChanged: (v) => setState(() => busqueda = v),
-            style: const TextStyle(color: Colors.white),
+            style: const TextStyle(color: const Color(0xFF111827)),
             decoration: InputDecoration(
               hintText: "Buscar por nombre, teléfono o compañía...",
-              hintStyle: const TextStyle(color: Colors.white38),
+              hintStyle: const TextStyle(color: const Color(0xFF94A3B8)),
               prefixIcon: const Icon(
                 Icons.search_rounded,
-                color: Colors.cyanAccent,
+                color: const Color(0xFF2563EB),
               ),
               filled: true,
-              fillColor: Colors.white.withOpacity(0.06),
+              fillColor: Colors.white,
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(18),
                 borderSide: BorderSide.none,
@@ -1117,16 +1151,16 @@ final usuariosPorAuthId = {
                 final color = f == "Alta"
                     ? Colors.redAccent
                     : f == "Media"
-                        ? Colors.orangeAccent
-                        : f == "Baja"
-                            ? Colors.greenAccent
-                            : f == "Calientes"
-                                ? Colors.redAccent
-                                : f == "Visitas"
-                                    ? Colors.orangeAccent
-                                    : f == "Vencimientos"
-                                        ? Colors.purpleAccent
-                                        : Colors.cyanAccent;
+                    ? Colors.orangeAccent
+                    : f == "Baja"
+                    ? Colors.greenAccent
+                    : f == "Calientes"
+                    ? Colors.redAccent
+                    : f == "Visitas"
+                    ? Colors.orangeAccent
+                    : f == "Vencimientos"
+                    ? Colors.purpleAccent
+                    : const Color(0xFF2563EB);
 
                 return Padding(
                   padding: const EdgeInsets.only(right: 8),
@@ -1135,17 +1169,17 @@ final usuariosPorAuthId = {
                       f,
                       style: TextStyle(
                         color: selected
-                            ? const Color(0xFF061018)
-                            : Colors.white,
+                            ? Colors.white
+                            : const Color(0xFF111827),
                         fontWeight: FontWeight.w900,
                         fontSize: 13,
                       ),
                     ),
                     selected: selected,
                     selectedColor: color,
-                    backgroundColor: const Color(0xFF162033),
+                    backgroundColor: const Color(0xFFFFFFFF),
                     side: BorderSide(
-                      color: selected ? color : Colors.white.withOpacity(0.12),
+                      color: selected ? color : const Color(0xFFD7DFEA),
                     ),
                     showCheckmark: false,
                     shape: RoundedRectangleBorder(
@@ -1196,7 +1230,7 @@ final usuariosPorAuthId = {
         margin: const EdgeInsets.only(bottom: 14),
         padding: const EdgeInsets.all(18),
         decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.075),
+          color: Colors.white,
           borderRadius: BorderRadius.circular(26),
           border: Border.all(color: color.withOpacity(0.28)),
           boxShadow: [
@@ -1223,7 +1257,7 @@ final usuariosPorAuthId = {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
-                          color: Colors.white,
+                          color: const Color(0xFF111827),
                           fontSize: 19,
                           fontWeight: FontWeight.w900,
                         ),
@@ -1239,11 +1273,7 @@ final usuariosPorAuthId = {
                     ],
                   ),
                 ),
-                _pill(
-                  prioridad,
-                  color,
-                  Icons.flag_rounded,
-                ),
+                _pill(prioridad, color, Icons.flag_rounded),
               ],
             ),
 
@@ -1252,7 +1282,7 @@ final usuariosPorAuthId = {
             _infoMini(
               Icons.phone_rounded,
               telefono.isEmpty ? "Sin teléfono" : telefono,
-              Colors.white70,
+              const Color(0xFF64748B),
             ),
 
             const SizedBox(height: 7),
@@ -1260,16 +1290,16 @@ final usuariosPorAuthId = {
             _infoMini(
               Icons.apartment_rounded,
               r['compania_actual']?.toString() ?? "Sin compañía",
-              Colors.cyanAccent,
+              const Color(0xFF2563EB),
             ),
 
             const SizedBox(height: 7),
 
-_infoMini(
-  Icons.person_rounded,
-  r['nombre_agente_ref']?.toString() ?? "Sin agente",
-  Colors.amberAccent,
-),
+            _infoMini(
+              Icons.person_rounded,
+              r['nombre_agente_ref']?.toString() ?? "Sin agente",
+              Colors.amberAccent,
+            ),
 
             const SizedBox(height: 7),
 
@@ -1298,7 +1328,7 @@ _infoMini(
                     child: LinearProgressIndicator(
                       value: score / 100,
                       minHeight: 10,
-                      backgroundColor: Colors.white.withOpacity(0.12),
+                      backgroundColor: Colors.white,
                       valueColor: AlwaysStoppedAnimation(scoreColor),
                     ),
                   ),
@@ -1326,10 +1356,10 @@ _infoMini(
                       vertical: 8,
                     ),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF142235),
+                      color: const Color(0xFFFFFFFF),
                       borderRadius: BorderRadius.circular(30),
                       border: Border.all(
-                        color: Colors.cyanAccent.withOpacity(0.45),
+                        color: const Color(0xFF2563EB).withOpacity(0.45),
                         width: 1.1,
                       ),
                     ),
@@ -1338,14 +1368,14 @@ _infoMini(
                       children: [
                         const Icon(
                           Icons.sell_rounded,
-                          color: Colors.cyanAccent,
+                          color: const Color(0xFF2563EB),
                           size: 16,
                         ),
                         const SizedBox(width: 6),
                         Text(
                           p,
                           style: const TextStyle(
-                            color: Colors.white,
+                            color: const Color(0xFF111827),
                             fontSize: 12,
                             fontWeight: FontWeight.w900,
                           ),
@@ -1364,7 +1394,7 @@ _infoMini(
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
-                  color: Colors.white54,
+                  color: const Color(0xFF64748B),
                   height: 1.35,
                 ),
               ),
@@ -1378,7 +1408,7 @@ _infoMini(
                   child: _actionButton(
                     "Gestionar",
                     Icons.settings_suggest_rounded,
-                    Colors.cyanAccent,
+                    const Color(0xFF2563EB),
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -1440,10 +1470,7 @@ _infoMini(
         Expanded(
           child: Text(
             text,
-            style: TextStyle(
-              color: color,
-              fontWeight: FontWeight.w700,
-            ),
+            style: TextStyle(color: color, fontWeight: FontWeight.w700),
           ),
         ),
       ],
@@ -1459,7 +1486,7 @@ _infoMini(
     return Container(
       padding: const EdgeInsets.all(15),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.055),
+        color: Colors.white,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: color.withOpacity(0.25)),
       ),
@@ -1481,7 +1508,7 @@ _infoMini(
               children: [
                 Text(
                   title,
-                  style: const TextStyle(color: Colors.white54),
+                  style: const TextStyle(color: const Color(0xFF64748B)),
                 ),
                 Text(
                   value,
@@ -1509,19 +1536,17 @@ _infoMini(
         shape: BoxShape.circle,
         gradient: LinearGradient(
           colors: [
-            Colors.cyanAccent.withOpacity(0.35),
+            const Color(0xFF2563EB).withOpacity(0.35),
             Colors.purpleAccent.withOpacity(0.25),
           ],
         ),
-        border: Border.all(
-          color: Colors.cyanAccent.withOpacity(0.38),
-        ),
+        border: Border.all(color: const Color(0xFF2563EB).withOpacity(0.38)),
       ),
       child: Center(
         child: Text(
           letter,
           style: const TextStyle(
-            color: Colors.white,
+            color: const Color(0xFF111827),
             fontSize: 19,
             fontWeight: FontWeight.w900,
           ),
@@ -1560,16 +1585,12 @@ _infoMini(
     return _glassCard(
       child: const Column(
         children: [
-          Icon(
-            Icons.inbox_rounded,
-            color: Colors.white38,
-            size: 58,
-          ),
+          Icon(Icons.inbox_rounded, color: const Color(0xFF94A3B8), size: 58),
           SizedBox(height: 12),
           Text(
             "Sin referencias",
             style: TextStyle(
-              color: Colors.white,
+              color: const Color(0xFF111827),
               fontSize: 20,
               fontWeight: FontWeight.w900,
             ),
@@ -1578,7 +1599,7 @@ _infoMini(
           Text(
             "No hay referencias para este filtro.",
             textAlign: TextAlign.center,
-            style: TextStyle(color: Colors.white54),
+            style: TextStyle(color: const Color(0xFF64748B)),
           ),
         ],
       ),
@@ -1597,9 +1618,9 @@ _infoMini(
           width: double.infinity,
           padding: padding,
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.075),
+            color: Colors.white,
             borderRadius: BorderRadius.circular(26),
-            border: Border.all(color: Colors.white.withOpacity(0.12)),
+            border: Border.all(color: const Color(0xFFE2E8F0)),
             boxShadow: [
               BoxShadow(
                 color: Colors.black.withOpacity(0.28),
@@ -1625,21 +1646,21 @@ _infoMini(
       controller: controller,
       keyboardType: keyboardType,
       maxLines: maxLines,
-      style: const TextStyle(color: Colors.white),
+      style: const TextStyle(color: const Color(0xFF111827)),
       decoration: InputDecoration(
         labelText: label,
-        labelStyle: const TextStyle(color: Colors.white60),
-        prefixIcon: Icon(icon, color: Colors.cyanAccent),
+        labelStyle: const TextStyle(color: const Color(0xFF64748B)),
+        prefixIcon: Icon(icon, color: const Color(0xFF2563EB)),
         filled: true,
-        fillColor: Colors.white.withOpacity(0.065),
+        fillColor: Colors.white,
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(18),
-          borderSide: BorderSide(color: Colors.white.withOpacity(0.10)),
+          borderSide: BorderSide(color: Colors.white),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(18),
           borderSide: BorderSide(
-            color: Colors.cyanAccent.withOpacity(0.65),
+            color: const Color(0xFF2563EB).withOpacity(0.65),
           ),
         ),
       ),
@@ -1655,32 +1676,27 @@ _infoMini(
   }) {
     return DropdownButtonFormField<String>(
       value: value,
-      dropdownColor: const Color(0xFF0F172A),
-      style: const TextStyle(color: Colors.white),
+      dropdownColor: const Color(0xFFF8FAFC),
+      style: const TextStyle(color: const Color(0xFF111827)),
       decoration: InputDecoration(
         labelText: label,
-        labelStyle: const TextStyle(color: Colors.white60),
-        prefixIcon: Icon(icon, color: Colors.cyanAccent),
+        labelStyle: const TextStyle(color: const Color(0xFF64748B)),
+        prefixIcon: Icon(icon, color: const Color(0xFF2563EB)),
         filled: true,
-        fillColor: Colors.white.withOpacity(0.065),
+        fillColor: Colors.white,
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(18),
-          borderSide: BorderSide(color: Colors.white.withOpacity(0.10)),
+          borderSide: BorderSide(color: Colors.white),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(18),
           borderSide: BorderSide(
-            color: Colors.cyanAccent.withOpacity(0.65),
+            color: const Color(0xFF2563EB).withOpacity(0.65),
           ),
         ),
       ),
       items: items
-          .map(
-            (e) => DropdownMenuItem(
-              value: e,
-              child: Text(e),
-            ),
-          )
+          .map((e) => DropdownMenuItem(value: e, child: Text(e)))
           .toList(),
       onChanged: onChanged,
     );
@@ -1692,65 +1708,14 @@ class _FondoReferencias extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Stack(
-      children: [
-        Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                Color(0xFF020617),
-                Color(0xFF061A2D),
-                Color(0xFF0B1026),
-              ],
-            ),
-          ),
-        ),
-        Positioned(
-          top: -110,
-          right: -90,
-          child: _glow(260, Colors.cyanAccent),
-        ),
-        Positioned(
-          bottom: 160,
-          left: -120,
-          child: _glow(280, Colors.purpleAccent),
-        ),
-        Positioned(
-          bottom: -120,
-          right: -80,
-          child: _glow(240, Colors.blueAccent),
-        ),
-      ],
-    );
-  }
-
-  Widget _glow(double size, Color color) {
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: color.withOpacity(0.15),
-        boxShadow: [
-          BoxShadow(
-            color: color.withOpacity(0.20),
-            blurRadius: 120,
-            spreadRadius: 45,
-          ),
-        ],
-      ),
-    );
+    return const Positioned.fill(child: ColoredBox(color: Color(0xFFF4F6FB)));
   }
 }
+
 class ReferenciaDetailScreen extends StatefulWidget {
   final Map<String, dynamic> referencia;
 
-  const ReferenciaDetailScreen({
-    super.key,
-    required this.referencia,
-  });
+  const ReferenciaDetailScreen({super.key, required this.referencia});
 
   @override
   State<ReferenciaDetailScreen> createState() => _ReferenciaDetailScreenState();
@@ -1855,7 +1820,7 @@ class _ReferenciaDetailScreenState extends State<ReferenciaDetailScreen> {
       case 'Baja':
         return Colors.greenAccent;
       default:
-        return Colors.cyanAccent;
+        return const Color(0xFF2563EB);
     }
   }
 
@@ -1906,7 +1871,7 @@ class _ReferenciaDetailScreenState extends State<ReferenciaDetailScreen> {
       case 'Salud':
         return Colors.blueAccent;
       default:
-        return Colors.cyanAccent;
+        return const Color(0xFF2563EB);
     }
   }
 
@@ -1929,11 +1894,11 @@ class _ReferenciaDetailScreenState extends State<ReferenciaDetailScreen> {
         return Theme(
           data: ThemeData.dark().copyWith(
             colorScheme: const ColorScheme.dark(
-              primary: Colors.cyanAccent,
-              surface: Color(0xFF061018),
+              primary: const Color(0xFF2563EB),
+              surface: Color(0xFFFFFFFF),
               onSurface: Colors.white,
             ),
-            dialogBackgroundColor: const Color(0xFF061018),
+            dialogBackgroundColor: const Color(0xFFFFFFFF),
           ),
           child: child!,
         );
@@ -1947,7 +1912,8 @@ class _ReferenciaDetailScreenState extends State<ReferenciaDetailScreen> {
     String estado = widget.referencia['estado']?.toString() ?? "En curso";
     if (estado == "Pendiente") estado = "En curso";
 
-    String resultado = widget.referencia['resultado']?.toString() ?? "Contratado";
+    String resultado =
+        widget.referencia['resultado']?.toString() ?? "Contratado";
 
     fechaRellamada = _parseDate(widget.referencia['fecha_rellamada']);
 
@@ -1967,10 +1933,10 @@ class _ReferenciaDetailScreenState extends State<ReferenciaDetailScreen> {
                   child: Container(
                     padding: const EdgeInsets.all(22),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF061018).withOpacity(0.96),
+                      color: const Color(0xFFFFFFFF).withOpacity(0.96),
                       borderRadius: BorderRadius.circular(28),
                       border: Border.all(
-                        color: Colors.cyanAccent.withOpacity(0.35),
+                        color: const Color(0xFF2563EB).withOpacity(0.35),
                       ),
                     ),
                     child: SingleChildScrollView(
@@ -1982,14 +1948,14 @@ class _ReferenciaDetailScreenState extends State<ReferenciaDetailScreen> {
                             children: [
                               Icon(
                                 Icons.settings_suggest_rounded,
-                                color: Colors.cyanAccent,
+                                color: const Color(0xFF2563EB),
                               ),
                               SizedBox(width: 10),
                               Expanded(
                                 child: Text(
                                   "Gestionar referencia",
                                   style: TextStyle(
-                                    color: Colors.white,
+                                    color: const Color(0xFF111827),
                                     fontSize: 22,
                                     fontWeight: FontWeight.w900,
                                   ),
@@ -2003,26 +1969,30 @@ class _ReferenciaDetailScreenState extends State<ReferenciaDetailScreen> {
                           TextField(
                             controller: notaController,
                             maxLines: 3,
-                            style: const TextStyle(color: Colors.white),
+                            style: const TextStyle(
+                              color: const Color(0xFF111827),
+                            ),
                             decoration: InputDecoration(
                               labelText: "Nota de seguimiento",
-                              labelStyle: const TextStyle(color: Colors.white60),
+                              labelStyle: const TextStyle(
+                                color: const Color(0xFF64748B),
+                              ),
                               prefixIcon: const Icon(
                                 Icons.notes_rounded,
-                                color: Colors.cyanAccent,
+                                color: const Color(0xFF2563EB),
                               ),
                               filled: true,
-                              fillColor: Colors.white.withOpacity(0.065),
+                              fillColor: Colors.white,
                               enabledBorder: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(18),
-                                borderSide: BorderSide(
-                                  color: Colors.white.withOpacity(0.10),
-                                ),
+                                borderSide: BorderSide(color: Colors.white),
                               ),
                               focusedBorder: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(18),
                                 borderSide: BorderSide(
-                                  color: Colors.cyanAccent.withOpacity(0.65),
+                                  color: const Color(
+                                    0xFF2563EB,
+                                  ).withOpacity(0.65),
                                 ),
                               ),
                             ),
@@ -2032,27 +2002,31 @@ class _ReferenciaDetailScreenState extends State<ReferenciaDetailScreen> {
 
                           DropdownButtonFormField<String>(
                             value: estado,
-                            dropdownColor: const Color(0xFF0F172A),
-                            style: const TextStyle(color: Colors.white),
+                            dropdownColor: const Color(0xFFF8FAFC),
+                            style: const TextStyle(
+                              color: const Color(0xFF111827),
+                            ),
                             decoration: InputDecoration(
                               labelText: "Estado",
-                              labelStyle: const TextStyle(color: Colors.white60),
+                              labelStyle: const TextStyle(
+                                color: const Color(0xFF64748B),
+                              ),
                               prefixIcon: const Icon(
                                 Icons.track_changes_rounded,
-                                color: Colors.cyanAccent,
+                                color: const Color(0xFF2563EB),
                               ),
                               filled: true,
-                              fillColor: Colors.white.withOpacity(0.065),
+                              fillColor: Colors.white,
                               enabledBorder: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(18),
-                                borderSide: BorderSide(
-                                  color: Colors.white.withOpacity(0.10),
-                                ),
+                                borderSide: BorderSide(color: Colors.white),
                               ),
                               focusedBorder: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(18),
                                 borderSide: BorderSide(
-                                  color: Colors.cyanAccent.withOpacity(0.65),
+                                  color: const Color(
+                                    0xFF2563EB,
+                                  ).withOpacity(0.65),
                                 ),
                               ),
                             ),
@@ -2090,17 +2064,19 @@ class _ReferenciaDetailScreenState extends State<ReferenciaDetailScreen> {
                                 width: double.infinity,
                                 padding: const EdgeInsets.all(15),
                                 decoration: BoxDecoration(
-                                  color: Colors.white.withOpacity(0.07),
+                                  color: Colors.white,
                                   borderRadius: BorderRadius.circular(18),
                                   border: Border.all(
-                                    color: Colors.cyanAccent.withOpacity(0.35),
+                                    color: const Color(
+                                      0xFF2563EB,
+                                    ).withOpacity(0.35),
                                   ),
                                 ),
                                 child: Row(
                                   children: [
                                     const Icon(
                                       Icons.phone_callback_rounded,
-                                      color: Colors.cyanAccent,
+                                      color: const Color(0xFF2563EB),
                                     ),
                                     const SizedBox(width: 12),
                                     Expanded(
@@ -2109,7 +2085,7 @@ class _ReferenciaDetailScreenState extends State<ReferenciaDetailScreen> {
                                             ? "Programar próxima llamada"
                                             : "Rellamada: ${_fechaBonita(fechaRellamada!.toIso8601String())}",
                                         style: const TextStyle(
-                                          color: Colors.cyanAccent,
+                                          color: const Color(0xFF2563EB),
                                           fontWeight: FontWeight.w800,
                                         ),
                                       ),
@@ -2122,27 +2098,31 @@ class _ReferenciaDetailScreenState extends State<ReferenciaDetailScreen> {
                           if (estado == "Resuelto")
                             DropdownButtonFormField<String>(
                               value: resultado,
-                              dropdownColor: const Color(0xFF0F172A),
-                              style: const TextStyle(color: Colors.white),
+                              dropdownColor: const Color(0xFFF8FAFC),
+                              style: const TextStyle(
+                                color: const Color(0xFF111827),
+                              ),
                               decoration: InputDecoration(
                                 labelText: "Resultado",
-                                labelStyle: const TextStyle(color: Colors.white60),
+                                labelStyle: const TextStyle(
+                                  color: const Color(0xFF64748B),
+                                ),
                                 prefixIcon: const Icon(
                                   Icons.verified_rounded,
-                                  color: Colors.cyanAccent,
+                                  color: const Color(0xFF2563EB),
                                 ),
                                 filled: true,
-                                fillColor: Colors.white.withOpacity(0.065),
+                                fillColor: Colors.white,
                                 enabledBorder: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(18),
-                                  borderSide: BorderSide(
-                                    color: Colors.white.withOpacity(0.10),
-                                  ),
+                                  borderSide: BorderSide(color: Colors.white),
                                 ),
                                 focusedBorder: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(18),
                                   borderSide: BorderSide(
-                                    color: Colors.cyanAccent.withOpacity(0.65),
+                                    color: const Color(
+                                      0xFF2563EB,
+                                    ).withOpacity(0.65),
                                   ),
                                 ),
                               ),
@@ -2171,7 +2151,7 @@ class _ReferenciaDetailScreenState extends State<ReferenciaDetailScreen> {
                                 child: OutlinedButton(
                                   onPressed: () => Navigator.pop(context),
                                   style: OutlinedButton.styleFrom(
-                                    foregroundColor: Colors.white70,
+                                    foregroundColor: const Color(0xFF64748B),
                                     side: BorderSide(
                                       color: Colors.white.withOpacity(0.25),
                                     ),
@@ -2192,18 +2172,22 @@ class _ReferenciaDetailScreenState extends State<ReferenciaDetailScreen> {
                                     await supabase
                                         .from('referencias_viables')
                                         .update({
-                                      'estado': estado,
-                                      'resultado': estado == "Resuelto"
-                                          ? resultado
-                                          : null,
-                                      'nota_seguimiento':
-                                          notaController.text.trim(),
-                                      'fecha_rellamada': estado == "En curso"
-                                          ? fechaRellamada?.toIso8601String()
-                                          : null,
-                                      'updated_at':
-                                          DateTime.now().toIso8601String(),
-                                    }).eq('id', widget.referencia['id']);
+                                          'estado': estado,
+                                          'resultado': estado == "Resuelto"
+                                              ? resultado
+                                              : null,
+                                          'nota_seguimiento': notaController
+                                              .text
+                                              .trim(),
+                                          'fecha_rellamada':
+                                              estado == "En curso"
+                                              ? fechaRellamada
+                                                    ?.toIso8601String()
+                                              : null,
+                                          'updated_at': DateTime.now()
+                                              .toIso8601String(),
+                                        })
+                                        .eq('id', widget.referencia['id']);
 
                                     if (!mounted) return;
 
@@ -2213,8 +2197,8 @@ class _ReferenciaDetailScreenState extends State<ReferenciaDetailScreen> {
                                   icon: const Icon(Icons.save_rounded),
                                   label: const Text("Guardar"),
                                   style: ElevatedButton.styleFrom(
-                                    backgroundColor: Colors.cyanAccent,
-                                    foregroundColor: const Color(0xFF031018),
+                                    backgroundColor: const Color(0xFF2563EB),
+                                    foregroundColor: const Color(0xFFFFFFFF),
                                     padding: const EdgeInsets.symmetric(
                                       vertical: 14,
                                     ),
@@ -2260,7 +2244,7 @@ class _ReferenciaDetailScreenState extends State<ReferenciaDetailScreen> {
     final prioridadColor = _prioridadColor(prioridad);
 
     return Scaffold(
-      backgroundColor: const Color(0xFF020617),
+      backgroundColor: const Color(0xFFF4F6FB),
       body: Stack(
         children: [
           const _FondoReferencias(),
@@ -2294,9 +2278,11 @@ class _ReferenciaDetailScreenState extends State<ReferenciaDetailScreen> {
                 if (productos.isNotEmpty) const SizedBox(height: 16),
                 _notasCard(
                   titulo: "Notas de la referencia",
-                  texto: notas.trim().isEmpty ? "Sin notas registradas." : notas,
+                  texto: notas.trim().isEmpty
+                      ? "Sin notas registradas."
+                      : notas,
                   icon: Icons.notes_rounded,
-                  color: Colors.cyanAccent,
+                  color: const Color(0xFF2563EB),
                 ),
                 if (notaSeguimiento.trim().isNotEmpty) ...[
                   const SizedBox(height: 16),
@@ -2324,8 +2310,8 @@ class _ReferenciaDetailScreenState extends State<ReferenciaDetailScreen> {
                         ),
                       ),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.cyanAccent,
-                        foregroundColor: const Color(0xFF031018),
+                        backgroundColor: const Color(0xFF2563EB),
+                        foregroundColor: const Color(0xFFFFFFFF),
                         padding: const EdgeInsets.symmetric(vertical: 17),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(18),
@@ -2351,15 +2337,15 @@ class _ReferenciaDetailScreenState extends State<ReferenciaDetailScreen> {
             height: 54,
             width: 54,
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.08),
+              color: Colors.white,
               borderRadius: BorderRadius.circular(18),
               border: Border.all(
-                color: Colors.cyanAccent.withOpacity(0.45),
+                color: const Color(0xFF2563EB).withOpacity(0.45),
               ),
             ),
             child: const Icon(
               Icons.arrow_back_rounded,
-              color: Colors.white,
+              color: Color(0xFF111827),
             ),
           ),
         ),
@@ -2371,7 +2357,7 @@ class _ReferenciaDetailScreenState extends State<ReferenciaDetailScreen> {
               Text(
                 "Detalle CRM",
                 style: TextStyle(
-                  color: Colors.white,
+                  color: const Color(0xFF111827),
                   fontSize: 26,
                   fontWeight: FontWeight.w900,
                   letterSpacing: -0.7,
@@ -2380,10 +2366,7 @@ class _ReferenciaDetailScreenState extends State<ReferenciaDetailScreen> {
               SizedBox(height: 3),
               Text(
                 "Ficha completa de oportunidad",
-                style: TextStyle(
-                  color: Colors.white60,
-                  fontSize: 13,
-                ),
+                style: TextStyle(color: const Color(0xFF64748B), fontSize: 13),
               ),
             ],
           ),
@@ -2411,12 +2394,12 @@ class _ReferenciaDetailScreenState extends State<ReferenciaDetailScreen> {
               shape: BoxShape.circle,
               gradient: LinearGradient(
                 colors: [
-                  Colors.cyanAccent.withOpacity(0.35),
+                  const Color(0xFF2563EB).withOpacity(0.35),
                   Colors.purpleAccent.withOpacity(0.25),
                 ],
               ),
               border: Border.all(
-                color: Colors.cyanAccent.withOpacity(0.45),
+                color: const Color(0xFF2563EB).withOpacity(0.45),
                 width: 1.4,
               ),
             ),
@@ -2424,7 +2407,7 @@ class _ReferenciaDetailScreenState extends State<ReferenciaDetailScreen> {
               child: Text(
                 _iniciales(nombre),
                 style: const TextStyle(
-                  color: Colors.white,
+                  color: const Color(0xFF111827),
                   fontSize: 30,
                   fontWeight: FontWeight.w900,
                 ),
@@ -2436,7 +2419,7 @@ class _ReferenciaDetailScreenState extends State<ReferenciaDetailScreen> {
             nombre,
             textAlign: TextAlign.center,
             style: const TextStyle(
-              color: Colors.white,
+              color: const Color(0xFF111827),
               fontSize: 25,
               fontWeight: FontWeight.w900,
               letterSpacing: -0.5,
@@ -2446,7 +2429,7 @@ class _ReferenciaDetailScreenState extends State<ReferenciaDetailScreen> {
           Text(
             compania,
             style: const TextStyle(
-              color: Colors.cyanAccent,
+              color: const Color(0xFF2563EB),
               fontSize: 15,
               fontWeight: FontWeight.w800,
             ),
@@ -2457,11 +2440,7 @@ class _ReferenciaDetailScreenState extends State<ReferenciaDetailScreen> {
             spacing: 8,
             runSpacing: 8,
             children: [
-              _pill(
-                prioridad,
-                prioridadColor,
-                Icons.flag_rounded,
-              ),
+              _pill(prioridad, prioridadColor, Icons.flag_rounded),
               _pill(
                 _scoreTexto(score),
                 scoreColor,
@@ -2478,7 +2457,7 @@ class _ReferenciaDetailScreenState extends State<ReferenciaDetailScreen> {
                   child: LinearProgressIndicator(
                     value: score / 100,
                     minHeight: 12,
-                    backgroundColor: Colors.white.withOpacity(0.12),
+                    backgroundColor: Colors.white,
                     valueColor: AlwaysStoppedAnimation(scoreColor),
                   ),
                 ),
@@ -2500,7 +2479,7 @@ class _ReferenciaDetailScreenState extends State<ReferenciaDetailScreen> {
             child: Text(
               "Score de oportunidad",
               style: TextStyle(
-                color: Colors.white54,
+                color: const Color(0xFF64748B),
                 fontSize: 12,
                 fontWeight: FontWeight.w700,
               ),
@@ -2520,18 +2499,14 @@ class _ReferenciaDetailScreenState extends State<ReferenciaDetailScreen> {
         gradient: LinearGradient(
           colors: [
             color.withOpacity(0.24),
-            Colors.cyanAccent.withOpacity(0.08),
+            const Color(0xFF2563EB).withOpacity(0.08),
           ],
         ),
         border: Border.all(color: color.withOpacity(0.34)),
       ),
       child: Row(
         children: [
-          Icon(
-            Icons.warning_amber_rounded,
-            color: color,
-            size: 30,
-          ),
+          Icon(Icons.warning_amber_rounded, color: color, size: 30),
           const SizedBox(width: 12),
           Expanded(
             child: Text(
@@ -2546,7 +2521,7 @@ class _ReferenciaDetailScreenState extends State<ReferenciaDetailScreen> {
           Text(
             _fechaBonita(value),
             style: const TextStyle(
-              color: Colors.white70,
+              color: const Color(0xFF64748B),
               fontWeight: FontWeight.w700,
             ),
           ),
@@ -2570,7 +2545,7 @@ class _ReferenciaDetailScreenState extends State<ReferenciaDetailScreen> {
           const Text(
             "Datos principales",
             style: TextStyle(
-              color: Colors.white,
+              color: const Color(0xFF111827),
               fontSize: 19,
               fontWeight: FontWeight.w900,
             ),
@@ -2580,20 +2555,15 @@ class _ReferenciaDetailScreenState extends State<ReferenciaDetailScreen> {
             Icons.phone_rounded,
             "Teléfono",
             telefono.isEmpty ? "Sin teléfono" : telefono,
-            Colors.white70,
+            const Color(0xFF64748B),
           ),
           _infoLine(
             Icons.apartment_rounded,
             "Compañía",
             compania,
-            Colors.cyanAccent,
+            const Color(0xFF2563EB),
           ),
-          _infoLine(
-            Icons.flag_rounded,
-            "Prioridad",
-            prioridad,
-            prioridadColor,
-          ),
+          _infoLine(Icons.flag_rounded, "Prioridad", prioridad, prioridadColor),
           _infoLine(
             Icons.track_changes_rounded,
             "Estado",
@@ -2605,9 +2575,7 @@ class _ReferenciaDetailScreenState extends State<ReferenciaDetailScreen> {
               Icons.verified_rounded,
               "Resultado",
               resultado,
-              resultado == "Contratado"
-                  ? Colors.greenAccent
-                  : Colors.redAccent,
+              resultado == "Contratado" ? Colors.greenAccent : Colors.redAccent,
             ),
           if (widget.referencia['requiere_visita'] == true)
             Container(
@@ -2616,16 +2584,11 @@ class _ReferenciaDetailScreenState extends State<ReferenciaDetailScreen> {
               decoration: BoxDecoration(
                 color: Colors.redAccent.withOpacity(0.12),
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                  color: Colors.redAccent.withOpacity(0.32),
-                ),
+                border: Border.all(color: Colors.redAccent.withOpacity(0.32)),
               ),
               child: const Row(
                 children: [
-                  Icon(
-                    Icons.home_work_rounded,
-                    color: Colors.redAccent,
-                  ),
+                  Icon(Icons.home_work_rounded, color: Colors.redAccent),
                   SizedBox(width: 8),
                   Text(
                     "Requiere visita",
@@ -2650,7 +2613,7 @@ class _ReferenciaDetailScreenState extends State<ReferenciaDetailScreen> {
           const Text(
             "Productos actuales",
             style: TextStyle(
-              color: Colors.white,
+              color: const Color(0xFF111827),
               fontSize: 19,
               fontWeight: FontWeight.w900,
             ),
@@ -2668,7 +2631,7 @@ class _ReferenciaDetailScreenState extends State<ReferenciaDetailScreen> {
                   vertical: 10,
                 ),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF142235),
+                  color: const Color(0xFFFFFFFF),
                   borderRadius: BorderRadius.circular(30),
                   border: Border.all(
                     color: color.withOpacity(0.45),
@@ -2678,16 +2641,12 @@ class _ReferenciaDetailScreenState extends State<ReferenciaDetailScreen> {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(
-                      _iconoProducto(p),
-                      color: color,
-                      size: 18,
-                    ),
+                    Icon(_iconoProducto(p), color: color, size: 18),
                     const SizedBox(width: 8),
                     Text(
                       p,
                       style: const TextStyle(
-                        color: Colors.white,
+                        color: const Color(0xFF111827),
                         fontSize: 13,
                         fontWeight: FontWeight.w900,
                       ),
@@ -2720,7 +2679,7 @@ class _ReferenciaDetailScreenState extends State<ReferenciaDetailScreen> {
                 child: Text(
                   titulo,
                   style: const TextStyle(
-                    color: Colors.white,
+                    color: const Color(0xFF111827),
                     fontSize: 19,
                     fontWeight: FontWeight.w900,
                   ),
@@ -2732,7 +2691,7 @@ class _ReferenciaDetailScreenState extends State<ReferenciaDetailScreen> {
           Text(
             texto,
             style: const TextStyle(
-              color: Colors.white70,
+              color: const Color(0xFF64748B),
               height: 1.45,
               fontWeight: FontWeight.w500,
             ),
@@ -2754,7 +2713,7 @@ class _ReferenciaDetailScreenState extends State<ReferenciaDetailScreen> {
           const Text(
             "Timeline CRM",
             style: TextStyle(
-              color: Colors.white,
+              color: const Color(0xFF111827),
               fontSize: 19,
               fontWeight: FontWeight.w900,
             ),
@@ -2762,7 +2721,7 @@ class _ReferenciaDetailScreenState extends State<ReferenciaDetailScreen> {
           const SizedBox(height: 16),
           _timelineItem(
             icon: Icons.add_circle_rounded,
-            color: Colors.cyanAccent,
+            color: const Color(0xFF2563EB),
             title: "Referencia creada",
             subtitle: _fechaBonita(createdAt),
           ),
@@ -2794,7 +2753,7 @@ class _ReferenciaDetailScreenState extends State<ReferenciaDetailScreen> {
           else
             _timelineItem(
               icon: Icons.touch_app_rounded,
-              color: Colors.white38,
+              color: const Color(0xFF94A3B8),
               title: "Pendiente de gestión",
               subtitle: "Pulsa en gestionar referencia",
               last: true,
@@ -2844,7 +2803,7 @@ class _ReferenciaDetailScreenState extends State<ReferenciaDetailScreen> {
                 Text(
                   title,
                   style: const TextStyle(
-                    color: Colors.white,
+                    color: const Color(0xFF111827),
                     fontWeight: FontWeight.w900,
                   ),
                 ),
@@ -2852,7 +2811,7 @@ class _ReferenciaDetailScreenState extends State<ReferenciaDetailScreen> {
                 Text(
                   subtitle,
                   style: const TextStyle(
-                    color: Colors.white60,
+                    color: const Color(0xFF64748B),
                     height: 1.35,
                   ),
                 ),
@@ -2864,24 +2823,19 @@ class _ReferenciaDetailScreenState extends State<ReferenciaDetailScreen> {
     );
   }
 
-  Widget _infoLine(
-    IconData icon,
-    String label,
-    String value,
-    Color color,
-  ) {
+  Widget _infoLine(IconData icon, String label, String value, Color color) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 13),
       child: Row(
         children: [
-          Icon(icon, color: Colors.cyanAccent, size: 21),
+          Icon(icon, color: const Color(0xFF2563EB), size: 21),
           const SizedBox(width: 10),
           SizedBox(
             width: 100,
             child: Text(
               label,
               style: const TextStyle(
-                color: Colors.white54,
+                color: const Color(0xFF64748B),
                 fontWeight: FontWeight.w700,
               ),
             ),
@@ -2890,10 +2844,7 @@ class _ReferenciaDetailScreenState extends State<ReferenciaDetailScreen> {
             child: Text(
               value,
               textAlign: TextAlign.right,
-              style: TextStyle(
-                color: color,
-                fontWeight: FontWeight.w900,
-              ),
+              style: TextStyle(color: color, fontWeight: FontWeight.w900),
             ),
           ),
         ],
@@ -2939,9 +2890,9 @@ class _ReferenciaDetailScreenState extends State<ReferenciaDetailScreen> {
           width: double.infinity,
           padding: padding,
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.075),
+            color: Colors.white,
             borderRadius: BorderRadius.circular(26),
-            border: Border.all(color: Colors.white.withOpacity(0.12)),
+            border: Border.all(color: const Color(0xFFE2E8F0)),
             boxShadow: [
               BoxShadow(
                 color: Colors.black.withOpacity(0.28),

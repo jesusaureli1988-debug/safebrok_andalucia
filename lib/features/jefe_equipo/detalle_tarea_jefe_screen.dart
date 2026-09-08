@@ -6,14 +6,10 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 class DetalleTareaJefeScreen extends StatefulWidget {
   final Map<String, dynamic> tarea;
 
-  const DetalleTareaJefeScreen({
-    super.key,
-    required this.tarea,
-  });
+  const DetalleTareaJefeScreen({super.key, required this.tarea});
 
   @override
-  State<DetalleTareaJefeScreen> createState() =>
-      _DetalleTareaJefeScreenState();
+  State<DetalleTareaJefeScreen> createState() => _DetalleTareaJefeScreenState();
 }
 
 class _DetalleTareaJefeScreenState extends State<DetalleTareaJefeScreen> {
@@ -109,6 +105,9 @@ class _DetalleTareaJefeScreenState extends State<DetalleTareaJefeScreen> {
       final data = await supabase
           .from('usuarios')
           .select()
+          .or(
+            'estado.is.null,estado.not.in.(inactivo,Inactivo,INACTIVO,baja,Baja,BAJA,desactivado,Desactivado,DESACTIVADO,bloqueado,Bloqueado,BLOQUEADO,suspendido,Suspendido,SUSPENDIDO)',
+          )
           .eq('auth_id', authId)
           .maybeSingle();
 
@@ -126,7 +125,7 @@ class _DetalleTareaJefeScreenState extends State<DetalleTareaJefeScreen> {
     if (equipo == 0 && propios == 0) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          backgroundColor: Color(0xFFEF4444),
+          backgroundColor: Color(0xFFE74646),
           content: Text("Debes introducir contactos antes de completar"),
         ),
       );
@@ -136,12 +135,15 @@ class _DetalleTareaJefeScreenState extends State<DetalleTareaJefeScreen> {
     setState(() => loading = true);
 
     try {
-      await supabase.from('contactos_diarios_jefe_equipo').update({
-        'contactos_equipo': equipo,
-        'contactos_propios': propios,
-        'total_contactos': equipo + propios,
-        'realizada': true,
-      }).eq('id', widget.tarea['id']);
+      await supabase
+          .from('contactos_diarios_jefe_equipo')
+          .update({
+            'contactos_equipo': equipo,
+            'contactos_propios': propios,
+            'total_contactos': equipo + propios,
+            'realizada': true,
+          })
+          .eq('id', widget.tarea['id']);
 
       if (mounted) Navigator.pop(context);
     } catch (e) {
@@ -150,7 +152,7 @@ class _DetalleTareaJefeScreenState extends State<DetalleTareaJefeScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            backgroundColor: Color(0xFFEF4444),
+            backgroundColor: Color(0xFFE74646),
             content: Text("No se pudo guardar la tarea"),
           ),
         );
@@ -167,7 +169,7 @@ class _DetalleTareaJefeScreenState extends State<DetalleTareaJefeScreen> {
     final bloqueado = realizada;
 
     return Scaffold(
-      backgroundColor: const Color(0xFF050816),
+      backgroundColor: const Color(0xFFF2FCFD),
       body: Stack(
         children: [
           const _GlowBackground(),
@@ -212,9 +214,9 @@ class _DetalleTareaJefeScreenState extends State<DetalleTareaJefeScreen> {
               height: 44,
               width: 44,
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.08),
+                color: Colors.white,
                 borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: Colors.white.withOpacity(0.10)),
+                border: Border.all(color: Colors.white),
               ),
               child: const Icon(
                 Icons.arrow_back_ios_new_rounded,
@@ -228,7 +230,7 @@ class _DetalleTareaJefeScreenState extends State<DetalleTareaJefeScreen> {
             child: Text(
               "Detalle diario",
               style: TextStyle(
-                color: Colors.white,
+                color: const Color(0xFF071A3A),
                 fontSize: 24,
                 fontWeight: FontWeight.w900,
               ),
@@ -240,7 +242,7 @@ class _DetalleTareaJefeScreenState extends State<DetalleTareaJefeScreen> {
   }
 
   Widget _heroCard() {
-    final color = realizada ? const Color(0xFF22C55E) : const Color(0xFFF59E0B);
+    final color = realizada ? const Color(0xFF0AAEAE) : const Color(0xFF0A7F91);
 
     return Container(
       width: double.infinity,
@@ -250,10 +252,7 @@ class _DetalleTareaJefeScreenState extends State<DetalleTareaJefeScreen> {
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [
-            color.withOpacity(0.24),
-            Colors.white.withOpacity(0.06),
-          ],
+          colors: [color.withOpacity(0.24), Colors.white],
         ),
         border: Border.all(color: color.withOpacity(0.35)),
         boxShadow: [
@@ -275,9 +274,7 @@ class _DetalleTareaJefeScreenState extends State<DetalleTareaJefeScreen> {
               border: Border.all(color: color.withOpacity(0.45)),
             ),
             child: Icon(
-              realizada
-                  ? Icons.verified_rounded
-                  : Icons.hourglass_top_rounded,
+              realizada ? Icons.verified_rounded : Icons.hourglass_top_rounded,
               color: color,
               size: 36,
             ),
@@ -290,7 +287,7 @@ class _DetalleTareaJefeScreenState extends State<DetalleTareaJefeScreen> {
                 Text(
                   realizada ? "Tarea completada" : "Tarea pendiente",
                   style: const TextStyle(
-                    color: Colors.white,
+                    color: const Color(0xFF071A3A),
                     fontSize: 22,
                     fontWeight: FontWeight.w900,
                   ),
@@ -299,7 +296,7 @@ class _DetalleTareaJefeScreenState extends State<DetalleTareaJefeScreen> {
                 Text(
                   "Fecha: ${_fechaBonita(widget.tarea['fecha'])}",
                   style: TextStyle(
-                    color: Colors.white.withOpacity(0.65),
+                    color: const Color(0xFF53627A),
                     fontSize: 14,
                   ),
                 ),
@@ -312,47 +309,31 @@ class _DetalleTareaJefeScreenState extends State<DetalleTareaJefeScreen> {
   }
 
   Widget _usuarioCard() {
-    final nombre = _valorUsuario(
-      [
-        'nombre',
-        'nombre_completo',
-        'nombre_apellidos',
-        'nombre_y_apellidos',
-        'NOMBRE Y APELLIDOS',
-      ],
-      'Jefe de equipo',
-    );
+    final nombre = _valorUsuario([
+      'nombre',
+      'nombre_completo',
+      'nombre_apellidos',
+      'nombre_y_apellidos',
+      'NOMBRE Y APELLIDOS',
+    ], 'Jefe de equipo');
 
-    final telefono = _valorUsuario(
-      [
-        'telefono',
-        'teléfono',
-        'TELEFONO',
-        'TELÉFONO',
-      ],
-      'Sin teléfono',
-    );
+    final telefono = _valorUsuario([
+      'telefono',
+      'teléfono',
+      'TELEFONO',
+      'TELÉFONO',
+    ], 'Sin teléfono');
 
-    final email = _valorUsuario(
-      [
-        'email',
-        'EMAIL',
-        'correo',
-      ],
-      'Sin email',
-    );
+    final email = _valorUsuario(['email', 'EMAIL', 'correo'], 'Sin email');
 
-    final ciudad = _valorUsuario(
-      [
-        'ciudad',
-        'poblacion',
-        'población',
-        'direccion',
-        'dirección',
-        'DIRECCIÓN',
-      ],
-      'Sin ciudad',
-    );
+    final ciudad = _valorUsuario([
+      'ciudad',
+      'poblacion',
+      'población',
+      'direccion',
+      'dirección',
+      'DIRECCIÓN',
+    ], 'Sin ciudad');
 
     return ClipRRect(
       borderRadius: BorderRadius.circular(28),
@@ -362,17 +343,15 @@ class _DetalleTareaJefeScreenState extends State<DetalleTareaJefeScreen> {
           width: double.infinity,
           padding: const EdgeInsets.all(18),
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.075),
+            color: Colors.white,
             borderRadius: BorderRadius.circular(28),
-            border: Border.all(color: Colors.white.withOpacity(0.10)),
+            border: Border.all(color: Colors.white),
           ),
           child: loadingUsuario
               ? const Center(
                   child: Padding(
                     padding: EdgeInsets.all(18),
-                    child: CircularProgressIndicator(
-                      color: Color(0xFF38BDF8),
-                    ),
+                    child: CircularProgressIndicator(color: Color(0xFF20C7C2)),
                   ),
                 )
               : Column(
@@ -386,10 +365,7 @@ class _DetalleTareaJefeScreenState extends State<DetalleTareaJefeScreen> {
                           decoration: const BoxDecoration(
                             shape: BoxShape.circle,
                             gradient: LinearGradient(
-                              colors: [
-                                Color(0xFF38BDF8),
-                                Color(0xFF6366F1),
-                              ],
+                              colors: [Color(0xFF20C7C2), Color(0xFF0A7F91)],
                             ),
                           ),
                           child: const Icon(
@@ -406,7 +382,7 @@ class _DetalleTareaJefeScreenState extends State<DetalleTareaJefeScreen> {
                               Text(
                                 nombre,
                                 style: const TextStyle(
-                                  color: Colors.white,
+                                  color: const Color(0xFF071A3A),
                                   fontSize: 19,
                                   fontWeight: FontWeight.w900,
                                 ),
@@ -415,7 +391,7 @@ class _DetalleTareaJefeScreenState extends State<DetalleTareaJefeScreen> {
                               Text(
                                 "Responsable del registro diario",
                                 style: TextStyle(
-                                  color: Colors.white.withOpacity(0.50),
+                                  color: const Color(0xFF53627A),
                                   fontSize: 13,
                                 ),
                               ),
@@ -440,15 +416,12 @@ class _DetalleTareaJefeScreenState extends State<DetalleTareaJefeScreen> {
       padding: const EdgeInsets.only(top: 9),
       child: Row(
         children: [
-          Icon(icon, color: const Color(0xFF7DD3FC), size: 18),
+          Icon(icon, color: const Color(0xFF20C7C2), size: 18),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
               text,
-              style: TextStyle(
-                color: Colors.white.withOpacity(0.72),
-                fontSize: 14,
-              ),
+              style: TextStyle(color: const Color(0xFF53627A), fontSize: 14),
             ),
           ),
         ],
@@ -461,9 +434,9 @@ class _DetalleTareaJefeScreenState extends State<DetalleTareaJefeScreen> {
       width: double.infinity,
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.07),
+        color: Colors.white,
         borderRadius: BorderRadius.circular(28),
-        border: Border.all(color: Colors.white.withOpacity(0.09)),
+        border: Border.all(color: Colors.white),
       ),
       child: Column(
         children: [
@@ -508,7 +481,7 @@ class _DetalleTareaJefeScreenState extends State<DetalleTareaJefeScreen> {
       decoration: BoxDecoration(
         color: Colors.black.withOpacity(0.18),
         borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: Colors.white.withOpacity(0.08)),
+        border: Border.all(color: Colors.white),
       ),
       child: Row(
         children: [
@@ -516,13 +489,10 @@ class _DetalleTareaJefeScreenState extends State<DetalleTareaJefeScreen> {
             height: 48,
             width: 48,
             decoration: BoxDecoration(
-              color: const Color(0xFF38BDF8).withOpacity(0.14),
+              color: const Color(0xFF20C7C2).withOpacity(0.14),
               borderRadius: BorderRadius.circular(16),
             ),
-            child: Icon(
-              icon,
-              color: const Color(0xFF7DD3FC),
-            ),
+            child: Icon(icon, color: const Color(0xFF20C7C2)),
           ),
           const SizedBox(width: 13),
           Expanded(
@@ -532,7 +502,7 @@ class _DetalleTareaJefeScreenState extends State<DetalleTareaJefeScreen> {
                 Text(
                   title,
                   style: const TextStyle(
-                    color: Colors.white,
+                    color: const Color(0xFF071A3A),
                     fontWeight: FontWeight.w800,
                     fontSize: 15,
                   ),
@@ -541,7 +511,7 @@ class _DetalleTareaJefeScreenState extends State<DetalleTareaJefeScreen> {
                 Text(
                   subtitle,
                   style: TextStyle(
-                    color: Colors.white.withOpacity(0.45),
+                    color: const Color(0xFF53627A),
                     fontSize: 12,
                   ),
                 ),
@@ -556,18 +526,16 @@ class _DetalleTareaJefeScreenState extends State<DetalleTareaJefeScreen> {
               enabled: enabled,
               textAlign: TextAlign.center,
               keyboardType: TextInputType.number,
-              inputFormatters: [
-                FilteringTextInputFormatter.digitsOnly,
-              ],
+              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
               style: const TextStyle(
-                color: Colors.white,
+                color: const Color(0xFF071A3A),
                 fontSize: 22,
                 fontWeight: FontWeight.w900,
               ),
               decoration: InputDecoration(
                 filled: true,
                 fillColor: enabled
-                    ? Colors.white.withOpacity(0.08)
+                    ? Colors.white
                     : Colors.white.withOpacity(0.03),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(16),
@@ -593,14 +561,11 @@ class _DetalleTareaJefeScreenState extends State<DetalleTareaJefeScreen> {
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(30),
         gradient: const LinearGradient(
-          colors: [
-            Color(0xFF0EA5E9),
-            Color(0xFF2563EB),
-          ],
+          colors: [Color(0xFF0AAEAE), Color(0xFF0A7F91)],
         ),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF38BDF8).withOpacity(0.30),
+            color: const Color(0xFF20C7C2).withOpacity(0.30),
             blurRadius: 28,
             offset: const Offset(0, 14),
           ),
@@ -608,17 +573,13 @@ class _DetalleTareaJefeScreenState extends State<DetalleTareaJefeScreen> {
       ),
       child: Row(
         children: [
-          const Icon(
-            Icons.calculate_rounded,
-            color: Colors.white,
-            size: 34,
-          ),
+          const Icon(Icons.calculate_rounded, color: Colors.white, size: 34),
           const SizedBox(width: 15),
           const Expanded(
             child: Text(
               "Total contactos",
               style: TextStyle(
-                color: Colors.white,
+                color: const Color(0xFF071A3A),
                 fontSize: 18,
                 fontWeight: FontWeight.w900,
               ),
@@ -627,7 +588,7 @@ class _DetalleTareaJefeScreenState extends State<DetalleTareaJefeScreen> {
           Text(
             total.toString(),
             style: const TextStyle(
-              color: Colors.white,
+              color: const Color(0xFF071A3A),
               fontSize: 36,
               fontWeight: FontWeight.w900,
             ),
@@ -644,8 +605,7 @@ class _DetalleTareaJefeScreenState extends State<DetalleTareaJefeScreen> {
       child: ElevatedButton(
         style: ElevatedButton.styleFrom(
           elevation: 0,
-          backgroundColor:
-              bloqueado ? Colors.white.withOpacity(0.12) : const Color(0xFF22C55E),
+          backgroundColor: bloqueado ? Colors.white : const Color(0xFF0AAEAE),
           foregroundColor: Colors.white,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(20),
@@ -683,17 +643,17 @@ class _GlowBackground extends StatelessWidget {
         Positioned(
           top: -100,
           left: -80,
-          child: _glow(const Color(0xFF38BDF8), 250),
+          child: _glow(const Color(0xFF20C7C2), 250),
         ),
         Positioned(
           top: 220,
           right: -120,
-          child: _glow(const Color(0xFF6366F1), 260),
+          child: _glow(const Color(0xFF0A7F91), 260),
         ),
         Positioned(
           bottom: -120,
           left: 20,
-          child: _glow(const Color(0xFF22C55E), 240),
+          child: _glow(const Color(0xFF0AAEAE), 240),
         ),
       ],
     );

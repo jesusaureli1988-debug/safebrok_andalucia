@@ -2,20 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class TeamScreen extends StatefulWidget {
-
   final String role;
 
-  const TeamScreen({
-    super.key,
-    required this.role,
-  });
+  const TeamScreen({super.key, required this.role});
 
   @override
   State<TeamScreen> createState() => _TeamScreenState();
 }
 
 class _TeamScreenState extends State<TeamScreen> {
-
   List users = [];
 
   @override
@@ -25,7 +20,6 @@ class _TeamScreenState extends State<TeamScreen> {
   }
 
   Future<void> loadUsers() async {
-
     final currentUser = Supabase.instance.client.auth.currentUser;
 
     if (currentUser == null) return;
@@ -34,6 +28,9 @@ class _TeamScreenState extends State<TeamScreen> {
     final myUser = await Supabase.instance.client
         .from('usuarios')
         .select()
+        .or(
+          'estado.is.null,estado.not.in.(inactivo,Inactivo,INACTIVO,baja,Baja,BAJA,desactivado,Desactivado,DESACTIVADO,bloqueado,Bloqueado,BLOQUEADO,suspendido,Suspendido,SUSPENDIDO)',
+        )
         .eq('auth_id', currentUser.id)
         .single();
 
@@ -41,10 +38,12 @@ class _TeamScreenState extends State<TeamScreen> {
 
     // 👑 DIRECTOR VE TODO
     if (widget.role == 'director_zona') {
-
       final res = await Supabase.instance.client
           .from('usuarios')
-          .select();
+          .select()
+          .or(
+            'estado.is.null,estado.not.in.(inactivo,Inactivo,INACTIVO,baja,Baja,BAJA,desactivado,Desactivado,DESACTIVADO,bloqueado,Bloqueado,BLOQUEADO,suspendido,Suspendido,SUSPENDIDO)',
+          );
 
       setState(() {
         users = res;
@@ -55,11 +54,13 @@ class _TeamScreenState extends State<TeamScreen> {
 
     // 💼 JEFE VENTAS
     if (widget.role == 'jefe_ventas') {
-
       // 🔥 obtener jefes de equipo
       final equipos = await Supabase.instance.client
           .from('usuarios')
           .select()
+          .or(
+            'estado.is.null,estado.not.in.(inactivo,Inactivo,INACTIVO,baja,Baja,BAJA,desactivado,Desactivado,DESACTIVADO,bloqueado,Bloqueado,BLOQUEADO,suspendido,Suspendido,SUSPENDIDO)',
+          )
           .eq('parent_id', myId);
 
       List<dynamic> allUsers = [];
@@ -68,10 +69,12 @@ class _TeamScreenState extends State<TeamScreen> {
 
       // 🔥 obtener agentes de esos equipos
       for (var equipo in equipos) {
-
         final agentes = await Supabase.instance.client
             .from('usuarios')
             .select()
+            .or(
+              'estado.is.null,estado.not.in.(inactivo,Inactivo,INACTIVO,baja,Baja,BAJA,desactivado,Desactivado,DESACTIVADO,bloqueado,Bloqueado,BLOQUEADO,suspendido,Suspendido,SUSPENDIDO)',
+            )
             .eq('parent_id', equipo['id']);
 
         allUsers.addAll(agentes);
@@ -86,10 +89,12 @@ class _TeamScreenState extends State<TeamScreen> {
 
     // 👥 JEFE EQUIPO
     if (widget.role == 'jefe_equipo') {
-
       final agentes = await Supabase.instance.client
           .from('usuarios')
           .select()
+          .or(
+            'estado.is.null,estado.not.in.(inactivo,Inactivo,INACTIVO,baja,Baja,BAJA,desactivado,Desactivado,DESACTIVADO,bloqueado,Bloqueado,BLOQUEADO,suspendido,Suspendido,SUSPENDIDO)',
+          )
           .eq('parent_id', myId);
 
       setState(() {
@@ -101,7 +106,6 @@ class _TeamScreenState extends State<TeamScreen> {
 
     // 👤 AGENTE
     if (widget.role == 'agente') {
-
       setState(() {
         users = [myUser];
       });
@@ -111,9 +115,7 @@ class _TeamScreenState extends State<TeamScreen> {
   }
 
   Color getRoleColor(String role) {
-
     switch (role) {
-
       case 'director_zona':
         return Colors.purpleAccent;
 
@@ -132,9 +134,7 @@ class _TeamScreenState extends State<TeamScreen> {
   }
 
   IconData getRoleIcon(String role) {
-
     switch (role) {
-
       case 'director_zona':
         return Icons.workspace_premium;
 
@@ -154,18 +154,15 @@ class _TeamScreenState extends State<TeamScreen> {
 
   @override
   Widget build(BuildContext context) {
-
     return Scaffold(
-      backgroundColor: const Color(0xFF08121C),
+      backgroundColor: const Color(0xFFF2FCFD),
 
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
         title: const Text(
           "Mi Equipo",
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-          ),
+          style: TextStyle(fontWeight: FontWeight.bold),
         ),
       ),
 
@@ -173,7 +170,6 @@ class _TeamScreenState extends State<TeamScreen> {
         padding: const EdgeInsets.all(20),
         itemCount: users.length,
         itemBuilder: (context, index) {
-
           final user = users[index];
 
           final role = user['rol_usuario'] ?? '';
@@ -185,21 +181,13 @@ class _TeamScreenState extends State<TeamScreen> {
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(22),
 
-              gradient: LinearGradient(
-                colors: [
-                  Colors.white.withOpacity(0.08),
-                  Colors.white.withOpacity(0.04),
-                ],
-              ),
+              gradient: LinearGradient(colors: [Colors.white, Colors.white]),
 
-              border: Border.all(
-                color: Colors.white.withOpacity(0.08),
-              ),
+              border: Border.all(color: Colors.white),
             ),
 
             child: Row(
               children: [
-
                 // 🔥 ICONO
                 Container(
                   width: 60,
@@ -224,11 +212,10 @@ class _TeamScreenState extends State<TeamScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-
                       Text(
                         "${user['nombre'] ?? ''} ${user['apellidos'] ?? ''}",
                         style: const TextStyle(
-                          color: Colors.white,
+                          color: const Color(0xFF071A3A),
                           fontSize: 17,
                           fontWeight: FontWeight.bold,
                         ),

@@ -6,7 +6,8 @@ class IntegracionEquipoScreen extends StatefulWidget {
   const IntegracionEquipoScreen({super.key});
 
   @override
-  State<IntegracionEquipoScreen> createState() => _IntegracionEquipoScreenState();
+  State<IntegracionEquipoScreen> createState() =>
+      _IntegracionEquipoScreenState();
 }
 
 class _IntegracionEquipoScreenState extends State<IntegracionEquipoScreen> {
@@ -56,26 +57,20 @@ class _IntegracionEquipoScreenState extends State<IntegracionEquipoScreen> {
   String _nombreCompleto(Map<String, dynamic>? usuario) {
     if (usuario == null) return 'Sin nombre';
 
-    final nombre =
-        usuario['nombre']?.toString().trim() ?? '';
+    final nombre = usuario['nombre']?.toString().trim() ?? '';
 
-    final apellidos =
-        usuario['apellidos']?.toString().trim() ?? '';
+    final apellidos = usuario['apellidos']?.toString().trim() ?? '';
 
     final completo = '$nombre $apellidos'.trim();
 
     if (completo.isNotEmpty) return completo;
 
-    final email =
-        usuario['email']?.toString().trim() ?? '';
+    final email = usuario['email']?.toString().trim() ?? '';
 
     return email.isNotEmpty ? email : 'Sin nombre';
   }
 
-  bool _relacionPermitida({
-    required String rolPadre,
-    required String rolHijo,
-  }) {
+  bool _relacionPermitida({required String rolPadre, required String rolHijo}) {
     final padre = _normalizarRol(rolPadre);
     final hijo = _normalizarRol(rolHijo);
 
@@ -92,8 +87,7 @@ class _IntegracionEquipoScreenState extends State<IntegracionEquipoScreen> {
             hijo == 'agente';
 
       case 'jefe_ventas':
-        return hijo == 'jefe_equipo' ||
-            hijo == 'agente';
+        return hijo == 'jefe_equipo' || hijo == 'agente';
 
       case 'jefe_equipo':
         return hijo == 'agente';
@@ -107,8 +101,7 @@ class _IntegracionEquipoScreenState extends State<IntegracionEquipoScreen> {
     required Map<String, dynamic> perfil,
     required List<Map<String, dynamic>> todosUsuarios,
   }) {
-    final rolPerfil =
-        _normalizarRol(perfil['rol_usuario']);
+    final rolPerfil = _normalizarRol(perfil['rol_usuario']);
 
     // Administración puede consultar toda la compañía.
     if (rolPerfil == 'administracion' ||
@@ -120,20 +113,15 @@ class _IntegracionEquipoScreenState extends State<IntegracionEquipoScreen> {
       }).toList();
     }
 
-    final hijosPorParentId =
-        <String, List<Map<String, dynamic>>>{};
+    final hijosPorParentId = <String, List<Map<String, dynamic>>>{};
 
     for (final usuario in todosUsuarios) {
-      final parentId =
-          _idTexto(usuario['parent_id']);
+      final parentId = _idTexto(usuario['parent_id']);
 
       if (parentId.isEmpty) continue;
 
       hijosPorParentId
-          .putIfAbsent(
-            parentId,
-            () => <Map<String, dynamic>>[],
-          )
+          .putIfAbsent(parentId, () => <Map<String, dynamic>>[])
           .add(usuario);
     }
 
@@ -143,28 +131,22 @@ class _IntegracionEquipoScreenState extends State<IntegracionEquipoScreen> {
     void recorrer(Map<String, dynamic> actual) {
       final idActual = _idTexto(actual['id']);
 
-      if (idActual.isEmpty ||
-          visitados.contains(idActual)) {
+      if (idActual.isEmpty || visitados.contains(idActual)) {
         return;
       }
 
       visitados.add(idActual);
       resultado.add(actual);
 
-      final rolActual =
-          _normalizarRol(actual['rol_usuario']);
+      final rolActual = _normalizarRol(actual['rol_usuario']);
 
-      final hijos = hijosPorParentId[idActual] ??
-          const <Map<String, dynamic>>[];
+      final hijos =
+          hijosPorParentId[idActual] ?? const <Map<String, dynamic>>[];
 
       for (final hijo in hijos) {
-        final rolHijo =
-            _normalizarRol(hijo['rol_usuario']);
+        final rolHijo = _normalizarRol(hijo['rol_usuario']);
 
-        if (!_relacionPermitida(
-          rolPadre: rolActual,
-          rolHijo: rolHijo,
-        )) {
+        if (!_relacionPermitida(rolPadre: rolActual, rolHijo: rolHijo)) {
           debugPrint(
             'INTEGRACIÓN: usuario bloqueado '
             '${_nombreCompleto(hijo)} '
@@ -214,29 +196,29 @@ class _IntegracionEquipoScreenState extends State<IntegracionEquipoScreen> {
             'id, auth_id, parent_id, rol_usuario, '
             'nombre, apellidos, email',
           )
+          .or(
+            'estado.is.null,estado.not.in.(inactivo,Inactivo,INACTIVO,baja,Baja,BAJA,desactivado,Desactivado,DESACTIVADO,bloqueado,Bloqueado,BLOQUEADO,suspendido,Suspendido,SUSPENDIDO)',
+          )
           .eq('auth_id', user.id)
           .maybeSingle();
 
       if (perfilData == null) {
-        throw Exception(
-          'No se encontró el perfil del usuario conectado.',
-        );
+        throw Exception('No se encontró el perfil del usuario conectado.');
       }
 
-      final perfil =
-          Map<String, dynamic>.from(perfilData);
+      final perfil = Map<String, dynamic>.from(perfilData);
 
       final usuariosData = await supabase
           .from('usuarios')
           .select(
             'id, auth_id, parent_id, rol_usuario, '
             'nombre, apellidos, email',
+          )
+          .or(
+            'estado.is.null,estado.not.in.(inactivo,Inactivo,INACTIVO,baja,Baja,BAJA,desactivado,Desactivado,DESACTIVADO,bloqueado,Bloqueado,BLOQUEADO,suspendido,Suspendido,SUSPENDIDO)',
           );
 
-      final todosUsuarios =
-          List<Map<String, dynamic>>.from(
-        usuariosData,
-      );
+      final todosUsuarios = List<Map<String, dynamic>>.from(usuariosData);
 
       final estructura = _construirEstructura(
         perfil: perfil,
@@ -255,18 +237,16 @@ class _IntegracionEquipoScreenState extends State<IntegracionEquipoScreen> {
        *
        * Nunca se incluyen superiores, compañeros ni otras ramas.
        */
-      final agentesPermitidos = estructura.where(
-        (usuario) =>
-            _normalizarRol(usuario['rol_usuario']) ==
-            'agente',
-      ).toList();
+      final agentesPermitidos = estructura
+          .where(
+            (usuario) => _normalizarRol(usuario['rol_usuario']) == 'agente',
+          )
+          .toList();
 
       agentesPermitidos.sort((a, b) {
-        return _nombreCompleto(a)
-            .toLowerCase()
-            .compareTo(
-              _nombreCompleto(b).toLowerCase(),
-            );
+        return _nombreCompleto(
+          a,
+        ).toLowerCase().compareTo(_nombreCompleto(b).toLowerCase());
       });
 
       final agentesIds = agentesPermitidos
@@ -282,30 +262,15 @@ class _IntegracionEquipoScreenState extends State<IntegracionEquipoScreen> {
             .select()
             .inFilter('agente_id', agentesIds);
 
-        integracionData =
-            List<Map<String, dynamic>>.from(
-          response,
-        );
+        integracionData = List<Map<String, dynamic>>.from(response);
       }
 
-      debugPrint(
-        '======= INTEGRACIÓN ESTRUCTURA REAL =======',
-      );
-      debugPrint(
-        'USUARIO: ${_nombreCompleto(perfil)}',
-      );
-      debugPrint(
-        'ROL: ${perfil['rol_usuario']}',
-      );
-      debugPrint(
-        'PERSONAS EN ESTRUCTURA: ${estructura.length}',
-      );
-      debugPrint(
-        'AGENTES PERMITIDOS: ${agentesPermitidos.length}',
-      );
-      debugPrint(
-        'INTEGRACIONES CARGADAS: ${integracionData.length}',
-      );
+      debugPrint('======= INTEGRACIÓN ESTRUCTURA REAL =======');
+      debugPrint('USUARIO: ${_nombreCompleto(perfil)}');
+      debugPrint('ROL: ${perfil['rol_usuario']}');
+      debugPrint('PERSONAS EN ESTRUCTURA: ${estructura.length}');
+      debugPrint('AGENTES PERMITIDOS: ${agentesPermitidos.length}');
+      debugPrint('INTEGRACIONES CARGADAS: ${integracionData.length}');
 
       for (final agente in agentesPermitidos) {
         debugPrint(
@@ -316,9 +281,7 @@ class _IntegracionEquipoScreenState extends State<IntegracionEquipoScreen> {
         );
       }
 
-      debugPrint(
-        '===========================================',
-      );
+      debugPrint('===========================================');
 
       if (!mounted) return;
 
@@ -328,9 +291,7 @@ class _IntegracionEquipoScreenState extends State<IntegracionEquipoScreen> {
         loading = false;
       });
     } catch (e, stackTrace) {
-      debugPrint(
-        'ERROR CARGANDO INTEGRACIÓN: $e',
-      );
+      debugPrint('ERROR CARGANDO INTEGRACIÓN: $e');
       debugPrintStack(stackTrace: stackTrace);
 
       if (!mounted) return;
@@ -343,9 +304,7 @@ class _IntegracionEquipoScreenState extends State<IntegracionEquipoScreen> {
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(
-            'Error al cargar la integración: $e',
-          ),
+          content: Text('Error al cargar la integración: $e'),
           backgroundColor: Colors.redAccent,
         ),
       );
@@ -355,9 +314,7 @@ class _IntegracionEquipoScreenState extends State<IntegracionEquipoScreen> {
   Map<String, dynamic>? obtenerIntegracion(dynamic agenteId) {
     try {
       return integraciones.firstWhere(
-        (x) =>
-            x['agente_id']?.toString() ==
-            agenteId?.toString(),
+        (x) => x['agente_id']?.toString() == agenteId?.toString(),
       );
     } catch (_) {
       return null;
@@ -382,7 +339,8 @@ class _IntegracionEquipoScreenState extends State<IntegracionEquipoScreen> {
     final query = searchController.text.trim().toLowerCase();
 
     return agentes.where((a) {
-      final nombre = "${a['nombre'] ?? ''} ${a['apellidos'] ?? ''}".toLowerCase();
+      final nombre = "${a['nombre'] ?? ''} ${a['apellidos'] ?? ''}"
+          .toLowerCase();
       final email = (a['email'] ?? '').toString().toLowerCase();
 
       final progreso = calcularIntegracion(obtenerIntegracion(a['id']));
@@ -453,9 +411,7 @@ class _IntegracionEquipoScreenState extends State<IntegracionEquipoScreen> {
         foregroundColor: const Color(0xFF0F172A),
         title: const Text(
           "Integración del equipo",
-          style: TextStyle(
-            fontWeight: FontWeight.w900,
-          ),
+          style: TextStyle(fontWeight: FontWeight.w900),
         ),
         actions: [
           IconButton(
@@ -466,9 +422,7 @@ class _IntegracionEquipoScreenState extends State<IntegracionEquipoScreen> {
       ),
       body: loading
           ? const Center(
-              child: CircularProgressIndicator(
-                color: Color(0xFF2563EB),
-              ),
+              child: CircularProgressIndicator(color: Color(0xFF2563EB)),
             )
           : RefreshIndicator(
               onRefresh: cargarDatos,
@@ -536,10 +490,7 @@ class _IntegracionEquipoScreenState extends State<IntegracionEquipoScreen> {
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
-          colors: [
-            Color(0xFF2563EB),
-            Color(0xFF1E40AF),
-          ],
+          colors: [Color(0xFF2563EB), Color(0xFF1E40AF)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
@@ -639,9 +590,7 @@ class _IntegracionEquipoScreenState extends State<IntegracionEquipoScreen> {
       decoration: BoxDecoration(
         color: Colors.white.withOpacity(0.16),
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: Colors.white.withOpacity(0.18),
-        ),
+        border: Border.all(color: Colors.white.withOpacity(0.18)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -728,7 +677,8 @@ class _IntegracionEquipoScreenState extends State<IntegracionEquipoScreen> {
     required int progreso,
   }) {
     final color = colorEstado(progreso);
-    final nombre = "${agente['nombre'] ?? ''} ${agente['apellidos'] ?? ''}".trim();
+    final nombre = "${agente['nombre'] ?? ''} ${agente['apellidos'] ?? ''}"
+        .trim();
     final email = agente['email'] ?? '';
 
     return Material(
@@ -739,9 +689,7 @@ class _IntegracionEquipoScreenState extends State<IntegracionEquipoScreen> {
           final result = await Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (_) => IntegracionAgenteDetalleScreen(
-                agente: agente,
-              ),
+              builder: (_) => IntegracionAgenteDetalleScreen(agente: agente),
             ),
           );
 
@@ -861,10 +809,7 @@ class _IntegracionEquipoScreenState extends State<IntegracionEquipoScreen> {
     return const Center(
       child: Text(
         "No hay agentes con este filtro.",
-        style: TextStyle(
-          color: Color(0xFF64748B),
-          fontWeight: FontWeight.w700,
-        ),
+        style: TextStyle(color: Color(0xFF64748B), fontWeight: FontWeight.w700),
       ),
     );
   }

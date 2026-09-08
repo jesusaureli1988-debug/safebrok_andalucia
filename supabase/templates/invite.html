@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="es">
+<body style="margin:0;background:#f3f6fa;font-family:Arial,sans-serif;color:#172033">
+  <div style="max-width:620px;margin:30px auto;background:#fff;border-radius:18px;padding:34px">
+    <h1 style="margin:0 0 12px;color:#136f79">Bienvenido/a a SafeBrok</h1>
+    <p>Hola {{ .Data.nombre }},</p>
+    <p>Tu cuenta de acceso a SafeBrok ya está preparada. Para activarla solo tienes que crear tu contraseña.</p>
+    <p style="margin:28px 0">
+      <a href="{{ .ConfirmationURL }}" style="background:#1976d2;color:#fff;text-decoration:none;padding:14px 24px;border-radius:10px;font-weight:bold">
+        CREAR MI CONTRASEÑA
+      </a>
+    </p>
+    <h2 style="font-size:18px">Pasos</h2>
+    <ol style="line-height:1.7">
+      <li>Pulsa el botón «Crear mi contraseña».</li>
+      <li>SafeBrok se abrirá en la pantalla de nueva contraseña.</li>
+      <li>Escribe una contraseña de al menos 8 caracteres, con mayúscula, minúscula y número.</li>
+      <li>Guárdala y entra con tu correo: <strong>{{ .Email }}</strong>.</li>
+    </ol>
+    <p style="color:#64748b;font-size:13px">Por seguridad, no compartas este correo ni el enlace. Si no esperabas esta invitación, puedes ignorarlo.</p>
+  </div>
+</body>
+</html>

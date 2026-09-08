@@ -9,8 +9,7 @@ class AgendaJefeEquipoScreen extends StatefulWidget {
   const AgendaJefeEquipoScreen({super.key});
 
   @override
-  State<AgendaJefeEquipoScreen> createState() =>
-      _AgendaJefeEquipoScreenState();
+  State<AgendaJefeEquipoScreen> createState() => _AgendaJefeEquipoScreenState();
 }
 
 class _AgendaJefeEquipoScreenState extends State<AgendaJefeEquipoScreen> {
@@ -98,14 +97,15 @@ class _AgendaJefeEquipoScreenState extends State<AgendaJefeEquipoScreen> {
           endTime: DateTime.parse(item['fecha_fin']),
           subject: item['titulo'] ?? 'Evento',
           notes: item['descripcion'] ?? '',
-          color: const Color(0xFF22D3EE),
+          color: const Color(0xFF20C7C2),
           location: 'agenda|${item['id']}',
         ),
       );
     }
 
     for (final reunion in reuniones) {
-      final roomId = reunion['room_id']?.toString() ??
+      final roomId =
+          reunion['room_id']?.toString() ??
           'safebrok-equipo-${reunion['id'] ?? DateTime.now().millisecondsSinceEpoch}';
 
       eventos.add(
@@ -115,7 +115,7 @@ class _AgendaJefeEquipoScreenState extends State<AgendaJefeEquipoScreen> {
           endTime: DateTime.parse(reunion['fecha_fin']),
           subject: reunion['titulo'] ?? 'Reunión',
           notes: reunion['descripcion'] ?? '',
-          color: const Color(0xFFA855F7),
+          color: const Color(0xFF10AAA6),
           location: 'reunion|$roomId|${reunion['id']}',
         ),
       );
@@ -136,8 +136,11 @@ class _AgendaJefeEquipoScreenState extends State<AgendaJefeEquipoScreen> {
 
   int get eventosSemana {
     final now = DateTime.now();
-    final start = DateTime(now.year, now.month, now.day)
-        .subtract(Duration(days: now.weekday - 1));
+    final start = DateTime(
+      now.year,
+      now.month,
+      now.day,
+    ).subtract(Duration(days: now.weekday - 1));
     final end = start.add(const Duration(days: 7));
 
     return appointments.where((a) {
@@ -185,14 +188,19 @@ class _AgendaJefeEquipoScreenState extends State<AgendaJefeEquipoScreen> {
 
     setState(() {
       if (currentView == CalendarView.month) {
-        calendarController.displayDate =
-            DateTime(current.year, current.month - 1, 1);
+        calendarController.displayDate = DateTime(
+          current.year,
+          current.month - 1,
+          1,
+        );
       } else if (currentView == CalendarView.week) {
-        calendarController.displayDate =
-            current.subtract(const Duration(days: 7));
+        calendarController.displayDate = current.subtract(
+          const Duration(days: 7),
+        );
       } else {
-        calendarController.displayDate =
-            current.subtract(const Duration(days: 1));
+        calendarController.displayDate = current.subtract(
+          const Duration(days: 1),
+        );
       }
     });
   }
@@ -202,8 +210,11 @@ class _AgendaJefeEquipoScreenState extends State<AgendaJefeEquipoScreen> {
 
     setState(() {
       if (currentView == CalendarView.month) {
-        calendarController.displayDate =
-            DateTime(current.year, current.month + 1, 1);
+        calendarController.displayDate = DateTime(
+          current.year,
+          current.month + 1,
+          1,
+        );
       } else if (currentView == CalendarView.week) {
         calendarController.displayDate = current.add(const Duration(days: 7));
       } else {
@@ -224,7 +235,10 @@ class _AgendaJefeEquipoScreenState extends State<AgendaJefeEquipoScreen> {
     );
   }
 
-  Future<void> _openEventDetails(Appointment event, DateTime selectedDate) async {
+  Future<void> _openEventDetails(
+    Appointment event,
+    DateTime selectedDate,
+  ) async {
     final parts = (event.location ?? '').split('|');
     final isReunion = parts.isNotEmpty && parts.first == 'reunion';
     final roomId = isReunion && parts.length > 1 ? parts[1] : null;
@@ -244,11 +258,9 @@ class _AgendaJefeEquipoScreenState extends State<AgendaJefeEquipoScreen> {
               child: Container(
                 padding: const EdgeInsets.all(22),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF061018).withOpacity(0.97),
+                  color: const Color(0xFFFFFFFF).withOpacity(0.97),
                   borderRadius: BorderRadius.circular(28),
-                  border: Border.all(
-                    color: event.color.withOpacity(0.38),
-                  ),
+                  border: Border.all(color: event.color.withOpacity(0.38)),
                   boxShadow: [
                     BoxShadow(
                       color: event.color.withOpacity(0.15),
@@ -284,7 +296,7 @@ class _AgendaJefeEquipoScreenState extends State<AgendaJefeEquipoScreen> {
                           child: Text(
                             event.subject,
                             style: const TextStyle(
-                              color: Colors.white,
+                              color: const Color(0xFF071A3A),
                               fontSize: 22,
                               fontWeight: FontWeight.w900,
                             ),
@@ -297,7 +309,7 @@ class _AgendaJefeEquipoScreenState extends State<AgendaJefeEquipoScreen> {
                       Icons.calendar_month_rounded,
                       'Fecha',
                       '${event.startTime.day}/${event.startTime.month}/${event.startTime.year}',
-                      const Color(0xFF22D3EE),
+                      const Color(0xFF20C7C2),
                     ),
                     _detailLine(
                       Icons.access_time_rounded,
@@ -311,16 +323,14 @@ class _AgendaJefeEquipoScreenState extends State<AgendaJefeEquipoScreen> {
                         margin: const EdgeInsets.only(top: 14),
                         padding: const EdgeInsets.all(15),
                         decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.07),
+                          color: Colors.white,
                           borderRadius: BorderRadius.circular(18),
-                          border: Border.all(
-                            color: Colors.white.withOpacity(0.10),
-                          ),
+                          border: Border.all(color: Colors.white),
                         ),
                         child: Text(
                           event.notes ?? '',
                           style: const TextStyle(
-                            color: Colors.white70,
+                            color: const Color(0xFF53627A),
                             height: 1.4,
                           ),
                         ),
@@ -338,8 +348,9 @@ class _AgendaJefeEquipoScreenState extends State<AgendaJefeEquipoScreen> {
                                 side: BorderSide(
                                   color: Colors.orangeAccent.withOpacity(0.45),
                                 ),
-                                padding:
-                                    const EdgeInsets.symmetric(vertical: 14),
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 14,
+                                ),
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(16),
                                 ),
@@ -349,10 +360,8 @@ class _AgendaJefeEquipoScreenState extends State<AgendaJefeEquipoScreen> {
 
                                 showDialog(
                                   context: context,
-                                  barrierColor:
-                                      Colors.black.withOpacity(0.75),
-                                  builder: (_) =>
-                                      MeetingCreateDialogJefeEquipo(
+                                  barrierColor: Colors.black.withOpacity(0.75),
+                                  builder: (_) => MeetingCreateDialogJefeEquipo(
                                     supabase: supabase,
                                     selectedDate: selectedDate,
                                     editData: {
@@ -360,10 +369,10 @@ class _AgendaJefeEquipoScreenState extends State<AgendaJefeEquipoScreen> {
                                       'titulo': event.subject,
                                       'descripcion': event.notes,
                                       'room_id': roomId,
-                                      'fecha_inicio':
-                                          event.startTime.toIso8601String(),
-                                      'fecha_fin':
-                                          event.endTime.toIso8601String(),
+                                      'fecha_inicio': event.startTime
+                                          .toIso8601String(),
+                                      'fecha_fin': event.endTime
+                                          .toIso8601String(),
                                     },
                                     onSaved: refreshCalendar,
                                   ),
@@ -377,10 +386,11 @@ class _AgendaJefeEquipoScreenState extends State<AgendaJefeEquipoScreen> {
                               icon: const Icon(Icons.video_call_rounded),
                               label: const Text('Entrar'),
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFF22D3EE),
-                                foregroundColor: const Color(0xFF031018),
-                                padding:
-                                    const EdgeInsets.symmetric(vertical: 14),
+                                backgroundColor: const Color(0xFF20C7C2),
+                                foregroundColor: const Color(0xFFFFFFFF),
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 14,
+                                ),
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(16),
                                 ),
@@ -461,7 +471,7 @@ class _AgendaJefeEquipoScreenState extends State<AgendaJefeEquipoScreen> {
             child: Text(
               label,
               style: const TextStyle(
-                color: Colors.white54,
+                color: const Color(0xFF64748B),
                 fontWeight: FontWeight.w700,
               ),
             ),
@@ -470,24 +480,22 @@ class _AgendaJefeEquipoScreenState extends State<AgendaJefeEquipoScreen> {
             child: Text(
               value,
               textAlign: TextAlign.right,
-              style: TextStyle(
-                color: color,
-                fontWeight: FontWeight.w900,
-              ),
+              style: TextStyle(color: color, fontWeight: FontWeight.w900),
             ),
           ),
         ],
       ),
     );
   }
-    @override
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF020617),
+      backgroundColor: const Color(0xFFF2FCFD),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _openMeetingDialog(DateTime.now()),
-        backgroundColor: const Color(0xFF22D3EE),
-        foregroundColor: const Color(0xFF031018),
+        backgroundColor: const Color(0xFF20C7C2),
+        foregroundColor: const Color(0xFFFFFFFF),
         icon: const Icon(Icons.add_rounded),
         label: const Text(
           'Nueva reunión',
@@ -500,160 +508,153 @@ class _AgendaJefeEquipoScreenState extends State<AgendaJefeEquipoScreen> {
           SafeArea(
             child: loading
                 ? const Center(
-                    child: CircularProgressIndicator(
-                      color: Color(0xFF22D3EE),
-                    ),
+                    child: CircularProgressIndicator(color: Color(0xFF20C7C2)),
                   )
                 : error != null
-                    ? Center(
-                        child: Padding(
-                          padding: const EdgeInsets.all(22),
-                          child: Text(
-                            error!,
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(color: Colors.white70),
+                ? Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(22),
+                      child: Text(
+                        error!,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(color: const Color(0xFF53627A)),
+                      ),
+                    ),
+                  )
+                : Column(
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(18, 12, 18, 0),
+                        child: Column(
+                          children: [
+                            _header(),
+                            const SizedBox(height: 16),
+                            _kpis(),
+                            const SizedBox(height: 14),
+                            _viewSelector(),
+                            const SizedBox(height: 10),
+                            _calendarNavigator(),
+                          ],
+                        ),
+                      ),
+                      Expanded(
+                        child: Container(
+                          margin: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(26),
+                            border: Border.all(color: Colors.white),
+                          ),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(26),
+                            child: SfCalendar(
+                              key: ValueKey(currentView),
+                              view: currentView,
+                              controller: calendarController,
+                              backgroundColor: Colors.transparent,
+                              initialDisplayDate:
+                                  calendarController.displayDate ??
+                                  DateTime.now(),
+                              dataSource: AgendaJefeEquipoDataSource(
+                                appointments,
+                              ),
+                              onViewChanged: (ViewChangedDetails details) {
+                                WidgetsBinding.instance.addPostFrameCallback((
+                                  _,
+                                ) {
+                                  if (!mounted) return;
+                                  setState(() {
+                                    displayDate = details.visibleDates.first;
+                                  });
+                                });
+                              },
+                              onTap: (CalendarTapDetails details) {
+                                final selectedDate =
+                                    details.date ?? DateTime.now();
+                                final appointment = details.appointments;
+
+                                if (appointment != null &&
+                                    appointment.isNotEmpty) {
+                                  final event =
+                                      appointment.first as Appointment;
+                                  _openEventDetails(event, selectedDate);
+                                } else {
+                                  _openMeetingDialog(selectedDate);
+                                }
+                              },
+                              todayHighlightColor: const Color(0xFF20C7C2),
+                              cellBorderColor: Colors.white10,
+                              selectionDecoration: BoxDecoration(
+                                border: Border.all(
+                                  color: const Color(0xFF20C7C2),
+                                  width: 2,
+                                ),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              headerHeight: 0,
+                              viewHeaderStyle: const ViewHeaderStyle(
+                                backgroundColor: Color(0xFFFFFFFF),
+                                dateTextStyle: TextStyle(
+                                  color: const Color(0xFF071A3A),
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w900,
+                                ),
+                                dayTextStyle: TextStyle(
+                                  color: const Color(0xFF53627A),
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              timeSlotViewSettings: const TimeSlotViewSettings(
+                                timeTextStyle: TextStyle(
+                                  color: const Color(0xFF53627A),
+                                  fontWeight: FontWeight.w600,
+                                ),
+                                dateFormat: 'd',
+                                dayFormat: 'EEE',
+                              ),
+                              monthViewSettings: const MonthViewSettings(
+                                showAgenda: true,
+                                appointmentDisplayMode:
+                                    MonthAppointmentDisplayMode.indicator,
+                                dayFormat: 'EEE',
+                                agendaStyle: AgendaStyle(
+                                  backgroundColor: Color(0xFFFFFFFF),
+                                  appointmentTextStyle: TextStyle(
+                                    color: const Color(0xFF071A3A),
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                  dateTextStyle: TextStyle(
+                                    color: Color(0xFF20C7C2),
+                                    fontWeight: FontWeight.w900,
+                                  ),
+                                  dayTextStyle: TextStyle(
+                                    color: const Color(0xFF64748B),
+                                  ),
+                                ),
+                                monthCellStyle: MonthCellStyle(
+                                  textStyle: TextStyle(
+                                    color: const Color(0xFF071A3A),
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                  todayTextStyle: TextStyle(
+                                    color: Color(0xFF20C7C2),
+                                    fontWeight: FontWeight.w900,
+                                  ),
+                                  trailingDatesTextStyle: TextStyle(
+                                    color: const Color(0xFFB7D7DA),
+                                  ),
+                                  leadingDatesTextStyle: TextStyle(
+                                    color: const Color(0xFFB7D7DA),
+                                  ),
+                                ),
+                              ),
+                            ),
                           ),
                         ),
-                      )
-                    : Column(
-                        children: [
-                          Padding(
-                            padding: const EdgeInsets.fromLTRB(18, 12, 18, 0),
-                            child: Column(
-                              children: [
-                                _header(),
-                                const SizedBox(height: 16),
-                                _kpis(),
-                                const SizedBox(height: 14),
-                                _viewSelector(),
-                                const SizedBox(height: 10),
-                                _calendarNavigator(),
-                              ],
-                            ),
-                          ),
-                          Expanded(
-                            child: Container(
-                              margin: const EdgeInsets.fromLTRB(12, 8, 12, 12),
-                              decoration: BoxDecoration(
-                                color: Colors.white.withOpacity(0.055),
-                                borderRadius: BorderRadius.circular(26),
-                                border: Border.all(
-                                  color: Colors.white.withOpacity(0.10),
-                                ),
-                              ),
-                              child: ClipRRect(
-                                borderRadius: BorderRadius.circular(26),
-                                child: SfCalendar(
-                                  key: ValueKey(currentView),
-                                  view: currentView,
-                                  controller: calendarController,
-                                  backgroundColor: Colors.transparent,
-                                  initialDisplayDate:
-                                      calendarController.displayDate ??
-                                          DateTime.now(),
-                                  dataSource:
-                                      AgendaJefeEquipoDataSource(appointments),
-                                  onViewChanged:
-                                      (ViewChangedDetails details) {
-                                    WidgetsBinding.instance
-                                        .addPostFrameCallback((_) {
-                                      if (!mounted) return;
-                                      setState(() {
-                                        displayDate =
-                                            details.visibleDates.first;
-                                      });
-                                    });
-                                  },
-                                  onTap: (CalendarTapDetails details) {
-                                    final selectedDate =
-                                        details.date ?? DateTime.now();
-                                    final appointment = details.appointments;
-
-                                    if (appointment != null &&
-                                        appointment.isNotEmpty) {
-                                      final event =
-                                          appointment.first as Appointment;
-                                      _openEventDetails(event, selectedDate);
-                                    } else {
-                                      _openMeetingDialog(selectedDate);
-                                    }
-                                  },
-                                  todayHighlightColor:
-                                      const Color(0xFF22D3EE),
-                                  cellBorderColor: Colors.white10,
-                                  selectionDecoration: BoxDecoration(
-                                    border: Border.all(
-                                      color: const Color(0xFF22D3EE),
-                                      width: 2,
-                                    ),
-                                    borderRadius: BorderRadius.circular(10),
-                                  ),
-                                  headerHeight: 0,
-                                  viewHeaderStyle: const ViewHeaderStyle(
-                                    backgroundColor: Color(0xFF07111F),
-                                    dateTextStyle: TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w900,
-                                    ),
-                                    dayTextStyle: TextStyle(
-                                      color: Colors.white70,
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                  ),
-                                  timeSlotViewSettings:
-                                      const TimeSlotViewSettings(
-                                    timeTextStyle: TextStyle(
-                                      color: Colors.white70,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                    dateFormat: 'd',
-                                    dayFormat: 'EEE',
-                                  ),
-                                  monthViewSettings:
-                                      const MonthViewSettings(
-                                    showAgenda: true,
-                                    appointmentDisplayMode:
-                                        MonthAppointmentDisplayMode.indicator,
-                                    dayFormat: 'EEE',
-                                    agendaStyle: AgendaStyle(
-                                      backgroundColor: Color(0xFF07111F),
-                                      appointmentTextStyle: TextStyle(
-                                        color: Colors.white,
-                                        fontWeight: FontWeight.w700,
-                                      ),
-                                      dateTextStyle: TextStyle(
-                                        color: Color(0xFF22D3EE),
-                                        fontWeight: FontWeight.w900,
-                                      ),
-                                      dayTextStyle: TextStyle(
-                                        color: Colors.white60,
-                                      ),
-                                    ),
-                                    monthCellStyle: MonthCellStyle(
-                                      textStyle: TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                      todayTextStyle: TextStyle(
-                                        color: Color(0xFF22D3EE),
-                                        fontWeight: FontWeight.w900,
-                                      ),
-                                      trailingDatesTextStyle: TextStyle(
-                                        color: Colors.white24,
-                                      ),
-                                      leadingDatesTextStyle: TextStyle(
-                                        color: Colors.white24,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
                       ),
+                    ],
+                  ),
           ),
         ],
       ),
@@ -670,16 +671,13 @@ class _AgendaJefeEquipoScreenState extends State<AgendaJefeEquipoScreen> {
             height: 54,
             width: 54,
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.08),
+              color: Colors.white,
               borderRadius: BorderRadius.circular(18),
               border: Border.all(
-                color: const Color(0xFF22D3EE).withOpacity(0.45),
+                color: const Color(0xFF20C7C2).withOpacity(0.45),
               ),
             ),
-            child: const Icon(
-              Icons.arrow_back_rounded,
-              color: Colors.white,
-            ),
+            child: const Icon(Icons.arrow_back_rounded, color: Colors.white),
           ),
         ),
         const SizedBox(width: 14),
@@ -690,7 +688,7 @@ class _AgendaJefeEquipoScreenState extends State<AgendaJefeEquipoScreen> {
               Text(
                 'Agenda de equipo',
                 style: TextStyle(
-                  color: Colors.white,
+                  color: const Color(0xFF071A3A),
                   fontSize: 27,
                   fontWeight: FontWeight.w900,
                   letterSpacing: -0.8,
@@ -699,10 +697,7 @@ class _AgendaJefeEquipoScreenState extends State<AgendaJefeEquipoScreen> {
               SizedBox(height: 3),
               Text(
                 'Planificación, reuniones y seguimiento diario',
-                style: TextStyle(
-                  color: Colors.white60,
-                  fontSize: 13,
-                ),
+                style: TextStyle(color: const Color(0xFF64748B), fontSize: 13),
               ),
             ],
           ),
@@ -712,14 +707,14 @@ class _AgendaJefeEquipoScreenState extends State<AgendaJefeEquipoScreen> {
           width: 52,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            color: const Color(0xFF22D3EE).withOpacity(0.12),
+            color: const Color(0xFF20C7C2).withOpacity(0.12),
             border: Border.all(
-              color: const Color(0xFF22D3EE).withOpacity(0.38),
+              color: const Color(0xFF20C7C2).withOpacity(0.38),
             ),
           ),
           child: const Icon(
             Icons.calendar_month_rounded,
-            color: Color(0xFF22D3EE),
+            color: Color(0xFF20C7C2),
           ),
         ),
       ],
@@ -734,7 +729,7 @@ class _AgendaJefeEquipoScreenState extends State<AgendaJefeEquipoScreen> {
             title: 'Eventos',
             value: appointments.length.toString(),
             icon: Icons.event_available_rounded,
-            color: const Color(0xFF22D3EE),
+            color: const Color(0xFF20C7C2),
           ),
         ),
         const SizedBox(width: 10),
@@ -768,7 +763,7 @@ class _AgendaJefeEquipoScreenState extends State<AgendaJefeEquipoScreen> {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.075),
+        color: Colors.white,
         borderRadius: BorderRadius.circular(22),
         border: Border.all(color: color.withOpacity(0.25)),
       ),
@@ -787,7 +782,7 @@ class _AgendaJefeEquipoScreenState extends State<AgendaJefeEquipoScreen> {
           Text(
             title,
             style: const TextStyle(
-              color: Colors.white60,
+              color: const Color(0xFF64748B),
               fontSize: 12,
               fontWeight: FontWeight.w700,
             ),
@@ -823,12 +818,10 @@ class _AgendaJefeEquipoScreenState extends State<AgendaJefeEquipoScreen> {
           margin: const EdgeInsets.symmetric(horizontal: 4),
           padding: const EdgeInsets.symmetric(vertical: 11),
           decoration: BoxDecoration(
-            color: selected ? const Color(0xFF22D3EE) : const Color(0xFF162033),
+            color: selected ? const Color(0xFF20C7C2) : const Color(0xFFFFFFFF),
             borderRadius: BorderRadius.circular(30),
             border: Border.all(
-              color: selected
-                  ? const Color(0xFF22D3EE)
-                  : Colors.white.withOpacity(0.12),
+              color: selected ? const Color(0xFF20C7C2) : Colors.white,
             ),
           ),
           child: Row(
@@ -836,14 +829,14 @@ class _AgendaJefeEquipoScreenState extends State<AgendaJefeEquipoScreen> {
             children: [
               Icon(
                 icon,
-                color: selected ? const Color(0xFF061018) : Colors.white,
+                color: selected ? const Color(0xFFFFFFFF) : Colors.white,
                 size: 17,
               ),
               const SizedBox(width: 7),
               Text(
                 label,
                 style: TextStyle(
-                  color: selected ? const Color(0xFF061018) : Colors.white,
+                  color: selected ? const Color(0xFFFFFFFF) : Colors.white,
                   fontWeight: FontWeight.w900,
                 ),
               ),
@@ -863,15 +856,15 @@ class _AgendaJefeEquipoScreenState extends State<AgendaJefeEquipoScreen> {
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.07),
+              color: Colors.white,
               borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: Colors.white.withOpacity(0.10)),
+              border: Border.all(color: Colors.white),
             ),
             child: Text(
               _getHeaderTitle(),
               textAlign: TextAlign.center,
               style: const TextStyle(
-                color: Colors.white,
+                color: const Color(0xFF071A3A),
                 fontSize: 17,
                 fontWeight: FontWeight.w900,
               ),
@@ -892,11 +885,9 @@ class _AgendaJefeEquipoScreenState extends State<AgendaJefeEquipoScreen> {
         height: 48,
         width: 48,
         decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.08),
+          color: Colors.white,
           borderRadius: BorderRadius.circular(18),
-          border: Border.all(
-            color: const Color(0xFF22D3EE).withOpacity(0.28),
-          ),
+          border: Border.all(color: const Color(0xFF20C7C2).withOpacity(0.28)),
         ),
         child: Icon(icon, color: Colors.white, size: 30),
       ),
@@ -956,10 +947,12 @@ class _MeetingCreateDialogJefeEquipoState
       tituloCtrl.text = widget.editData!['titulo'] ?? '';
       descripcionCtrl.text = widget.editData!['descripcion'] ?? '';
 
-      final inicio =
-          DateTime.tryParse(widget.editData!['fecha_inicio']?.toString() ?? '');
-      final fin =
-          DateTime.tryParse(widget.editData!['fecha_fin']?.toString() ?? '');
+      final inicio = DateTime.tryParse(
+        widget.editData!['fecha_inicio']?.toString() ?? '',
+      );
+      final fin = DateTime.tryParse(
+        widget.editData!['fecha_fin']?.toString() ?? '',
+      );
 
       if (inicio != null) {
         selectedDate = inicio;
@@ -988,6 +981,9 @@ class _MeetingCreateDialogJefeEquipoState
     final me = await widget.supabase
         .from('usuarios')
         .select('id')
+        .or(
+          'estado.is.null,estado.not.in.(inactivo,Inactivo,INACTIVO,baja,Baja,BAJA,desactivado,Desactivado,DESACTIVADO,bloqueado,Bloqueado,BLOQUEADO,suspendido,Suspendido,SUSPENDIDO)',
+        )
         .eq('auth_id', user.id)
         .single();
 
@@ -998,6 +994,9 @@ class _MeetingCreateDialogJefeEquipoState
     final res = await widget.supabase
         .from('usuarios')
         .select('id, nombre, apellidos, auth_id, rol_usuario')
+        .or(
+          'estado.is.null,estado.not.in.(inactivo,Inactivo,INACTIVO,baja,Baja,BAJA,desactivado,Desactivado,DESACTIVADO,bloqueado,Bloqueado,BLOQUEADO,suspendido,Suspendido,SUSPENDIDO)',
+        )
         .eq('parent_id', myUserId)
         .eq('rol_usuario', 'agente')
         .order('nombre', ascending: true);
@@ -1017,11 +1016,11 @@ class _MeetingCreateDialogJefeEquipoState
         return Theme(
           data: ThemeData.dark().copyWith(
             colorScheme: const ColorScheme.dark(
-              primary: Color(0xFF22D3EE),
-              surface: Color(0xFF061018),
+              primary: Color(0xFF20C7C2),
+              surface: Color(0xFFFFFFFF),
               onSurface: Colors.white,
             ),
-            dialogBackgroundColor: const Color(0xFF061018),
+            dialogBackgroundColor: const Color(0xFFFFFFFF),
           ),
           child: child!,
         );
@@ -1037,11 +1036,11 @@ class _MeetingCreateDialogJefeEquipoState
         return Theme(
           data: ThemeData.dark().copyWith(
             colorScheme: const ColorScheme.dark(
-              primary: Color(0xFF22D3EE),
-              surface: Color(0xFF061018),
+              primary: Color(0xFF20C7C2),
+              surface: Color(0xFFFFFFFF),
               onSurface: Colors.white,
             ),
-            dialogBackgroundColor: const Color(0xFF061018),
+            dialogBackgroundColor: const Color(0xFFFFFFFF),
           ),
           child: child!,
         );
@@ -1097,13 +1096,16 @@ class _MeetingCreateDialogJefeEquipoState
           'invitados': invitados,
         });
       } else {
-        await widget.supabase.from('reuniones').update({
-          'titulo': tituloCtrl.text.trim(),
-          'descripcion': descripcionCtrl.text.trim(),
-          'fecha_inicio': start.toIso8601String(),
-          'fecha_fin': end.toIso8601String(),
-          'invitados': invitados,
-        }).eq('id', widget.editData!['id']);
+        await widget.supabase
+            .from('reuniones')
+            .update({
+              'titulo': tituloCtrl.text.trim(),
+              'descripcion': descripcionCtrl.text.trim(),
+              'fecha_inicio': start.toIso8601String(),
+              'fecha_fin': end.toIso8601String(),
+              'invitados': invitados,
+            })
+            .eq('id', widget.editData!['id']);
       }
 
       widget.onSaved();
@@ -1113,9 +1115,9 @@ class _MeetingCreateDialogJefeEquipoState
     } catch (e) {
       setState(() => saving = false);
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error al guardar: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error al guardar: $e')));
     }
   }
 
@@ -1138,10 +1140,10 @@ class _MeetingCreateDialogJefeEquipoState
             constraints: const BoxConstraints(maxHeight: 720),
             padding: const EdgeInsets.all(22),
             decoration: BoxDecoration(
-              color: const Color(0xFF061018).withOpacity(0.97),
+              color: const Color(0xFFFFFFFF).withOpacity(0.97),
               borderRadius: BorderRadius.circular(30),
               border: Border.all(
-                color: const Color(0xFF22D3EE).withOpacity(0.32),
+                color: const Color(0xFF20C7C2).withOpacity(0.32),
               ),
             ),
             child: SingleChildScrollView(
@@ -1155,16 +1157,16 @@ class _MeetingCreateDialogJefeEquipoState
                         height: 54,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          color: const Color(0xFF22D3EE).withOpacity(0.13),
+                          color: const Color(0xFF20C7C2).withOpacity(0.13),
                           border: Border.all(
-                            color: const Color(0xFF22D3EE).withOpacity(0.38),
+                            color: const Color(0xFF20C7C2).withOpacity(0.38),
                           ),
                         ),
                         child: Icon(
                           editando
                               ? Icons.edit_calendar_rounded
                               : Icons.video_call_rounded,
-                          color: const Color(0xFF22D3EE),
+                          color: const Color(0xFF20C7C2),
                           size: 29,
                         ),
                       ),
@@ -1173,7 +1175,7 @@ class _MeetingCreateDialogJefeEquipoState
                         child: Text(
                           editando ? 'Editar reunión' : 'Nueva reunión',
                           style: const TextStyle(
-                            color: Colors.white,
+                            color: const Color(0xFF071A3A),
                             fontSize: 24,
                             fontWeight: FontWeight.w900,
                           ),
@@ -1199,7 +1201,7 @@ class _MeetingCreateDialogJefeEquipoState
                     icon: Icons.calendar_month_rounded,
                     title: 'Fecha',
                     value: _dateText(),
-                    color: const Color(0xFF22D3EE),
+                    color: const Color(0xFF20C7C2),
                     onTap: () async {
                       final picked = await _pickDate();
                       if (picked != null) {
@@ -1246,14 +1248,14 @@ class _MeetingCreateDialogJefeEquipoState
                     children: [
                       const Icon(
                         Icons.groups_rounded,
-                        color: Color(0xFF22D3EE),
+                        color: Color(0xFF20C7C2),
                       ),
                       const SizedBox(width: 8),
                       const Expanded(
                         child: Text(
                           'Invitar agentes de mi equipo',
                           style: TextStyle(
-                            color: Colors.white,
+                            color: const Color(0xFF071A3A),
                             fontSize: 18,
                             fontWeight: FontWeight.w900,
                           ),
@@ -1262,7 +1264,7 @@ class _MeetingCreateDialogJefeEquipoState
                       Text(
                         '${invitados.length}',
                         style: const TextStyle(
-                          color: Color(0xFF22D3EE),
+                          color: Color(0xFF20C7C2),
                           fontWeight: FontWeight.w900,
                         ),
                       ),
@@ -1272,11 +1274,9 @@ class _MeetingCreateDialogJefeEquipoState
                   Container(
                     constraints: const BoxConstraints(maxHeight: 260),
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.055),
+                      color: Colors.white,
                       borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
-                        color: Colors.white.withOpacity(0.10),
-                      ),
+                      border: Border.all(color: Colors.white),
                     ),
                     child: usuarios.isEmpty
                         ? const Padding(
@@ -1284,7 +1284,9 @@ class _MeetingCreateDialogJefeEquipoState
                             child: Center(
                               child: Text(
                                 'No tienes agentes disponibles para invitar',
-                                style: TextStyle(color: Colors.white54),
+                                style: TextStyle(
+                                  color: const Color(0xFF64748B),
+                                ),
                               ),
                             ),
                           )
@@ -1301,14 +1303,12 @@ class _MeetingCreateDialogJefeEquipoState
 
                               return CheckboxListTile(
                                 value: selected,
-                                activeColor: const Color(0xFF22D3EE),
-                                checkColor: const Color(0xFF061018),
+                                activeColor: const Color(0xFF20C7C2),
+                                checkColor: const Color(0xFFFFFFFF),
                                 title: Text(
-                                  nombre.isEmpty
-                                      ? 'Agente sin nombre'
-                                      : nombre,
+                                  nombre.isEmpty ? 'Agente sin nombre' : nombre,
                                   style: const TextStyle(
-                                    color: Colors.white,
+                                    color: const Color(0xFF071A3A),
                                     fontWeight: FontWeight.w700,
                                   ),
                                 ),
@@ -1332,10 +1332,11 @@ class _MeetingCreateDialogJefeEquipoState
                     children: [
                       Expanded(
                         child: OutlinedButton(
-                          onPressed:
-                              saving ? null : () => Navigator.pop(context),
+                          onPressed: saving
+                              ? null
+                              : () => Navigator.pop(context),
                           style: OutlinedButton.styleFrom(
-                            foregroundColor: Colors.white70,
+                            foregroundColor: const Color(0xFF53627A),
                             side: BorderSide(
                               color: Colors.white.withOpacity(0.22),
                             ),
@@ -1357,7 +1358,7 @@ class _MeetingCreateDialogJefeEquipoState
                                   height: 17,
                                   child: CircularProgressIndicator(
                                     strokeWidth: 2,
-                                    color: Color(0xFF061018),
+                                    color: Color(0xFFFFFFFF),
                                   ),
                                 )
                               : Icon(
@@ -1367,13 +1368,11 @@ class _MeetingCreateDialogJefeEquipoState
                                 ),
                           label: Text(
                             editando ? 'Guardar' : 'Crear',
-                            style: const TextStyle(
-                              fontWeight: FontWeight.w900,
-                            ),
+                            style: const TextStyle(fontWeight: FontWeight.w900),
                           ),
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF22D3EE),
-                            foregroundColor: const Color(0xFF061018),
+                            backgroundColor: const Color(0xFF20C7C2),
+                            foregroundColor: const Color(0xFFFFFFFF),
                             padding: const EdgeInsets.symmetric(vertical: 15),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(17),
@@ -1401,21 +1400,21 @@ class _MeetingCreateDialogJefeEquipoState
     return TextField(
       controller: controller,
       maxLines: maxLines,
-      style: const TextStyle(color: Colors.white),
+      style: const TextStyle(color: const Color(0xFF071A3A)),
       decoration: InputDecoration(
         labelText: label,
-        labelStyle: const TextStyle(color: Colors.white60),
-        prefixIcon: Icon(icon, color: const Color(0xFF22D3EE)),
+        labelStyle: const TextStyle(color: const Color(0xFF64748B)),
+        prefixIcon: Icon(icon, color: const Color(0xFF20C7C2)),
         filled: true,
-        fillColor: Colors.white.withOpacity(0.065),
+        fillColor: Colors.white,
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(18),
-          borderSide: BorderSide(color: Colors.white.withOpacity(0.10)),
+          borderSide: BorderSide(color: Colors.white),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(18),
           borderSide: BorderSide(
-            color: const Color(0xFF22D3EE).withOpacity(0.65),
+            color: const Color(0xFF20C7C2).withOpacity(0.65),
           ),
         ),
       ),
@@ -1435,7 +1434,7 @@ class _MeetingCreateDialogJefeEquipoState
       child: Container(
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.065),
+          color: Colors.white,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(color: color.withOpacity(0.26)),
         ),
@@ -1450,7 +1449,7 @@ class _MeetingCreateDialogJefeEquipoState
                   Text(
                     title,
                     style: const TextStyle(
-                      color: Colors.white54,
+                      color: const Color(0xFF64748B),
                       fontSize: 12,
                       fontWeight: FontWeight.w700,
                     ),
@@ -1486,28 +1485,24 @@ class _AgendaBackgroundJefeEquipo extends StatelessWidget {
             gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
-              colors: [
-                Color(0xFF020617),
-                Color(0xFF061A2D),
-                Color(0xFF0B1026),
-              ],
+              colors: [Color(0xFFF2FCFD), Color(0xFFEAF8F8), Color(0xFFEAF8F8)],
             ),
           ),
         ),
         Positioned(
           top: -110,
           right: -90,
-          child: _glow(260, const Color(0xFF22D3EE)),
+          child: _glow(260, const Color(0xFF20C7C2)),
         ),
         Positioned(
           bottom: 160,
           left: -120,
-          child: _glow(280, const Color(0xFFA855F7)),
+          child: _glow(280, const Color(0xFF10AAA6)),
         ),
         Positioned(
           bottom: -120,
           right: -80,
-          child: _glow(240, const Color(0xFF2563EB)),
+          child: _glow(240, const Color(0xFF0A7F91)),
         ),
       ],
     );

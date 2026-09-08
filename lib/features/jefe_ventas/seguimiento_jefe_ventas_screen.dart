@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:safebrok_andalucia/core/production/premium_weighting.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:fl_chart/fl_chart.dart';
 
@@ -29,9 +30,9 @@ class _SeguimientoJefeVentasScreenState
   DateTime? fromDate;
   DateTime? toDate;
 
-  static const Color bg = Color(0xFF07111D);
-  static const Color card = Color(0xFF101C2B);
-  static const Color card2 = Color(0xFF132437);
+  static const Color bg = Color(0xFFF4F6FB);
+  static const Color card = Color(0xFFFFFFFF);
+  static const Color card2 = Color(0xFFF1F5F9);
   static const Color blue = Color(0xFF4DA3FF);
   static const Color green = Color(0xFF31D0AA);
   static const Color orange = Color(0xFFFFB020);
@@ -55,6 +56,9 @@ class _SeguimientoJefeVentasScreenState
       final me = await supabase
           .from('usuarios')
           .select('id')
+          .or(
+            'estado.is.null,estado.not.in.(inactivo,Inactivo,INACTIVO,baja,Baja,BAJA,desactivado,Desactivado,DESACTIVADO,bloqueado,Bloqueado,BLOQUEADO,suspendido,Suspendido,SUSPENDIDO)',
+          )
           .eq('auth_id', user.id)
           .single();
 
@@ -63,6 +67,9 @@ class _SeguimientoJefeVentasScreenState
       final jefesEquipo = await supabase
           .from('usuarios')
           .select('id, auth_id, nombre')
+          .or(
+            'estado.is.null,estado.not.in.(inactivo,Inactivo,INACTIVO,baja,Baja,BAJA,desactivado,Desactivado,DESACTIVADO,bloqueado,Bloqueado,BLOQUEADO,suspendido,Suspendido,SUSPENDIDO)',
+          )
           .eq('parent_id', myUserId!)
           .eq('rol_usuario', 'jefe_equipo');
 
@@ -73,6 +80,9 @@ class _SeguimientoJefeVentasScreenState
         final agentes = await supabase
             .from('usuarios')
             .select('auth_id')
+            .or(
+              'estado.is.null,estado.not.in.(inactivo,Inactivo,INACTIVO,baja,Baja,BAJA,desactivado,Desactivado,DESACTIVADO,bloqueado,Bloqueado,BLOQUEADO,suspendido,Suspendido,SUSPENDIDO)',
+            )
             .eq('parent_id', jefe['id'])
             .eq('rol_usuario', 'agente');
 
@@ -80,9 +90,7 @@ class _SeguimientoJefeVentasScreenState
             .map<String>((e) => e['auth_id'].toString())
             .toList();
 
-        listaEquipos.add({
-          "nombre": jefe['nombre'] ?? 'Sin nombre',
-        });
+        listaEquipos.add({"nombre": jefe['nombre'] ?? 'Sin nombre'});
 
         mapaEquipos[jefe['nombre'] ?? 'Sin nombre'] = ids;
       }
@@ -102,9 +110,9 @@ class _SeguimientoJefeVentasScreenState
           .from('contactos_diarios')
           .select('contactos_positivos, auth_id');
 
-      contactosData = List<Map<String, dynamic>>.from(contactosRes)
-          .where((c) => ids.contains(c['auth_id']))
-          .toList();
+      contactosData = List<Map<String, dynamic>>.from(
+        contactosRes,
+      ).where((c) => ids.contains(c['auth_id'])).toList();
 
       final salesRes = await supabase
           .from('ventas')
@@ -140,20 +148,12 @@ class _SeguimientoJefeVentasScreenState
       bool toOk = true;
 
       if (fromDate != null) {
-        final from = DateTime(
-          fromDate!.year,
-          fromDate!.month,
-          fromDate!.day,
-        );
+        final from = DateTime(fromDate!.year, fromDate!.month, fromDate!.day);
         fromOk = !saleDate.isBefore(from);
       }
 
       if (toDate != null) {
-        final to = DateTime(
-          toDate!.year,
-          toDate!.month,
-          toDate!.day,
-        );
+        final to = DateTime(toDate!.year, toDate!.month, toDate!.day);
         toOk = !saleDate.isAfter(to);
       }
 
@@ -174,22 +174,19 @@ class _SeguimientoJefeVentasScreenState
   double calcPrima(Map<String, dynamic> s) {
     final price = double.tryParse((s['precio'] ?? 0).toString()) ?? 0;
 
-    final form = (s['forma_pago'] ?? '')
-        .toString()
-        .trim()
-        .toLowerCase();
+    final form = (s['forma_pago'] ?? '').toString().trim().toLowerCase();
 
     switch (form) {
       case 'mensual':
-        return price * 12;
+        return PremiumWeighting.amount(s, price * 12);
       case 'trimestral':
-        return price * 4;
+        return PremiumWeighting.amount(s, price * 4);
       case 'semestral':
-        return price * 2;
+        return PremiumWeighting.amount(s, price * 2);
       case 'anual':
-        return price;
+        return PremiumWeighting.amount(s, price);
       default:
-        return price;
+        return PremiumWeighting.amount(s, price);
     }
   }
 
@@ -201,20 +198,14 @@ class _SeguimientoJefeVentasScreenState
   double get mediaPrima =>
       filteredSales.isEmpty ? 0 : totalPrima / filteredSales.length;
 
-  double get mediaVentas =>
-      filteredSales.isEmpty ? 0 : totalVentas.toDouble();
+  double get mediaVentas => filteredSales.isEmpty ? 0 : totalVentas.toDouble();
 
   int get totalContactosPositivos {
-    return filteredContactos.fold<int>(
-      0,
-      (sum, c) {
-        final value = int.tryParse(
-              (c['contactos_positivos'] ?? 0).toString(),
-            ) ??
-            0;
-        return sum + value;
-      },
-    );
+    return filteredContactos.fold<int>(0, (sum, c) {
+      final value =
+          int.tryParse((c['contactos_positivos'] ?? 0).toString()) ?? 0;
+      return sum + value;
+    });
   }
 
   double get eficaciaEquipo {
@@ -248,22 +239,15 @@ class _SeguimientoJefeVentasScreenState
 
       final prima = calcPrima(sale);
 
-      totals.update(
-        date.day,
-        (value) => value + prima,
-        ifAbsent: () => prima,
-      );
+      totals.update(date.day, (value) => value + prima, ifAbsent: () => prima);
     }
 
     final lastDay = DateTime(now.year, now.month + 1, 0).day;
 
-    return List.generate(
-      lastDay,
-      (index) {
-        final day = index + 1;
-        return FlSpot(day.toDouble(), totals[day] ?? 0);
-      },
-    );
+    return List.generate(lastDay, (index) {
+      final day = index + 1;
+      return FlSpot(day.toDouble(), totals[day] ?? 0);
+    });
   }
 
   String money(double value) {
@@ -285,11 +269,8 @@ class _SeguimientoJefeVentasScreenState
       initialDate: DateTime.now(),
       builder: (context, child) {
         return Theme(
-          data: ThemeData.dark().copyWith(
-            colorScheme: const ColorScheme.dark(
-              primary: blue,
-              surface: card,
-            ),
+          data: ThemeData.light().copyWith(
+            colorScheme: const ColorScheme.light(primary: blue, surface: card),
           ),
           child: child!,
         );
@@ -324,16 +305,11 @@ class _SeguimientoJefeVentasScreenState
         backgroundColor: bg,
         title: const Text(
           "Seguimiento Comercial",
-          style: TextStyle(
-            fontWeight: FontWeight.w800,
-            color: Colors.white,
-          ),
+          style: TextStyle(fontWeight: FontWeight.w800, color: Colors.white),
         ),
       ),
       body: loading
-          ? const Center(
-              child: CircularProgressIndicator(color: blue),
-            )
+          ? const Center(child: CircularProgressIndicator(color: blue))
           : RefreshIndicator(
               onRefresh: loadData,
               color: blue,
@@ -363,10 +339,7 @@ class _SeguimientoJefeVentasScreenState
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
-          colors: [
-            Color(0xFF102A43),
-            Color(0xFF0B1624),
-          ],
+          colors: [Color(0xFF102A43), Color(0xFF0B1624)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
@@ -477,7 +450,7 @@ class _SeguimientoJefeVentasScreenState
               iconEnabledColor: Colors.white,
               underline: const SizedBox(),
               isExpanded: true,
-              style: const TextStyle(color: Colors.white),
+              style: const TextStyle(color: Color(0xFF111827)),
               items: [
                 const DropdownMenuItem(
                   value: 'Todos',
@@ -523,9 +496,7 @@ class _SeguimientoJefeVentasScreenState
               onPressed: clearFilters,
               icon: const Icon(Icons.filter_alt_off_rounded, size: 18),
               label: const Text("Limpiar filtros"),
-              style: TextButton.styleFrom(
-                foregroundColor: Colors.white70,
-              ),
+              style: TextButton.styleFrom(foregroundColor: Colors.white70),
             ),
           ),
         ],
@@ -557,7 +528,7 @@ class _SeguimientoJefeVentasScreenState
                 title,
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
-                  color: Colors.white,
+                  color: Color(0xFF111827),
                   fontWeight: FontWeight.w700,
                 ),
               ),
@@ -583,12 +554,7 @@ class _SeguimientoJefeVentasScreenState
           Icons.shopping_bag_rounded,
           blue,
         ),
-        _kpiCard(
-          "Prima total",
-          money(totalPrima),
-          Icons.euro_rounded,
-          green,
-        ),
+        _kpiCard("Prima total", money(totalPrima), Icons.euro_rounded, green),
         _kpiCard(
           "Prima media",
           money(mediaPrima),
@@ -605,12 +571,7 @@ class _SeguimientoJefeVentasScreenState
     );
   }
 
-  Widget _kpiCard(
-    String title,
-    String value,
-    IconData icon,
-    Color color,
-  ) {
+  Widget _kpiCard(String title, String value, IconData icon, Color color) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -647,7 +608,7 @@ class _SeguimientoJefeVentasScreenState
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: const TextStyle(
-              color: Colors.white,
+              color: Color(0xFF111827),
               fontSize: 20,
               fontWeight: FontWeight.w900,
             ),
@@ -789,10 +750,7 @@ class _SeguimientoJefeVentasScreenState
                     belowBarData: BarAreaData(
                       show: true,
                       gradient: LinearGradient(
-                        colors: [
-                          blue.withOpacity(0.28),
-                          Colors.transparent,
-                        ],
+                        colors: [blue.withOpacity(0.28), Colors.transparent],
                         begin: Alignment.topCenter,
                         end: Alignment.bottomCenter,
                       ),
@@ -833,14 +791,13 @@ class _SeguimientoJefeVentasScreenState
           if (entries.isEmpty)
             Text(
               "No hay ventas para los filtros seleccionados.",
-              style: TextStyle(
-                color: Colors.white.withOpacity(0.55),
-              ),
+              style: TextStyle(color: Colors.white.withOpacity(0.55)),
             )
           else
             ...entries.map((e) {
-              final percent =
-                  totalVentas == 0 ? 0 : (e.value / totalVentas) * 100;
+              final percent = totalVentas == 0
+                  ? 0
+                  : (e.value / totalVentas) * 100;
 
               return Container(
                 margin: const EdgeInsets.only(bottom: 12),
@@ -852,7 +809,7 @@ class _SeguimientoJefeVentasScreenState
                           child: Text(
                             e.key,
                             style: const TextStyle(
-                              color: Colors.white,
+                              color: Color(0xFF111827),
                               fontWeight: FontWeight.w700,
                             ),
                           ),

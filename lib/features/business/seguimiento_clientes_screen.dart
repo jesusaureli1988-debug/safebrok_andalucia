@@ -42,7 +42,7 @@ class _SeguimientoClientesScreenState extends State<SeguimientoClientesScreen> {
           .select()
           .eq('auth_id', user.id)
           .eq('estado', 'Pendiente');
-          await comprobarAlertasSeguimientoJefe();
+      await comprobarAlertasSeguimientoJefe();
 
       final now = DateTime.now();
       final hoy = DateTime(now.year, now.month, now.day);
@@ -65,11 +65,7 @@ class _SeguimientoClientesScreenState extends State<SeguimientoClientesScreen> {
           return false;
         }
 
-        final fechaLlamada = DateTime(
-          fecha.year,
-          fecha.month,
-          fecha.day,
-        );
+        final fechaLlamada = DateTime(fecha.year, fecha.month, fecha.day);
 
         final debeSalir = !fechaLlamada.isAfter(hoy);
 
@@ -109,82 +105,87 @@ class _SeguimientoClientesScreenState extends State<SeguimientoClientesScreen> {
       );
     }
   }
+
   Future<void> comprobarAlertasSeguimientoJefe() async {
-  final user = supabase.auth.currentUser;
-  if (user == null) return;
+    final user = supabase.auth.currentUser;
+    if (user == null) return;
 
-  final hoy = DateTime.now();
+    final hoy = DateTime.now();
 
-  final limite = DateTime(
-    hoy.year,
-    hoy.month,
-    hoy.day,
-  ).subtract(const Duration(days: 3));
+    final limite = DateTime(
+      hoy.year,
+      hoy.month,
+      hoy.day,
+    ).subtract(const Duration(days: 3));
 
-  final limiteString =
-      "${limite.year.toString().padLeft(4, '0')}-"
-      "${limite.month.toString().padLeft(2, '0')}-"
-      "${limite.day.toString().padLeft(2, '0')}";
+    final limiteString =
+        "${limite.year.toString().padLeft(4, '0')}-"
+        "${limite.month.toString().padLeft(2, '0')}-"
+        "${limite.day.toString().padLeft(2, '0')}";
 
-  final seguimientosAtrasados = await supabase
-      .from('seguimiento_clientes')
-      .select('id')
-      .eq('auth_id', user.id)
-      .eq('estado', 'Pendiente')
-      .lte('proxima_llamada', limiteString);
+    final seguimientosAtrasados = await supabase
+        .from('seguimiento_clientes')
+        .select('id')
+        .eq('auth_id', user.id)
+        .eq('estado', 'Pendiente')
+        .lte('proxima_llamada', limiteString);
 
-  if (seguimientosAtrasados.isEmpty) return;
+    if (seguimientosAtrasados.isEmpty) return;
 
-  final agente = await supabase
-      .from('usuarios')
-      .select('nombre, auth_id, parent_id')
-      .eq('auth_id', user.id)
-      .maybeSingle();
+    final agente = await supabase
+        .from('usuarios')
+        .select('nombre, auth_id, parent_id')
+        .or(
+          'estado.is.null,estado.not.in.(inactivo,Inactivo,INACTIVO,baja,Baja,BAJA,desactivado,Desactivado,DESACTIVADO,bloqueado,Bloqueado,BLOQUEADO,suspendido,Suspendido,SUSPENDIDO)',
+        )
+        .eq('auth_id', user.id)
+        .maybeSingle();
 
-  if (agente == null) return;
+    if (agente == null) return;
 
-  final parentId = agente['parent_id'];
+    final parentId = agente['parent_id'];
 
-  if (parentId == null) return;
+    if (parentId == null) return;
 
-  final jefe = await supabase
-      .from('usuarios')
-      .select('auth_id')
-      .eq('id', parentId)
-      .maybeSingle();
+    final jefe = await supabase
+        .from('usuarios')
+        .select('auth_id')
+        .or(
+          'estado.is.null,estado.not.in.(inactivo,Inactivo,INACTIVO,baja,Baja,BAJA,desactivado,Desactivado,DESACTIVADO,bloqueado,Bloqueado,BLOQUEADO,suspendido,Suspendido,SUSPENDIDO)',
+        )
+        .eq('id', parentId)
+        .maybeSingle();
 
-  if (jefe == null) return;
+    if (jefe == null) return;
 
-  final authIdJefe = jefe['auth_id'];
+    final authIdJefe = jefe['auth_id'];
 
-  final alertaExistente = await supabase
-      .from('alertas')
-      .select('id')
-      .eq('auth_id_destino', authIdJefe)
-      .eq('auth_id_origen', user.id)
-      .eq('tipo', 'seguimiento_atrasado')
-      .eq('leida', false)
-      .maybeSingle();
+    final alertaExistente = await supabase
+        .from('alertas')
+        .select('id')
+        .eq('auth_id_destino', authIdJefe)
+        .eq('auth_id_origen', user.id)
+        .eq('tipo', 'seguimiento_atrasado')
+        .eq('leida', false)
+        .maybeSingle();
 
-  if (alertaExistente != null) return;
+    if (alertaExistente != null) return;
 
-  await supabase.from('alertas').insert({
-    'auth_id_destino': authIdJefe,
-    'auth_id_origen': user.id,
-    'tipo': 'seguimiento_atrasado',
-    'titulo': 'Seguimiento atrasado',
-    'mensaje':
-        '${agente['nombre']} tiene ${seguimientosAtrasados.length} seguimiento(s) de clientes atrasado(s) más de 3 días. Revisa con el agente que gestione esas llamadas cuanto antes.',
-  });
-}
+    await supabase.from('alertas').insert({
+      'auth_id_destino': authIdJefe,
+      'auth_id_origen': user.id,
+      'tipo': 'seguimiento_atrasado',
+      'titulo': 'Seguimiento atrasado',
+      'mensaje':
+          '${agente['nombre']} tiene ${seguimientosAtrasados.length} seguimiento(s) de clientes atrasado(s) más de 3 días. Revisa con el agente que gestione esas llamadas cuanto antes.',
+    });
+  }
 
   Future<void> _abrirDetalle(Map<String, dynamic> llamada) async {
     await Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => DetalleSeguimientoScreen(
-          seguimiento: llamada,
-        ),
+        builder: (_) => DetalleSeguimientoScreen(seguimiento: llamada),
       ),
     );
 
@@ -223,7 +224,7 @@ class _SeguimientoClientesScreenState extends State<SeguimientoClientesScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF061018),
+      backgroundColor: const Color(0xFFFFFFFF),
       body: Stack(
         children: [
           const _PremiumBackground(),
@@ -255,8 +256,7 @@ class _SeguimientoClientesScreenState extends State<SeguimientoClientesScreen> {
                       padding: const EdgeInsets.fromLTRB(18, 18, 18, 28),
                       sliver: SliverList.separated(
                         itemCount: llamadas.length,
-                        separatorBuilder: (_, __) =>
-                            const SizedBox(height: 14),
+                        separatorBuilder: (_, __) => const SizedBox(height: 14),
                         itemBuilder: (context, index) {
                           return _llamadaCard(llamadas[index]);
                         },
@@ -299,7 +299,7 @@ class _SeguimientoClientesScreenState extends State<SeguimientoClientesScreen> {
             child: Text(
               "Seguimientos",
               style: TextStyle(
-                color: Colors.white,
+                color: const Color(0xFF071A3A),
                 fontSize: 31,
                 fontWeight: FontWeight.w900,
                 letterSpacing: -0.8,
@@ -312,9 +312,7 @@ class _SeguimientoClientesScreenState extends State<SeguimientoClientesScreen> {
             decoration: BoxDecoration(
               color: Colors.cyanAccent.withOpacity(0.10),
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: Colors.cyanAccent.withOpacity(0.35),
-              ),
+              border: Border.all(color: Colors.cyanAccent.withOpacity(0.35)),
             ),
             child: const Icon(
               Icons.support_agent_rounded,
@@ -337,14 +335,12 @@ class _SeguimientoClientesScreenState extends State<SeguimientoClientesScreen> {
           colors: [
             Colors.cyanAccent.withOpacity(0.16),
             const Color(0xFF081A2A).withOpacity(0.92),
-            const Color(0xFF061018).withOpacity(0.95),
+            const Color(0xFFFFFFFF).withOpacity(0.95),
           ],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
-        border: Border.all(
-          color: Colors.cyanAccent.withOpacity(0.30),
-        ),
+        border: Border.all(color: Colors.cyanAccent.withOpacity(0.30)),
         boxShadow: [
           BoxShadow(
             color: Colors.cyanAccent.withOpacity(0.11),
@@ -376,7 +372,7 @@ class _SeguimientoClientesScreenState extends State<SeguimientoClientesScreen> {
                   Text(
                     "${llamadas.length}",
                     style: const TextStyle(
-                      color: Colors.white,
+                      color: const Color(0xFF071A3A),
                       fontSize: 64,
                       fontWeight: FontWeight.w900,
                       height: 0.9,
@@ -388,7 +384,7 @@ class _SeguimientoClientesScreenState extends State<SeguimientoClientesScreen> {
                     child: Text(
                       "pendientes",
                       style: TextStyle(
-                        color: Colors.white70,
+                        color: const Color(0xFF53627A),
                         fontSize: 22,
                         fontWeight: FontWeight.w700,
                       ),
@@ -446,7 +442,7 @@ class _SeguimientoClientesScreenState extends State<SeguimientoClientesScreen> {
             child: Text(
               title,
               style: const TextStyle(
-                color: Colors.white70,
+                color: const Color(0xFF53627A),
                 fontWeight: FontWeight.w700,
               ),
             ),
@@ -486,9 +482,7 @@ class _SeguimientoClientesScreenState extends State<SeguimientoClientesScreen> {
             begin: Alignment.centerLeft,
             end: Alignment.centerRight,
           ),
-          border: Border.all(
-            color: color.withOpacity(0.27),
-          ),
+          border: Border.all(color: color.withOpacity(0.27)),
           boxShadow: [
             BoxShadow(
               color: color.withOpacity(0.08),
@@ -531,7 +525,7 @@ class _SeguimientoClientesScreenState extends State<SeguimientoClientesScreen> {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
-                      color: Colors.white,
+                      color: const Color(0xFF071A3A),
                       fontSize: 17,
                       fontWeight: FontWeight.w900,
                     ),
@@ -540,7 +534,7 @@ class _SeguimientoClientesScreenState extends State<SeguimientoClientesScreen> {
                   Text(
                     "${l['producto'] ?? 'Producto no indicado'}",
                     style: const TextStyle(
-                      color: Colors.white70,
+                      color: const Color(0xFF53627A),
                       fontSize: 14,
                       fontWeight: FontWeight.w600,
                     ),
@@ -619,9 +613,7 @@ class _SeguimientoClientesScreenState extends State<SeguimientoClientesScreen> {
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               color: Colors.greenAccent.withOpacity(0.10),
-              border: Border.all(
-                color: Colors.greenAccent.withOpacity(0.35),
-              ),
+              border: Border.all(color: Colors.greenAccent.withOpacity(0.35)),
             ),
             child: const Icon(
               Icons.check_circle_rounded,
@@ -633,7 +625,7 @@ class _SeguimientoClientesScreenState extends State<SeguimientoClientesScreen> {
           const Text(
             "Todo al día",
             style: TextStyle(
-              color: Colors.white,
+              color: const Color(0xFF071A3A),
               fontSize: 28,
               fontWeight: FontWeight.w900,
             ),
@@ -642,11 +634,7 @@ class _SeguimientoClientesScreenState extends State<SeguimientoClientesScreen> {
           const Text(
             "No tienes seguimientos pendientes para hoy.",
             textAlign: TextAlign.center,
-            style: TextStyle(
-              color: Colors.white70,
-              fontSize: 16,
-              height: 1.4,
-            ),
+            style: TextStyle(color: const Color(0xFF53627A), fontSize: 16, height: 1.4),
           ),
         ],
       ),
@@ -664,11 +652,7 @@ class _PremiumBackground extends StatelessWidget {
         Container(
           decoration: const BoxDecoration(
             gradient: LinearGradient(
-              colors: [
-                Color(0xFF02060A),
-                Color(0xFF061018),
-                Color(0xFF071827),
-              ],
+              colors: [Color(0xFF02060A), Color(0xFFFFFFFF), Color(0xFF071827)],
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
             ),
@@ -700,13 +684,7 @@ class _PremiumBackground extends StatelessWidget {
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         color: color,
-        boxShadow: [
-          BoxShadow(
-            color: color,
-            blurRadius: 80,
-            spreadRadius: 45,
-          ),
-        ],
+        boxShadow: [BoxShadow(color: color, blurRadius: 80, spreadRadius: 45)],
       ),
     );
   }

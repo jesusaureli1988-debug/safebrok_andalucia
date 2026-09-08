@@ -130,7 +130,10 @@ class _NuevoCandidatoScreenState extends State<NuevoCandidatoScreen> {
 
       final data = await supabase
           .from('usuarios')
-          .select('id, auth_id, parent_id, rol_usuario, nombre, apellidos');
+          .select('id, auth_id, parent_id, rol_usuario, nombre, apellidos')
+          .or(
+            'estado.is.null,estado.not.in.(inactivo,Inactivo,INACTIVO,baja,Baja,BAJA,desactivado,Desactivado,DESACTIVADO,bloqueado,Bloqueado,BLOQUEADO,suspendido,Suspendido,SUSPENDIDO)',
+          );
 
       final usuarios = List<Map<String, dynamic>>.from(data).map((u) {
         return <String, dynamic>{
@@ -396,6 +399,9 @@ class _NuevoCandidatoScreenState extends State<NuevoCandidatoScreen> {
       final usuarioRemitente = await supabase
           .from('usuarios')
           .select('nombre, apellidos')
+          .or(
+            'estado.is.null,estado.not.in.(inactivo,Inactivo,INACTIVO,baja,Baja,BAJA,desactivado,Desactivado,DESACTIVADO,bloqueado,Bloqueado,BLOQUEADO,suspendido,Suspendido,SUSPENDIDO)',
+          )
           .eq('auth_id', remitenteAuthId)
           .maybeSingle();
 

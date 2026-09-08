@@ -2,10 +2,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-enum TipoEdicionComision {
-  comisiones,
-  impuestos,
-}
+enum TipoEdicionComision { comisiones, impuestos }
 
 class ModificarComisionesScreen extends StatefulWidget {
   const ModificarComisionesScreen({super.key});
@@ -15,8 +12,7 @@ class ModificarComisionesScreen extends StatefulWidget {
       _ModificarComisionesScreenState();
 }
 
-class _ModificarComisionesScreenState
-    extends State<ModificarComisionesScreen> {
+class _ModificarComisionesScreenState extends State<ModificarComisionesScreen> {
   final supabase = Supabase.instance.client;
 
   bool loading = true;
@@ -62,23 +58,23 @@ class _ModificarComisionesScreenState
     return double.tryParse(value.toString()) ?? 0;
   }
 
-
-
   Future<void> cargarComisiones() async {
     setState(() => loading = true);
 
     try {
       final resultados = await Future.wait([
         supabase.from('comisiones_productos').select().order('orden'),
-        supabase.from('comisiones_producto_compania').select(
-              'producto, compania, porcentaje_comision',
-            ),
+        supabase
+            .from('comisiones_producto_compania')
+            .select('producto, compania, porcentaje_comision'),
       ]);
 
-      final productosCargados =
-          List<Map<String, dynamic>>.from(resultados[0] as List);
-      final comisionesCargadas =
-          List<Map<String, dynamic>>.from(resultados[1] as List);
+      final productosCargados = List<Map<String, dynamic>>.from(
+        resultados[0] as List,
+      );
+      final comisionesCargadas = List<Map<String, dynamic>>.from(
+        resultados[1] as List,
+      );
 
       comisionesPorCompania.clear();
       for (final fila in comisionesCargadas) {
@@ -86,8 +82,9 @@ class _ModificarComisionesScreenState
         final compania = fila['compania']?.toString().trim() ?? '';
         if (producto.isEmpty || compania.isEmpty) continue;
 
-        comisionesPorCompania[_claveComision(producto, compania)] =
-            _num(fila['porcentaje_comision']);
+        comisionesPorCompania[_claveComision(producto, compania)] = _num(
+          fila['porcentaje_comision'],
+        );
       }
 
       if (!mounted) return;
@@ -98,9 +95,9 @@ class _ModificarComisionesScreenState
     } catch (e) {
       if (!mounted) return;
       setState(() => loading = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error cargando comisiones: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error cargando comisiones: $e')));
     }
   }
 
@@ -110,8 +107,10 @@ class _ModificarComisionesScreenState
 
   double _comisionProducto(Map<String, dynamic> producto) {
     final nombre = producto['producto']?.toString().trim() ?? '';
-    return comisionesPorCompania[
-            _claveComision(nombre, companiaSeleccionada)] ??
+    return comisionesPorCompania[_claveComision(
+          nombre,
+          companiaSeleccionada,
+        )] ??
         _num(producto['porcentaje_comision']);
   }
 
@@ -126,8 +125,9 @@ class _ModificarComisionesScreenState
 
     setState(() {
       // Evita residuos binarios y conserva exactamente dos decimales.
-      comisionesPorCompania[clave] =
-          double.parse(nuevoValor.toStringAsFixed(2));
+      comisionesPorCompania[clave] = double.parse(
+        nuevoValor.toStringAsFixed(2),
+      );
     });
   }
 
@@ -149,8 +149,9 @@ class _ModificarComisionesScreenState
     final actual = _num(productos[index]['porcentaje_impuestos']);
 
     setState(() {
-      productos[index]['porcentaje_impuestos'] =
-          _limitarPorcentaje(actual + 0.5);
+      productos[index]['porcentaje_impuestos'] = _limitarPorcentaje(
+        actual + 0.5,
+      );
     });
   }
 
@@ -158,8 +159,9 @@ class _ModificarComisionesScreenState
     final actual = _num(productos[index]['porcentaje_impuestos']);
 
     setState(() {
-      productos[index]['porcentaje_impuestos'] =
-          _limitarPorcentaje(actual - 0.5);
+      productos[index]['porcentaje_impuestos'] = _limitarPorcentaje(
+        actual - 0.5,
+      );
     });
   }
 
@@ -172,29 +174,30 @@ class _ModificarComisionesScreenState
       final actualizadoEn = DateTime.now().toIso8601String();
 
       if (tipoEdicion == TipoEdicionComision.comisiones) {
-        final filas = productos.map((producto) {
-          final nombre = producto['producto']?.toString().trim() ?? '';
-          return {
-            'producto': nombre,
-            'compania': companiaSeleccionada,
-            'porcentaje_comision': _comisionProducto(producto),
-            'actualizado_en': actualizadoEn,
-          };
-        }).where((fila) {
-          return (fila['producto'] as String).isNotEmpty;
-        }).toList();
+        final filas = productos
+            .map((producto) {
+              final nombre = producto['producto']?.toString().trim() ?? '';
+              return {
+                'producto': nombre,
+                'compania': companiaSeleccionada,
+                'porcentaje_comision': _comisionProducto(producto),
+                'actualizado_en': actualizadoEn,
+              };
+            })
+            .where((fila) {
+              return (fila['producto'] as String).isNotEmpty;
+            })
+            .toList();
 
-        await supabase.from('comisiones_producto_compania').upsert(
-              filas,
-              onConflict: 'producto,compania',
-            );
+        await supabase
+            .from('comisiones_producto_compania')
+            .upsert(filas, onConflict: 'producto,compania');
       } else {
         for (final producto in productos) {
           await supabase
               .from('comisiones_productos')
               .update({
-                'porcentaje_impuestos':
-                    _num(producto['porcentaje_impuestos']),
+                'porcentaje_impuestos': _num(producto['porcentaje_impuestos']),
                 'actualizado_en': actualizadoEn,
               })
               .eq('id', producto['id']);
@@ -215,9 +218,9 @@ class _ModificarComisionesScreenState
     } catch (e) {
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error guardando comisiones: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error guardando comisiones: $e')));
     } finally {
       if (mounted) setState(() => saving = false);
     }
@@ -244,33 +247,30 @@ class _ModificarComisionesScreenState
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF061018),
+      backgroundColor: const Color(0xFFFFFFFF),
       extendBodyBehindAppBar: true,
       appBar: AppBar(
-      leading: Padding(
-  padding: const EdgeInsets.all(8),
-  child: Material(
-    color: Colors.white.withOpacity(0.10),
-    shape: const CircleBorder(),
-    child: InkWell(
-      customBorder: const CircleBorder(),
-      onTap: () => Navigator.of(context).pop(),
-      child: const Center(
-        child: Icon(
-          Icons.arrow_back_ios_new_rounded,
-          color: Colors.white,
-          size: 20,
+        leading: Padding(
+          padding: const EdgeInsets.all(8),
+          child: Material(
+            color: Colors.white.withOpacity(0.10),
+            shape: const CircleBorder(),
+            child: InkWell(
+              customBorder: const CircleBorder(),
+              onTap: () => Navigator.of(context).pop(),
+              child: const Center(
+                child: Icon(
+                  Icons.arrow_back_ios_new_rounded,
+                  color: Colors.white,
+                  size: 20,
+                ),
+              ),
+            ),
+          ),
         ),
-      ),
-    ),
-  ),
-),
         title: const Text(
           'Comisiones e impuestos',
-          style: TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.w900,
-          ),
+          style: TextStyle(color: const Color(0xFF071A3A), fontWeight: FontWeight.w900),
         ),
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -287,9 +287,7 @@ class _ModificarComisionesScreenState
           SafeArea(
             child: loading
                 ? const Center(
-                    child: CircularProgressIndicator(
-                      color: Colors.cyanAccent,
-                    ),
+                    child: CircularProgressIndicator(color: Colors.cyanAccent),
                   )
                 : RefreshIndicator(
                     color: Colors.cyanAccent,
@@ -301,8 +299,7 @@ class _ModificarComisionesScreenState
                         _header(),
                         const SizedBox(height: 16),
                         _selectorEdicion(),
-                        if (tipoEdicion ==
-                            TipoEdicionComision.comisiones) ...[
+                        if (tipoEdicion == TipoEdicionComision.comisiones) ...[
                           const SizedBox(height: 16),
                           _selectorCompania(),
                         ],
@@ -310,48 +307,47 @@ class _ModificarComisionesScreenState
                         _resumenPanel(),
                         const SizedBox(height: 16),
                         ...productos.asMap().entries.map(
-                              (entry) =>
-                                  _productoCard(entry.value, entry.key),
+                          (entry) => _productoCard(entry.value, entry.key),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: Colors.amber.withOpacity(0.08),
+                            borderRadius: BorderRadius.circular(18),
+                            border: Border.all(
+                              color: Colors.amber.withOpacity(0.35),
                             ),
-                            Container(
-  padding: const EdgeInsets.all(16),
-  decoration: BoxDecoration(
-    color: Colors.amber.withOpacity(0.08),
-    borderRadius: BorderRadius.circular(18),
-    border: Border.all(
-      color: Colors.amber.withOpacity(0.35),
-    ),
-  ),
-  child: Row(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      const Icon(
-        Icons.info_outline_rounded,
-        color: Colors.amber,
-        size: 24,
-      ),
-      const SizedBox(width: 12),
-      Expanded(
-        child: Text(
-          tipoEdicion == TipoEdicionComision.comisiones
-              ? 'IMPORTANTE\n\n'
-                  'Los cambios realizados en las comisiones se aplicarán únicamente a las ventas que se registren a partir de este momento.\n\n'
-                  'Las ventas ya existentes conservarán la comisión con la que fueron creadas.'
-              : 'IMPORTANTE\n\n'
-                  'Los cambios realizados en los impuestos se aplicarán únicamente a las ventas que se registren a partir de este momento.\n\n'
-                  'La prima anual neta se calculará descontando de la prima anual bruta el porcentaje de impuestos configurado para cada producto.',
-          style: TextStyle(
-            color: Colors.white.withOpacity(0.90),
-            fontSize: 13,
-            height: 1.5,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-      ),
-    ],
-  ),
-),
-const SizedBox(height: 18),
+                          ),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Icon(
+                                Icons.info_outline_rounded,
+                                color: Colors.amber,
+                                size: 24,
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Text(
+                                  tipoEdicion == TipoEdicionComision.comisiones
+                                      ? 'IMPORTANTE\n\n'
+                                            'Los cambios realizados en las comisiones se aplicarán únicamente a las ventas que se registren a partir de este momento.\n\n'
+                                            'Las ventas ya existentes conservarán la comisión con la que fueron creadas.'
+                                      : 'IMPORTANTE\n\n'
+                                            'Los cambios realizados en los impuestos se aplicarán únicamente a las ventas que se registren a partir de este momento.\n\n'
+                                            'La prima anual neta se calculará descontando de la prima anual bruta el porcentaje de impuestos configurado para cada producto.',
+                                  style: TextStyle(
+                                    color: Colors.white.withOpacity(0.90),
+                                    fontSize: 13,
+                                    height: 1.5,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 18),
                         _guardarButton(),
                       ],
                     ),
@@ -376,8 +372,7 @@ const SizedBox(height: 18),
             child: _selectorButton(
               title: 'Comisiones',
               icon: Icons.percent_rounded,
-              selected:
-                  tipoEdicion == TipoEdicionComision.comisiones,
+              selected: tipoEdicion == TipoEdicionComision.comisiones,
               color: Colors.greenAccent,
               onTap: () {
                 setState(() {
@@ -391,8 +386,7 @@ const SizedBox(height: 18),
             child: _selectorButton(
               title: 'Impuestos',
               icon: Icons.receipt_long_rounded,
-              selected:
-                  tipoEdicion == TipoEdicionComision.impuestos,
+              selected: tipoEdicion == TipoEdicionComision.impuestos,
               color: Colors.cyanAccent,
               onTap: () {
                 setState(() {
@@ -419,16 +413,12 @@ const SizedBox(height: 18),
         children: [
           const Row(
             children: [
-              Icon(
-                Icons.business_rounded,
-                color: Colors.greenAccent,
-                size: 22,
-              ),
+              Icon(Icons.business_rounded, color: Colors.greenAccent, size: 22),
               SizedBox(width: 9),
               Text(
                 'Elige una compañía',
                 style: TextStyle(
-                  color: Colors.white,
+                  color: const Color(0xFF071A3A),
                   fontSize: 17,
                   fontWeight: FontWeight.w900,
                 ),
@@ -450,7 +440,7 @@ const SizedBox(height: 18),
             dropdownColor: const Color(0xFF102331),
             iconEnabledColor: Colors.greenAccent,
             style: const TextStyle(
-              color: Colors.white,
+              color: const Color(0xFF071A3A),
               fontWeight: FontWeight.w800,
             ),
             decoration: InputDecoration(
@@ -462,15 +452,11 @@ const SizedBox(height: 18),
               ),
               enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(18),
-                borderSide: BorderSide(
-                  color: Colors.white.withOpacity(0.09),
-                ),
+                borderSide: BorderSide(color: Colors.white.withOpacity(0.09)),
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(18),
-                borderSide: const BorderSide(
-                  color: Colors.greenAccent,
-                ),
+                borderSide: const BorderSide(color: Colors.greenAccent),
               ),
             ),
             items: companias.map((compania) {
@@ -505,18 +491,11 @@ const SizedBox(height: 18),
         borderRadius: BorderRadius.circular(17),
         onTap: saving ? null : onTap,
         child: Padding(
-          padding: const EdgeInsets.symmetric(
-            horizontal: 10,
-            vertical: 13,
-          ),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 13),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(
-                icon,
-                color: selected ? color : Colors.white38,
-                size: 20,
-              ),
+              Icon(icon, color: selected ? color : const Color(0xFF78909C), size: 20),
               const SizedBox(width: 7),
               Flexible(
                 child: Text(
@@ -524,7 +503,7 @@ const SizedBox(height: 18),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    color: selected ? color : Colors.white54,
+                    color: selected ? color : const Color(0xFF64748B),
                     fontWeight: FontWeight.w900,
                   ),
                 ),
@@ -561,10 +540,7 @@ const SizedBox(height: 18),
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   gradient: const LinearGradient(
-                    colors: [
-                      Colors.greenAccent,
-                      Colors.cyanAccent,
-                    ],
+                    colors: [Colors.greenAccent, Colors.cyanAccent],
                   ),
                   boxShadow: [
                     BoxShadow(
@@ -590,7 +566,7 @@ const SizedBox(height: 18),
                           ? 'Panel de comisiones'
                           : 'Panel de impuestos',
                       style: const TextStyle(
-                        color: Colors.white,
+                        color: const Color(0xFF071A3A),
                         fontSize: 23,
                         fontWeight: FontWeight.w900,
                         letterSpacing: -0.5,
@@ -602,7 +578,7 @@ const SizedBox(height: 18),
                           ? 'Configura cada producto para $companiaSeleccionada con precisión de 0,05 puntos.'
                           : 'Actualiza el porcentaje de impuestos que se descontará para calcular la prima anual neta.',
                       style: const TextStyle(
-                        color: Colors.white60,
+                        color: const Color(0xFF64748B),
                         fontWeight: FontWeight.w600,
                         height: 1.35,
                       ),
@@ -649,12 +625,7 @@ const SizedBox(height: 18),
     );
   }
 
-  Widget _kpiCard(
-    String title,
-    String value,
-    IconData icon,
-    Color color,
-  ) {
+  Widget _kpiCard(String title, String value, IconData icon, Color color) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -683,7 +654,7 @@ const SizedBox(height: 18),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
-                    color: Colors.white,
+                    color: const Color(0xFF071A3A),
                     fontSize: 18,
                     fontWeight: FontWeight.w900,
                   ),
@@ -705,8 +676,7 @@ const SizedBox(height: 18),
   }
 
   Widget _productoCard(Map<String, dynamic> producto, int index) {
-    final editandoComisiones =
-        tipoEdicion == TipoEdicionComision.comisiones;
+    final editandoComisiones = tipoEdicion == TipoEdicionComision.comisiones;
 
     final nombre = producto['producto']?.toString() ?? 'Producto';
     final descripcion =
@@ -715,16 +685,14 @@ const SizedBox(height: 18),
     final porcentajeComision = editandoComisiones
         ? _comisionProducto(producto)
         : _num(producto['porcentaje_comision']);
-    final porcentajeImpuestos =
-        _num(producto['porcentaje_impuestos']);
+    final porcentajeImpuestos = _num(producto['porcentaje_impuestos']);
 
     final actualizado = producto['actualizado_en']?.toString();
 
     const primaBrutaEjemplo = 1000.0;
     final primaNetaEjemplo =
         primaBrutaEjemplo * (1 - (porcentajeImpuestos / 100));
-    final comisionEjemplo =
-        primaNetaEjemplo * (porcentajeComision / 100);
+    final comisionEjemplo = primaNetaEjemplo * (porcentajeComision / 100);
 
     final porcentajeMostrado = editandoComisiones
         ? porcentajeComision
@@ -757,9 +725,7 @@ const SizedBox(height: 18),
             ],
           ),
           borderRadius: BorderRadius.circular(28),
-          border: Border.all(
-            color: colorPrincipal.withOpacity(0.16),
-          ),
+          border: Border.all(color: colorPrincipal.withOpacity(0.16)),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withOpacity(0.24),
@@ -795,7 +761,7 @@ const SizedBox(height: 18),
                       Text(
                         nombre,
                         style: const TextStyle(
-                          color: Colors.white,
+                          color: const Color(0xFF071A3A),
                           fontSize: 17,
                           fontWeight: FontWeight.w900,
                         ),
@@ -825,9 +791,7 @@ const SizedBox(height: 18),
               decoration: BoxDecoration(
                 color: Colors.black.withOpacity(0.20),
                 borderRadius: BorderRadius.circular(22),
-                border: Border.all(
-                  color: Colors.white.withOpacity(0.06),
-                ),
+                border: Border.all(color: Colors.white.withOpacity(0.06)),
               ),
               child: Column(
                 children: [
@@ -915,7 +879,7 @@ const SizedBox(height: 18),
                     child: _infoLine(
                       'Prima anual bruta',
                       '${primaBrutaEjemplo.toStringAsFixed(2)} €',
-                      Colors.white70,
+                      const Color(0xFF53627A),
                     ),
                   ),
                   const SizedBox(width: 10),
@@ -931,16 +895,11 @@ const SizedBox(height: 18),
             const SizedBox(height: 10),
             Container(
               width: double.infinity,
-              padding: const EdgeInsets.symmetric(
-                horizontal: 13,
-                vertical: 11,
-              ),
+              padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 11),
               decoration: BoxDecoration(
                 color: Colors.white.withOpacity(0.045),
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                  color: Colors.white.withOpacity(0.06),
-                ),
+                border: Border.all(color: Colors.white.withOpacity(0.06)),
               ),
               child: Row(
                 children: [
@@ -955,11 +914,7 @@ const SizedBox(height: 18),
                       ),
                     ),
                   ),
-                  Container(
-                    width: 1,
-                    height: 20,
-                    color: Colors.white12,
-                  ),
+                  Container(width: 1, height: 20, color: Colors.white12),
                   Expanded(
                     child: Text(
                       'Impuestos: ${porcentajeImpuestos.toStringAsFixed(2)} %',
@@ -1015,10 +970,7 @@ const SizedBox(height: 18),
               const SizedBox(width: 6),
               Text(
                 label,
-                style: TextStyle(
-                  color: color,
-                  fontWeight: FontWeight.w900,
-                ),
+                style: TextStyle(color: color, fontWeight: FontWeight.w900),
               ),
             ],
           ),
@@ -1096,18 +1048,14 @@ const SizedBox(height: 18),
           saving
               ? 'GUARDANDO...'
               : tipoEdicion == TipoEdicionComision.comisiones
-                  ? 'GUARDAR COMISIONES'
-                  : 'GUARDAR IMPUESTOS',
-          style: const TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w900,
-          ),
+              ? 'GUARDAR COMISIONES'
+              : 'GUARDAR IMPUESTOS',
+          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900),
         ),
         style: ElevatedButton.styleFrom(
-          backgroundColor:
-              tipoEdicion == TipoEdicionComision.comisiones
-                  ? Colors.greenAccent
-                  : Colors.cyanAccent,
+          backgroundColor: tipoEdicion == TipoEdicionComision.comisiones
+              ? Colors.greenAccent
+              : Colors.cyanAccent,
           foregroundColor: Colors.black,
           disabledBackgroundColor:
               (tipoEdicion == TipoEdicionComision.comisiones
@@ -1139,7 +1087,7 @@ class _PremiumBackground extends StatelessWidget {
   Widget build(BuildContext context) {
     return Stack(
       children: [
-        Container(color: const Color(0xFF061018)),
+        Container(color: const Color(0xFFFFFFFF)),
         Positioned(
           top: -120,
           right: -90,
@@ -1168,23 +1116,14 @@ class _PremiumBackground extends StatelessWidget {
     );
   }
 
-  Widget _blurCircle({
-    required Color color,
-    required double size,
-  }) {
+  Widget _blurCircle({required Color color, required double size}) {
     return Container(
       width: size,
       height: size,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         color: color,
-        boxShadow: [
-          BoxShadow(
-            color: color,
-            blurRadius: 95,
-            spreadRadius: 38,
-          ),
-        ],
+        boxShadow: [BoxShadow(color: color, blurRadius: 95, spreadRadius: 38)],
       ),
     );
   }

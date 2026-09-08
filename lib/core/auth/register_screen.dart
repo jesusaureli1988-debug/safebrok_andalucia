@@ -32,9 +32,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
   String? selectedParentId;
   List<Map<String, dynamic>> jefes = [];
 
-  static const bg = Color(0xFF07111D);
-  static const card = Color(0xFF101C2B);
-  static const card2 = Color(0xFF132437);
+  static const bg = Color(0xFFF4F6FB);
+  static const card = Color(0xFFFFFFFF);
+  static const card2 = Color(0xFFF1F5F9);
   static const blue = Color(0xFF2563EB);
   static const cyan = Color(0xFF22D3EE);
 
@@ -423,7 +423,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                             showPassword
                                 ? Icons.visibility_off_rounded
                                 : Icons.visibility_rounded,
-                            color: Colors.white54,
+                            color: const Color(0xFF64748B),
                           ),
                         ),
                       ),
@@ -441,7 +441,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                             showRepeatPassword
                                 ? Icons.visibility_off_rounded
                                 : Icons.visibility_rounded,
-                            color: Colors.white54,
+                            color: const Color(0xFF64748B),
                           ),
                         ),
                       ),
@@ -589,7 +589,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     Text(
                       title,
                       style: const TextStyle(
-                        color: Colors.white,
+                        color: Color(0xFF111827),
                         fontSize: 17,
                         fontWeight: FontWeight.w900,
                       ),
@@ -619,7 +619,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
       value: selectedRole,
       dropdownColor: card2,
       iconEnabledColor: cyan,
-      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800),
+      style: const TextStyle(
+        color: Color(0xFF111827),
+        fontWeight: FontWeight.w800,
+      ),
       decoration: _decoration(
         label: 'Cargo',
         icon: Icons.workspace_premium_outlined,
@@ -655,7 +658,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
               child: Text(
                 'El director de zona no necesita un jefe asignado.',
                 style: TextStyle(
-                  color: Colors.white70,
+                  color: const Color(0xFF475569),
                   fontWeight: FontWeight.w700,
                 ),
               ),
@@ -698,7 +701,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
       isExpanded: true,
       dropdownColor: card2,
       iconEnabledColor: cyan,
-      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800),
+      style: const TextStyle(
+        color: Color(0xFF111827),
+        fontWeight: FontWeight.w800,
+      ),
       decoration: _decoration(
         label: 'Elige tu jefe',
         icon: Icons.account_tree_outlined,
@@ -747,7 +753,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         obscureText: obscureText,
         validator: validator ?? _obligatorio,
         style: const TextStyle(
-          color: Colors.white,
+          color: Color(0xFF111827),
           fontWeight: FontWeight.w700,
         ),
         decoration: _decoration(
@@ -766,15 +772,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
   }) {
     return InputDecoration(
       labelText: label,
-      labelStyle: const TextStyle(color: Colors.white60),
+      labelStyle: const TextStyle(color: const Color(0xFF64748B)),
       prefixIcon: Icon(icon, color: cyan, size: 21),
       suffixIcon: suffixIcon,
       filled: true,
-      fillColor: Colors.white.withOpacity(0.06),
+      fillColor: Colors.white,
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 17),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(17),
-        borderSide: BorderSide(color: Colors.white.withOpacity(0.08)),
+        borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(17),

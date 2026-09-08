@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="es">
+<body style="margin:0;background:#f3f6fa;font-family:Arial,sans-serif;color:#172033">
+  <div style="max-width:620px;margin:30px auto;background:#fff;border-radius:18px;padding:34px">
+    <h1 style="margin:0 0 12px;color:#136f79">Contraseña de SafeBrok</h1>
+    <p>Hola,</p>
+    <p>Hemos recibido una solicitud para crear o restablecer la contraseña de tu cuenta SafeBrok.</p>
+    <p style="margin:28px 0">
+      <a href="{{ .ConfirmationURL }}" style="background:#1976d2;color:#fff;text-decoration:none;padding:14px 24px;border-radius:10px;font-weight:bold">
+        CREAR NUEVA CONTRASEÑA
+      </a>
+    </p>
+    <h2 style="font-size:18px">Qué debes hacer</h2>
+    <ol style="line-height:1.7">
+      <li>Pulsa el botón.</li>
+      <li>Se abrirá una página segura de SafeBrok desde tu navegador.</li>
+      <li>Escribe y confirma tu contraseña.</li>
+      <li>Después inicia sesión con <strong>{{ .Email }}</strong>.</li>
+    </ol>
+    <p>El enlace funciona desde móvil, tablet u ordenador. No es necesario abrirlo desde el mismo dispositivo en el que solicitaste el cambio.</p>
+    <p style="color:#64748b;font-size:13px">Si no solicitaste este cambio, ignora el mensaje. Tu contraseña actual seguirá siendo válida.</p>
+  </div>
+</body>
+</html>

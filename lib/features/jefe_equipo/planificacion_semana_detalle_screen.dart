@@ -4,10 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 class PlanificacionSemanaDetalleScreen extends StatefulWidget {
   final Map semana;
 
-  const PlanificacionSemanaDetalleScreen({
-    super.key,
-    required this.semana,
-  });
+  const PlanificacionSemanaDetalleScreen({super.key, required this.semana});
 
   @override
   State<PlanificacionSemanaDetalleScreen> createState() =>
@@ -43,12 +40,18 @@ class _PlanificacionSemanaDetalleScreenState
       final jefe = await supabase
           .from('usuarios')
           .select('id')
+          .or(
+            'estado.is.null,estado.not.in.(inactivo,Inactivo,INACTIVO,baja,Baja,BAJA,desactivado,Desactivado,DESACTIVADO,bloqueado,Bloqueado,BLOQUEADO,suspendido,Suspendido,SUSPENDIDO)',
+          )
           .eq('auth_id', user.id)
           .single();
 
       final agentesData = await supabase
           .from('usuarios')
           .select()
+          .or(
+            'estado.is.null,estado.not.in.(inactivo,Inactivo,INACTIVO,baja,Baja,BAJA,desactivado,Desactivado,DESACTIVADO,bloqueado,Bloqueado,BLOQUEADO,suspendido,Suspendido,SUSPENDIDO)',
+          )
           .eq('parent_id', jefe['id'])
           .eq('rol_usuario', 'agente')
           .order('nombre', ascending: true);
@@ -76,9 +79,7 @@ class _PlanificacionSemanaDetalleScreenState
 
   Map<String, dynamic>? getPlan(dynamic agenteId) {
     try {
-      return planificaciones.firstWhere(
-        (p) => p['agente_id'] == agenteId,
-      );
+      return planificaciones.firstWhere((p) => p['agente_id'] == agenteId);
     } catch (_) {
       return null;
     }
@@ -124,10 +125,10 @@ class _PlanificacionSemanaDetalleScreenState
   }
 
   Color colorProgreso(int dias) {
-    if (dias == 5) return const Color(0xFF22C55E);
-    if (dias >= 3) return const Color(0xFF22D3EE);
-    if (dias >= 1) return const Color(0xFFF59E0B);
-    return const Color(0xFFEF4444);
+    if (dias == 5) return const Color(0xFF0AAEAE);
+    if (dias >= 3) return const Color(0xFF20C7C2);
+    if (dias >= 1) return const Color(0xFF0A7F91);
+    return const Color(0xFFE74646);
   }
 
   String estadoTexto(int dias) {
@@ -142,23 +143,19 @@ class _PlanificacionSemanaDetalleScreenState
     final fin = DateTime.parse(widget.semana['semana_fin']);
 
     return Scaffold(
-      backgroundColor: const Color(0xFF020B1F),
+      backgroundColor: const Color(0xFFF2FCFD),
       body: loading
           ? const Center(
-              child: CircularProgressIndicator(
-                color: Color(0xFF22D3EE),
-              ),
+              child: CircularProgressIndicator(color: Color(0xFF20C7C2)),
             )
           : RefreshIndicator(
               onRefresh: cargar,
-              color: const Color(0xFF22D3EE),
-              backgroundColor: const Color(0xFF071A3A),
+              color: const Color(0xFF20C7C2),
+              backgroundColor: const Color(0xFFFFFFFF),
               child: CustomScrollView(
                 physics: const AlwaysScrollableScrollPhysics(),
                 slivers: [
-                  SliverToBoxAdapter(
-                    child: _header(inicio, fin),
-                  ),
+                  SliverToBoxAdapter(child: _header(inicio, fin)),
 
                   SliverToBoxAdapter(
                     child: Padding(
@@ -172,15 +169,12 @@ class _PlanificacionSemanaDetalleScreenState
                       padding: const EdgeInsets.fromLTRB(20, 0, 20, 14),
                       child: Row(
                         children: const [
-                          Icon(
-                            Icons.groups_rounded,
-                            color: Color(0xFF22D3EE),
-                          ),
+                          Icon(Icons.groups_rounded, color: Color(0xFF20C7C2)),
                           SizedBox(width: 10),
                           Text(
                             "Planificación por agente",
                             style: TextStyle(
-                              color: Colors.white,
+                              color: const Color(0xFF071A3A),
                               fontSize: 22,
                               fontWeight: FontWeight.w900,
                             ),
@@ -204,17 +198,12 @@ class _PlanificacionSemanaDetalleScreenState
 
                         return Padding(
                           padding: const EdgeInsets.fromLTRB(20, 0, 20, 14),
-                          child: _agenteCard(
-                            agente: agente,
-                            plan: plan,
-                          ),
+                          child: _agenteCard(agente: agente, plan: plan),
                         );
                       },
                     ),
 
-                  const SliverToBoxAdapter(
-                    child: SizedBox(height: 40),
-                  ),
+                  const SliverToBoxAdapter(child: SizedBox(height: 40)),
                 ],
               ),
             ),
@@ -226,11 +215,7 @@ class _PlanificacionSemanaDetalleScreenState
       padding: const EdgeInsets.fromLTRB(20, 54, 20, 28),
       decoration: const BoxDecoration(
         gradient: LinearGradient(
-          colors: [
-            Color(0xFF020B1F),
-            Color(0xFF061A3D),
-            Color(0xFF020B1F),
-          ],
+          colors: [Color(0xFFF2FCFD), Color(0xFFFFFFFF), Color(0xFFF2FCFD)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
@@ -247,7 +232,7 @@ class _PlanificacionSemanaDetalleScreenState
                 shape: BoxShape.circle,
                 gradient: RadialGradient(
                   colors: [
-                    const Color(0xFF22D3EE).withOpacity(0.28),
+                    const Color(0xFF20C7C2).withOpacity(0.28),
                     Colors.transparent,
                   ],
                 ),
@@ -267,7 +252,7 @@ class _PlanificacionSemanaDetalleScreenState
                       color: Colors.white,
                     ),
                     style: IconButton.styleFrom(
-                      backgroundColor: Colors.white.withOpacity(0.08),
+                      backgroundColor: Colors.white,
                       fixedSize: const Size(48, 48),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(18),
@@ -282,7 +267,7 @@ class _PlanificacionSemanaDetalleScreenState
                       color: Colors.white,
                     ),
                     style: IconButton.styleFrom(
-                      backgroundColor: Colors.white.withOpacity(0.08),
+                      backgroundColor: Colors.white,
                       fixedSize: const Size(48, 48),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(18),
@@ -303,16 +288,16 @@ class _PlanificacionSemanaDetalleScreenState
                       shape: BoxShape.circle,
                       gradient: const LinearGradient(
                         colors: [
-                          Color(0xFF22D3EE),
-                          Color(0xFF2563EB),
-                          Color(0xFF7C3AED),
+                          Color(0xFF20C7C2),
+                          Color(0xFF0A7F91),
+                          Color(0xFF0A7F91),
                         ],
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
                       ),
                       boxShadow: [
                         BoxShadow(
-                          color: const Color(0xFF22D3EE).withOpacity(0.35),
+                          color: const Color(0xFF20C7C2).withOpacity(0.35),
                           blurRadius: 24,
                           offset: const Offset(0, 10),
                         ),
@@ -332,7 +317,7 @@ class _PlanificacionSemanaDetalleScreenState
                           TextSpan(
                             text: "Semana\n",
                             style: TextStyle(
-                              color: Colors.white,
+                              color: const Color(0xFF071A3A),
                               fontSize: 36,
                               fontWeight: FontWeight.w900,
                               height: 1,
@@ -341,7 +326,7 @@ class _PlanificacionSemanaDetalleScreenState
                           TextSpan(
                             text: "del equipo",
                             style: TextStyle(
-                              color: Color(0xFF22D3EE),
+                              color: Color(0xFF20C7C2),
                               fontSize: 34,
                               fontWeight: FontWeight.w900,
                               height: 1,
@@ -359,7 +344,7 @@ class _PlanificacionSemanaDetalleScreenState
               Text(
                 "${formatoFecha(inicio)} - ${formatoFecha(fin)}",
                 style: const TextStyle(
-                  color: Color(0xFFE2E8F0),
+                  color: Color(0xFFC7ECEC),
                   fontSize: 18,
                   fontWeight: FontWeight.w900,
                 ),
@@ -370,7 +355,7 @@ class _PlanificacionSemanaDetalleScreenState
               const Text(
                 "Revisa la planificación diaria de cada agente durante la semana seleccionada.",
                 style: TextStyle(
-                  color: Color(0xFFCBD5E1),
+                  color: Color(0xFF64748B),
                   fontSize: 15,
                   fontWeight: FontWeight.w600,
                   height: 1.35,
@@ -393,7 +378,7 @@ class _PlanificacionSemanaDetalleScreenState
             icono: Icons.groups_rounded,
             valor: "${agentes.length}",
             titulo: "Agentes\ndel equipo",
-            color: const Color(0xFF2563EB),
+            color: const Color(0xFF0A7F91),
           ),
         ),
         const SizedBox(width: 12),
@@ -402,7 +387,7 @@ class _PlanificacionSemanaDetalleScreenState
             icono: Icons.task_alt_rounded,
             valor: "$agentesPlanificados",
             titulo: "Agentes\nplanificados",
-            color: const Color(0xFF14B8A6),
+            color: const Color(0xFF0AAEAE),
           ),
         ),
         const SizedBox(width: 12),
@@ -411,7 +396,7 @@ class _PlanificacionSemanaDetalleScreenState
             icono: Icons.track_changes_rounded,
             valor: "$porcentaje%",
             titulo: "Semana\ncubierta",
-            color: const Color(0xFF8B5CF6),
+            color: const Color(0xFF0A7F91),
           ),
         ),
       ],
@@ -429,10 +414,7 @@ class _PlanificacionSemanaDetalleScreenState
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [
-            color.withOpacity(0.32),
-            const Color(0xFF061329),
-          ],
+          colors: [color.withOpacity(0.32), const Color(0xFFFFFFFF)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
@@ -454,7 +436,7 @@ class _PlanificacionSemanaDetalleScreenState
           Text(
             valor,
             style: const TextStyle(
-              color: Colors.white,
+              color: const Color(0xFF071A3A),
               fontSize: 27,
               fontWeight: FontWeight.w900,
               height: 1,
@@ -464,7 +446,7 @@ class _PlanificacionSemanaDetalleScreenState
           Text(
             titulo,
             style: const TextStyle(
-              color: Color(0xFFE2E8F0),
+              color: Color(0xFFC7ECEC),
               fontSize: 12,
               fontWeight: FontWeight.w700,
               height: 1.2,
@@ -479,8 +461,8 @@ class _PlanificacionSemanaDetalleScreenState
     required Map<String, dynamic> agente,
     required Map<String, dynamic>? plan,
   }) {
-    final nombre =
-        "${agente['nombre'] ?? ''} ${agente['apellidos'] ?? ''}".trim();
+    final nombre = "${agente['nombre'] ?? ''} ${agente['apellidos'] ?? ''}"
+        .trim();
 
     final dias = diasPlanificados(plan);
     final progreso = dias / 5;
@@ -501,10 +483,7 @@ class _PlanificacionSemanaDetalleScreenState
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           gradient: const LinearGradient(
-            colors: [
-              Color(0xFF071A3A),
-              Color(0xFF061329),
-            ],
+            colors: [Color(0xFFFFFFFF), Color(0xFFFFFFFF)],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
@@ -550,7 +529,7 @@ class _PlanificacionSemanaDetalleScreenState
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
-                          color: Colors.white,
+                          color: const Color(0xFF071A3A),
                           fontSize: 18,
                           fontWeight: FontWeight.w900,
                         ),
@@ -559,7 +538,7 @@ class _PlanificacionSemanaDetalleScreenState
                       Text(
                         "$dias/5 días planificados",
                         style: const TextStyle(
-                          color: Color(0xFFCBD5E1),
+                          color: Color(0xFF64748B),
                           fontSize: 13,
                           fontWeight: FontWeight.w700,
                         ),
@@ -597,18 +576,18 @@ class _PlanificacionSemanaDetalleScreenState
               child: LinearProgressIndicator(
                 value: progreso,
                 minHeight: 7,
-                backgroundColor: Colors.white.withOpacity(0.10),
+                backgroundColor: Colors.white,
                 color: color,
               ),
             ),
 
             const SizedBox(height: 16),
 
-            _dia("Lunes", plan?['lunes'], const Color(0xFF22D3EE)),
-            _dia("Martes", plan?['martes'], const Color(0xFF2563EB)),
-            _dia("Miércoles", plan?['miercoles'], const Color(0xFF8B5CF6)),
-            _dia("Jueves", plan?['jueves'], const Color(0xFFF59E0B)),
-            _dia("Viernes", plan?['viernes'], const Color(0xFF22C55E)),
+            _dia("Lunes", plan?['lunes'], const Color(0xFF20C7C2)),
+            _dia("Martes", plan?['martes'], const Color(0xFF0A7F91)),
+            _dia("Miércoles", plan?['miercoles'], const Color(0xFF0A7F91)),
+            _dia("Jueves", plan?['jueves'], const Color(0xFF0A7F91)),
+            _dia("Viernes", plan?['viernes'], const Color(0xFF0AAEAE)),
           ],
         ),
       ),
@@ -623,10 +602,10 @@ class _PlanificacionSemanaDetalleScreenState
       margin: const EdgeInsets.only(bottom: 9),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.045),
+        color: Colors.white,
         borderRadius: BorderRadius.circular(18),
         border: Border.all(
-          color: tienePlan ? color.withOpacity(0.34) : Colors.white.withOpacity(0.07),
+          color: tienePlan ? color.withOpacity(0.34) : Colors.white,
         ),
       ),
       child: Row(
@@ -651,7 +630,7 @@ class _PlanificacionSemanaDetalleScreenState
             child: Text(
               dia,
               style: TextStyle(
-                color: tienePlan ? Colors.white : const Color(0xFF94A3B8),
+                color: tienePlan ? Colors.white : const Color(0xFF64748B),
                 fontWeight: FontWeight.w900,
               ),
             ),
@@ -660,7 +639,9 @@ class _PlanificacionSemanaDetalleScreenState
             child: Text(
               tienePlan ? texto : "Sin planificar",
               style: TextStyle(
-                color: tienePlan ? const Color(0xFFE2E8F0) : const Color(0xFF64748B),
+                color: tienePlan
+                    ? const Color(0xFFC7ECEC)
+                    : const Color(0xFF64748B),
                 fontSize: 13,
                 fontWeight: FontWeight.w600,
                 height: 1.35,
@@ -687,10 +668,7 @@ class _PlanificacionSemanaDetalleScreenState
     return const Center(
       child: Text(
         "No hay agentes asignados",
-        style: TextStyle(
-          color: Color(0xFF94A3B8),
-          fontWeight: FontWeight.w700,
-        ),
+        style: TextStyle(color: Color(0xFF64748B), fontWeight: FontWeight.w700),
       ),
     );
   }

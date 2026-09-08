@@ -55,77 +55,65 @@ class DesarrolloCrecimientoEquipoScreen extends StatelessWidget {
                 SliverPadding(
                   padding: const EdgeInsets.symmetric(horizontal: 18),
                   sliver: SliverList(
-                    delegate: SliverChildListDelegate(
-                      [
-                        _moduleCard(
-                          context: context,
-                          title: "Captación de talento",
-                          subtitle:
-                              "Gestiona candidatos, entrevistas, estados y seguimiento.",
-                          tag: "Selección",
-                          icon: Icons.person_search_rounded,
-                          gradient: const [
-                            Color(0xFF00C2FF),
-                            Color(0xFF0077FF),
-                          ],
-                          imageIcon: Icons.work_rounded,
-                          onTap: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => CandidatosCaptacionScreen(),
-                              ),
-                            );
-                          },
-                        ),
-                        const SizedBox(height: 16),
-                        _moduleCard(
-                          context: context,
-                          title: "Formación del equipo",
-                          subtitle:
-                              "Controla aprendizaje, progreso y evolución comercial.",
-                          tag: "Academia",
-                          icon: Icons.school_rounded,
-                          gradient: const [
-                            Color(0xFF8B5CF6),
-                            Color(0xFFEC4899),
-                          ],
-                          imageIcon: Icons.auto_stories_rounded,
-                          onTap: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => const FormacionEquipoScreen(),
-                              ),
-                            );
-                          },
-                        ),
-                        const SizedBox(height: 16),
-                        _moduleCard(
-                          context: context,
-                          title: "Integración y actividad",
-                          subtitle:
-                              "Acompañamiento, reuniones, adaptación y productividad.",
-                          tag: "Onboarding",
-                          icon: Icons.groups_2_rounded,
-                          gradient: const [
-                            Color(0xFF22C55E),
-                            Color(0xFF14B8A6),
-                          ],
-                          imageIcon: Icons.handshake_rounded,
-                          onTap: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) =>
-                                    const IntegracionEquipoScreen(),
-                              ),
-                            );
-                          },
-                        ),
-                        const SizedBox(height: 26),
-                      ],
-                    ),
+                    delegate: SliverChildListDelegate([
+                      _moduleCard(
+                        context: context,
+                        title: "Captación de talento",
+                        subtitle:
+                            "Gestiona candidatos, entrevistas, estados y seguimiento.",
+                        tag: "Selección",
+                        icon: Icons.person_search_rounded,
+                        gradient: const [Color(0xFF00C2FF), Color(0xFF0077FF)],
+                        imageIcon: Icons.work_rounded,
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => CandidatosCaptacionScreen(),
+                            ),
+                          );
+                        },
+                      ),
+                      const SizedBox(height: 16),
+                      _moduleCard(
+                        context: context,
+                        title: "Formación del equipo",
+                        subtitle:
+                            "Controla aprendizaje, progreso y evolución comercial.",
+                        tag: "Academia",
+                        icon: Icons.school_rounded,
+                        gradient: const [Color(0xFF8B5CF6), Color(0xFFEC4899)],
+                        imageIcon: Icons.auto_stories_rounded,
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const FormacionEquipoScreen(),
+                            ),
+                          );
+                        },
+                      ),
+                      const SizedBox(height: 16),
+                      _moduleCard(
+                        context: context,
+                        title: "Integración y actividad",
+                        subtitle:
+                            "Acompañamiento, reuniones, adaptación y productividad.",
+                        tag: "Onboarding",
+                        icon: Icons.groups_2_rounded,
+                        gradient: const [Color(0xFF22C55E), Color(0xFF14B8A6)],
+                        imageIcon: Icons.handshake_rounded,
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const IntegracionEquipoScreen(),
+                            ),
+                          );
+                        },
+                      ),
+                      const SizedBox(height: 26),
+                    ]),
                   ),
                 ),
               ],
@@ -180,10 +168,7 @@ class DesarrolloCrecimientoEquipoScreen extends StatelessWidget {
             color: const Color(0xFF111827),
             borderRadius: BorderRadius.circular(16),
           ),
-          child: const Icon(
-            Icons.bolt_rounded,
-            color: Colors.white,
-          ),
+          child: const Icon(Icons.bolt_rounded, color: Colors.white),
         ),
       ],
     );
@@ -198,10 +183,7 @@ class DesarrolloCrecimientoEquipoScreen extends StatelessWidget {
         gradient: const LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [
-            Color(0xFF111827),
-            Color(0xFF1D4ED8),
-          ],
+          colors: [Color(0xFF111827), Color(0xFF1D4ED8)],
         ),
         boxShadow: [
           BoxShadow(
@@ -226,8 +208,10 @@ class DesarrolloCrecimientoEquipoScreen extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 7,
+                ),
                 decoration: BoxDecoration(
                   color: Colors.white.withOpacity(0.14),
                   borderRadius: BorderRadius.circular(30),
@@ -314,144 +298,143 @@ class DesarrolloCrecimientoEquipoScreen extends StatelessWidget {
   }
 
   Widget _moduleCard({
-  required BuildContext context,
-  required String title,
-  required String subtitle,
-  required String tag,
-  required IconData icon,
-  required List<Color> gradient,
-  required IconData imageIcon,
-  required VoidCallback onTap,
-}) {
-  return _HoverModuleCard(
-    color: gradient.first,
-    onTap: onTap,
-    child: Container(
-      height: 170,
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(32),
-        boxShadow: [
-          BoxShadow(
-            color: gradient.first.withOpacity(0.18),
-            blurRadius: 26,
-            offset: const Offset(0, 14),
-          ),
-        ],
-      ),
-      child: Stack(
-        children: [
-          Positioned(
-            right: -22,
-            bottom: -26,
-            child: Icon(
-              imageIcon,
-              size: 145,
-              color: gradient.first.withOpacity(0.08),
+    required BuildContext context,
+    required String title,
+    required String subtitle,
+    required String tag,
+    required IconData icon,
+    required List<Color> gradient,
+    required IconData imageIcon,
+    required VoidCallback onTap,
+  }) {
+    return _HoverModuleCard(
+      color: gradient.first,
+      onTap: onTap,
+      child: Container(
+        height: 170,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(32),
+          boxShadow: [
+            BoxShadow(
+              color: gradient.first.withOpacity(0.18),
+              blurRadius: 26,
+              offset: const Offset(0, 14),
             ),
-          ),
-          Positioned(
-            top: 18,
-            right: 18,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
-              decoration: BoxDecoration(
-                color: gradient.first.withOpacity(0.12),
-                borderRadius: BorderRadius.circular(30),
-              ),
-              child: Text(
-                tag,
-                style: TextStyle(
-                  color: gradient.last,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w900,
-                ),
+          ],
+        ),
+        child: Stack(
+          children: [
+            Positioned(
+              right: -22,
+              bottom: -26,
+              child: Icon(
+                imageIcon,
+                size: 145,
+                color: gradient.first.withOpacity(0.08),
               ),
             ),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(20),
-            child: Row(
-              children: [
-                Container(
-                  height: 62,
-                  width: 62,
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(colors: gradient),
-                    borderRadius: BorderRadius.circular(22),
-                    boxShadow: [
-                      BoxShadow(
-                        color: gradient.first.withOpacity(0.28),
-                        blurRadius: 18,
-                        offset: const Offset(0, 8),
-                      ),
-                    ],
-                  ),
-                  child: Icon(
-                    icon,
-                    color: Colors.white,
-                    size: 32,
+            Positioned(
+              top: 18,
+              right: 18,
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 11,
+                  vertical: 7,
+                ),
+                decoration: BoxDecoration(
+                  color: gradient.first.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(30),
+                ),
+                child: Text(
+                  tag,
+                  style: TextStyle(
+                    color: gradient.last,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w900,
                   ),
                 ),
-                const SizedBox(width: 17),
-                Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.only(right: 18),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          title,
-                          style: const TextStyle(
-                            color: Color(0xFF111827),
-                            fontSize: 20,
-                            fontWeight: FontWeight.w900,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          subtitle,
-                          maxLines: 3,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            color: Colors.black.withOpacity(0.52),
-                            fontSize: 13,
-                            height: 1.28,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        const SizedBox(height: 14),
-                        Row(
-                          children: [
-                            Text(
-                              "Entrar",
-                              style: TextStyle(
-                                color: gradient.last,
-                                fontWeight: FontWeight.w900,
-                                fontSize: 13,
-                              ),
-                            ),
-                            const SizedBox(width: 5),
-                            Icon(
-                              Icons.arrow_forward_rounded,
-                              color: gradient.last,
-                              size: 18,
-                            ),
-                          ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(20),
+              child: Row(
+                children: [
+                  Container(
+                    height: 62,
+                    width: 62,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(colors: gradient),
+                      borderRadius: BorderRadius.circular(22),
+                      boxShadow: [
+                        BoxShadow(
+                          color: gradient.first.withOpacity(0.28),
+                          blurRadius: 18,
+                          offset: const Offset(0, 8),
                         ),
                       ],
                     ),
+                    child: Icon(icon, color: Colors.white, size: 32),
                   ),
-                ),
-              ],
+                  const SizedBox(width: 17),
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.only(right: 18),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            title,
+                            style: const TextStyle(
+                              color: Color(0xFF111827),
+                              fontSize: 20,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            subtitle,
+                            maxLines: 3,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: Colors.black.withOpacity(0.52),
+                              fontSize: 13,
+                              height: 1.28,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const SizedBox(height: 14),
+                          Row(
+                            children: [
+                              Text(
+                                "Entrar",
+                                style: TextStyle(
+                                  color: gradient.last,
+                                  fontWeight: FontWeight.w900,
+                                  fontSize: 13,
+                                ),
+                              ),
+                              const SizedBox(width: 5),
+                              Icon(
+                                Icons.arrow_forward_rounded,
+                                color: gradient.last,
+                                size: 18,
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
-    ),
-  );
-}
+    );
+  }
 }
 
 class _HoverModuleCard extends StatefulWidget {
@@ -478,8 +461,8 @@ class _HoverModuleCardState extends State<_HoverModuleCard> {
     final scale = pressing
         ? 0.985
         : hovering
-            ? 1.018
-            : 1.0;
+        ? 1.018
+        : 1.0;
 
     return MouseRegion(
       cursor: SystemMouseCursors.click,

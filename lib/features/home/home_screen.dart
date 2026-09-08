@@ -1,4 +1,5 @@
 import 'dart:ui';
+import 'package:safebrok_andalucia/core/production/premium_weighting.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -6,7 +7,6 @@ import '../sales/create_sale_wizard.dart';
 import '../sales/my_sales_screen.dart';
 import '../clients/my_clients_screen.dart';
 import 'package:safebrok_andalucia/features/team/team_dashboard_screen.dart';
-import 'package:safebrok_andalucia/features/team/team_agents_screen.dart';
 import 'package:safebrok_andalucia/utils/team_tracking_screen.dart';
 import 'package:safebrok_andalucia/features/tareas/mis_tareas_screen.dart';
 import 'package:safebrok_andalucia/core/update_service.dart';
@@ -22,6 +22,7 @@ import 'dart:async';
 import 'package:safebrok_andalucia/features/chat/internal_chat_screen.dart';
 import 'package:safebrok_andalucia/features/recibos/recibos_agente_screen.dart';
 import 'package:safebrok_andalucia/features/ia/safebrok_ai_screen.dart';
+import 'package:safebrok_andalucia/features/previsiones/previsiones_screen.dart';
 import 'package:safebrok_andalucia/features/director_nacional/director_nacional_kpis_screen.dart';
 import 'package:safebrok_andalucia/features/director_nacional/director_nacional_usuarios_screen.dart';
 import 'package:safebrok_andalucia/features/business/ranking_comercial_screen.dart';
@@ -116,12 +117,12 @@ class _ProductionCountdownState extends State<ProductionCountdown> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 10),
       decoration: BoxDecoration(
-        color: const Color(0xFFFF7A00).withOpacity(0.10),
+        color: Colors.white.withOpacity(0.94),
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0xFFFF7A00).withOpacity(0.65)),
+        border: Border.all(color: const Color(0xFF8EDFE0)),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFFFF7A00).withOpacity(0.18),
+            color: const Color(0xFF0AAEAE).withOpacity(0.12),
             blurRadius: 16,
             offset: const Offset(0, 8),
           ),
@@ -130,7 +131,7 @@ class _ProductionCountdownState extends State<ProductionCountdown> {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(Icons.timer_rounded, color: Color(0xFFFF9F1C), size: 20),
+          const Icon(Icons.timer_rounded, color: Color(0xFF0AAEAE), size: 20),
           const SizedBox(width: 7),
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -138,7 +139,7 @@ class _ProductionCountdownState extends State<ProductionCountdown> {
               const Text(
                 "Producción cierra en",
                 style: TextStyle(
-                  color: Colors.white70,
+                  color: Color(0xFF53627A),
                   fontSize: 10,
                   fontWeight: FontWeight.w700,
                 ),
@@ -146,7 +147,7 @@ class _ProductionCountdownState extends State<ProductionCountdown> {
               Text(
                 _loadingPeriod ? "Consultando cierre…" : format(remaining),
                 style: const TextStyle(
-                  color: Color(0xFFFFB020),
+                  color: Color(0xFF087F86),
                   fontSize: 13,
                   fontWeight: FontWeight.w900,
                 ),
@@ -171,12 +172,11 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   final supabase = Supabase.instance.client;
 
-  int totalClientes = 0;
   int totalVentas = 0;
   int totalTareas = 0;
 
   double primasSemana = 0.0;
-  int clientesSemana = 0;
+  double primasMixSemana = 0.0;
   double objetivoSemana = 1250.0;
   int rachaSemanas = 0;
 
@@ -313,7 +313,7 @@ class _HomeScreenState extends State<HomeScreen> {
       final notificaciones = await supabase
           .from('notificaciones')
           .select('id')
-          .eq('auth_id', user.id)
+          .eq('usuario_auth_id', user.id)
           .eq('leida', false);
 
       if (!mounted) return;
@@ -334,6 +334,9 @@ class _HomeScreenState extends State<HomeScreen> {
       final miUsuario = await supabase
           .from('usuarios')
           .select('id, auth_id, rol_usuario')
+          .or(
+            'estado.is.null,estado.not.in.(inactivo,Inactivo,INACTIVO,baja,Baja,BAJA,desactivado,Desactivado,DESACTIVADO,bloqueado,Bloqueado,BLOQUEADO,suspendido,Suspendido,SUSPENDIDO)',
+          )
           .eq('auth_id', user.id)
           .maybeSingle();
 
@@ -346,6 +349,9 @@ class _HomeScreenState extends State<HomeScreen> {
       final agentes = await supabase
           .from('usuarios')
           .select('id, auth_id, nombre, apellidos, parent_id, rol_usuario')
+          .or(
+            'estado.is.null,estado.not.in.(inactivo,Inactivo,INACTIVO,baja,Baja,BAJA,desactivado,Desactivado,DESACTIVADO,bloqueado,Bloqueado,BLOQUEADO,suspendido,Suspendido,SUSPENDIDO)',
+          )
           .eq('parent_id', miUserId)
           .eq('rol_usuario', 'agente');
 
@@ -426,9 +432,9 @@ class _HomeScreenState extends State<HomeScreen> {
       final notificaciones = await supabase
           .from('notificaciones')
           .select()
-          .eq('auth_id', user.id)
+          .eq('usuario_auth_id', user.id)
           .eq('leida', false)
-          .order('created_at', ascending: false);
+          .order('creado_en', ascending: false);
 
       final lista = <Map<String, dynamic>>[];
 
@@ -449,7 +455,7 @@ class _HomeScreenState extends State<HomeScreen> {
         lista.add({
           ...notificacion,
           '_tabla': 'notificaciones',
-          '_fecha_orden': notificacion['created_at']?.toString(),
+          '_fecha_orden': notificacion['creado_en']?.toString(),
           '_mensaje_visible': notificacion['mensaje']?.toString() ?? '',
         });
       }
@@ -495,7 +501,7 @@ class _HomeScreenState extends State<HomeScreen> {
     await showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
-      barrierColor: Colors.black.withOpacity(0.65),
+      barrierColor: const Color(0xFF071A3A).withOpacity(0.28),
       isScrollControlled: true,
       builder: (modalContext) {
         return DraggableScrollableSheet(
@@ -512,13 +518,11 @@ class _HomeScreenState extends State<HomeScreen> {
                 filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
                 child: Container(
                   decoration: BoxDecoration(
-                    color: const Color(0xFF061329).withOpacity(0.97),
+                    color: Colors.white.withOpacity(0.98),
                     borderRadius: const BorderRadius.vertical(
                       top: Radius.circular(30),
                     ),
-                    border: Border.all(
-                      color: const Color(0xFF22D3EE).withOpacity(0.25),
-                    ),
+                    border: Border.all(color: const Color(0xFF9FE3E2)),
                   ),
                   child: SafeArea(
                     top: false,
@@ -531,7 +535,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             width: 46,
                             height: 5,
                             decoration: BoxDecoration(
-                              color: Colors.white24,
+                              color: Color(0xFFB7D7DA),
                               borderRadius: BorderRadius.circular(99),
                             ),
                           ),
@@ -543,13 +547,13 @@ class _HomeScreenState extends State<HomeScreen> {
                           children: [
                             Icon(
                               Icons.notifications_active_rounded,
-                              color: Color(0xFF22D3EE),
+                              color: Color(0xFF0AAEAE),
                             ),
                             SizedBox(width: 10),
                             Text(
                               "Notificaciones",
                               style: TextStyle(
-                                color: Colors.white,
+                                color: Color(0xFF071A3A),
                                 fontSize: 22,
                                 fontWeight: FontWeight.w900,
                               ),
@@ -586,7 +590,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         for (final alerta in alertasSistema) ...[
                           _notificationItem(
                             icon: Icons.warning_amber_rounded,
-                            color: Colors.orangeAccent,
+                            color: const Color(0xFF0A7F91),
                             title: alerta['titulo'] ?? 'Alerta',
                             subtitle:
                                 alerta['_mensaje_visible']?.toString() ?? '',
@@ -655,17 +659,17 @@ class _HomeScreenState extends State<HomeScreen> {
                             width: double.infinity,
                             padding: const EdgeInsets.all(18),
                             decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.06),
+                              color: const Color(0xFFEAF8F8),
                               borderRadius: BorderRadius.circular(22),
                               border: Border.all(
-                                color: Colors.white.withOpacity(0.10),
+                                color: const Color(0xFFC7ECEC),
                               ),
                             ),
                             child: const Column(
                               children: [
                                 Icon(
                                   Icons.mark_chat_read_rounded,
-                                  color: Colors.white38,
+                                  color: Color(0xFF6B8790),
                                   size: 42,
                                 ),
                                 SizedBox(height: 10),
@@ -673,7 +677,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                   "No tienes notificaciones pendientes",
                                   textAlign: TextAlign.center,
                                   style: TextStyle(
-                                    color: Colors.white70,
+                                    color: Color(0xFF34495E),
                                     fontWeight: FontWeight.w800,
                                   ),
                                 ),
@@ -708,7 +712,7 @@ class _HomeScreenState extends State<HomeScreen> {
           width: double.infinity,
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.07),
+            color: const Color(0xFFF3FCFC),
             borderRadius: BorderRadius.circular(22),
             border: Border.all(color: color.withOpacity(0.28)),
           ),
@@ -731,7 +735,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     Text(
                       title,
                       style: const TextStyle(
-                        color: Colors.white,
+                        color: Color(0xFF071A3A),
                         fontSize: 15.5,
                         fontWeight: FontWeight.w900,
                       ),
@@ -740,7 +744,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     Text(
                       subtitle,
                       style: const TextStyle(
-                        color: Colors.white60,
+                        color: Color(0xFF53627A),
                         fontSize: 12.5,
                         fontWeight: FontWeight.w600,
                       ),
@@ -748,7 +752,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   ],
                 ),
               ),
-              const Icon(Icons.chevron_right_rounded, color: Colors.white38),
+              const Icon(Icons.chevron_right_rounded, color: Color(0xFF6B8790)),
             ],
           ),
         ),
@@ -768,6 +772,9 @@ class _HomeScreenState extends State<HomeScreen> {
     final miUsuario = await supabase
         .from('usuarios')
         .select('id, auth_id, parent_id, rol_usuario, nombre, apellidos')
+        .or(
+          'estado.is.null,estado.not.in.(inactivo,Inactivo,INACTIVO,baja,Baja,BAJA,desactivado,Desactivado,DESACTIVADO,bloqueado,Bloqueado,BLOQUEADO,suspendido,Suspendido,SUSPENDIDO)',
+        )
         .eq('auth_id', myAuthId)
         .maybeSingle();
 
@@ -787,7 +794,12 @@ class _HomeScreenState extends State<HomeScreen> {
     ).toLowerCase().replaceAll('-', '_').replaceAll(' ', '_');
 
     if (rol == 'administracion' || rol == 'administrador' || rol == 'admin') {
-      final data = await supabase.from('usuarios').select('id, auth_id');
+      final data = await supabase
+          .from('usuarios')
+          .select('id, auth_id')
+          .or(
+            'estado.is.null,estado.not.in.(inactivo,Inactivo,INACTIVO,baja,Baja,BAJA,desactivado,Desactivado,DESACTIVADO,bloqueado,Bloqueado,BLOQUEADO,suspendido,Suspendido,SUSPENDIDO)',
+          );
 
       final ids = <String>{};
       final authIds = <String>{myAuthId};
@@ -839,6 +851,9 @@ class _HomeScreenState extends State<HomeScreen> {
         final hijosData = await supabase
             .from('usuarios')
             .select('id, auth_id, parent_id, rol_usuario, nombre, apellidos')
+            .or(
+              'estado.is.null,estado.not.in.(inactivo,Inactivo,INACTIVO,baja,Baja,BAJA,desactivado,Desactivado,DESACTIVADO,bloqueado,Bloqueado,BLOQUEADO,suspendido,Suspendido,SUSPENDIDO)',
+            )
             .inFilter('parent_id', bloqueIdsJefes);
 
         for (final fila in List<Map<String, dynamic>>.from(hijosData)) {
@@ -957,12 +972,27 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   double _primaNetaVenta(Map<String, dynamic> venta) {
-    return _money(
-      venta['prima_anual_neta'] ??
-          venta['prima_neta'] ??
-          venta['PRIMA_ANUAL_NETA'] ??
-          venta['PRIMA NETA'],
-    );
+    return PremiumWeighting.net(venta);
+  }
+
+  bool _esDecesosOVida(Map<String, dynamic> venta) {
+    final producto =
+        (venta['producto'] ??
+                venta['ramo'] ??
+                venta['tipo_seguro'] ??
+                venta['PRODUCTO'] ??
+                venta['RAMO'] ??
+                '')
+            .toString()
+            .trim()
+            .toLowerCase()
+            .replaceAll('á', 'a')
+            .replaceAll('é', 'e')
+            .replaceAll('í', 'i')
+            .replaceAll('ó', 'o')
+            .replaceAll('ú', 'u');
+
+    return producto.contains('deceso') || producto.contains('vida');
   }
 
   double _objetivoPrimasSemanalPorRol(String role) {
@@ -1114,6 +1144,9 @@ class _HomeScreenState extends State<HomeScreen> {
       final perfilLogueado = await supabase
           .from('usuarios')
           .select('rol_usuario')
+          .or(
+            'estado.is.null,estado.not.in.(inactivo,Inactivo,INACTIVO,baja,Baja,BAJA,desactivado,Desactivado,DESACTIVADO,bloqueado,Bloqueado,BLOQUEADO,suspendido,Suspendido,SUSPENDIDO)',
+          )
           .eq('auth_id', user.id)
           .maybeSingle();
 
@@ -1172,19 +1205,11 @@ class _HomeScreenState extends State<HomeScreen> {
         (total, venta) => total + _primaNetaVenta(venta),
       );
 
-      final objetivoPrimasSemana = _objetivoPrimasSemanalPorRol(rolReal);
+      final primasDecesosVidaSemana = ventasProductivasSemana
+          .where(_esDecesosOVida)
+          .fold<double>(0.0, (total, venta) => total + _primaNetaVenta(venta));
 
-      /*
-        CLIENTES:
-        se mantiene la relación clientes.auth_id = usuarios.auth_id.
-      */
-      final clientesSemanaData = await _cargarFilasSemanaPorEstructura(
-        tabla: 'clientes',
-        columnaAuthId: 'auth_id',
-        authIds: authIds,
-        inicio: inicioSemana,
-        finExclusivo: finSemanaExclusivo,
-      );
+      final objetivoPrimasSemana = _objetivoPrimasSemanalPorRol(rolReal);
 
       /*
         Las tareas se mantienen con el filtrado por estructura porque
@@ -1220,7 +1245,10 @@ class _HomeScreenState extends State<HomeScreen> {
 
       final usuariosRanking = await supabase
           .from('usuarios')
-          .select('id, auth_id, nombre, apellidos, rol_usuario');
+          .select('id, auth_id, nombre, apellidos, rol_usuario')
+          .or(
+            'estado.is.null,estado.not.in.(inactivo,Inactivo,INACTIVO,baja,Baja,BAJA,desactivado,Desactivado,DESACTIVADO,bloqueado,Bloqueado,BLOQUEADO,suspendido,Suspendido,SUSPENDIDO)',
+          );
 
       final todasLasVentas = await supabase
           .from('ventas')
@@ -1287,8 +1315,6 @@ class _HomeScreenState extends State<HomeScreen> {
       debugPrint(
         "VENTAS SEMANA CONSULTADAS POR agente_auth_id: ${ventasSemanaData.length}",
       );
-      debugPrint("CLIENTES SEMANA ESTRUCTURA: ${clientesSemanaData.length}");
-      debugPrint("CLIENTES SEMANA CREATED_AT: ${clientesSemanaData.length}");
       debugPrint("VENTAS SEMANA ESTRUCTURA: ${ventasSemanaData.length}");
       debugPrint(
         "VENTAS PRODUCTIVAS SEMANA CREATED_AT: "
@@ -1300,14 +1326,13 @@ class _HomeScreenState extends State<HomeScreen> {
       if (!mounted) return;
 
       setState(() {
-        totalClientes = clientesSemanaData.length;
         totalVentas = ventasProductivasSemana.length;
         totalTareas = tareasPendientes.length;
 
         rolUsuarioLogueado = rolReal;
         objetivoSemana = objetivoPrimasSemana;
         primasSemana = primasNetasSemana;
-        clientesSemana = clientesSemanaData.length;
+        primasMixSemana = primasDecesosVidaSemana;
 
         rankingPosicion = posicion;
         rankingTotal = rankingOrdenado.length;
@@ -1324,12 +1349,11 @@ class _HomeScreenState extends State<HomeScreen> {
       if (!mounted) return;
 
       setState(() {
-        totalClientes = 0;
         totalVentas = 0;
         totalTareas = 0;
 
         primasSemana = 0.0;
-        clientesSemana = 0;
+        primasMixSemana = 0.0;
         rachaSemanas = 0;
         objetivoSemana = _objetivoPrimasSemanalPorRol(
           rolUsuarioLogueado.isNotEmpty ? rolUsuarioLogueado : widget.role,
@@ -1597,13 +1621,16 @@ class _HomeScreenState extends State<HomeScreen> {
     final isWide = MediaQuery.of(context).size.width > 700;
 
     return Scaffold(
-      backgroundColor: const Color(0xFF020617),
+      backgroundColor: const Color(0xFFF2FCFD),
       extendBody: true,
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
       floatingActionButton:
           rolActivo == 'director_nacional' || rolActivo == 'administracion'
           ? null
-          : _bigSaleButton(),
+          : Padding(
+              padding: const EdgeInsets.only(bottom: 76),
+              child: _bigSaleButton(),
+            ),
       body: Stack(
         children: [
           _background(),
@@ -1614,12 +1641,17 @@ class _HomeScreenState extends State<HomeScreen> {
               backgroundColor: const Color(0xFF071A3A),
               child: SingleChildScrollView(
                 physics: const AlwaysScrollableScrollPhysics(),
-                padding: const EdgeInsets.fromLTRB(20, 20, 20, 130),
+                padding: EdgeInsets.fromLTRB(
+                  isWide ? 42 : 20,
+                  20,
+                  isWide ? 42 : 20,
+                  130,
+                ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     _topBar(),
-                    const SizedBox(height: 30),
+                    const SizedBox(height: 22),
                     _hero(),
                     const SizedBox(height: 24),
                     _sectionTitle(
@@ -1657,7 +1689,7 @@ class _HomeScreenState extends State<HomeScreen> {
         Container(
           decoration: const BoxDecoration(
             gradient: LinearGradient(
-              colors: [Color(0xFF020617), Color(0xFF061B3A), Color(0xFF020617)],
+              colors: [Color(0xFFF4FDFE), Color(0xFFDDF8FA), Color(0xFFF7FBFF)],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
@@ -1666,12 +1698,12 @@ class _HomeScreenState extends State<HomeScreen> {
         Positioned(
           top: -90,
           right: -80,
-          child: _glow(const Color(0xFF2563EB), 260),
+          child: _glow(const Color(0xFF14B8B3), 300),
         ),
         Positioned(
           top: 260,
           right: -120,
-          child: _glow(const Color(0xFF7C3AED), 280),
+          child: _glow(const Color(0xFF36D6E5), 320),
         ),
         Positioned(
           bottom: -90,
@@ -1680,7 +1712,7 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         BackdropFilter(
           filter: ImageFilter.blur(sigmaX: 36, sigmaY: 36),
-          child: Container(color: Colors.black.withOpacity(0.08)),
+          child: Container(color: Colors.white.withOpacity(0.05)),
         ),
       ],
     );
@@ -1706,72 +1738,141 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _topBar() {
     final totalNotifications = chatUnreadCount + systemUnreadCount;
 
-    return Row(
-      children: [
-        Expanded(
-          child: Image.asset(
-            'assets/images/logo.png',
-            height: 70,
-            alignment: Alignment.centerLeft,
-            fit: BoxFit.contain,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final compact = constraints.maxWidth < 560;
+        return Container(
+          width: double.infinity,
+          height: compact ? 82 : 96,
+          padding: EdgeInsets.symmetric(
+            horizontal: compact ? 12 : 22,
+            vertical: 8,
           ),
-        ),
-
-        Stack(
-          clipBehavior: Clip.none,
-          children: [
-            IconButton(
-              onPressed: () {
-                _openNotificationsPanel();
-              },
-              icon: const Icon(
-                Icons.notifications_none_rounded,
-                color: Colors.white,
+          decoration: BoxDecoration(
+            color: const Color(0xFF2A3143),
+            borderRadius: BorderRadius.circular(26),
+            border: Border.all(
+              color: const Color(0xFF20C7C2).withOpacity(0.62),
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF071A3A).withOpacity(0.16),
+                blurRadius: 28,
+                offset: const Offset(0, 11),
               ),
-              style: IconButton.styleFrom(
-                backgroundColor: Colors.white.withOpacity(0.08),
-                fixedSize: const Size(48, 48),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(18),
+              BoxShadow(
+                color: const Color(0xFF0AAEAE).withOpacity(0.13),
+                blurRadius: 20,
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              SizedBox(
+                width: compact ? 145 : 195,
+                child: Image.asset(
+                  'assets/images/logo.png',
+                  fit: BoxFit.contain,
                 ),
               ),
-            ),
-
-            if (totalNotifications > 0)
-              Positioned(
-                right: -2,
-                top: -2,
-                child: Container(
-                  constraints: const BoxConstraints(
-                    minWidth: 22,
-                    minHeight: 22,
+              if (!compact) ...[
+                Container(
+                  width: 1,
+                  height: 42,
+                  margin: const EdgeInsets.symmetric(horizontal: 20),
+                  color: const Color(0xFF20C7C2).withOpacity(0.45),
+                ),
+                const Expanded(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'PLATAFORMA COMERCIAL',
+                        style: TextStyle(
+                          color: Color(0xFF45D8D1),
+                          fontSize: 13,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 1.5,
+                        ),
+                      ),
+                      SizedBox(height: 4),
+                      Text(
+                        'Todo el negocio, en un solo lugar',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: Color(0xFFE7F8F8),
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
                   ),
-                  padding: const EdgeInsets.symmetric(horizontal: 6),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFEF4444),
-                    borderRadius: BorderRadius.circular(99),
-                    border: Border.all(
-                      color: const Color(0xFF061018),
-                      width: 2,
+                ),
+              ] else
+                const Spacer(),
+              const SizedBox(width: 14),
+              Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  IconButton(
+                    onPressed: _openNotificationsPanel,
+                    icon: const Icon(
+                      Icons.notifications_none_rounded,
+                      color: Color(0xFF071A3A),
+                      size: 29,
                     ),
-                  ),
-                  child: Center(
-                    child: Text(
-                      totalNotifications > 99
-                          ? '+99'
-                          : totalNotifications.toString(),
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 10,
-                        fontWeight: FontWeight.w900,
+                    style: IconButton.styleFrom(
+                      backgroundColor: const Color(0xFFF1FFFF),
+                      fixedSize: const Size(56, 56),
+                      side: const BorderSide(
+                        color: Color(0xFF45D8D1),
+                        width: 1.5,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(18),
                       ),
                     ),
                   ),
-                ),
+                  if (totalNotifications > 0)
+                    Positioned(
+                      right: -4,
+                      top: -6,
+                      child: Container(
+                        constraints: const BoxConstraints(
+                          minWidth: 24,
+                          minHeight: 24,
+                        ),
+                        padding: const EdgeInsets.symmetric(horizontal: 6),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFE74646),
+                          borderRadius: BorderRadius.circular(99),
+                          border: Border.all(
+                            color: const Color(0xFF2A3143),
+                            width: 2,
+                          ),
+                        ),
+                        child: Center(
+                          child: Text(
+                            totalNotifications > 99
+                                ? '+99'
+                                : totalNotifications.toString(),
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
               ),
-          ],
-        ),
-      ],
+            ],
+          ),
+        );
+      },
     );
   }
 
@@ -1781,20 +1882,22 @@ class _HomeScreenState extends State<HomeScreen> {
       padding: const EdgeInsets.all(2),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(30),
-        gradient: LinearGradient(
-          colors: [
-            const Color(0xFF22D3EE).withOpacity(0.35),
-            const Color(0xFF7C3AED).withOpacity(0.45),
-            const Color(0xFFFF7A00).withOpacity(0.35),
-          ],
-        ),
+        color: const Color(0xFF52D2CF).withOpacity(0.24),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF0AAEAE).withOpacity(0.10),
+            blurRadius: 30,
+            offset: const Offset(0, 14),
+          ),
+        ],
       ),
       child: Container(
-        padding: const EdgeInsets.all(22),
+        constraints: const BoxConstraints(minHeight: 250),
+        padding: const EdgeInsets.all(28),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(28),
           gradient: const LinearGradient(
-            colors: [Color(0xFF061329), Color(0xFF071A3A), Color(0xFF120A2E)],
+            colors: [Color(0xFFFFFFFF), Color(0xFFEAFBFC), Color(0xFFD9F6F8)],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
@@ -1802,12 +1905,12 @@ class _HomeScreenState extends State<HomeScreen> {
         child: Stack(
           children: [
             Positioned(
-              right: -20,
-              top: -15,
+              right: 8,
+              top: 4,
               child: Icon(
                 Icons.rocket_launch_rounded,
-                color: const Color(0xFF22D3EE).withOpacity(0.18),
-                size: 120,
+                color: const Color(0xFF0AAEAE).withOpacity(0.14),
+                size: 160,
               ),
             ),
             Column(
@@ -1815,8 +1918,8 @@ class _HomeScreenState extends State<HomeScreen> {
               children: [
                 Text(
                   fraseDelDia[0],
-                  style: TextStyle(
-                    color: Colors.white,
+                  style: const TextStyle(
+                    color: Color(0xFF071A3A),
                     fontSize: 31,
                     fontWeight: FontWeight.w900,
                     height: 1.05,
@@ -1825,8 +1928,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 const SizedBox(height: 3),
                 Text(
                   "${fraseDelDia[1]} 🚀",
-                  style: TextStyle(
-                    color: Color(0xFF22D3EE),
+                  style: const TextStyle(
+                    color: Color(0xFF0AAEAE),
                     fontSize: 29,
                     fontWeight: FontWeight.w900,
                     height: 1.05,
@@ -1837,7 +1940,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   children: [
                     const Icon(
                       Icons.person_pin_rounded,
-                      color: Color(0xFF22D3EE),
+                      color: Color(0xFF0AAEAE),
                       size: 22,
                     ),
                     const SizedBox(width: 8),
@@ -1845,7 +1948,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       child: Text(
                         _roleTitle(_rolActivo),
                         style: const TextStyle(
-                          color: Color(0xFF67E8F9),
+                          color: Color(0xFF075D68),
                           fontSize: 17,
                           fontWeight: FontWeight.w800,
                         ),
@@ -1871,7 +1974,7 @@ class _HomeScreenState extends State<HomeScreen> {
         Text(
           title,
           style: const TextStyle(
-            color: Colors.white,
+            color: Color(0xFF071A3A),
             fontSize: 20,
             fontWeight: FontWeight.w900,
           ),
@@ -1887,21 +1990,22 @@ class _HomeScreenState extends State<HomeScreen> {
         value: _formatearEuros(primasSemana),
         subtitle: "creadas esta semana",
         icon: Icons.euro_rounded,
-        color: const Color(0xFF2563EB),
+        color: const Color(0xFF0A7F91),
       ),
       _metricCard(
-        title: "Clientes semana",
-        value: "$clientesSemana",
-        subtitle: "nuevos esta semana",
-        icon: Icons.groups_rounded,
-        color: const Color(0xFF14B8A6),
+        title: "Mix semana",
+        value: _formatearEuros(primasMixSemana),
+        subtitle:
+            "Decesos + Vida · ${primasSemana > 0 ? ((primasMixSemana / primasSemana) * 100).toStringAsFixed(1) : '0.0'}% del total",
+        icon: Icons.pie_chart_rounded,
+        color: const Color(0xFF10AAA6),
       ),
       _metricCard(
         title: "Pendientes",
         value: "$totalTareas",
         subtitle: "tareas",
         icon: Icons.assignment_rounded,
-        color: const Color(0xFFFF7A00),
+        color: const Color(0xFF0A7F91),
       ),
       _productionMetricCard(),
     ];
@@ -1912,7 +2016,7 @@ class _HomeScreenState extends State<HomeScreen> {
       physics: const NeverScrollableScrollPhysics(),
       mainAxisSpacing: 14,
       crossAxisSpacing: 14,
-      childAspectRatio: isWide ? 1.2 : 0.78,
+      childAspectRatio: isWide ? 1.02 : 0.66,
       children: cards,
     );
   }
@@ -1935,8 +2039,8 @@ class _HomeScreenState extends State<HomeScreen> {
           Text(
             title,
             style: const TextStyle(
-              color: Colors.white,
-              fontSize: 14,
+              color: Color(0xFF071A3A),
+              fontSize: 16,
               fontWeight: FontWeight.w800,
             ),
           ),
@@ -1944,8 +2048,8 @@ class _HomeScreenState extends State<HomeScreen> {
           Text(
             loadingKpis ? "..." : value,
             style: const TextStyle(
-              color: Colors.white,
-              fontSize: 31,
+              color: Color(0xFF071A3A),
+              fontSize: 38,
               fontWeight: FontWeight.w900,
               height: 1,
             ),
@@ -1954,10 +2058,10 @@ class _HomeScreenState extends State<HomeScreen> {
           Text(
             subtitle,
             style: TextStyle(
-              color: color == const Color(0xFFFF7A00)
-                  ? Colors.white70
-                  : const Color(0xFF2DD4BF),
-              fontSize: 12,
+              color: color == const Color(0xFF0A7F91)
+                  ? const Color(0xFF53627A)
+                  : const Color(0xFF0AAEAE),
+              fontSize: 14,
               fontWeight: FontWeight.w800,
             ),
           ),
@@ -1971,7 +2075,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _productionMetricCard() {
     return Container(
       padding: const EdgeInsets.all(16),
-      decoration: _premiumCard(const Color(0xFF8B5CF6)),
+      decoration: _premiumCard(const Color(0xFF10AAA6)),
       child: Row(
         children: [
           Expanded(
@@ -1980,14 +2084,14 @@ class _HomeScreenState extends State<HomeScreen> {
               children: [
                 _iconBubble(
                   Icons.track_changes_rounded,
-                  const Color(0xFF8B5CF6),
+                  const Color(0xFF10AAA6),
                 ),
                 const Spacer(),
                 const Text(
                   "Producción",
                   style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 14,
+                    color: Color(0xFF071A3A),
+                    fontSize: 16,
                     fontWeight: FontWeight.w800,
                   ),
                 ),
@@ -1995,8 +2099,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 Text(
                   "$produccionTexto%",
                   style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 31,
+                    color: Color(0xFF071A3A),
+                    fontSize: 38,
                     fontWeight: FontWeight.w900,
                     height: 1,
                   ),
@@ -2005,8 +2109,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 const Text(
                   "del objetivo",
                   style: TextStyle(
-                    color: Colors.white70,
-                    fontSize: 12,
+                    color: Color(0xFF64748B),
+                    fontSize: 14,
                     fontWeight: FontWeight.w700,
                   ),
                 ),
@@ -2019,8 +2123,8 @@ class _HomeScreenState extends State<HomeScreen> {
             child: CircularProgressIndicator(
               value: produccionPorcentaje,
               strokeWidth: 7,
-              backgroundColor: Colors.white.withOpacity(0.10),
-              color: const Color(0xFFA855F7),
+              backgroundColor: const Color(0xFFE2E8F0),
+              color: const Color(0xFF0A7F91),
             ),
           ),
         ],
@@ -2066,22 +2170,22 @@ class _HomeScreenState extends State<HomeScreen> {
     final progreso = objetivoSemana == 0 ? 0.0 : conseguido / objetivoSemana;
 
     return Container(
-      height: 190,
+      height: 230,
       padding: const EdgeInsets.all(18),
-      decoration: _premiumCard(const Color(0xFF22D3EE)),
+      decoration: _premiumCard(const Color(0xFF0AAEAE)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Row(
             children: [
-              Icon(Icons.track_changes_rounded, color: Color(0xFF22D3EE)),
+              Icon(Icons.track_changes_rounded, color: Color(0xFF0AAEAE)),
               SizedBox(width: 8),
               Text(
                 "OBJETIVO DE LA SEMANA",
                 style: TextStyle(
-                  color: Color(0xFF67E8F9),
+                  color: Color(0xFF087F86),
                   fontWeight: FontWeight.w900,
-                  fontSize: 12,
+                  fontSize: 14,
                 ),
               ),
             ],
@@ -2090,8 +2194,8 @@ class _HomeScreenState extends State<HomeScreen> {
           Text(
             _formatearEuros(objetivoSemana),
             style: const TextStyle(
-              color: Colors.white,
-              fontSize: 22,
+              color: Color(0xFF071A3A),
+              fontSize: 28,
               fontWeight: FontWeight.w900,
             ),
           ),
@@ -2101,8 +2205,8 @@ class _HomeScreenState extends State<HomeScreen> {
             child: LinearProgressIndicator(
               value: progreso,
               minHeight: 9,
-              backgroundColor: Colors.white.withOpacity(0.10),
-              color: const Color(0xFF2DD4BF),
+              backgroundColor: const Color(0xFFE2E8F0),
+              color: const Color(0xFF0AAEAE),
             ),
           ),
           const SizedBox(height: 12),
@@ -2111,14 +2215,14 @@ class _HomeScreenState extends State<HomeScreen> {
               _goalMini(
                 "Has conseguido",
                 _formatearEuros(primasSemana),
-                const Color(0xFF2DD4BF),
+                const Color(0xFF0AAEAE),
               ),
-              Container(
-                width: 1,
-                height: 30,
-                color: Colors.white.withOpacity(0.10),
+              Container(width: 1, height: 30, color: const Color(0xFFE2E8F0)),
+              _goalMini(
+                "Te quedan",
+                _formatearEuros(quedan),
+                const Color(0xFF071A3A),
               ),
-              _goalMini("Te quedan", _formatearEuros(quedan), Colors.white),
             ],
           ),
         ],
@@ -2134,8 +2238,8 @@ class _HomeScreenState extends State<HomeScreen> {
           Text(
             label,
             style: const TextStyle(
-              color: Colors.white70,
-              fontSize: 11,
+              color: Color(0xFF64748B),
+              fontSize: 13,
               fontWeight: FontWeight.w700,
             ),
           ),
@@ -2143,7 +2247,7 @@ class _HomeScreenState extends State<HomeScreen> {
             value,
             style: TextStyle(
               color: color,
-              fontSize: 25,
+              fontSize: 30,
               fontWeight: FontWeight.w900,
             ),
           ),
@@ -2156,9 +2260,9 @@ class _HomeScreenState extends State<HomeScreen> {
     final textoSemana = rachaSemanas == 1 ? "semana" : "semanas";
 
     return Container(
-      height: 190,
+      height: 230,
       padding: const EdgeInsets.all(18),
-      decoration: _premiumCard(const Color(0xFFA855F7)),
+      decoration: _premiumCard(const Color(0xFF0A7F91)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -2166,15 +2270,15 @@ class _HomeScreenState extends State<HomeScreen> {
             children: [
               Icon(
                 Icons.local_fire_department_rounded,
-                color: Color(0xFFFF7A00),
+                color: Color(0xFF0AAEAE),
               ),
               SizedBox(width: 8),
               Text(
                 "RACHA ACTUAL",
                 style: TextStyle(
-                  color: Color(0xFFC084FC),
+                  color: Color(0xFF087F86),
                   fontWeight: FontWeight.w900,
-                  fontSize: 12,
+                  fontSize: 14,
                 ),
               ),
             ],
@@ -2183,8 +2287,8 @@ class _HomeScreenState extends State<HomeScreen> {
           Text(
             "$rachaSemanas $textoSemana",
             style: const TextStyle(
-              color: Colors.white,
-              fontSize: 30,
+              color: Color(0xFF071A3A),
+              fontSize: 36,
               fontWeight: FontWeight.w900,
             ),
           ),
@@ -2192,8 +2296,8 @@ class _HomeScreenState extends State<HomeScreen> {
           const Text(
             "cumpliendo objetivos",
             style: TextStyle(
-              color: Colors.white70,
-              fontSize: 14,
+              color: Color(0xFF64748B),
+              fontSize: 16,
               fontWeight: FontWeight.w700,
             ),
           ),
@@ -2235,7 +2339,7 @@ class _HomeScreenState extends State<HomeScreen> {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(18),
-      decoration: _premiumCard(const Color(0xFF2563EB)),
+      decoration: _premiumCard(const Color(0xFF0A7F91)),
       child: Row(
         children: [
           Container(
@@ -2243,12 +2347,12 @@ class _HomeScreenState extends State<HomeScreen> {
             height: 82,
             decoration: BoxDecoration(
               gradient: const LinearGradient(
-                colors: [Color(0xFFFFB020), Color(0xFFFF7A00)],
+                colors: [Color(0xFFFFB020), Color(0xFF0AAEAE)],
               ),
               borderRadius: BorderRadius.circular(24),
               boxShadow: [
                 BoxShadow(
-                  color: const Color(0xFFFFB020).withOpacity(0.28),
+                  color: const Color(0xFF10AAA6).withOpacity(0.28),
                   blurRadius: 20,
                   offset: const Offset(0, 8),
                 ),
@@ -2256,7 +2360,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             child: const Icon(
               Icons.emoji_events_rounded,
-              color: Colors.white,
+              color: Color(0xFF071A3A),
               size: 44,
             ),
           ),
@@ -2267,16 +2371,16 @@ class _HomeScreenState extends State<HomeScreen> {
               const Text(
                 "TU POSICIÓN",
                 style: TextStyle(
-                  color: Color(0xFFCBD5E1),
-                  fontSize: 12,
+                  color: Color(0xFF53627A),
+                  fontSize: 14,
                   fontWeight: FontWeight.w900,
                 ),
               ),
               Text(
                 sinUsuarios ? "—" : "#$rankingPosicion",
                 style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 42,
+                  color: Color(0xFF071A3A),
+                  fontSize: 48,
                   fontWeight: FontWeight.w900,
                   height: 1,
                 ),
@@ -2284,8 +2388,8 @@ class _HomeScreenState extends State<HomeScreen> {
               Text(
                 sinUsuarios ? "cargando" : "de $rankingTotal",
                 style: const TextStyle(
-                  color: Color(0xFFCBD5E1),
-                  fontSize: 14,
+                  color: Color(0xFF53627A),
+                  fontSize: 16,
                   fontWeight: FontWeight.w700,
                 ),
               ),
@@ -2299,8 +2403,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 const Text(
                   "Ranking de Ventas",
                   style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 15,
+                    color: Color(0xFF071A3A),
+                    fontSize: 18,
                     fontWeight: FontWeight.w900,
                   ),
                 ),
@@ -2308,8 +2412,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 Text(
                   "$misPolizasTotales pólizas emitidas",
                   style: const TextStyle(
-                    color: Color(0xFFCBD5E1),
-                    fontSize: 12,
+                    color: Color(0xFF53627A),
+                    fontSize: 14,
                     fontWeight: FontWeight.w700,
                   ),
                 ),
@@ -2319,16 +2423,16 @@ class _HomeScreenState extends State<HomeScreen> {
                   child: LinearProgressIndicator(
                     value: progreso,
                     minHeight: 9,
-                    backgroundColor: Colors.white.withOpacity(0.10),
-                    color: const Color(0xFF22D3EE),
+                    backgroundColor: const Color(0xFFE2E8F0),
+                    color: const Color(0xFF0AAEAE),
                   ),
                 ),
                 const SizedBox(height: 8),
                 Text(
                   mensaje,
                   style: const TextStyle(
-                    color: Colors.white70,
-                    fontSize: 12,
+                    color: Color(0xFF64748B),
+                    fontSize: 14,
                     fontWeight: FontWeight.w700,
                   ),
                 ),
@@ -2346,7 +2450,7 @@ class _HomeScreenState extends State<HomeScreen> {
         title: "Nueva venta",
         icon: Icons.add_rounded,
         subtitle: "Crear oportunidad",
-        color: const Color(0xFF2563EB),
+        color: const Color(0xFF0A7F91),
         onTap: () {
           Navigator.push(
             context,
@@ -2359,7 +2463,7 @@ class _HomeScreenState extends State<HomeScreen> {
         title: "Safebrok IA",
         icon: Icons.auto_awesome_rounded,
         subtitle: "Asistente inteligente",
-        color: const Color(0xFF22D3EE),
+        color: const Color(0xFF0AAEAE),
         onTap: () {
           Navigator.push(
             context,
@@ -2369,10 +2473,29 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
 
       DashboardItem(
+        title: "Previsiones",
+        icon: Icons.insights_rounded,
+        subtitle: "Plan mensual y avance",
+        color: const Color(0xFF0A7F91),
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => PrevisionesScreen(
+                role: rolUsuarioLogueado.isNotEmpty
+                    ? rolUsuarioLogueado
+                    : widget.role,
+              ),
+            ),
+          );
+        },
+      ),
+
+      DashboardItem(
         title: "Mis gestiones",
         icon: Icons.assignment_turned_in_rounded,
         subtitle: "Gestiones asignadas",
-        color: const Color(0xFFFF7A00),
+        color: const Color(0xFF0A7F91),
         onTap: () {
           Navigator.push(
             context,
@@ -2392,7 +2515,7 @@ class _HomeScreenState extends State<HomeScreen> {
         crossAxisCount: isWide ? 3 : 2,
         crossAxisSpacing: 14,
         mainAxisSpacing: 14,
-        childAspectRatio: isWide ? 1.45 : 0.95,
+        childAspectRatio: isWide ? 1.25 : 0.82,
       ),
       itemBuilder: (context, index) {
         final item = allItems[index];
@@ -2429,7 +2552,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                     child: const Icon(
                       Icons.chevron_right_rounded,
-                      color: Colors.white,
+                      color: Color(0xFF071A3A),
                       size: 23,
                     ),
                   ),
@@ -2443,8 +2566,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 16,
+                  color: Color(0xFF071A3A),
+                  fontSize: 20,
                   fontWeight: FontWeight.w900,
                   height: 1.10,
                 ),
@@ -2457,8 +2580,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
-                  color: Colors.white70,
-                  fontSize: 12,
+                  color: Color(0xFF64748B),
+                  fontSize: 14,
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -2476,13 +2599,13 @@ class _HomeScreenState extends State<HomeScreen> {
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         gradient: const LinearGradient(
-          colors: [Color(0xFF22D3EE), Color(0xFF2563EB), Color(0xFF7C3AED)],
+          colors: [Color(0xFF0AAEAE), Color(0xFF2563EB), Color(0xFF7C3AED)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF22D3EE).withOpacity(0.50),
+            color: const Color(0xFF0AAEAE).withOpacity(0.50),
             blurRadius: 30,
             offset: const Offset(0, 12),
           ),
@@ -2507,18 +2630,18 @@ class _HomeScreenState extends State<HomeScreen> {
       width: size,
       height: size,
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [color.withOpacity(0.95), color.withOpacity(0.28)],
+        gradient: const LinearGradient(
+          colors: [Color(0xFF18C3BD), Color(0xFF087F8D)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(size * 0.30),
-        border: Border.all(color: color.withOpacity(0.42)),
+        border: Border.all(color: const Color(0xFF9FE3E2)),
         boxShadow: [
           BoxShadow(
-            color: color.withOpacity(0.20),
-            blurRadius: 16,
-            offset: const Offset(0, 8),
+            color: const Color(0xFF0AAEAE).withOpacity(0.16),
+            blurRadius: 14,
+            offset: const Offset(0, 7),
           ),
         ],
       ),
@@ -2538,22 +2661,14 @@ class _HomeScreenState extends State<HomeScreen> {
 
   BoxDecoration _premiumCard(Color color) {
     return BoxDecoration(
-      gradient: LinearGradient(
-        colors: [
-          color.withOpacity(0.22),
-          const Color(0xFF061329).withOpacity(0.96),
-          const Color(0xFF020617).withOpacity(0.92),
-        ],
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-      ),
+      color: Colors.white.withOpacity(0.96),
       borderRadius: BorderRadius.circular(24),
-      border: Border.all(color: color.withOpacity(0.42)),
+      border: Border.all(color: const Color(0xFFC7ECEC)),
       boxShadow: [
         BoxShadow(
-          color: color.withOpacity(0.12),
-          blurRadius: 20,
-          offset: const Offset(0, 10),
+          color: const Color(0xFF071A3A).withOpacity(0.065),
+          blurRadius: 22,
+          offset: const Offset(0, 9),
         ),
       ],
     );
@@ -2594,8 +2709,8 @@ class _HomeScreenState extends State<HomeScreen> {
             },
           ),
           DashboardItem(
-            title: "Usuarios",
-            subtitle: "Toda la estructura",
+            title: "Rendimiento comercial",
+            subtitle: "Primas y mix por estructura",
             icon: Icons.groups_rounded,
             color: const Color(0xFF14B8A6),
             onTap: () {
@@ -2771,8 +2886,8 @@ class _HomeScreenState extends State<HomeScreen> {
             },
           ),
           DashboardItem(
-            title: "Equipos",
-            subtitle: "Gestionar zona",
+            title: "Rendimiento comercial",
+            subtitle: "Primas y mix por estructura",
             icon: Icons.groups_rounded,
             color: const Color(0xFF14B8A6),
             onTap: () {
@@ -2886,8 +3001,8 @@ class _HomeScreenState extends State<HomeScreen> {
         return [
           _annualCommercialPlanItem(context),
           DashboardItem(
-            title: "Mis Equipos",
-            subtitle: "Gestionar equipos",
+            title: "Rendimiento comercial",
+            subtitle: "Primas y mix por estructura",
             icon: Icons.groups_rounded,
             color: const Color(0xFF14B8A6),
             onTap: () {
@@ -2985,14 +3100,16 @@ class _HomeScreenState extends State<HomeScreen> {
         return [
           _annualCommercialPlanItem(context),
           DashboardItem(
-            title: "Mis Agentes",
-            subtitle: "Gestionar agentes",
-            icon: Icons.people_rounded,
-            color: const Color(0xFF2563EB),
+            title: "Rendimiento comercial",
+            subtitle: "Primas y mix por estructura",
+            icon: Icons.insights_rounded,
+            color: const Color(0xFF14B8A6),
             onTap: () {
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (_) => const TeamAgentsScreen()),
+                MaterialPageRoute(
+                  builder: (_) => const MisEquiposJefeVentasScreen(),
+                ),
               );
             },
           ),

@@ -1,4 +1,5 @@
 import 'dart:ui';
+import 'package:safebrok_andalucia/core/production/premium_weighting.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:safebrok_andalucia/core/production/production_period_service.dart';
@@ -200,6 +201,9 @@ class _BusinessScreenState extends State<BusinessScreen> {
           .select(
             'id, auth_id, parent_id, rol_usuario, nombre, apellidos, email',
           )
+          .or(
+            'estado.is.null,estado.not.in.(inactivo,Inactivo,INACTIVO,baja,Baja,BAJA,desactivado,Desactivado,DESACTIVADO,bloqueado,Bloqueado,BLOQUEADO,suspendido,Suspendido,SUSPENDIDO)',
+          )
           .eq('auth_id', authUser.id)
           .maybeSingle();
 
@@ -213,6 +217,9 @@ class _BusinessScreenState extends State<BusinessScreen> {
           .from('usuarios')
           .select(
             'id, auth_id, parent_id, rol_usuario, nombre, apellidos, email',
+          )
+          .or(
+            'estado.is.null,estado.not.in.(inactivo,Inactivo,INACTIVO,baja,Baja,BAJA,desactivado,Desactivado,DESACTIVADO,bloqueado,Bloqueado,BLOQUEADO,suspendido,Suspendido,SUSPENDIDO)',
           );
 
       final todosUsuarios = List<Map<String, dynamic>>.from(usuariosData);
@@ -467,7 +474,7 @@ class _BusinessScreenState extends State<BusinessScreen> {
     double comisionPropia = 0;
 
     for (final venta in ventasPeriodo) {
-      final prima = _numero(venta['prima_anual_neta']);
+      final prima = PremiumWeighting.net(venta);
 
       final authId = _idTexto(venta['agente_auth_id']);
 
@@ -676,7 +683,7 @@ class _BusinessScreenState extends State<BusinessScreen> {
 
     final ventasData = await supabase
         .from('ventas')
-        .select('id, agente_auth_id, producto')
+        .select('id, agente_auth_id, producto, fecha_efecto')
         .inFilter('id', ventaIds);
 
     final ventasMap = <String, Map<String, dynamic>>{};
@@ -708,7 +715,10 @@ class _BusinessScreenState extends State<BusinessScreen> {
         continue;
       }
 
-      final primaExtornada = _numero(anulacion['prima_extornada']);
+      final primaExtornada = PremiumWeighting.amount(
+        venta,
+        anulacion['prima_extornada'],
+      );
 
       final comisionExtornada = _numero(anulacion['comision_extornada']);
 
@@ -737,7 +747,7 @@ class _BusinessScreenState extends State<BusinessScreen> {
     final progresoObjetivo = (objetivo / 100).clamp(0.0, 1.0);
 
     return Scaffold(
-      backgroundColor: const Color(0xFF050B12),
+      backgroundColor: const Color(0xFFF2FCFD),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
       floatingActionButton: FloatingActionButton(
         backgroundColor: Colors.transparent,
@@ -758,7 +768,7 @@ class _BusinessScreenState extends State<BusinessScreen> {
             ),
             boxShadow: [
               BoxShadow(
-                color: Colors.blueAccent.withOpacity(0.45),
+                color: const Color(0xFF0A7F91).withOpacity(0.45),
                 blurRadius: 28,
                 spreadRadius: 2,
               ),
@@ -774,7 +784,9 @@ class _BusinessScreenState extends State<BusinessScreen> {
           SafeArea(
             child: loading
                 ? const Center(
-                    child: CircularProgressIndicator(color: Colors.cyanAccent),
+                    child: CircularProgressIndicator(
+                      color: const Color(0xFF0AAEAE),
+                    ),
                   )
                 : ListView(
                     padding: const EdgeInsets.fromLTRB(20, 18, 20, 110),
@@ -795,7 +807,7 @@ class _BusinessScreenState extends State<BusinessScreen> {
                               value: "${esteMes.toStringAsFixed(0)} €",
                               subtitle: "Importe generado",
                               icon: Icons.trending_up_rounded,
-                              color: Colors.cyanAccent,
+                              color: const Color(0xFF0AAEAE),
                             ),
                           ),
                           const SizedBox(width: 14),
@@ -808,8 +820,8 @@ class _BusinessScreenState extends State<BusinessScreen> {
                                   : "En progreso",
                               icon: Icons.track_changes_rounded,
                               color: _objetivoCumplido
-                                  ? Colors.greenAccent
-                                  : Colors.purpleAccent,
+                                  ? const Color(0xFF0AAEAE)
+                                  : const Color(0xFF0AAEAE),
                               circularValue: progresoObjetivo,
                             ),
                           ),
@@ -850,7 +862,7 @@ class _BusinessScreenState extends State<BusinessScreen> {
                           child: const Text(
                             "Ver todas",
                             style: TextStyle(
-                              color: Colors.cyanAccent,
+                              color: const Color(0xFF0AAEAE),
                               fontWeight: FontWeight.w800,
                             ),
                           ),
@@ -884,7 +896,7 @@ class _BusinessScreenState extends State<BusinessScreen> {
                             _discoverRow(
                               icon: Icons.card_giftcard_rounded,
                               title: "Trae a un amigo",
-                              color: Colors.orangeAccent,
+                              color: const Color(0xFF0AAEAE),
                               onTap: () {
                                 Navigator.push(
                                   context,
@@ -897,7 +909,7 @@ class _BusinessScreenState extends State<BusinessScreen> {
                             _discoverRow(
                               icon: Icons.people_alt_rounded,
                               title: "Referencias viables",
-                              color: Colors.purpleAccent,
+                              color: const Color(0xFF0AAEAE),
                               onTap: () {
                                 Navigator.push(
                                   context,
@@ -910,7 +922,7 @@ class _BusinessScreenState extends State<BusinessScreen> {
                             _discoverRow(
                               icon: Icons.rocket_launch_rounded,
                               title: "Mejora tu producción",
-                              color: Colors.greenAccent,
+                              color: const Color(0xFF0AAEAE),
                               onTap: () {
                                 Navigator.push(
                                   context,
@@ -924,7 +936,7 @@ class _BusinessScreenState extends State<BusinessScreen> {
                             _discoverRow(
                               icon: Icons.emoji_events_rounded,
                               title: "Ranking comercial",
-                              color: Colors.amberAccent,
+                              color: const Color(0xFF0AAEAE),
                               onTap: () {
                                 Navigator.push(
                                   context,
@@ -976,7 +988,7 @@ class _BusinessScreenState extends State<BusinessScreen> {
               const Text(
                 "Negocio",
                 style: TextStyle(
-                  color: Colors.white,
+                  color: const Color(0xFF071A3A),
                   fontSize: 29,
                   fontWeight: FontWeight.w900,
                   letterSpacing: -0.8,
@@ -985,7 +997,7 @@ class _BusinessScreenState extends State<BusinessScreen> {
               Text(
                 "Panel económico y producción comercial",
                 style: TextStyle(
-                  color: Colors.white.withOpacity(0.58),
+                  color: const Color(0xFF53627A),
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
                 ),
@@ -996,15 +1008,17 @@ class _BusinessScreenState extends State<BusinessScreen> {
         Container(
           padding: const EdgeInsets.all(11),
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.07),
+            color: Colors.white,
             borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: Colors.white.withOpacity(0.10)),
+            border: Border.all(color: const Color(0xFFC7ECEC)),
           ),
           child: Icon(
             _objetivoCumplido
                 ? Icons.verified_rounded
                 : Icons.trending_up_rounded,
-            color: _objetivoCumplido ? Colors.greenAccent : Colors.orangeAccent,
+            color: _objetivoCumplido
+                ? const Color(0xFF0AAEAE)
+                : const Color(0xFF0AAEAE),
             size: 25,
           ),
         ),
@@ -1022,12 +1036,12 @@ class _BusinessScreenState extends State<BusinessScreen> {
         gradient: const LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [Color(0xFF062C68), Color(0xFF071B3E), Color(0xFF050B12)],
+          colors: [Color(0xFFFFFFFF), Color(0xFFFFFFFF)],
         ),
-        border: Border.all(color: Colors.cyanAccent.withOpacity(0.28)),
+        border: Border.all(color: const Color(0xFF0AAEAE).withOpacity(0.28)),
         boxShadow: [
           BoxShadow(
-            color: Colors.blueAccent.withOpacity(0.22),
+            color: const Color(0xFF0A7F91).withOpacity(0.22),
             blurRadius: 35,
             offset: const Offset(0, 18),
           ),
@@ -1053,13 +1067,15 @@ class _BusinessScreenState extends State<BusinessScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 8),
               decoration: BoxDecoration(
                 color:
-                    (variacionPositiva ? Colors.greenAccent : Colors.redAccent)
+                    (variacionPositiva
+                            ? const Color(0xFF0AAEAE)
+                            : Colors.redAccent)
                         .withOpacity(0.15),
                 borderRadius: BorderRadius.circular(40),
                 border: Border.all(
                   color:
                       (variacionPositiva
-                              ? Colors.greenAccent
+                              ? const Color(0xFF0AAEAE)
                               : Colors.redAccent)
                           .withOpacity(0.34),
                 ),
@@ -1067,7 +1083,7 @@ class _BusinessScreenState extends State<BusinessScreen> {
                   BoxShadow(
                     color:
                         (variacionPositiva
-                                ? Colors.greenAccent
+                                ? const Color(0xFF0AAEAE)
                                 : Colors.redAccent)
                             .withOpacity(0.18),
                     blurRadius: 18,
@@ -1082,7 +1098,7 @@ class _BusinessScreenState extends State<BusinessScreen> {
                         ? Icons.arrow_upward_rounded
                         : Icons.arrow_downward_rounded,
                     color: variacionPositiva
-                        ? Colors.greenAccent
+                        ? const Color(0xFF0AAEAE)
                         : Colors.redAccent,
                     size: 17,
                   ),
@@ -1091,7 +1107,7 @@ class _BusinessScreenState extends State<BusinessScreen> {
                     "${variacionMesAnterior.abs().toStringAsFixed(1)}%",
                     style: TextStyle(
                       color: variacionPositiva
-                          ? Colors.greenAccent
+                          ? const Color(0xFF0AAEAE)
                           : Colors.redAccent,
                       fontSize: 12,
                       fontWeight: FontWeight.w900,
@@ -1110,8 +1126,11 @@ class _BusinessScreenState extends State<BusinessScreen> {
                   ? Icons.trending_up_rounded
                   : Icons.trending_down_rounded,
               size: 155,
-              color: (variacionPositiva ? Colors.greenAccent : Colors.redAccent)
-                  .withOpacity(0.055),
+              color:
+                  (variacionPositiva
+                          ? const Color(0xFF0AAEAE)
+                          : Colors.redAccent)
+                      .withOpacity(0.055),
             ),
           ),
 
@@ -1121,7 +1140,7 @@ class _BusinessScreenState extends State<BusinessScreen> {
               Text(
                 "SALDO GENERADO",
                 style: TextStyle(
-                  color: Colors.white.withOpacity(0.75),
+                  color: const Color(0xFF53627A),
                   fontSize: 13,
                   fontWeight: FontWeight.w900,
                   letterSpacing: 0.8,
@@ -1133,7 +1152,7 @@ class _BusinessScreenState extends State<BusinessScreen> {
               Text(
                 "${saldoTotal.toStringAsFixed(0)} €",
                 style: const TextStyle(
-                  color: Colors.white,
+                  color: const Color(0xFF071A3A),
                   fontSize: 50,
                   fontWeight: FontWeight.w900,
                   letterSpacing: -2,
@@ -1147,7 +1166,7 @@ class _BusinessScreenState extends State<BusinessScreen> {
                   Text(
                     "vs mes anterior",
                     style: TextStyle(
-                      color: Colors.white.withOpacity(0.62),
+                      color: const Color(0xFF53627A),
                       fontSize: 13,
                       fontWeight: FontWeight.w700,
                     ),
@@ -1156,7 +1175,7 @@ class _BusinessScreenState extends State<BusinessScreen> {
                   Text(
                     "Periodo actual",
                     style: TextStyle(
-                      color: Colors.white.withOpacity(0.42),
+                      color: const Color(0xFF53627A),
                       fontSize: 12,
                       fontWeight: FontWeight.w700,
                     ),
@@ -1183,10 +1202,8 @@ class _BusinessScreenState extends State<BusinessScreen> {
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(26),
-        gradient: LinearGradient(
-          colors: [color.withOpacity(0.18), Colors.white.withOpacity(0.045)],
-        ),
-        border: Border.all(color: color.withOpacity(0.25)),
+        color: Colors.white,
+        border: Border.all(color: const Color(0xFFC7ECEC)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1212,7 +1229,7 @@ class _BusinessScreenState extends State<BusinessScreen> {
           Text(
             title.toUpperCase(),
             style: TextStyle(
-              color: Colors.white.withOpacity(0.64),
+              color: const Color(0xFF53627A),
               fontSize: 11,
               fontWeight: FontWeight.w900,
               letterSpacing: 0.7,
@@ -1224,7 +1241,7 @@ class _BusinessScreenState extends State<BusinessScreen> {
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: const TextStyle(
-              color: Colors.white,
+              color: const Color(0xFF071A3A),
               fontSize: 25,
               fontWeight: FontWeight.w900,
               letterSpacing: -0.7,
@@ -1234,7 +1251,7 @@ class _BusinessScreenState extends State<BusinessScreen> {
           Text(
             subtitle,
             style: TextStyle(
-              color: Colors.white.withOpacity(0.55),
+              color: const Color(0xFF53627A),
               fontSize: 12,
               fontWeight: FontWeight.w600,
             ),
@@ -1248,10 +1265,10 @@ class _BusinessScreenState extends State<BusinessScreen> {
     final bool objetivoOk = _objetivoCumplido || progresoObjetivo >= 1;
 
     final Color colorBase = objetivoOk
-        ? Colors.amberAccent
+        ? const Color(0xFF0AAEAE)
         : progresoObjetivo >= 0.80
-        ? Colors.purpleAccent
-        : Colors.cyanAccent;
+        ? const Color(0xFF0AAEAE)
+        : const Color(0xFF0AAEAE);
 
     final IconData iconoCentro = objetivoOk
         ? Icons.workspace_premium_rounded
@@ -1264,16 +1281,8 @@ class _BusinessScreenState extends State<BusinessScreen> {
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(34),
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            const Color(0xFF061B36),
-            colorBase.withOpacity(0.15),
-            const Color(0xFF080A18),
-          ],
-        ),
-        border: Border.all(color: colorBase.withOpacity(0.34)),
+        color: Colors.white,
+        border: Border.all(color: const Color(0xFFC7ECEC)),
         boxShadow: [
           BoxShadow(
             color: colorBase.withOpacity(0.18),
@@ -1321,7 +1330,7 @@ class _BusinessScreenState extends State<BusinessScreen> {
                 const Text(
                   "OBJETIVO DEL MES",
                   style: TextStyle(
-                    color: Colors.white,
+                    color: const Color(0xFF071A3A),
                     fontSize: 18,
                     fontWeight: FontWeight.w900,
                     letterSpacing: 0.8,
@@ -1333,7 +1342,7 @@ class _BusinessScreenState extends State<BusinessScreen> {
                 Text(
                   "Tu progreso actual",
                   style: TextStyle(
-                    color: Colors.white.withOpacity(0.58),
+                    color: const Color(0xFF53627A),
                     fontSize: 14,
                     fontWeight: FontWeight.w700,
                   ),
@@ -1352,7 +1361,7 @@ class _BusinessScreenState extends State<BusinessScreen> {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
-                      color: Colors.white,
+                      color: const Color(0xFF071A3A),
                       fontSize: 47,
                       fontWeight: FontWeight.w900,
                       letterSpacing: -2,
@@ -1480,7 +1489,7 @@ class _BusinessScreenState extends State<BusinessScreen> {
           child: _premiumAction(
             icon: Icons.calendar_month_rounded,
             title: "Mes",
-            color: Colors.cyanAccent,
+            color: const Color(0xFF0AAEAE),
             onTap: () {
               Navigator.push(
                 context,
@@ -1494,7 +1503,7 @@ class _BusinessScreenState extends State<BusinessScreen> {
           child: _premiumAction(
             icon: Icons.track_changes_rounded,
             title: "Objetivo",
-            color: Colors.purpleAccent,
+            color: const Color(0xFF0AAEAE),
             onTap: () {
               Navigator.push(
                 context,
@@ -1510,7 +1519,7 @@ class _BusinessScreenState extends State<BusinessScreen> {
           child: _premiumAction(
             icon: Icons.more_horiz_rounded,
             title: "Más",
-            color: Colors.orangeAccent,
+            color: const Color(0xFF0AAEAE),
             onTap: () {
               showModalBottomSheet(
                 context: context,
@@ -1542,13 +1551,8 @@ class _BusinessScreenState extends State<BusinessScreen> {
           height: 96,
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(24),
-            gradient: LinearGradient(
-              colors: [
-                color.withOpacity(0.18),
-                Colors.white.withOpacity(0.045),
-              ],
-            ),
-            border: Border.all(color: color.withOpacity(0.28)),
+            color: Colors.white,
+            border: Border.all(color: const Color(0xFFC7ECEC)),
           ),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -1558,7 +1562,7 @@ class _BusinessScreenState extends State<BusinessScreen> {
               Text(
                 title,
                 style: const TextStyle(
-                  color: Colors.white,
+                  color: const Color(0xFF071A3A),
                   fontWeight: FontWeight.w900,
                   fontSize: 13,
                 ),
@@ -1580,21 +1584,21 @@ class _BusinessScreenState extends State<BusinessScreen> {
       width: double.infinity,
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.065),
+        color: Colors.white,
         borderRadius: BorderRadius.circular(28),
-        border: Border.all(color: Colors.white.withOpacity(0.09)),
+        border: Border.all(color: const Color(0xFFC7ECEC)),
       ),
       child: Column(
         children: [
           Row(
             children: [
-              _hexIcon(icon, Colors.cyanAccent, 42),
+              _hexIcon(icon, const Color(0xFF0AAEAE), 42),
               const SizedBox(width: 11),
               Expanded(
                 child: Text(
                   title,
                   style: const TextStyle(
-                    color: Colors.white,
+                    color: const Color(0xFF071A3A),
                     fontWeight: FontWeight.w900,
                     fontSize: 18,
                   ),
@@ -1615,15 +1619,15 @@ class _BusinessScreenState extends State<BusinessScreen> {
       width: double.infinity,
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.04),
+        color: Colors.white,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.white.withOpacity(0.06)),
+        border: Border.all(color: const Color(0xFFC7ECEC)),
       ),
       child: Text(
         "Sin ventas registradas todavía",
         textAlign: TextAlign.center,
         style: TextStyle(
-          color: Colors.white.withOpacity(0.58),
+          color: const Color(0xFF53627A),
           fontWeight: FontWeight.w700,
         ),
       ),
@@ -1636,8 +1640,8 @@ class _BusinessScreenState extends State<BusinessScreen> {
     required String importe,
   }) {
     final color = producto.toLowerCase().contains('vida')
-        ? Colors.purpleAccent
-        : Colors.greenAccent;
+        ? const Color(0xFF0AAEAE)
+        : const Color(0xFF0AAEAE);
 
     final icon = producto.toLowerCase().contains('vida')
         ? Icons.favorite_rounded
@@ -1647,9 +1651,9 @@ class _BusinessScreenState extends State<BusinessScreen> {
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.045),
+        color: Colors.white,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.white.withOpacity(0.06)),
+        border: Border.all(color: const Color(0xFFC7ECEC)),
       ),
       child: Row(
         children: [
@@ -1664,7 +1668,7 @@ class _BusinessScreenState extends State<BusinessScreen> {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
-                    color: Colors.white,
+                    color: const Color(0xFF071A3A),
                     fontWeight: FontWeight.w900,
                     fontSize: 15,
                   ),
@@ -1675,7 +1679,7 @@ class _BusinessScreenState extends State<BusinessScreen> {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    color: Colors.white.withOpacity(0.58),
+                    color: const Color(0xFF53627A),
                     fontWeight: FontWeight.w600,
                     fontSize: 12,
                   ),
@@ -1687,7 +1691,7 @@ class _BusinessScreenState extends State<BusinessScreen> {
           Text(
             importe,
             style: const TextStyle(
-              color: Colors.white,
+              color: const Color(0xFF071A3A),
               fontWeight: FontWeight.w900,
               fontSize: 16,
             ),
@@ -1714,9 +1718,9 @@ class _BusinessScreenState extends State<BusinessScreen> {
           margin: const EdgeInsets.only(bottom: 10),
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.045),
+            color: Colors.white,
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: Colors.white.withOpacity(0.06)),
+            border: Border.all(color: const Color(0xFFC7ECEC)),
           ),
           child: Row(
             children: [
@@ -1726,7 +1730,7 @@ class _BusinessScreenState extends State<BusinessScreen> {
                 child: Text(
                   title,
                   style: const TextStyle(
-                    color: Colors.white,
+                    color: const Color(0xFF071A3A),
                     fontSize: 14,
                     fontWeight: FontWeight.w900,
                   ),
@@ -1783,24 +1787,24 @@ class _PremiumBackground extends StatelessWidget {
             gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
-              colors: [Color(0xFF050B12), Color(0xFF071A2E), Color(0xFF050B12)],
+              colors: [Color(0xFFF2FCFD), Color(0xFFFFFFFF), Color(0xFFF2FCFD)],
             ),
           ),
         ),
         Positioned(
           top: -150,
           right: -100,
-          child: _glow(Colors.cyanAccent, 330, 0.16),
+          child: _glow(const Color(0xFF0AAEAE), 330, 0.16),
         ),
         Positioned(
           bottom: -170,
           left: -110,
-          child: _glow(Colors.blueAccent, 370, 0.15),
+          child: _glow(const Color(0xFF0A7F91), 370, 0.15),
         ),
         Positioned(
           top: 330,
           left: -120,
-          child: _glow(Colors.purpleAccent, 240, 0.08),
+          child: _glow(const Color(0xFF0AAEAE), 240, 0.08),
         ),
         BackdropFilter(
           filter: ImageFilter.blur(sigmaX: 60, sigmaY: 60),
@@ -1830,7 +1834,7 @@ class MoreMenuSheet extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
       decoration: const BoxDecoration(
-        color: Color(0xFF071421),
+        color: Color(0xFFFFFFFF),
         borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
       ),
       child: Column(
@@ -1840,7 +1844,7 @@ class MoreMenuSheet extends StatelessWidget {
             width: 44,
             height: 5,
             decoration: BoxDecoration(
-              color: Colors.white24,
+              color: const Color(0xFFB7D7DA),
               borderRadius: BorderRadius.circular(20),
             ),
           ),
@@ -1848,7 +1852,7 @@ class MoreMenuSheet extends StatelessWidget {
           const Text(
             "Más opciones",
             style: TextStyle(
-              color: Colors.white,
+              color: const Color(0xFF071A3A),
               fontSize: 21,
               fontWeight: FontWeight.w900,
             ),
@@ -1869,23 +1873,23 @@ class MoreMenuSheet extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.055),
+        color: Colors.white,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: Colors.white.withOpacity(0.07)),
+        border: Border.all(color: const Color(0xFFC7ECEC)),
       ),
       child: ListTile(
-        leading: Icon(icon, color: Colors.cyanAccent),
+        leading: Icon(icon, color: const Color(0xFF0AAEAE)),
         title: Text(
           title,
           style: const TextStyle(
-            color: Colors.white,
+            color: const Color(0xFF071A3A),
             fontWeight: FontWeight.w800,
           ),
         ),
         trailing: const Icon(
           Icons.arrow_forward_ios_rounded,
           size: 14,
-          color: Colors.white38,
+          color: const Color(0xFF78909C),
         ),
         onTap: () {},
       ),
@@ -1900,7 +1904,7 @@ class _MiniChartPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final color = positive ? Colors.greenAccent : Colors.redAccent;
+    final color = positive ? const Color(0xFF0AAEAE) : Colors.redAccent;
 
     final gridPaint = Paint()
       ..color = Colors.white.withOpacity(0.055)

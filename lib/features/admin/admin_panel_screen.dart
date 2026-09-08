@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:safebrok_andalucia/core/production/premium_weighting.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:excel/excel.dart' as excel;
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -8,6 +9,8 @@ import 'dart:typed_data';
 import 'dart:convert';
 import 'package:intl/intl.dart';
 import 'package:open_filex/open_filex.dart';
+import 'package:safebrok_andalucia/features/incorporaciones/incorporaciones_screen.dart';
+import 'package:safebrok_andalucia/features/admin/usuarios_accesos_screen.dart';
 
 class AdminPanelScreen extends StatefulWidget {
   const AdminPanelScreen({super.key});
@@ -23,6 +26,14 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
   void initState() {
     super.initState();
     inicializarPermisosERP();
+    _agentesScrollController.addListener(_cargarSiguienteBloqueAgentes);
+  }
+
+  @override
+  void dispose() {
+    _buscarAgentesController.dispose();
+    _agentesScrollController.dispose();
+    super.dispose();
   }
 
   double produccionTotal = 0;
@@ -153,6 +164,32 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
 
   String modoCarga = '';
   String selectedMenu = "dashboard";
+
+  Future<List<Map<String, dynamic>>>? _agentesErpFuture;
+  final TextEditingController _buscarAgentesController =
+      TextEditingController();
+  final ScrollController _agentesScrollController = ScrollController();
+  String _filtroEstadoAgentes = 'TODOS';
+  int _agentesVisibles = 10;
+
+  Future<void> _recargarAgentesERP() async {
+    final future = getAgentesERP();
+    if (mounted) {
+      setState(() {
+        _agentesVisibles = 10;
+        _agentesErpFuture = future;
+      });
+    }
+    await future;
+  }
+
+  void _cargarSiguienteBloqueAgentes() {
+    if (!_agentesScrollController.hasClients) return;
+    final posicion = _agentesScrollController.position;
+    if (posicion.pixels < posicion.maxScrollExtent - 120) return;
+    if (!mounted) return;
+    setState(() => _agentesVisibles += 10);
+  }
 
   Future<void> seleccionarExcel() async {
     final result = await FilePicker.platform.pickFiles(
@@ -408,13 +445,11 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
           .not('numero_recibo', 'is', null);
 
       final existentesPorNumero = <String, Map<String, dynamic>>{};
-      for (final existente
-          in List<Map<String, dynamic>>.from(existentesResponse)) {
-        final numero = existente['numero_recibo']
-                ?.toString()
-                .trim()
-                .toUpperCase() ??
-            '';
+      for (final existente in List<Map<String, dynamic>>.from(
+        existentesResponse,
+      )) {
+        final numero =
+            existente['numero_recibo']?.toString().trim().toUpperCase() ?? '';
         if (numero.isNotEmpty) existentesPorNumero[numero] = existente;
       }
 
@@ -443,9 +478,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
       }
 
       for (final cambio in cambiosADevuelto) {
-        final datos = Map<String, dynamic>.from(
-          cambio['datos'] as Map,
-        );
+        final datos = Map<String, dynamic>.from(cambio['datos'] as Map);
 
         try {
           await supabase
@@ -612,12 +645,9 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
             .select('numero_poliza, agente_auth_id')
             .inFilter('numero_poliza', polizas.sublist(i, fin));
 
-        for (final venta
-            in List<Map<String, dynamic>>.from(ventasResponse)) {
-          final poliza =
-              venta['numero_poliza']?.toString().trim() ?? '';
-          final agente =
-              venta['agente_auth_id']?.toString().trim() ?? '';
+        for (final venta in List<Map<String, dynamic>>.from(ventasResponse)) {
+          final poliza = venta['numero_poliza']?.toString().trim() ?? '';
+          final agente = venta['agente_auth_id']?.toString().trim() ?? '';
 
           if (poliza.isNotEmpty && agente.isNotEmpty) {
             agentePorPoliza.putIfAbsent(poliza, () => agente);
@@ -628,8 +658,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
       for (final recibo in devueltos) {
         try {
           final poliza = recibo['poliza']?.toString().trim() ?? '';
-          final agenteGuardado =
-              recibo['agente']?.toString().trim() ?? '';
+          final agenteGuardado = recibo['agente']?.toString().trim() ?? '';
 
           final agenteAuthId = usuariosPorAuthId.containsKey(agenteGuardado)
               ? agenteGuardado
@@ -645,18 +674,14 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
 
           final destinatarios = <String>{};
           final idsVisitados = <String>{};
-          Map<String, dynamic>? usuarioActual =
-              usuariosPorAuthId[agenteAuthId];
+          Map<String, dynamic>? usuarioActual = usuariosPorAuthId[agenteAuthId];
 
           while (usuarioActual != null) {
             final id = usuarioActual['id']?.toString().trim() ?? '';
-            final authId =
-                usuarioActual['auth_id']?.toString().trim() ?? '';
+            final authId = usuarioActual['auth_id']?.toString().trim() ?? '';
 
             if (id.isNotEmpty && !idsVisitados.add(id)) {
-              debugPrint(
-                'PUSH RECIBO: ciclo de parent_id detectado en $id.',
-              );
+              debugPrint('PUSH RECIBO: ciclo de parent_id detectado en $id.');
               break;
             }
 
@@ -664,25 +689,19 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
 
             final parentId =
                 usuarioActual['parent_id']?.toString().trim() ?? '';
-            usuarioActual =
-                parentId.isEmpty ? null : usuariosPorId[parentId];
+            usuarioActual = parentId.isEmpty ? null : usuariosPorId[parentId];
           }
 
-          final numeroRecibo =
-              recibo['numero_recibo']?.toString().trim() ?? '';
-          final cliente =
-              recibo['cliente']?.toString().trim() ?? 'Cliente';
-          final compania =
-              recibo['compania']?.toString().trim() ?? '';
-          final motivo =
-              recibo['motivo']?.toString().trim() ?? '';
+          final numeroRecibo = recibo['numero_recibo']?.toString().trim() ?? '';
+          final cliente = recibo['cliente']?.toString().trim() ?? 'Cliente';
+          final compania = recibo['compania']?.toString().trim() ?? '';
+          final motivo = recibo['motivo']?.toString().trim() ?? '';
           final importe = toDoublePoliza(recibo['importe']) ?? 0;
 
           final detalleImporte = importe > 0
               ? ' por ${importe.toStringAsFixed(2)} €'
               : '';
-          final detalleMotivo =
-              motivo.isEmpty ? '' : ' Motivo: $motivo.';
+          final detalleMotivo = motivo.isEmpty ? '' : ' Motivo: $motivo.';
 
           final mensaje =
               'El recibo ${numeroRecibo.isEmpty ? poliza : numeroRecibo} '
@@ -704,22 +723,19 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                     'cliente': cliente,
                     'compania': compania,
                     'importe': importe,
-                    'estado': recibo['estado_recibo'] ??
+                    'estado':
+                        recibo['estado_recibo'] ??
                         recibo['estado'] ??
                         'Devuelto',
                   },
                 },
               );
             } catch (errorPush) {
-              debugPrint(
-                'ERROR PUSH RECIBO A $authIdDestino: $errorPush',
-              );
+              debugPrint('ERROR PUSH RECIBO A $authIdDestino: $errorPush');
             }
           }
         } catch (errorRecibo) {
-          debugPrint(
-            'ERROR PREPARANDO PUSH DE RECIBO: $errorRecibo',
-          );
+          debugPrint('ERROR PREPARANDO PUSH DE RECIBO: $errorRecibo');
         }
       }
     } catch (error) {
@@ -731,10 +747,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
   void _mostrarMensajeRecibos(String mensaje) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(mensaje),
-        duration: const Duration(seconds: 8),
-      ),
+      SnackBar(content: Text(mensaje), duration: const Duration(seconds: 8)),
     );
   }
 
@@ -1100,7 +1113,6 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
 
       "APELLIDOS": "cliente.apellidos",
       "APELLIDO": "cliente.apellidos",
-
 
       "CORREO": "cliente.email",
 
@@ -2611,6 +2623,13 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
     return rol == 'admin' || rol == 'administracion';
   }
 
+  bool get puedeGestionarUsuariosERP {
+    final rol = _normalizarRolERP(usuarioActualERP?['rol_usuario']);
+    return rol == 'admin' ||
+        rol == 'administracion' ||
+        rol == 'director_nacional';
+  }
+
   String _normalizarRolERP(dynamic rol) {
     return (rol ?? '')
         .toString()
@@ -2814,9 +2833,22 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
 
                       _menuItem("Nóminas", "nominas", Icons.payments_rounded),
 
+                      _menuItem(
+                        "Incorporaciones",
+                        "incorporaciones",
+                        Icons.badge_outlined,
+                      ),
+
                       const SizedBox(height: 14),
 
                       _menuSection("SISTEMA"),
+
+                      if (puedeGestionarUsuariosERP)
+                        _menuItem(
+                          "Usuarios y accesos",
+                          "usuarios_accesos",
+                          Icons.manage_accounts_rounded,
+                        ),
 
                       _menuItem("Mensajes", "mensajes", Icons.message_rounded),
 
@@ -3621,6 +3653,13 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
     if (selectedMenu == 'agentes') {
       return buildAgentesPageERP();
     }
+
+    if (selectedMenu == 'incorporaciones') {
+      return const IncorporacionesScreen();
+    }
+    if (selectedMenu == 'usuarios_accesos') {
+      return UsuariosAccesosScreen(allowed: puedeGestionarUsuariosERP);
+    }
     // CLIENTES
     if (selectedMenu == 'clientes') {
       return Column(
@@ -3710,13 +3749,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
         );
 
         final primaTotal = ventasAgente.fold<double>(0, (suma, v) {
-          return suma +
-              _toDoubleKpi(
-                v['prima_anual_bruta'] ??
-                    v['prima_anual'] ??
-                    v['prima_anual_neta'] ??
-                    0,
-              );
+          return suma + PremiumWeighting.gross(v);
         });
 
         final comisionTotal = ventasAgente.fold<double>(0, (suma, v) {
@@ -3746,333 +3779,587 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
   }
 
   Widget buildAgentesPageERP() {
+    _agentesErpFuture ??= getAgentesERP();
+
     return FutureBuilder<List<Map<String, dynamic>>>(
-      future: getAgentesERP(),
+      future: _agentesErpFuture,
       builder: (context, snapshot) {
-        if (!snapshot.hasData) {
+        if (snapshot.connectionState == ConnectionState.waiting &&
+            !snapshot.hasData) {
           return const Center(child: CircularProgressIndicator());
         }
 
-        final agentes = snapshot.data!;
+        if (snapshot.hasError) {
+          return Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.error_outline, color: Colors.red, size: 42),
+                const SizedBox(height: 10),
+                const Text('No se pudo cargar el listado de agentes.'),
+                const SizedBox(height: 12),
+                ElevatedButton.icon(
+                  onPressed: _recargarAgentesERP,
+                  icon: const Icon(Icons.refresh),
+                  label: const Text('Reintentar'),
+                ),
+              ],
+            ),
+          );
+        }
 
+        final agentes = snapshot.data ?? <Map<String, dynamic>>[];
+        final busqueda = _buscarAgentesController.text.trim().toLowerCase();
+
+        String estadoNormalizado(Map<String, dynamic> agente) {
+          final estado =
+              agente['estado']?.toString().trim().toUpperCase() ?? '';
+          return estado.isEmpty ? 'ACTIVO' : estado;
+        }
+
+        final filtrados = agentes.where((agente) {
+          final coincideEstado =
+              _filtroEstadoAgentes == 'TODOS' ||
+              estadoNormalizado(agente) == _filtroEstadoAgentes;
+          if (!coincideEstado) return false;
+          if (busqueda.isEmpty) return true;
+
+          final texto = [
+            agente['nombre_completo'],
+            agente['email'],
+            agente['rol_usuario'],
+            agente['jefe_nombre'],
+          ].map((valor) => valor?.toString().toLowerCase() ?? '').join(' ');
+          return texto.contains(busqueda);
+        }).toList();
+
+        final visibles = filtrados.take(_agentesVisibles).toList();
+        final quedanRegistros = visibles.length < filtrados.length;
         final totalAgentes = agentes.length;
-
         final comerciales = agentes.where((a) {
           final rol = a['rol_usuario']?.toString().toLowerCase() ?? '';
           return rol.contains('agente') || rol.contains('comercial');
         }).length;
-
         final jefes = agentes.where((a) {
           final rol = a['rol_usuario']?.toString().toLowerCase() ?? '';
           return rol.contains('jefe') && rol.contains('equipo');
         }).length;
-
         final jefesVentas = agentes.where((a) {
           final rol = a['rol_usuario']?.toString().toLowerCase() ?? '';
           return rol.contains('jefe') && rol.contains('venta');
         }).length;
+        final produccion = agentes.fold<double>(
+          0,
+          (suma, a) => suma + _toDoubleKpi(a['prima_total']),
+        );
 
-        final produccion = agentes.fold<double>(0, (suma, a) {
-          return suma + _toDoubleKpi(a['prima_total']);
-        });
-
-        return SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(22),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(24),
-                  border: Border.all(color: Colors.grey.shade300),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.04),
-                      blurRadius: 16,
-                      offset: const Offset(0, 6),
+        return RefreshIndicator(
+          onRefresh: _recargarAgentesERP,
+          child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(22),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(24),
+                    border: Border.all(color: Colors.grey.shade300),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.04),
+                        blurRadius: 16,
+                        offset: const Offset(0, 6),
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: Colors.blue.shade50,
+                          borderRadius: BorderRadius.circular(18),
+                        ),
+                        child: Icon(
+                          Icons.groups_rounded,
+                          color: Colors.blue.shade700,
+                          size: 36,
+                        ),
+                      ),
+                      const SizedBox(width: 14),
+                      const Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Centro de Agentes',
+                              style: TextStyle(
+                                fontSize: 27,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            SizedBox(height: 5),
+                            Text(
+                              'Consulta y gestión de usuarios, estados, responsables y producción',
+                              style: TextStyle(color: Colors.grey),
+                            ),
+                          ],
+                        ),
+                      ),
+                      IconButton.filledTonal(
+                        tooltip: 'Actualizar listado',
+                        onPressed: _recargarAgentesERP,
+                        icon: const Icon(Icons.refresh_rounded),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Wrap(
+                  spacing: 14,
+                  runSpacing: 14,
+                  children: [
+                    _kpiAgenteERP(
+                      'Usuarios',
+                      totalAgentes.toString(),
+                      Icons.people_alt_outlined,
+                      Colors.blue,
+                    ),
+                    _kpiAgenteERP(
+                      'Agentes',
+                      comerciales.toString(),
+                      Icons.person_outline,
+                      Colors.green,
+                    ),
+                    _kpiAgenteERP(
+                      'Jefes equipo',
+                      jefes.toString(),
+                      Icons.groups_outlined,
+                      Colors.indigo,
+                    ),
+                    _kpiAgenteERP(
+                      'Jefes ventas',
+                      jefesVentas.toString(),
+                      Icons.workspace_premium_outlined,
+                      Colors.deepPurple,
+                    ),
+                    _kpiAgenteERP(
+                      'Producción',
+                      _formatoEuroKpi(produccion),
+                      Icons.euro_outlined,
+                      Colors.orange,
                     ),
                   ],
                 ),
-                child: Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(14),
-                      decoration: BoxDecoration(
-                        color: Colors.blue.shade50,
-                        borderRadius: BorderRadius.circular(18),
-                      ),
-                      child: Icon(
-                        Icons.groups_rounded,
-                        color: Colors.blue.shade700,
-                        size: 36,
-                      ),
-                    ),
-                    const SizedBox(width: 14),
-                    const Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                const SizedBox(height: 16),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(16),
+                  decoration: _decoracionAgenteERP(),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
                         children: [
-                          Text(
-                            "Centro de Agentes",
-                            style: TextStyle(
-                              fontSize: 27,
-                              fontWeight: FontWeight.bold,
+                          const Expanded(
+                            child: Text(
+                              'Listado profesional de agentes',
+                              style: TextStyle(
+                                fontSize: 19,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
                           ),
-                          SizedBox(height: 5),
                           Text(
-                            "Consulta de comerciales, roles, responsables, producción y seguimiento",
-                            style: TextStyle(color: Colors.grey),
+                            '${filtrados.length} registros',
+                            style: TextStyle(
+                              color: Colors.grey.shade600,
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
                         ],
                       ),
-                    ),
-                  ],
-                ),
-              ),
-
-              const SizedBox(height: 16),
-
-              Wrap(
-                spacing: 14,
-                runSpacing: 14,
-                children: [
-                  _kpiAgenteERP(
-                    "Usuarios",
-                    totalAgentes.toString(),
-                    Icons.people_alt_outlined,
-                    Colors.blue,
-                  ),
-                  _kpiAgenteERP(
-                    "Agentes",
-                    comerciales.toString(),
-                    Icons.person_outline,
-                    Colors.green,
-                  ),
-                  _kpiAgenteERP(
-                    "Jefes equipo",
-                    jefes.toString(),
-                    Icons.groups_outlined,
-                    Colors.indigo,
-                  ),
-                  _kpiAgenteERP(
-                    "Jefes ventas",
-                    jefesVentas.toString(),
-                    Icons.workspace_premium_outlined,
-                    Colors.deepPurple,
-                  ),
-                  _kpiAgenteERP(
-                    "Producción",
-                    _formatoEuroKpi(produccion),
-                    Icons.euro_outlined,
-                    Colors.orange,
-                  ),
-                ],
-              ),
-
-              const SizedBox(height: 16),
-
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(16),
-                decoration: _decoracionAgenteERP(),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        const Text(
-                          "Listado profesional de agentes",
-                          style: TextStyle(
-                            fontSize: 19,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const Spacer(),
-                        Text(
-                          "${agentes.length} registros",
-                          style: TextStyle(
-                            color: Colors.grey.shade600,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
-                    ),
-
-                    const SizedBox(height: 14),
-
-                    SizedBox(
-                      height: 620,
-                      child: SingleChildScrollView(
-                        scrollDirection: Axis.vertical,
-                        child: TablaConScrollHorizontalERP(
-                          child: ConstrainedBox(
-                            constraints: BoxConstraints(
-                              minWidth: MediaQuery.of(context).size.width - 360,
-                            ),
-                            child: DataTable(
-                              headingRowColor: WidgetStateProperty.all(
-                                Colors.grey.shade100,
-                              ),
-                              dataRowMinHeight: 64,
-                              dataRowMaxHeight: 78,
-                              columnSpacing: 28,
-                              horizontalMargin: 14,
-                              border: TableBorder(
-                                horizontalInside: BorderSide(
-                                  color: Colors.grey.shade200,
+                      const SizedBox(height: 14),
+                      LayoutBuilder(
+                        builder: (context, constraints) {
+                          final campoBusqueda = TextField(
+                            controller: _buscarAgentesController,
+                            onChanged: (_) {
+                              setState(() => _agentesVisibles = 10);
+                            },
+                            decoration: InputDecoration(
+                              hintText:
+                                  'Buscar por nombre, email, rol o responsable',
+                              prefixIcon: const Icon(Icons.search_rounded),
+                              suffixIcon: busqueda.isEmpty
+                                  ? null
+                                  : IconButton(
+                                      tooltip: 'Limpiar búsqueda',
+                                      onPressed: () {
+                                        _buscarAgentesController.clear();
+                                        setState(() => _agentesVisibles = 10);
+                                      },
+                                      icon: const Icon(Icons.close),
+                                    ),
+                              filled: true,
+                              fillColor: Colors.grey.shade50,
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(14),
+                                borderSide: BorderSide(
+                                  color: Colors.grey.shade300,
                                 ),
                               ),
-                              columns: const [
-                                DataColumn(label: Text("Agente")),
-                                DataColumn(label: Text("Rol")),
-                                DataColumn(label: Text("Jefe equipo")),
-                                DataColumn(label: Text("Ventas")),
-                                DataColumn(label: Text("Producción")),
-                                DataColumn(label: Text("Comisión")),
-                                DataColumn(label: Text("Devueltos")),
-                                DataColumn(label: Text("Estado")),
-                                DataColumn(label: Text("Acciones")),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(14),
+                                borderSide: BorderSide(
+                                  color: Colors.grey.shade300,
+                                ),
+                              ),
+                            ),
+                          );
+
+                          final filtro = DropdownButtonFormField<String>(
+                            value: _filtroEstadoAgentes,
+                            decoration: InputDecoration(
+                              labelText: 'Estado',
+                              prefixIcon: const Icon(Icons.filter_alt_outlined),
+                              filled: true,
+                              fillColor: Colors.grey.shade50,
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                            ),
+                            items: const [
+                              DropdownMenuItem(
+                                value: 'TODOS',
+                                child: Text('Todos'),
+                              ),
+                              DropdownMenuItem(
+                                value: 'ACTIVO',
+                                child: Text('Activos'),
+                              ),
+                              DropdownMenuItem(
+                                value: 'INACTIVO',
+                                child: Text('Inactivos'),
+                              ),
+                              DropdownMenuItem(
+                                value: 'BAJA',
+                                child: Text('Bajas'),
+                              ),
+                              DropdownMenuItem(
+                                value: 'SUSPENDIDO',
+                                child: Text('Suspendidos'),
+                              ),
+                            ],
+                            onChanged: (value) {
+                              if (value == null) return;
+                              setState(() {
+                                _filtroEstadoAgentes = value;
+                                _agentesVisibles = 10;
+                              });
+                            },
+                          );
+
+                          if (constraints.maxWidth < 720) {
+                            return Column(
+                              children: [
+                                campoBusqueda,
+                                const SizedBox(height: 10),
+                                filtro,
                               ],
-                              rows: agentes.map((a) {
-                                return DataRow(
-                                  onSelectChanged: (_) async {
-                                    await mostrarEnviarNotificacionAgenteERP(a);
-                                  },
-                                  cells: [
-                                    DataCell(
-                                      Row(
-                                        children: [
-                                          CircleAvatar(
-                                            radius: 17,
-                                            backgroundColor:
-                                                Colors.blue.shade700,
-                                            child: Text(
-                                              (a['nombre_completo']
-                                                          ?.toString()
-                                                          .isNotEmpty ??
-                                                      false)
-                                                  ? a['nombre_completo']
-                                                        .toString()[0]
-                                                        .toUpperCase()
-                                                  : "A",
-                                              style: const TextStyle(
-                                                color: Colors.white,
-                                                fontWeight: FontWeight.bold,
-                                              ),
+                            );
+                          }
+                          return Row(
+                            children: [
+                              Expanded(flex: 3, child: campoBusqueda),
+                              const SizedBox(width: 12),
+                              SizedBox(width: 220, child: filtro),
+                            ],
+                          );
+                        },
+                      ),
+                      const SizedBox(height: 14),
+                      if (filtrados.isEmpty)
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(vertical: 55),
+                          alignment: Alignment.center,
+                          child: const Column(
+                            children: [
+                              Icon(
+                                Icons.person_search_outlined,
+                                size: 48,
+                                color: Colors.grey,
+                              ),
+                              SizedBox(height: 10),
+                              Text('No hay agentes con estos criterios.'),
+                            ],
+                          ),
+                        )
+                      else
+                        SizedBox(
+                          height: 620,
+                          child: Scrollbar(
+                            controller: _agentesScrollController,
+                            thumbVisibility: true,
+                            child: SingleChildScrollView(
+                              controller: _agentesScrollController,
+                              scrollDirection: Axis.vertical,
+                              child: Column(
+                                children: [
+                                  TablaConScrollHorizontalERP(
+                                    child: ConstrainedBox(
+                                      constraints: BoxConstraints(
+                                        minWidth:
+                                            MediaQuery.of(context).size.width -
+                                            360,
+                                      ),
+                                      child: DataTable(
+                                        headingRowColor:
+                                            WidgetStateProperty.all(
+                                              Colors.grey.shade100,
                                             ),
+                                        dataRowMinHeight: 64,
+                                        dataRowMaxHeight: 78,
+                                        columnSpacing: 28,
+                                        horizontalMargin: 14,
+                                        border: TableBorder(
+                                          horizontalInside: BorderSide(
+                                            color: Colors.grey.shade200,
                                           ),
-                                          const SizedBox(width: 10),
-                                          Column(
-                                            crossAxisAlignment:
-                                                CrossAxisAlignment.start,
-                                            mainAxisAlignment:
-                                                MainAxisAlignment.center,
-                                            children: [
-                                              Text(
-                                                a['nombre_completo']
-                                                        ?.toString() ??
-                                                    'Sin nombre',
-                                                style: const TextStyle(
-                                                  fontWeight: FontWeight.bold,
+                                        ),
+                                        columns: const [
+                                          DataColumn(label: Text('Agente')),
+                                          DataColumn(label: Text('Rol')),
+                                          DataColumn(
+                                            label: Text('Responsable directo'),
+                                          ),
+                                          DataColumn(label: Text('Ventas')),
+                                          DataColumn(label: Text('Producción')),
+                                          DataColumn(label: Text('Comisión')),
+                                          DataColumn(label: Text('Devueltos')),
+                                          DataColumn(label: Text('Estado')),
+                                          DataColumn(label: Text('Acciones')),
+                                        ],
+                                        rows: visibles.map((a) {
+                                          final nombre =
+                                              a['nombre_completo']
+                                                  ?.toString() ??
+                                              'Sin nombre';
+                                          return DataRow(
+                                            onSelectChanged: (_) async {
+                                              await mostrarEnviarNotificacionAgenteERP(
+                                                a,
+                                              );
+                                            },
+                                            cells: [
+                                              DataCell(
+                                                Row(
+                                                  children: [
+                                                    CircleAvatar(
+                                                      radius: 17,
+                                                      backgroundColor:
+                                                          Colors.blue.shade700,
+                                                      child: Text(
+                                                        nombre.isNotEmpty
+                                                            ? nombre[0]
+                                                                  .toUpperCase()
+                                                            : 'A',
+                                                        style: const TextStyle(
+                                                          color: Colors.white,
+                                                          fontWeight:
+                                                              FontWeight.bold,
+                                                        ),
+                                                      ),
+                                                    ),
+                                                    const SizedBox(width: 10),
+                                                    Column(
+                                                      crossAxisAlignment:
+                                                          CrossAxisAlignment
+                                                              .start,
+                                                      mainAxisAlignment:
+                                                          MainAxisAlignment
+                                                              .center,
+                                                      children: [
+                                                        Text(
+                                                          nombre,
+                                                          style:
+                                                              const TextStyle(
+                                                                fontWeight:
+                                                                    FontWeight
+                                                                        .bold,
+                                                              ),
+                                                        ),
+                                                        Text(
+                                                          a['email']
+                                                                  ?.toString() ??
+                                                              '',
+                                                          style: TextStyle(
+                                                            fontSize: 12,
+                                                            color: Colors
+                                                                .grey
+                                                                .shade600,
+                                                          ),
+                                                        ),
+                                                      ],
+                                                    ),
+                                                  ],
                                                 ),
                                               ),
-                                              Text(
-                                                a['email']?.toString() ?? '',
-                                                style: TextStyle(
-                                                  fontSize: 12,
-                                                  color: Colors.grey.shade600,
+                                              DataCell(
+                                                _chipRolAgenteERP(
+                                                  a['rol_usuario']
+                                                          ?.toString() ??
+                                                      '',
+                                                ),
+                                              ),
+                                              DataCell(
+                                                Text(
+                                                  a['jefe_nombre']
+                                                          ?.toString() ??
+                                                      '',
+                                                ),
+                                              ),
+                                              DataCell(
+                                                Text(
+                                                  a['total_ventas'].toString(),
+                                                ),
+                                              ),
+                                              DataCell(
+                                                Text(
+                                                  _formatoEuroKpi(
+                                                    a['prima_total'],
+                                                  ),
+                                                ),
+                                              ),
+                                              DataCell(
+                                                Text(
+                                                  _formatoEuroKpi(
+                                                    a['comision_total'],
+                                                  ),
+                                                ),
+                                              ),
+                                              DataCell(
+                                                Text(
+                                                  a['recibos_devueltos']
+                                                      .toString(),
+                                                ),
+                                              ),
+                                              DataCell(_chipEstadoAgenteERP(a)),
+                                              DataCell(
+                                                PopupMenuButton<String>(
+                                                  icon: const Icon(
+                                                    Icons.more_vert,
+                                                  ),
+                                                  itemBuilder: (context) => const [
+                                                    PopupMenuItem(
+                                                      value: 'detalle',
+                                                      child: ListTile(
+                                                        leading: Icon(
+                                                          Icons
+                                                              .visibility_outlined,
+                                                        ),
+                                                        title: Text(
+                                                          'Ver ficha',
+                                                        ),
+                                                      ),
+                                                    ),
+                                                    PopupMenuItem(
+                                                      value: 'produccion',
+                                                      child: ListTile(
+                                                        leading: Icon(
+                                                          Icons
+                                                              .bar_chart_outlined,
+                                                        ),
+                                                        title: Text(
+                                                          'Ver producción',
+                                                        ),
+                                                      ),
+                                                    ),
+                                                    PopupMenuItem(
+                                                      value: 'gestionar',
+                                                      child: ListTile(
+                                                        leading: Icon(
+                                                          Icons
+                                                              .admin_panel_settings_outlined,
+                                                        ),
+                                                        title: Text(
+                                                          'Gestionar agente',
+                                                        ),
+                                                      ),
+                                                    ),
+                                                  ],
+                                                  onSelected: (value) async {
+                                                    if (value == 'detalle') {
+                                                      await mostrarDetalleAgenteERP(
+                                                        a,
+                                                      );
+                                                    } else if (value ==
+                                                        'produccion') {
+                                                      await mostrarProduccionAgenteERP(
+                                                        a,
+                                                      );
+                                                    } else if (value ==
+                                                        'gestionar') {
+                                                      await mostrarGestionarAgenteERP(
+                                                        a,
+                                                      );
+                                                    }
+                                                  },
                                                 ),
                                               ),
                                             ],
+                                          );
+                                        }).toList(),
+                                      ),
+                                    ),
+                                  ),
+                                  if (quedanRegistros)
+                                    const Padding(
+                                      padding: EdgeInsets.symmetric(
+                                        vertical: 18,
+                                      ),
+                                      child: Row(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.center,
+                                        children: [
+                                          SizedBox(
+                                            width: 18,
+                                            height: 18,
+                                            child: CircularProgressIndicator(
+                                              strokeWidth: 2,
+                                            ),
                                           ),
+                                          SizedBox(width: 10),
+                                          Text('Desplázate para cargar 10 más'),
                                         ],
                                       ),
-                                    ),
-                                    DataCell(
-                                      _chipRolAgenteERP(
-                                        a['rol_usuario']?.toString() ?? '',
+                                    )
+                                  else
+                                    Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                        vertical: 16,
+                                      ),
+                                      child: Text(
+                                        'Mostrados ${visibles.length} de ${filtrados.length}',
+                                        style: TextStyle(
+                                          color: Colors.grey.shade600,
+                                        ),
                                       ),
                                     ),
-                                    DataCell(
-                                      Text(a['jefe_nombre']?.toString() ?? ''),
-                                    ),
-                                    DataCell(
-                                      Text(a['total_ventas'].toString()),
-                                    ),
-                                    DataCell(
-                                      Text(_formatoEuroKpi(a['prima_total'])),
-                                    ),
-                                    DataCell(
-                                      Text(
-                                        _formatoEuroKpi(a['comision_total']),
-                                      ),
-                                    ),
-                                    DataCell(
-                                      Text(a['recibos_devueltos'].toString()),
-                                    ),
-                                    DataCell(_chipEstadoAgenteERP(a)),
-                                    DataCell(
-                                      PopupMenuButton<String>(
-                                        icon: const Icon(Icons.more_vert),
-                                        itemBuilder: (context) => const [
-                                          PopupMenuItem(
-                                            value: "detalle",
-                                            child: ListTile(
-                                              leading: Icon(
-                                                Icons.visibility_outlined,
-                                              ),
-                                              title: Text("Ver ficha"),
-                                            ),
-                                          ),
-                                          PopupMenuItem(
-                                            value: "produccion",
-                                            child: ListTile(
-                                              leading: Icon(
-                                                Icons.bar_chart_outlined,
-                                              ),
-                                              title: Text("Ver producción"),
-                                            ),
-                                          ),
-                                          PopupMenuItem(
-                                            value: "gestionar",
-                                            child: ListTile(
-                                              leading: Icon(
-                                                Icons
-                                                    .admin_panel_settings_outlined,
-                                              ),
-                                              title: Text("Gestionar agente"),
-                                            ),
-                                          ),
-                                        ],
-                                        onSelected: (value) {
-                                          if (value == "detalle") {
-                                            mostrarDetalleAgenteERP(a);
-                                          }
-
-                                          if (value == "produccion") {
-                                            mostrarProduccionAgenteERP(a);
-                                          }
-                                          if (value == "gestionar") {
-                                            mostrarGestionarAgenteERP(a);
-                                          }
-                                        },
-                                      ),
-                                    ),
-                                  ],
-                                );
-                              }).toList(),
+                                ],
+                              ),
                             ),
                           ),
                         ),
-                      ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         );
       },
@@ -4186,24 +4473,42 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
   }
 
   Widget _chipEstadoAgenteERP(Map<String, dynamic> a) {
-    final ventas = int.tryParse(a['total_ventas']?.toString() ?? '0') ?? 0;
-    final devueltos =
-        int.tryParse(a['recibos_devueltos']?.toString() ?? '0') ?? 0;
+    final estado = (a['estado'] ?? 'ACTIVO').toString().trim().toUpperCase();
 
-    String texto = "Activo";
-    MaterialColor color = Colors.green;
-    IconData icono = Icons.check_circle_outline;
+    String texto;
+    MaterialColor color;
+    IconData icono;
 
-    if (ventas == 0) {
-      texto = "Sin producción";
-      color = Colors.orange;
-      icono = Icons.info_outline;
-    }
-
-    if (devueltos >= 3) {
-      texto = "Revisar";
-      color = Colors.red;
-      icono = Icons.warning_amber_rounded;
+    switch (estado) {
+      case 'INACTIVO':
+      case 'DESACTIVADO':
+        texto = 'Inactivo';
+        color = Colors.grey;
+        icono = Icons.pause_circle_outline_rounded;
+        break;
+      case 'BAJA':
+        texto = 'Baja';
+        color = Colors.red;
+        icono = Icons.person_off_outlined;
+        break;
+      case 'SUSPENDIDO':
+        texto = 'Suspendido';
+        color = Colors.orange;
+        icono = Icons.timer_off_outlined;
+        break;
+      case 'BLOQUEADO':
+        texto = 'Bloqueado';
+        color = Colors.red;
+        icono = Icons.lock_outline_rounded;
+        break;
+      case 'ACTIVO':
+      default:
+        texto = estado.isEmpty
+            ? 'Activo'
+            : estado.substring(0, 1) + estado.substring(1).toLowerCase();
+        color = Colors.green;
+        icono = Icons.check_circle_outline;
+        break;
     }
 
     return Container(
@@ -4492,25 +4797,6 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
       }
     }
 
-    String? rolSuperiorDirecto(dynamic rol) {
-      switch (normalizarRol(rol)) {
-        case 'agente':
-          return 'jefe_equipo';
-
-        case 'jefe_equipo':
-          return 'jefe_ventas';
-
-        case 'jefe_ventas':
-          return 'director_zona';
-
-        case 'director_zona':
-          return 'director_nacional';
-
-        default:
-          return null;
-      }
-    }
-
     String nombreCompleto(Map<String, dynamic> usuario) {
       final nombre = usuario['nombre']?.toString().trim() ?? '';
 
@@ -4584,36 +4870,39 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
       return authPermitidos.contains(authId);
     }).toList();
 
-    List<Map<String, dynamic>> responsablesDisponibles(String rolUsuario) {
-      final rolSuperior = rolSuperiorDirecto(rolUsuario);
+    List<Map<String, dynamic>> responsablesDisponibles() {
+      final usuarioEditadoId = usuarioActual['id']?.toString().trim() ?? '';
 
-      if (rolSuperior == null) {
-        return [];
+      // Puede depender de cualquier figura. Solo bloqueamos la propia persona
+      // y sus descendientes para impedir ciclos en la estructura.
+      final descendientes = <String>{};
+      var hayCambios = true;
+      while (hayCambios) {
+        hayCambios = false;
+        for (final usuario in todosUsuarios) {
+          final id = usuario['id']?.toString().trim() ?? '';
+          final parentId = usuario['parent_id']?.toString().trim() ?? '';
+          if (id.isEmpty || descendientes.contains(id)) continue;
+          if (parentId == usuarioEditadoId ||
+              descendientes.contains(parentId)) {
+            descendientes.add(id);
+            hayCambios = true;
+          }
+        }
       }
-
-      final usuarioEditadoId = usuarioActual['id']?.toString() ?? '';
 
       final responsables = usuariosGestionables.where((usuario) {
         final id = usuario['id']?.toString().trim() ?? '';
-
-        if (id.isEmpty) return false;
-
-        /*
-       * Evitamos que una persona pueda depender de sí misma.
-       */
-        if (id == usuarioEditadoId) {
-          return false;
-        }
-
-        return normalizarRol(usuario['rol_usuario']) == rolSuperior;
+        return id.isNotEmpty &&
+            id != usuarioEditadoId &&
+            !descendientes.contains(id);
       }).toList();
 
-      responsables.sort((a, b) {
-        return nombreCompleto(
+      responsables.sort(
+        (a, b) => nombreCompleto(
           a,
-        ).toLowerCase().compareTo(nombreCompleto(b).toLowerCase());
-      });
-
+        ).toLowerCase().compareTo(nombreCompleto(b).toLowerCase()),
+      );
       return responsables;
     }
 
@@ -4696,7 +4985,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
       builder: (_) {
         return StatefulBuilder(
           builder: (context, setDialogState) {
-            final responsables = responsablesDisponibles(rolSeleccionado);
+            final responsables = responsablesDisponibles();
 
             final parentActualValido =
                 parentIdSeleccionado != null &&
@@ -4715,9 +5004,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
 
             String textoDependenciaActual() {
               if (!parentActualValido) {
-                return responsables.isEmpty
-                    ? 'Este rol no requiere una dependencia directa.'
-                    : 'No tiene una dependencia directa válida asignada.';
+                return 'No tiene una dependencia directa asignada.';
               }
 
               final responsable = responsables.firstWhere(
@@ -4873,9 +5160,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                                         rolSeleccionado = value;
 
                                         final nuevosResponsables =
-                                            responsablesDisponibles(
-                                              rolSeleccionado,
-                                            );
+                                            responsablesDisponibles();
 
                                         final actualSigueValido =
                                             nuevosResponsables.any(
@@ -4976,9 +5261,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                               child: Align(
                                 alignment: Alignment.centerLeft,
                                 child: Text(
-                                  responsables.isEmpty
-                                      ? 'Sin dependencia necesaria'
-                                      : 'Sin dependencia asignada',
+                                  'Sin dependencia',
                                   style: TextStyle(color: Colors.grey.shade600),
                                 ),
                               ),
@@ -5046,7 +5329,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                               alignment: Alignment.centerLeft,
                               child: Text(
                                 responsables.isEmpty
-                                    ? 'Sin dependencia necesaria'
+                                    ? 'Sin dependencia asignada'
                                     : 'Sin dependencia asignada',
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
@@ -5264,26 +5547,6 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                               onPressed: guardando
                                   ? null
                                   : () async {
-                                      final requiereResponsable =
-                                          rolSuperiorDirecto(rolSeleccionado) !=
-                                          null;
-
-                                      if (requiereResponsable &&
-                                          parentIdSeleccionado == null) {
-                                        ScaffoldMessenger.of(
-                                          context,
-                                        ).showSnackBar(
-                                          const SnackBar(
-                                            content: Text(
-                                              'Selecciona la dependencia directa del usuario.',
-                                            ),
-                                            backgroundColor: Colors.orange,
-                                          ),
-                                        );
-
-                                        return;
-                                      }
-
                                       setDialogState(() {
                                         guardando = true;
                                       });
@@ -5341,10 +5604,9 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                                        * después de cambiar el parent_id.
                                        */
                                         await cargarPermisosERP();
+                                        await _recargarAgentesERP();
 
                                         if (!mounted) return;
-
-                                        setState(() {});
 
                                         ScaffoldMessenger.of(
                                           this.context,
@@ -7050,11 +7312,11 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                       isExpanded: true,
                       hint: const Text("No mapear"),
                       items: camposCargaRecibos.map((field) {
-                            return DropdownMenuItem(
-                              value: field,
-                              child: Text(field),
-                            );
-                          }).toList(),
+                        return DropdownMenuItem(
+                          value: field,
+                          child: Text(field),
+                        );
+                      }).toList(),
                       onChanged: (value) {
                         setState(() {
                           if (value == null) {
@@ -7951,16 +8213,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
             fecha.isBefore(inicioMesActual);
       }).toList();
 
-      double calcularPrima(Map<String, dynamic> v) {
-        return _toDoubleKpi(
-          v['prima_anual_neta'] ??
-              v['prima_neta'] ??
-              v['prima_anual'] ??
-              v['prima_anual_bruta'] ??
-              v['precio'] ??
-              0,
-        );
-      }
+      double calcularPrima(Map<String, dynamic> v) => PremiumWeighting.net(v);
 
       final produccionActual = ventasMesActual.fold<double>(
         0,
@@ -8035,15 +8288,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
 
       final primaBrutaEmitida = ventasMesActual.fold<double>(
         0,
-        (suma, v) =>
-            suma +
-            _toDoubleKpi(
-              v['prima_anual_bruta'] ??
-                  v['prima_anual'] ??
-                  v['prima_anual_neta'] ??
-                  v['precio'] ??
-                  0,
-            ),
+        (suma, v) => suma + PremiumWeighting.gross(v),
       );
 
       print("KPIS ERP MES ACTUAL -> ventas: ${ventasMesActual.length}");
@@ -9371,7 +9616,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
     double comisionTotal = 0;
 
     for (final venta in ventas) {
-      primaTotal += (venta['prima_anual'] ?? 0).toDouble();
+      primaTotal += PremiumWeighting.amount(venta, venta['prima_anual']);
 
       comisionTotal += (venta['comision'] ?? 0).toDouble();
     }
@@ -10363,8 +10608,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
         final activas = totalVentas - anuladas;
 
         final primaTotal = ventas.fold<double>(0, (suma, v) {
-          return suma +
-              (double.tryParse(v['prima_anual']?.toString() ?? '0') ?? 0);
+          return suma + PremiumWeighting.amount(v, v['prima_anual']);
         });
 
         final comisionTotal = ventas.fold<double>(0, (suma, v) {
@@ -11201,7 +11445,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
       );
     }
 
-    final ventas = await ventasQuery;
+    final ventas = List<Map<String, dynamic>>.from(await ventasQuery);
 
     dynamic usuariosQuery = supabase
         .from('usuarios')
@@ -11211,7 +11455,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
       usuariosQuery = usuariosQuery.inFilter('auth_id', authIdsPermitidosERP);
     }
 
-    final usuarios = await usuariosQuery;
+    final usuarios = List<Map<String, dynamic>>.from(await usuariosQuery);
 
     final companias = ventas
         .map((e) => e['compania']?.toString() ?? '')

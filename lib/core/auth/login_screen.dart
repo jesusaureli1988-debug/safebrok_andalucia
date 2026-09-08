@@ -40,7 +40,7 @@ class _LoginScreenState extends State<LoginScreen>
 
     _animationController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 850),
+      duration: const Duration(milliseconds: 1100),
     );
 
     _fadeAnimation = CurvedAnimation(
@@ -219,7 +219,7 @@ class _LoginScreenState extends State<LoginScreen>
                 child: Text(
                   message,
                   style: const TextStyle(
-                    color: Colors.white,
+                    color: const Color(0xFF071A3A),
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -240,26 +240,26 @@ class _LoginScreenState extends State<LoginScreen>
       labelText: label,
       hintText: hint,
       labelStyle: const TextStyle(
-        color: Color(0xFFB7C9D6),
+        color: Color(0xFF53627A),
         fontWeight: FontWeight.w600,
       ),
-      hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.30)),
-      prefixIcon: Icon(icon, color: const Color(0xFF35D6E8)),
+      hintStyle: TextStyle(color: const Color(0xFF53627A)),
+      prefixIcon: Icon(icon, color: const Color(0xFF20C7C2)),
       suffixIcon: suffixIcon,
       filled: true,
-      fillColor: Colors.white.withValues(alpha: 0.055),
+      fillColor: const Color(0xFFF7FAFC),
       contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 19),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(18),
-        borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.10)),
+        borderSide: const BorderSide(color: Color(0xFFD7E2EE)),
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(18),
-        borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.10)),
+        borderSide: const BorderSide(color: Color(0xFFD7E2EE)),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(18),
-        borderSide: const BorderSide(color: Color(0xFF35D6E8), width: 1.5),
+        borderSide: const BorderSide(color: Color(0xFF20C7C2), width: 1.5),
       ),
       errorBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(18),
@@ -281,7 +281,7 @@ class _LoginScreenState extends State<LoginScreen>
     final screenWidth = MediaQuery.sizeOf(context).width;
 
     return Scaffold(
-      backgroundColor: const Color(0xFF06111B),
+      backgroundColor: const Color(0xFFF2FCFD),
       body: Stack(
         children: [
           Positioned.fill(
@@ -291,10 +291,10 @@ class _LoginScreenState extends State<LoginScreen>
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                   colors: [
-                    Color(0xFF06111B),
-                    Color(0xFF0B2434),
-                    Color(0xFF0B3546),
-                    Color(0xFF08212E),
+                    Color(0xFFF2FCFD),
+                    Color(0xFFEAF8F8),
+                    Color(0xFFDDF8FA),
+                    Color(0xFFF7FBFF),
                   ],
                   stops: [0, 0.36, 0.72, 1],
                 ),
@@ -325,14 +325,14 @@ class _LoginScreenState extends State<LoginScreen>
             left: -80,
             child: _GlowCircle(
               size: 220,
-              color: const Color(0xFF35D6E8).withValues(alpha: 0.08),
+              color: const Color(0xFF20C7C2).withValues(alpha: 0.08),
             ),
           ),
 
           Positioned.fill(
             child: BackdropFilter(
               filter: ImageFilter.blur(sigmaX: 50, sigmaY: 50),
-              child: Container(color: Colors.black.withValues(alpha: 0.08)),
+              child: Container(color: Colors.white.withValues(alpha: 0.10)),
             ),
           ),
 
@@ -349,28 +349,7 @@ class _LoginScreenState extends State<LoginScreen>
                   opacity: _fadeAnimation,
                   child: SlideTransition(
                     position: _slideAnimation,
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 500),
-                      child: Column(
-                        children: [
-                          _buildBrandHeader(),
-                          const SizedBox(height: 30),
-                          _buildLoginCard(),
-                          const SizedBox(height: 24),
-                          _buildRegisterSection(),
-                          const SizedBox(height: 16),
-                          Text(
-                            'Acceso exclusivo para la red SafeBrok',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              color: Colors.white.withValues(alpha: 0.38),
-                              fontSize: screenWidth < 370 ? 11 : 12,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
+                    child: _buildResponsiveContent(screenWidth),
                   ),
                 ),
               ),
@@ -381,30 +360,99 @@ class _LoginScreenState extends State<LoginScreen>
     );
   }
 
-  Widget _buildBrandHeader() {
+  Widget _buildResponsiveContent(double screenWidth) {
+    final desktop = screenWidth >= 900;
+    final footer = Text(
+      'Acceso exclusivo para la red SafeBrok',
+      textAlign: TextAlign.center,
+      style: TextStyle(
+        color: const Color(0xFF53627A),
+        fontSize: screenWidth < 370 ? 11 : 12,
+        fontWeight: FontWeight.w500,
+      ),
+    );
+    if (!desktop) {
+      return ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 500),
+        child: Column(
+          children: [
+            _buildBrandHeader(),
+            const SizedBox(height: 30),
+            _buildLoginCard(),
+            const SizedBox(height: 24),
+            _buildRegisterSection(),
+            const SizedBox(height: 16),
+            footer,
+          ],
+        ),
+      );
+    }
+    return ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: 1180),
+      child: Row(
+        children: [
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.only(right: 72),
+              child: _buildBrandHeader(desktop: true),
+            ),
+          ),
+          SizedBox(
+            width: 480,
+            child: Column(
+              children: [
+                _buildLoginCard(),
+                const SizedBox(height: 24),
+                _buildRegisterSection(),
+                const SizedBox(height: 16),
+                footer,
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBrandHeader({bool desktop = false}) {
     return Column(
       children: [
         Container(
-          width: 170,
-          height: 170,
+          width: desktop ? 230 : 170,
+          height: desktop ? 230 : 170,
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(30),
             boxShadow: [
               BoxShadow(
-                color: const Color(0xFF00D4FF).withValues(alpha: 0.35),
-                blurRadius: 40,
-                spreadRadius: 4,
+                color: const Color(0xFF2563EB).withValues(alpha: 0.16),
+                blurRadius: 46,
+                spreadRadius: 1,
+                offset: const Offset(0, 18),
               ),
             ],
           ),
-          child: Image.asset('assets/images/logo.png', fit: BoxFit.contain),
+          padding: EdgeInsets.all(desktop ? 24 : 18),
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(36),
+              border: Border.all(color: const Color(0xFFDCE6F2)),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Image.asset(
+                'assets/images/safebrok_mark.png',
+                fit: BoxFit.contain,
+              ),
+            ),
+          ),
         ),
         const SizedBox(height: 20),
-        const Text(
+        Text(
           'SafeBrok',
           style: TextStyle(
-            color: Colors.white,
-            fontSize: 35,
+            color: const Color(0xFF071A3A),
+            fontSize: desktop ? 46 : 35,
             fontWeight: FontWeight.w900,
             letterSpacing: -1.2,
           ),
@@ -415,9 +463,9 @@ class _LoginScreenState extends State<LoginScreen>
           'Gestión, producción y crecimiento\npara toda tu red comercial',
           textAlign: TextAlign.center,
           style: TextStyle(
-            color: Colors.white.withValues(alpha: 0.62),
+            color: const Color(0xFF53627A),
             height: 1.45,
-            fontSize: 14,
+            fontSize: desktop ? 17 : 14,
             fontWeight: FontWeight.w500,
           ),
         ),
@@ -433,14 +481,15 @@ class _LoginScreenState extends State<LoginScreen>
         child: Container(
           padding: const EdgeInsets.fromLTRB(24, 26, 24, 24),
           decoration: BoxDecoration(
-            color: const Color(0xFF0B1E2B).withValues(alpha: 0.78),
+            color: Colors.white.withValues(alpha: 0.94),
             borderRadius: BorderRadius.circular(30),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.10)),
+            border: Border.all(color: const Color(0xFFD9E4F0)),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withValues(alpha: 0.25),
-                blurRadius: 35,
-                offset: const Offset(0, 18),
+                color: const Color(0xFF0F2747).withValues(alpha: 0.12),
+                blurRadius: 42,
+                spreadRadius: -8,
+                offset: const Offset(0, 22),
               ),
             ],
           ),
@@ -450,10 +499,42 @@ class _LoginScreenState extends State<LoginScreen>
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 7,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFE8F8F6),
+                      borderRadius: BorderRadius.circular(999),
+                      border: Border.all(color: const Color(0xFFBCEBE5)),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.verified_user_rounded,
+                          size: 15,
+                          color: Color(0xFF0F766E),
+                        ),
+                        SizedBox(width: 7),
+                        Text(
+                          'ACCESO SEGURO',
+                          style: TextStyle(
+                            color: Color(0xFF0F766E),
+                            fontSize: 10,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 1.1,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 18),
                   const Text(
                     'Bienvenido de nuevo',
                     style: TextStyle(
-                      color: Colors.white,
+                      color: const Color(0xFF071A3A),
                       fontSize: 22,
                       fontWeight: FontWeight.w900,
                     ),
@@ -462,7 +543,7 @@ class _LoginScreenState extends State<LoginScreen>
                   Text(
                     'Introduce tus datos para acceder a SafeBrok.',
                     style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.52),
+                      color: const Color(0xFF53627A),
                       fontSize: 13,
                       height: 1.4,
                     ),
@@ -482,7 +563,7 @@ class _LoginScreenState extends State<LoginScreen>
                     autocorrect: false,
                     enableSuggestions: false,
                     style: const TextStyle(
-                      color: Colors.white,
+                      color: const Color(0xFF071A3A),
                       fontWeight: FontWeight.w600,
                     ),
                     decoration: _inputDecoration(
@@ -522,7 +603,7 @@ class _LoginScreenState extends State<LoginScreen>
                     textInputAction: TextInputAction.done,
                     autofillHints: const [AutofillHints.password],
                     style: const TextStyle(
-                      color: Colors.white,
+                      color: const Color(0xFF071A3A),
                       fontWeight: FontWeight.w600,
                     ),
                     decoration: _inputDecoration(
@@ -542,7 +623,7 @@ class _LoginScreenState extends State<LoginScreen>
                           obscurePassword
                               ? Icons.visibility_outlined
                               : Icons.visibility_off_outlined,
-                          color: Colors.white60,
+                          color: const Color(0xFF64748B),
                         ),
                       ),
                     ),
@@ -573,7 +654,7 @@ class _LoginScreenState extends State<LoginScreen>
                       icon: const Icon(Icons.key_rounded, size: 17),
                       label: const Text('He olvidado mi contraseña'),
                       style: TextButton.styleFrom(
-                        foregroundColor: const Color(0xFF35D6E8),
+                        foregroundColor: const Color(0xFF20C7C2),
                         textStyle: const TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.w700,
@@ -592,12 +673,16 @@ class _LoginScreenState extends State<LoginScreen>
                         borderRadius: BorderRadius.circular(18),
                         gradient: loading
                             ? const LinearGradient(
-                                colors: [Color(0xFF45606F), Color(0xFF45606F)],
+                                colors: [Color(0xFF53627A), Color(0xFF53627A)],
                               )
                             : const LinearGradient(
                                 begin: Alignment.centerLeft,
                                 end: Alignment.centerRight,
-                                colors: [Color(0xFF187FD1), Color(0xFF15B9CB)],
+                                colors: [
+                                  Color(0xFF0F2747),
+                                  Color(0xFF1D4ED8),
+                                  Color(0xFF14B8A6),
+                                ],
                               ),
                         boxShadow: loading
                             ? null
@@ -618,7 +703,7 @@ class _LoginScreenState extends State<LoginScreen>
                           disabledBackgroundColor: Colors.transparent,
                           shadowColor: Colors.transparent,
                           foregroundColor: Colors.white,
-                          disabledForegroundColor: Colors.white70,
+                          disabledForegroundColor: const Color(0xFF53627A),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(18),
                           ),
@@ -665,7 +750,7 @@ class _LoginScreenState extends State<LoginScreen>
       'contacta con tu responsable.',
       textAlign: TextAlign.center,
       style: TextStyle(
-        color: Colors.white.withValues(alpha: 0.58),
+        color: const Color(0xFF53627A),
         fontSize: 13,
         height: 1.4,
       ),

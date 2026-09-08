@@ -49,11 +49,11 @@ class _CreateSaleWizardState extends State<CreateSaleWizard> {
   final precio = TextEditingController();
   final asegurados = TextEditingController();
 
-  static const Color bg = Color(0xFF07111D);
-  static const Color card = Color(0xFF101C2B);
-  static const Color card2 = Color(0xFF132437);
+  static const Color bg = Color(0xFFF4F6FB);
+  static const Color card = Color(0xFFFFFFFF);
+  static const Color card2 = Color(0xFFF1F5F9);
   static const Color blue = Color(0xFF2563EB);
-  static const Color cyan = Colors.cyanAccent;
+  static const Color cyan = Color(0xFF2563EB);
 
   final products = [
     'Decesos',
@@ -76,6 +76,14 @@ class _CreateSaleWizardState extends State<CreateSaleWizard> {
     'Mascotas',
     'Viajes',
     'Prima única',
+    'Transportes construcción',
+    'Caución',
+    'Camión',
+    'Decenal',
+    'Pymes',
+    'Accidentes colectivos',
+    'Salud colectivo',
+    'Transportes',
   ];
 
   final companies = [
@@ -171,7 +179,7 @@ class _CreateSaleWizardState extends State<CreateSaleWizard> {
         leading: Padding(
           padding: const EdgeInsets.all(8),
           child: Material(
-            color: Colors.white.withOpacity(0.12),
+            color: const Color(0xFFE1F8F8),
             shape: const CircleBorder(),
             child: InkWell(
               customBorder: const CircleBorder(),
@@ -179,7 +187,7 @@ class _CreateSaleWizardState extends State<CreateSaleWizard> {
               child: const Center(
                 child: Icon(
                   Icons.arrow_back_ios_new_rounded,
-                  color: Colors.white,
+                  color: const Color(0xFF111827),
                   size: 20,
                 ),
               ),
@@ -188,7 +196,10 @@ class _CreateSaleWizardState extends State<CreateSaleWizard> {
         ),
         title: const Text(
           "Nueva venta",
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900),
+          style: TextStyle(
+            color: Color(0xFF111827),
+            fontWeight: FontWeight.w900,
+          ),
         ),
       ),
       body: SafeArea(
@@ -218,7 +229,7 @@ class _CreateSaleWizardState extends State<CreateSaleWizard> {
       decoration: BoxDecoration(
         color: card,
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: Colors.white.withOpacity(0.08)),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
       ),
       child: Column(
         children: [
@@ -235,7 +246,7 @@ class _CreateSaleWizardState extends State<CreateSaleWizard> {
           LinearProgressIndicator(
             value: (step + 1) / 3,
             minHeight: 6,
-            backgroundColor: Colors.white.withOpacity(0.08),
+            backgroundColor: const Color(0xFFD9E9EC),
             color: cyan,
             borderRadius: BorderRadius.circular(20),
           ),
@@ -433,7 +444,7 @@ class _CreateSaleWizardState extends State<CreateSaleWizard> {
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
       decoration: BoxDecoration(
         color: bg,
-        border: Border(top: BorderSide(color: Colors.white.withOpacity(0.06))),
+        border: const Border(top: BorderSide(color: Color(0xFFE2E8F0))),
       ),
       child: Row(
         children: [
@@ -444,8 +455,8 @@ class _CreateSaleWizardState extends State<CreateSaleWizard> {
                 icon: const Icon(Icons.arrow_back_rounded),
                 label: const Text("Atrás"),
                 style: OutlinedButton.styleFrom(
-                  foregroundColor: Colors.white,
-                  side: BorderSide(color: Colors.white.withOpacity(0.18)),
+                  foregroundColor: const Color(0xFF111827),
+                  side: const BorderSide(color: Color(0xFF2563EB)),
                   padding: const EdgeInsets.symmetric(vertical: 15),
                 ),
               ),
@@ -477,8 +488,8 @@ class _CreateSaleWizardState extends State<CreateSaleWizard> {
               style: ElevatedButton.styleFrom(
                 backgroundColor: blue,
                 foregroundColor: Colors.white,
-                disabledBackgroundColor: Colors.white.withOpacity(0.08),
-                disabledForegroundColor: Colors.white38,
+                disabledBackgroundColor: const Color(0xFFE5EEF2),
+                disabledForegroundColor: const Color(0xFF8A9AAF),
                 padding: const EdgeInsets.symmetric(vertical: 15),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(16),
@@ -500,17 +511,17 @@ class _CreateSaleWizardState extends State<CreateSaleWizard> {
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
-          colors: [Color(0xFF102A43), Color(0xFF0B1624)],
+          colors: [Color(0xFFFFFFFF), Color(0xFFE1F8F8)],
         ),
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: Colors.white.withOpacity(0.08)),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
       ),
       child: Row(
         children: [
           CircleAvatar(
             radius: 25,
-            backgroundColor: Colors.white.withOpacity(0.12),
-            child: Icon(icon, color: Colors.white, size: 28),
+            backgroundColor: const Color(0xFFD9F5F4),
+            child: Icon(icon, color: blue, size: 28),
           ),
           const SizedBox(width: 14),
           Expanded(
@@ -520,7 +531,7 @@ class _CreateSaleWizardState extends State<CreateSaleWizard> {
                 Text(
                   title,
                   style: const TextStyle(
-                    color: Colors.white,
+                    color: Color(0xFF111827),
                     fontSize: 20,
                     fontWeight: FontWeight.w900,
                   ),
@@ -529,7 +540,7 @@ class _CreateSaleWizardState extends State<CreateSaleWizard> {
                 Text(
                   subtitle,
                   style: TextStyle(
-                    color: Colors.white.withOpacity(0.58),
+                    color: const Color(0xFF475569),
                     fontSize: 13,
                   ),
                 ),
@@ -547,7 +558,7 @@ class _CreateSaleWizardState extends State<CreateSaleWizard> {
       child: Text(
         text,
         style: const TextStyle(
-          color: Colors.white,
+          color: Color(0xFF111827),
           fontSize: 18,
           fontWeight: FontWeight.w900,
         ),
@@ -577,7 +588,7 @@ class _CreateSaleWizardState extends State<CreateSaleWizard> {
           }
         },
         style: const TextStyle(
-          color: Colors.white,
+          color: Color(0xFF111827),
           fontWeight: FontWeight.w600,
         ),
         validator:
@@ -606,7 +617,7 @@ class _CreateSaleWizardState extends State<CreateSaleWizard> {
         value: value,
         dropdownColor: card2,
         style: const TextStyle(
-          color: Colors.white,
+          color: Color(0xFF111827),
           fontSize: 15,
           fontWeight: FontWeight.w700,
         ),
@@ -638,8 +649,8 @@ class _CreateSaleWizardState extends State<CreateSaleWizard> {
             lastDate: DateTime(2035),
             builder: (context, child) {
               return Theme(
-                data: ThemeData.dark().copyWith(
-                  colorScheme: const ColorScheme.dark(
+                data: ThemeData.light().copyWith(
+                  colorScheme: const ColorScheme.light(
                     primary: blue,
                     surface: card,
                   ),
@@ -657,9 +668,9 @@ class _CreateSaleWizardState extends State<CreateSaleWizard> {
         child: Container(
           padding: const EdgeInsets.all(18),
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.08),
+            color: Colors.white,
             borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: Colors.white.withOpacity(0.08)),
+            border: Border.all(color: const Color(0xFFE2E8F0)),
           ),
           child: Row(
             children: [
@@ -671,14 +682,14 @@ class _CreateSaleWizardState extends State<CreateSaleWizard> {
                       ? "Fecha de efecto"
                       : _formatDate(fechaEfecto),
                   style: const TextStyle(
-                    color: Colors.white,
+                    color: Color(0xFF111827),
                     fontWeight: FontWeight.w700,
                   ),
                 ),
               ),
               const Icon(
                 Icons.keyboard_arrow_down_rounded,
-                color: Colors.white54,
+                color: Color(0xFF64748B),
               ),
             ],
           ),
@@ -691,13 +702,13 @@ class _CreateSaleWizardState extends State<CreateSaleWizard> {
     return InputDecoration(
       hintText: hint,
       prefixIcon: icon == null ? null : Icon(icon, color: cyan, size: 21),
-      hintStyle: const TextStyle(color: Colors.white60),
+      hintStyle: const TextStyle(color: Color(0xFF64748B)),
       filled: true,
-      fillColor: Colors.white.withOpacity(0.08),
+      fillColor: Colors.white,
       contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 18),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(18),
-        borderSide: BorderSide(color: Colors.white.withOpacity(0.08)),
+        borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(18),
@@ -723,7 +734,7 @@ class _CreateSaleWizardState extends State<CreateSaleWizard> {
       decoration: BoxDecoration(
         color: card,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.white.withOpacity(0.08)),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -734,7 +745,7 @@ class _CreateSaleWizardState extends State<CreateSaleWizard> {
                 child: Text(
                   "Vista previa económica",
                   style: TextStyle(
-                    color: Colors.white,
+                    color: const Color(0xFF111827),
                     fontWeight: FontWeight.w900,
                   ),
                 ),
@@ -778,13 +789,13 @@ class _CreateSaleWizardState extends State<CreateSaleWizard> {
           Expanded(
             child: Text(
               title,
-              style: TextStyle(color: Colors.white.withOpacity(0.58)),
+              style: TextStyle(color: const Color(0xFF475569)),
             ),
           ),
           Text(
             value,
             style: const TextStyle(
-              color: Colors.white,
+              color: Color(0xFF111827),
               fontWeight: FontWeight.w900,
             ),
           ),
@@ -800,7 +811,7 @@ class _CreateSaleWizardState extends State<CreateSaleWizard> {
       decoration: BoxDecoration(
         color: card,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: Colors.white.withOpacity(0.07)),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
       ),
       child: Row(
         children: [
@@ -808,7 +819,7 @@ class _CreateSaleWizardState extends State<CreateSaleWizard> {
             child: Text(
               title,
               style: TextStyle(
-                color: Colors.white.withOpacity(0.58),
+                color: const Color(0xFF475569),
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -819,7 +830,7 @@ class _CreateSaleWizardState extends State<CreateSaleWizard> {
               textAlign: TextAlign.right,
               overflow: TextOverflow.ellipsis,
               style: const TextStyle(
-                color: Colors.white,
+                color: Color(0xFF111827),
                 fontWeight: FontWeight.w900,
               ),
             ),
@@ -837,14 +848,14 @@ class _CreateSaleWizardState extends State<CreateSaleWizard> {
         children: [
           CircleAvatar(
             radius: 19,
-            backgroundColor: active ? blue : Colors.white.withOpacity(0.12),
+            backgroundColor: active ? blue : const Color(0xFFE1F0F2),
             child: Icon(icon, color: Colors.white, size: 19),
           ),
           const SizedBox(height: 7),
           Text(
             title,
             style: TextStyle(
-              color: active ? Colors.white : Colors.white54,
+              color: active ? const Color(0xFF111827) : const Color(0xFF64748B),
               fontSize: 11,
               fontWeight: FontWeight.w700,
             ),
@@ -862,7 +873,7 @@ class _CreateSaleWizardState extends State<CreateSaleWizard> {
       height: 3,
       margin: const EdgeInsets.only(bottom: 24),
       decoration: BoxDecoration(
-        color: active ? cyan : Colors.white24,
+        color: active ? cyan : const Color(0xFFD5E4E8),
         borderRadius: BorderRadius.circular(20),
       ),
     );
@@ -1044,7 +1055,7 @@ class _CreateSaleWizardState extends State<CreateSaleWizard> {
                 const Text(
                   "¿Guardar venta?",
                   style: TextStyle(
-                    color: Colors.white,
+                    color: const Color(0xFF111827),
                     fontSize: 22,
                     fontWeight: FontWeight.w900,
                   ),
@@ -1053,7 +1064,7 @@ class _CreateSaleWizardState extends State<CreateSaleWizard> {
                 Text(
                   "Se creará el cliente, la venta, los seguimientos y la nómina correspondiente.",
                   textAlign: TextAlign.center,
-                  style: TextStyle(color: Colors.white.withOpacity(0.62)),
+                  style: TextStyle(color: const Color(0xFF475569)),
                 ),
                 const SizedBox(height: 22),
                 SizedBox(

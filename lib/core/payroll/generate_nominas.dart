@@ -1,4 +1,5 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:safebrok_andalucia/core/production/premium_weighting.dart';
 import 'package:safebrok_andalucia/core/production/production_period_service.dart';
 
 class PayrollService {
@@ -66,9 +67,8 @@ class PayrollService {
     double primasDecesosVida = 0;
 
     for (final v in ventasFiltradas) {
-      final bruta = ((v['prima_anual_bruta'] ?? 0) as num).toDouble();
-
-      final neta = ((v['prima_anual_neta'] ?? 0) as num).toDouble();
+      final bruta = PremiumWeighting.gross(Map<String, dynamic>.from(v));
+      final neta = PremiumWeighting.net(Map<String, dynamic>.from(v));
 
       primaBrutaTotal += bruta;
       primaNetaTotal += neta;

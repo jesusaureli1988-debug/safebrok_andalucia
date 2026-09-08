@@ -66,6 +66,9 @@ class _InternalChatScreenState extends State<InternalChatScreen> {
       final usersRes = await supabase
           .from('usuarios')
           .select('id, nombre, apellidos, auth_id, rol_usuario')
+          .or(
+            'estado.is.null,estado.not.in.(inactivo,Inactivo,INACTIVO,baja,Baja,BAJA,desactivado,Desactivado,DESACTIVADO,bloqueado,Bloqueado,BLOQUEADO,suspendido,Suspendido,SUSPENDIDO)',
+          )
           .neq('auth_id', user.id)
           .order('nombre', ascending: true);
 
@@ -211,7 +214,7 @@ class _InternalChatScreenState extends State<InternalChatScreen> {
     final users = filteredUsers;
 
     return Scaffold(
-      backgroundColor: const Color(0xFF020617),
+      backgroundColor: const Color(0xFFF2FCFD),
       body: Stack(
         children: [
           const _ChatBackground(),
@@ -225,14 +228,14 @@ class _InternalChatScreenState extends State<InternalChatScreen> {
                   child: loading
                       ? const Center(
                           child: CircularProgressIndicator(
-                            color: Color(0xFF22D3EE),
+                            color: Color(0xFF20C7C2),
                           ),
                         )
                       : users.isEmpty
                       ? _emptyState()
                       : RefreshIndicator(
-                          color: const Color(0xFF22D3EE),
-                          backgroundColor: const Color(0xFF061329),
+                          color: const Color(0xFF20C7C2),
+                          backgroundColor: const Color(0xFFFFFFFF),
                           onRefresh: () => loadUsers(),
                           child: ListView.separated(
                             padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
@@ -268,15 +271,15 @@ class _InternalChatScreenState extends State<InternalChatScreen> {
             decoration: BoxDecoration(
               gradient: const LinearGradient(
                 colors: [
-                  Color(0xFF22D3EE),
-                  Color(0xFF2563EB),
-                  Color(0xFF7C3AED),
+                  Color(0xFF20C7C2),
+                  Color(0xFF0A7F91),
+                  Color(0xFF0A7F91),
                 ],
               ),
               borderRadius: BorderRadius.circular(18),
               boxShadow: [
                 BoxShadow(
-                  color: const Color(0xFF22D3EE).withOpacity(0.30),
+                  color: const Color(0xFF20C7C2).withOpacity(0.30),
                   blurRadius: 24,
                   offset: const Offset(0, 10),
                 ),
@@ -296,7 +299,7 @@ class _InternalChatScreenState extends State<InternalChatScreen> {
                 Text(
                   'Chat interno',
                   style: TextStyle(
-                    color: Colors.white,
+                    color: const Color(0xFF071A3A),
                     fontSize: 28,
                     fontWeight: FontWeight.w900,
                     letterSpacing: -0.7,
@@ -306,7 +309,7 @@ class _InternalChatScreenState extends State<InternalChatScreen> {
                 Text(
                   'Comunicación directa con todo el equipo',
                   style: TextStyle(
-                    color: Colors.white60,
+                    color: const Color(0xFF64748B),
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
                   ),
@@ -317,9 +320,9 @@ class _InternalChatScreenState extends State<InternalChatScreen> {
           IconButton(
             onPressed: () => loadUsers(),
             icon: const Icon(Icons.refresh_rounded),
-            color: Colors.white,
+            color: const Color(0xFF071A3A),
             style: IconButton.styleFrom(
-              backgroundColor: Colors.white.withOpacity(0.08),
+              backgroundColor: Colors.white,
               fixedSize: const Size(48, 48),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(17),
@@ -336,24 +339,24 @@ class _InternalChatScreenState extends State<InternalChatScreen> {
       padding: const EdgeInsets.fromLTRB(18, 4, 18, 8),
       child: TextField(
         controller: searchCtrl,
-        style: const TextStyle(color: Colors.white),
+        style: const TextStyle(color: const Color(0xFF071A3A)),
         decoration: InputDecoration(
           hintText: 'Buscar usuario, rol o equipo...',
-          hintStyle: const TextStyle(color: Colors.white38),
+          hintStyle: const TextStyle(color: const Color(0xFF78909C)),
           prefixIcon: const Icon(
             Icons.search_rounded,
-            color: Color(0xFF22D3EE),
+            color: Color(0xFF20C7C2),
           ),
           filled: true,
-          fillColor: Colors.white.withOpacity(0.07),
+          fillColor: Colors.white,
           enabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(22),
-            borderSide: BorderSide(color: Colors.white.withOpacity(0.10)),
+            borderSide: BorderSide(color: Colors.white),
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(22),
             borderSide: BorderSide(
-              color: const Color(0xFF22D3EE).withOpacity(0.65),
+              color: const Color(0xFF20C7C2).withOpacity(0.65),
             ),
           ),
         ),
@@ -374,8 +377,8 @@ class _InternalChatScreenState extends State<InternalChatScreen> {
       color: Colors.transparent,
       child: InkWell(
         borderRadius: BorderRadius.circular(26),
-        splashColor: const Color(0xFF22D3EE).withOpacity(0.10),
-        highlightColor: const Color(0xFF22D3EE).withOpacity(0.06),
+        splashColor: const Color(0xFF20C7C2).withOpacity(0.10),
+        highlightColor: const Color(0xFF20C7C2).withOpacity(0.06),
         onTap: () async {
           await Navigator.push(
             context,
@@ -391,9 +394,9 @@ class _InternalChatScreenState extends State<InternalChatScreen> {
           decoration: BoxDecoration(
             gradient: LinearGradient(
               colors: [
-                Colors.white.withOpacity(0.10),
-                const Color(0xFF061329).withOpacity(0.96),
-                const Color(0xFF020617).withOpacity(0.92),
+                Colors.white,
+                const Color(0xFFFFFFFF).withOpacity(0.96),
+                const Color(0xFFF2FCFD).withOpacity(0.92),
               ],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
@@ -401,13 +404,13 @@ class _InternalChatScreenState extends State<InternalChatScreen> {
             borderRadius: BorderRadius.circular(26),
             border: Border.all(
               color: unread > 0
-                  ? const Color(0xFF22D3EE).withOpacity(0.45)
-                  : Colors.white.withOpacity(0.10),
+                  ? const Color(0xFF20C7C2).withOpacity(0.45)
+                  : Colors.white,
             ),
             boxShadow: [
               BoxShadow(
                 color: unread > 0
-                    ? const Color(0xFF22D3EE).withOpacity(0.12)
+                    ? const Color(0xFF20C7C2).withOpacity(0.12)
                     : Colors.black.withOpacity(0.18),
                 blurRadius: 22,
                 offset: const Offset(0, 10),
@@ -423,7 +426,7 @@ class _InternalChatScreenState extends State<InternalChatScreen> {
                     height: 58,
                     decoration: BoxDecoration(
                       gradient: const LinearGradient(
-                        colors: [Color(0xFF22D3EE), Color(0xFF2563EB)],
+                        colors: [Color(0xFF20C7C2), Color(0xFF0A7F91)],
                       ),
                       borderRadius: BorderRadius.circular(20),
                     ),
@@ -431,7 +434,7 @@ class _InternalChatScreenState extends State<InternalChatScreen> {
                       child: Text(
                         initial,
                         style: const TextStyle(
-                          color: Colors.white,
+                          color: const Color(0xFF071A3A),
                           fontSize: 23,
                           fontWeight: FontWeight.w900,
                         ),
@@ -445,10 +448,10 @@ class _InternalChatScreenState extends State<InternalChatScreen> {
                       width: 13,
                       height: 13,
                       decoration: BoxDecoration(
-                        color: const Color(0xFF22C55E),
+                        color: const Color(0xFF0AAEAE),
                         shape: BoxShape.circle,
                         border: Border.all(
-                          color: const Color(0xFF020617),
+                          color: const Color(0xFFF2FCFD),
                           width: 2,
                         ),
                       ),
@@ -466,7 +469,7 @@ class _InternalChatScreenState extends State<InternalChatScreen> {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
-                        color: Colors.white,
+                        color: const Color(0xFF071A3A),
                         fontSize: 16.5,
                         fontWeight: FontWeight.w900,
                       ),
@@ -475,7 +478,7 @@ class _InternalChatScreenState extends State<InternalChatScreen> {
                     Text(
                       rol,
                       style: const TextStyle(
-                        color: Color(0xFF67E8F9),
+                        color: Color(0xFF20C7C2),
                         fontSize: 12,
                         fontWeight: FontWeight.w700,
                       ),
@@ -486,7 +489,9 @@ class _InternalChatScreenState extends State<InternalChatScreen> {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                        color: unread > 0 ? Colors.white : Colors.white54,
+                        color: unread > 0
+                            ? Colors.white
+                            : const Color(0xFF64748B),
                         fontSize: 13,
                         fontWeight: unread > 0
                             ? FontWeight.w800
@@ -503,7 +508,7 @@ class _InternalChatScreenState extends State<InternalChatScreen> {
                   Text(
                     _timeText(authId),
                     style: const TextStyle(
-                      color: Colors.white38,
+                      color: const Color(0xFF78909C),
                       fontSize: 11,
                       fontWeight: FontWeight.w700,
                     ),
@@ -516,13 +521,13 @@ class _InternalChatScreenState extends State<InternalChatScreen> {
                             vertical: 5,
                           ),
                           decoration: BoxDecoration(
-                            color: const Color(0xFF22D3EE),
+                            color: const Color(0xFF20C7C2),
                             borderRadius: BorderRadius.circular(999),
                           ),
                           child: Text(
                             unread.toString(),
                             style: const TextStyle(
-                              color: Color(0xFF020617),
+                              color: Color(0xFFF2FCFD),
                               fontSize: 12,
                               fontWeight: FontWeight.w900,
                             ),
@@ -530,7 +535,7 @@ class _InternalChatScreenState extends State<InternalChatScreen> {
                         )
                       : const Icon(
                           Icons.chevron_right_rounded,
-                          color: Colors.white38,
+                          color: const Color(0xFF78909C),
                         ),
                 ],
               ),
@@ -546,7 +551,7 @@ class _InternalChatScreenState extends State<InternalChatScreen> {
       child: Text(
         'No hay usuarios disponibles',
         style: TextStyle(
-          color: Colors.white54,
+          color: const Color(0xFF64748B),
           fontSize: 16,
           fontWeight: FontWeight.w700,
         ),
@@ -776,7 +781,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
     final initial = otherName.isNotEmpty ? otherName[0].toUpperCase() : '?';
 
     return Scaffold(
-      backgroundColor: const Color(0xFF020617),
+      backgroundColor: const Color(0xFFF2FCFD),
       body: Stack(
         children: [
           const _ChatBackground(),
@@ -788,7 +793,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                   child: loading
                       ? const Center(
                           child: CircularProgressIndicator(
-                            color: Color(0xFF22D3EE),
+                            color: Color(0xFF20C7C2),
                           ),
                         )
                       : messages.isEmpty
@@ -815,24 +820,22 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
     return Container(
       padding: const EdgeInsets.fromLTRB(10, 10, 14, 12),
       decoration: BoxDecoration(
-        color: const Color(0xFF020617).withOpacity(0.80),
-        border: Border(
-          bottom: BorderSide(color: Colors.white.withOpacity(0.08)),
-        ),
+        color: const Color(0xFFF2FCFD).withOpacity(0.80),
+        border: Border(bottom: BorderSide(color: Colors.white)),
       ),
       child: Row(
         children: [
           IconButton(
             onPressed: () => Navigator.pop(context),
             icon: const Icon(Icons.arrow_back_rounded),
-            color: Colors.white,
+            color: const Color(0xFF071A3A),
           ),
           Container(
             width: 48,
             height: 48,
             decoration: BoxDecoration(
               gradient: const LinearGradient(
-                colors: [Color(0xFF22D3EE), Color(0xFF2563EB)],
+                colors: [Color(0xFF20C7C2), Color(0xFF0A7F91)],
               ),
               borderRadius: BorderRadius.circular(17),
             ),
@@ -840,7 +843,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
               child: Text(
                 initial,
                 style: const TextStyle(
-                  color: Colors.white,
+                  color: const Color(0xFF071A3A),
                   fontSize: 21,
                   fontWeight: FontWeight.w900,
                 ),
@@ -857,7 +860,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
-                    color: Colors.white,
+                    color: const Color(0xFF071A3A),
                     fontSize: 17,
                     fontWeight: FontWeight.w900,
                   ),
@@ -869,7 +872,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                       width: 8,
                       height: 8,
                       decoration: const BoxDecoration(
-                        color: Color(0xFF22C55E),
+                        color: Color(0xFF0AAEAE),
                         shape: BoxShape.circle,
                       ),
                     ),
@@ -877,7 +880,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                     Text(
                       _roleText(widget.otherUser['rol_usuario']?.toString()),
                       style: const TextStyle(
-                        color: Color(0xFF67E8F9),
+                        color: Color(0xFF20C7C2),
                         fontSize: 12,
                         fontWeight: FontWeight.w700,
                       ),
@@ -890,7 +893,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
           IconButton(
             onPressed: () => loadMessages(),
             icon: const Icon(Icons.refresh_rounded),
-            color: Colors.white70,
+            color: const Color(0xFF53627A),
           ),
         ],
       ),
@@ -903,23 +906,23 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
         margin: const EdgeInsets.all(24),
         padding: const EdgeInsets.all(24),
         decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.075),
+          color: Colors.white,
           borderRadius: BorderRadius.circular(28),
-          border: Border.all(color: Colors.white.withOpacity(0.12)),
+          border: Border.all(color: Colors.white),
         ),
         child: const Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(
               Icons.chat_bubble_outline_rounded,
-              color: Color(0xFF22D3EE),
+              color: Color(0xFF20C7C2),
               size: 54,
             ),
             SizedBox(height: 14),
             Text(
               'Todavía no hay mensajes',
               style: TextStyle(
-                color: Colors.white,
+                color: const Color(0xFF071A3A),
                 fontSize: 20,
                 fontWeight: FontWeight.w900,
               ),
@@ -928,7 +931,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
             Text(
               'Escribe el primer mensaje para iniciar la conversación.',
               textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.white54, fontSize: 13),
+              style: TextStyle(color: const Color(0xFF64748B), fontSize: 13),
             ),
           ],
         ),
@@ -955,23 +958,19 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
         decoration: BoxDecoration(
           gradient: mine
               ? const LinearGradient(
-                  colors: [Color(0xFF22D3EE), Color(0xFF2563EB)],
+                  colors: [Color(0xFF20C7C2), Color(0xFF0A7F91)],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 )
               : null,
-          color: mine ? null : Colors.white.withOpacity(0.085),
+          color: mine ? null : Colors.white,
           borderRadius: BorderRadius.only(
             topLeft: const Radius.circular(20),
             topRight: const Radius.circular(20),
             bottomLeft: Radius.circular(mine ? 20 : 5),
             bottomRight: Radius.circular(mine ? 5 : 20),
           ),
-          border: Border.all(
-            color: mine
-                ? Colors.white.withOpacity(0.12)
-                : Colors.white.withOpacity(0.10),
-          ),
+          border: Border.all(color: mine ? Colors.white : Colors.white),
         ),
         child: Column(
           crossAxisAlignment: mine
@@ -1022,7 +1021,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                       child: Text(
                         archivoNombre ?? 'Archivo adjunto',
                         style: const TextStyle(
-                          color: Colors.white,
+                          color: const Color(0xFF071A3A),
                           fontWeight: FontWeight.w800,
                         ),
                       ),
@@ -1047,7 +1046,9 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                 Text(
                   time,
                   style: TextStyle(
-                    color: mine ? Colors.white70 : Colors.white38,
+                    color: mine
+                        ? const Color(0xFF53627A)
+                        : const Color(0xFF78909C),
                     fontSize: 10.5,
                     fontWeight: FontWeight.w700,
                   ),
@@ -1057,7 +1058,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                   Icon(
                     read ? Icons.done_all_rounded : Icons.done_rounded,
                     size: 15,
-                    color: read ? Colors.white : Colors.white70,
+                    color: read ? Colors.white : const Color(0xFF53627A),
                   ),
                 ],
               ],
@@ -1075,10 +1076,8 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
         child: Container(
           padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
           decoration: BoxDecoration(
-            color: const Color(0xFF020617).withOpacity(0.88),
-            border: Border(
-              top: BorderSide(color: Colors.white.withOpacity(0.08)),
-            ),
+            color: const Color(0xFFF2FCFD).withOpacity(0.88),
+            border: Border(top: BorderSide(color: Colors.white)),
           ),
           child: SafeArea(
             top: false,
@@ -1091,7 +1090,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                       onPressed: _openAttachmentMenu,
                       icon: const Icon(
                         Icons.add_circle_rounded,
-                        color: Color(0xFF22D3EE),
+                        color: Color(0xFF20C7C2),
                         size: 31,
                       ),
                     ),
@@ -1100,26 +1099,26 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                         controller: messageCtrl,
                         minLines: 1,
                         maxLines: 4,
-                        style: const TextStyle(color: Colors.white),
+                        style: const TextStyle(color: const Color(0xFF071A3A)),
                         decoration: InputDecoration(
                           hintText: 'Escribe un mensaje...',
-                          hintStyle: const TextStyle(color: Colors.white38),
+                          hintStyle: const TextStyle(
+                            color: const Color(0xFF78909C),
+                          ),
                           filled: true,
-                          fillColor: Colors.white.withOpacity(0.075),
+                          fillColor: Colors.white,
                           contentPadding: const EdgeInsets.symmetric(
                             horizontal: 16,
                             vertical: 13,
                           ),
                           enabledBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(22),
-                            borderSide: BorderSide(
-                              color: Colors.white.withOpacity(0.10),
-                            ),
+                            borderSide: BorderSide(color: Colors.white),
                           ),
                           focusedBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(22),
                             borderSide: BorderSide(
-                              color: const Color(0xFF22D3EE).withOpacity(0.60),
+                              color: const Color(0xFF20C7C2).withOpacity(0.60),
                             ),
                           ),
                         ),
@@ -1146,7 +1145,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                         height: 54,
                         decoration: BoxDecoration(
                           gradient: const LinearGradient(
-                            colors: [Color(0xFF22D3EE), Color(0xFF2563EB)],
+                            colors: [Color(0xFF20C7C2), Color(0xFF0A7F91)],
                           ),
                           borderRadius: BorderRadius.circular(20),
                         ),
@@ -1190,7 +1189,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
   Future<void> _openAttachmentMenu() async {
     showModalBottomSheet(
       context: context,
-      backgroundColor: const Color(0xFF061329),
+      backgroundColor: const Color(0xFFFFFFFF),
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
       ),
@@ -1204,11 +1203,11 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                 ListTile(
                   leading: const Icon(
                     Icons.image_rounded,
-                    color: Color(0xFF22D3EE),
+                    color: Color(0xFF20C7C2),
                   ),
                   title: const Text(
                     'Enviar foto',
-                    style: TextStyle(color: Colors.white),
+                    style: TextStyle(color: const Color(0xFF071A3A)),
                   ),
                   onTap: () async {
                     Navigator.pop(context);
@@ -1237,7 +1236,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                   ),
                   title: const Text(
                     'Enviar archivo',
-                    style: TextStyle(color: Colors.white),
+                    style: TextStyle(color: const Color(0xFF071A3A)),
                   ),
                   onTap: () async {
                     Navigator.pop(context);
@@ -1276,28 +1275,22 @@ class _ChatBackground extends StatelessWidget {
     return Stack(
       children: [
         Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              colors: [Color(0xFF020617), Color(0xFF061B3A), Color(0xFF020617)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-          ),
+          decoration: const BoxDecoration(color: const Color(0xFFF2FCFD)),
         ),
         Positioned(
           top: -110,
           right: -90,
-          child: _glow(const Color(0xFF22D3EE), 270),
+          child: _glow(const Color(0xFF20C7C2), 270),
         ),
         Positioned(
           top: 280,
           left: -130,
-          child: _glow(const Color(0xFF7C3AED), 290),
+          child: _glow(const Color(0xFF0A7F91), 290),
         ),
         Positioned(
           bottom: -110,
           right: -90,
-          child: _glow(const Color(0xFF2563EB), 250),
+          child: _glow(const Color(0xFF0A7F91), 250),
         ),
       ],
     );

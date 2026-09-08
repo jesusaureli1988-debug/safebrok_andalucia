@@ -57,6 +57,9 @@ class _InformesProgramadosPanelState extends State<InformesProgramadosPanel> {
         _supabase
             .from('usuarios')
             .select('email')
+            .or(
+              'estado.is.null,estado.not.in.(inactivo,Inactivo,INACTIVO,baja,Baja,BAJA,desactivado,Desactivado,DESACTIVADO,bloqueado,Bloqueado,BLOQUEADO,suspendido,Suspendido,SUSPENDIDO)',
+            )
             .eq('auth_id', user.id)
             .maybeSingle(),
         _supabase

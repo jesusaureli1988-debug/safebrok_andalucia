@@ -49,7 +49,7 @@ class _MisVisitasScreenState extends State<MisVisitasScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: const Text("Error al cargar las visitas"),
-          backgroundColor: const Color(0xFFE11D48),
+          backgroundColor: const Color(0xFFE74646),
           behavior: SnackBarBehavior.floating,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(14),
@@ -59,16 +59,14 @@ class _MisVisitasScreenState extends State<MisVisitasScreen> {
     }
   }
 
-  int get pendientes =>
-      visitas.where((v) => v['estado'] != 'Realizada').length;
+  int get pendientes => visitas.where((v) => v['estado'] != 'Realizada').length;
 
-  int get realizadas =>
-      visitas.where((v) => v['estado'] == 'Realizada').length;
+  int get realizadas => visitas.where((v) => v['estado'] == 'Realizada').length;
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF07111B),
+      backgroundColor: const Color(0xFFF2FCFD),
       appBar: AppBar(
         title: const Text(
           "Mis visitas",
@@ -83,22 +81,17 @@ class _MisVisitasScreenState extends State<MisVisitasScreen> {
           const _PremiumBackground(),
           if (loading)
             const Center(
-              child: CircularProgressIndicator(
-                color: Color(0xFF22D3EE),
-              ),
+              child: CircularProgressIndicator(color: Color(0xFF20C7C2)),
             )
           else
             RefreshIndicator(
-              color: const Color(0xFF22D3EE),
-              backgroundColor: const Color(0xFF102331),
+              color: const Color(0xFF20C7C2),
+              backgroundColor: const Color(0xFFFFFFFF),
               onRefresh: loadVisitas,
               child: visitas.isEmpty
                   ? ListView(
                       padding: const EdgeInsets.all(20),
-                      children: [
-                        const SizedBox(height: 120),
-                        _emptyState(),
-                      ],
+                      children: [const SizedBox(height: 120), _emptyState()],
                     )
                   : ListView(
                       padding: const EdgeInsets.fromLTRB(20, 10, 20, 28),
@@ -122,14 +115,9 @@ class _MisVisitasScreenState extends State<MisVisitasScreen> {
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(28),
         gradient: const LinearGradient(
-          colors: [
-            Color(0xFF0F172A),
-            Color(0xFF123044),
-          ],
+          colors: [Color(0xFFEAF8F8), Color(0xFFFFFFFF)],
         ),
-        border: Border.all(
-          color: Colors.white.withOpacity(0.10),
-        ),
+        border: Border.all(color: Colors.white),
         boxShadow: [
           BoxShadow(
             color: Colors.cyanAccent.withOpacity(0.10),
@@ -146,10 +134,7 @@ class _MisVisitasScreenState extends State<MisVisitasScreen> {
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               gradient: const LinearGradient(
-                colors: [
-                  Color(0xFF22D3EE),
-                  Color(0xFF2563EB),
-                ],
+                colors: [Color(0xFF20C7C2), Color(0xFF0A7F91)],
               ),
               boxShadow: [
                 BoxShadow(
@@ -172,7 +157,7 @@ class _MisVisitasScreenState extends State<MisVisitasScreen> {
                 Text(
                   "Agenda comercial",
                   style: TextStyle(
-                    color: Colors.white,
+                    color: const Color(0xFF071A3A),
                     fontSize: 22,
                     fontWeight: FontWeight.w900,
                   ),
@@ -181,7 +166,7 @@ class _MisVisitasScreenState extends State<MisVisitasScreen> {
                 Text(
                   "Controla tus visitas pendientes y realizadas.",
                   style: TextStyle(
-                    color: Colors.white60,
+                    color: const Color(0xFF64748B),
                     fontSize: 13,
                     height: 1.3,
                   ),
@@ -236,24 +221,18 @@ class _MisVisitasScreenState extends State<MisVisitasScreen> {
         child: Container(
           padding: const EdgeInsets.all(15),
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.055),
+            color: Colors.white,
             borderRadius: BorderRadius.circular(22),
-            border: Border.all(
-              color: Colors.white.withOpacity(0.10),
-            ),
+            border: Border.all(color: Colors.white),
           ),
           child: Column(
             children: [
-              Icon(
-                icon,
-                color: const Color(0xFF22D3EE),
-                size: 24,
-              ),
+              Icon(icon, color: const Color(0xFF20C7C2), size: 24),
               const SizedBox(height: 8),
               Text(
                 value,
                 style: const TextStyle(
-                  color: Colors.white,
+                  color: const Color(0xFF071A3A),
                   fontSize: 22,
                   fontWeight: FontWeight.w900,
                 ),
@@ -262,7 +241,7 @@ class _MisVisitasScreenState extends State<MisVisitasScreen> {
               Text(
                 title,
                 style: const TextStyle(
-                  color: Colors.white54,
+                  color: const Color(0xFF64748B),
                   fontSize: 11,
                   fontWeight: FontWeight.w700,
                 ),
@@ -289,9 +268,7 @@ class _MisVisitasScreenState extends State<MisVisitasScreen> {
             decoration: BoxDecoration(
               color: Colors.white.withOpacity(0.060),
               borderRadius: BorderRadius.circular(26),
-              border: Border.all(
-                color: Colors.white.withOpacity(0.10),
-              ),
+              border: Border.all(color: Colors.white),
               boxShadow: [
                 BoxShadow(
                   color: Colors.black.withOpacity(0.22),
@@ -333,7 +310,7 @@ class _MisVisitasScreenState extends State<MisVisitasScreen> {
                       child: Text(
                         visita['nombre_cliente'] ?? '',
                         style: const TextStyle(
-                          color: Colors.white,
+                          color: const Color(0xFF071A3A),
                           fontSize: 18,
                           fontWeight: FontWeight.w900,
                         ),
@@ -359,10 +336,7 @@ class _MisVisitasScreenState extends State<MisVisitasScreen> {
 
                 if ((visita['telefono'] ?? '').toString().isNotEmpty) ...[
                   const SizedBox(height: 8),
-                  _infoRow(
-                    icon: Icons.phone_rounded,
-                    text: visita['telefono'],
-                  ),
+                  _infoRow(icon: Icons.phone_rounded, text: visita['telefono']),
                 ],
 
                 if ((visita['direccion'] ?? '').toString().isNotEmpty) ...[
@@ -379,16 +353,14 @@ class _MisVisitasScreenState extends State<MisVisitasScreen> {
                     width: double.infinity,
                     padding: const EdgeInsets.all(14),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF0B1724),
+                      color: const Color(0xFFFFFFFF),
                       borderRadius: BorderRadius.circular(18),
-                      border: Border.all(
-                        color: Colors.white.withOpacity(0.08),
-                      ),
+                      border: Border.all(color: Colors.white),
                     ),
                     child: Text(
                       visita['observaciones'],
                       style: const TextStyle(
-                        color: Colors.white70,
+                        color: const Color(0xFF53627A),
                         height: 1.35,
                         fontSize: 13,
                       ),
@@ -428,24 +400,17 @@ class _MisVisitasScreenState extends State<MisVisitasScreen> {
     );
   }
 
-  Widget _infoRow({
-    required IconData icon,
-    required String text,
-  }) {
+  Widget _infoRow({required IconData icon, required String text}) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(
-          icon,
-          color: const Color(0xFF22D3EE),
-          size: 18,
-        ),
+        Icon(icon, color: const Color(0xFF20C7C2), size: 18),
         const SizedBox(width: 9),
         Expanded(
           child: Text(
             text,
             style: const TextStyle(
-              color: Colors.white70,
+              color: const Color(0xFF53627A),
               fontSize: 13,
               fontWeight: FontWeight.w600,
               height: 1.3,
@@ -457,16 +422,17 @@ class _MisVisitasScreenState extends State<MisVisitasScreen> {
   }
 
   String _direccionCompleta(Map<String, dynamic> visita) {
-    final partes = [
-      visita['direccion'],
-      visita['numero'],
-      visita['codigo_postal'],
-      visita['poblacion'],
-      visita['provincia'],
-    ]
-        .where((e) => e != null && e.toString().trim().isNotEmpty)
-        .map((e) => e.toString().trim())
-        .toList();
+    final partes =
+        [
+              visita['direccion'],
+              visita['numero'],
+              visita['codigo_postal'],
+              visita['poblacion'],
+              visita['provincia'],
+            ]
+            .where((e) => e != null && e.toString().trim().isNotEmpty)
+            .map((e) => e.toString().trim())
+            .toList();
 
     return partes.join(', ');
   }
@@ -490,17 +456,15 @@ class _MisVisitasScreenState extends State<MisVisitasScreen> {
         child: Container(
           padding: const EdgeInsets.all(26),
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.055),
+            color: Colors.white,
             borderRadius: BorderRadius.circular(28),
-            border: Border.all(
-              color: Colors.white.withOpacity(0.10),
-            ),
+            border: Border.all(color: Colors.white),
           ),
           child: const Column(
             children: [
               Icon(
                 Icons.event_busy_rounded,
-                color: Color(0xFF22D3EE),
+                color: Color(0xFF20C7C2),
                 size: 58,
               ),
               SizedBox(height: 16),
@@ -508,7 +472,7 @@ class _MisVisitasScreenState extends State<MisVisitasScreen> {
                 "No tienes visitas todavía",
                 textAlign: TextAlign.center,
                 style: TextStyle(
-                  color: Colors.white,
+                  color: const Color(0xFF071A3A),
                   fontSize: 20,
                   fontWeight: FontWeight.w900,
                 ),
@@ -517,10 +481,7 @@ class _MisVisitasScreenState extends State<MisVisitasScreen> {
               Text(
                 "Cuando crees una visita, aparecerá aquí con su fecha, hora, estado y dirección.",
                 textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: Colors.white60,
-                  height: 1.4,
-                ),
+                style: TextStyle(color: const Color(0xFF64748B), height: 1.4),
               ),
             ],
           ),
@@ -540,27 +501,18 @@ class _PremiumBackground extends StatelessWidget {
         Positioned(
           top: -90,
           right: -70,
-          child: _glow(
-            color: const Color(0xFF22D3EE),
-            size: 230,
-          ),
+          child: _glow(color: const Color(0xFF20C7C2), size: 230),
         ),
         Positioned(
           bottom: -110,
           left: -80,
-          child: _glow(
-            color: const Color(0xFF2563EB),
-            size: 260,
-          ),
+          child: _glow(color: const Color(0xFF0A7F91), size: 260),
         ),
       ],
     );
   }
 
-  Widget _glow({
-    required Color color,
-    required double size,
-  }) {
+  Widget _glow({required Color color, required double size}) {
     return Container(
       width: size,
       height: size,

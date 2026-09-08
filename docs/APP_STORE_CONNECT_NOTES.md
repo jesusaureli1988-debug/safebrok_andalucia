@@ -16,6 +16,11 @@ Recorrido recomendado:
 3. Use las pestañas Chat, Negocio y SafeCloud para revisar comunicación interna, operaciones comerciales, clientes, ventas, recibos, informes y documentos de prueba.
 4. En Ajustes puede abrir Perfil, Seguridad, Incidencias, Soporte e Información de la app.
 5. En Ajustes > Panel de administración puede revisar los módulos de gestión autorizados para el rol Director nacional.
+6. Desde Inicio > Previsiones puede registrar compromisos propios y consultar el árbol de previsiones y cumplimiento de su estructura.
+7. En Rendimiento comercial puede desplegar la jerarquía y consultar primas y mix por periodo.
+8. En Panel de administración > Usuarios y accesos puede revisar la gestión de roles, estados, dependencias e incorporaciones contractuales.
+
+La visibilidad de los módulos depende exclusivamente del rol real y de los permisos del usuario autenticado, de la misma manera para Apple y para los usuarios de producción. No se desbloquea ninguna función mediante fecha, dispositivo, plataforma, revisión remota ni configuración oculta. La cuenta facilitada tiene el rol real Director nacional, que ofrece el recorrido funcional más amplio permitido por la organización.
 
 Las notificaciones push son opcionales. Si el sistema solicita permiso, puede aceptarlo o rechazarlo; la decisión no bloquea ninguna función principal. Los enlaces externos de pago y videoconferencia requieren conexión a internet y se abren mediante HTTPS.
 
@@ -37,6 +42,11 @@ Suggested review path:
 3. Use Chat, Business, and SafeCloud to review internal communication, commercial workflows, clients, sales, receipts, reports, and test documents.
 4. Settings contains Profile, Security, Issues, Support, and App Information.
 5. Settings > Administration Panel contains the management modules authorized for the National Director role.
+6. From Home > Forecasts, the reviewer can enter personal commitments and inspect the hierarchy of team forecasts and completion.
+7. Commercial Performance exposes the organizational tree, premiums, and product mix by period.
+8. Administration Panel > Users and Access exposes role, status, reporting-line, and contractual onboarding management.
+
+Module visibility is determined exclusively by the authenticated user's real assigned role and permissions, exactly as it is for production users. No feature is unlocked by date, device, platform, remote review flag, or hidden configuration. The supplied account has the real National Director role, which provides the broadest functional path permitted by the organization.
 
 Push notifications are optional. If iOS asks for permission, either choice is valid and does not block core functionality. External payment and meeting links require internet access and open over HTTPS.
 

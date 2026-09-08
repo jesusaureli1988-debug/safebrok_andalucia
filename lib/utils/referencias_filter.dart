@@ -1,12 +1,7 @@
-bool esReferenciaActiva(
-  Map<String, dynamic> r,
-  DateTime now,
-) {
+bool esReferenciaActiva(Map<String, dynamic> r, DateTime now) {
   final estado = r['estado'];
 
-  if (estado == 'Resuelto' ||
-      estado == 'Contratado' ||
-      estado == 'Desechado') {
+  if (estado == 'Resuelto' || estado == 'Contratado' || estado == 'Desechado') {
     return false;
   }
 
@@ -18,23 +13,17 @@ bool esReferenciaActiva(
       ? DateTime.parse(r['fecha_rellamada'])
       : null;
 
-  bool okVencimiento = vencimiento != null &&
-      vencimiento.isBefore(
-        DateTime(now.year, now.month + 2, now.day),
-      );
+  bool okVencimiento =
+      vencimiento != null &&
+      vencimiento.isBefore(DateTime(now.year, now.month + 2, now.day));
 
   bool okRellamada = false;
 
   if (rellamada != null) {
-    final inicio = rellamada.subtract(
-      const Duration(days: 1),
-    );
-    final fin = rellamada.add(
-      const Duration(days: 2),
-    );
+    final inicio = rellamada.subtract(const Duration(days: 1));
+    final fin = rellamada.add(const Duration(days: 2));
 
-    okRellamada =
-        now.isAfter(inicio) && now.isBefore(fin);
+    okRellamada = now.isAfter(inicio) && now.isBefore(fin);
   }
 
   if (estado == 'En curso') {

@@ -85,6 +85,9 @@ class _CargarGestionesScreenState extends State<CargarGestionesScreen> {
           .select(
             'id, auth_id, parent_id, rol_usuario, nombre, apellidos, email',
           )
+          .or(
+            'estado.is.null,estado.not.in.(inactivo,Inactivo,INACTIVO,baja,Baja,BAJA,desactivado,Desactivado,DESACTIVADO,bloqueado,Bloqueado,BLOQUEADO,suspendido,Suspendido,SUSPENDIDO)',
+          )
           .eq('auth_id', user.id)
           .maybeSingle();
 
@@ -96,6 +99,9 @@ class _CargarGestionesScreenState extends State<CargarGestionesScreen> {
           .from('usuarios')
           .select(
             'id, auth_id, parent_id, rol_usuario, nombre, apellidos, email',
+          )
+          .or(
+            'estado.is.null,estado.not.in.(inactivo,Inactivo,INACTIVO,baja,Baja,BAJA,desactivado,Desactivado,DESACTIVADO,bloqueado,Bloqueado,BLOQUEADO,suspendido,Suspendido,SUSPENDIDO)',
           )
           .order('nombre', ascending: true);
 

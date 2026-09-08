@@ -24,6 +24,8 @@ interface Venta {
   agente_auth_id?: string | null;
   prima_anual_neta?: number | string | null;
   prima_neta?: number | string | null;
+  producto?: string | null;
+  fecha_efecto?: string | null;
   estado?: string | null;
   estado_poliza?: string | null;
   tipo?: string | null;
@@ -33,6 +35,14 @@ interface Venta {
 
 const zonaHoraria = 'Europe/Madrid';
 const umbrales = [50, 75, 90, 100] as const;
+
+function primaComputable(venta: Venta): number {
+  const producto = String(venta.producto ?? '').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  const esAuto = producto.includes('auto') || producto.includes('coche') || producto.includes('vehicul') || producto.includes('turismo') || producto.includes('moto');
+  const fechaEfecto = String(venta.fecha_efecto ?? '').slice(0, 10);
+  const importe = numero(venta.prima_anual_neta ?? venta.prima_neta);
+  return importe * (esAuto && fechaEfecto >= '2026-08-27' ? 0.5 : 1);
+}
 
 function json(
   contenido: Record<string, unknown>,
@@ -477,7 +487,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
     for (const venta of ventas) {
       const authId = String(venta.agente_auth_id ?? '').trim();
       if (!authId) continue;
-      const prima = numero(venta.prima_anual_neta ?? venta.prima_neta);
+      const prima = primaComputable(venta);
       produccionPorAuthId.set(
         authId,
         (produccionPorAuthId.get(authId) ?? 0) + prima,

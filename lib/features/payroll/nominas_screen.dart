@@ -1,4 +1,5 @@
 import 'dart:ui';
+import 'package:safebrok_andalucia/core/production/premium_weighting.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:safebrok_andalucia/core/production/production_period_service.dart';
@@ -287,7 +288,7 @@ class _NominasScreenState extends State<NominasScreen> {
             },
           );
 
-          final prima = _money(raw['prima_anual_neta']);
+          final prima = PremiumWeighting.net(raw);
           grouped[key]!['prima_neta_total'] =
               _money(grouped[key]!['prima_neta_total']) + prima;
 
@@ -319,7 +320,7 @@ class _NominasScreenState extends State<NominasScreen> {
         if (ventaIds.isNotEmpty) {
           final originalesData = await supabase
               .from('ventas')
-              .select('id, agente_auth_id, producto')
+              .select('id, agente_auth_id, producto, fecha_efecto')
               .inFilter('id', ventaIds);
           final originales = {
             for (final v in List<Map<String, dynamic>>.from(originalesData))
@@ -353,7 +354,10 @@ class _NominasScreenState extends State<NominasScreen> {
               },
             );
 
-            final prima = _money(baja['prima_extornada']);
+            final prima = PremiumWeighting.amount(
+              venta,
+              baja['prima_extornada'],
+            );
             grouped[key]!['prima_neta_total'] =
                 _money(grouped[key]!['prima_neta_total']) - prima;
             if (_esDV(venta['producto'])) {
@@ -949,17 +953,11 @@ class _NominaDetailScreenState extends State<NominaDetailScreen> {
   }
 
   double _primaBrutaVenta(Map<String, dynamic> venta) {
-    return _money(
-      venta['prima_anual_bruta'] ??
-          venta['prima_bruta'] ??
-          venta['prima_total'] ??
-          venta['precio_anual'] ??
-          venta['prima_anual_neta'],
-    );
+    return PremiumWeighting.gross(venta);
   }
 
   double _primaNetaVenta(Map<String, dynamic> venta) {
-    return _money(venta['prima_anual_neta']);
+    return PremiumWeighting.net(venta);
   }
 
   double _comisionVenta(Map<String, dynamic> venta) {
@@ -1397,18 +1395,23 @@ class _NominaDetailScreenState extends State<NominaDetailScreen> {
           ventaBaja['id'] = 'baja_${baja['id']}';
           ventaBaja['tipo_movimiento'] = 'BAJA';
           ventaBaja['anulacion_id'] = baja['id'];
+          ventaBaja['fecha_efecto_poliza'] = ventaOriginal['fecha_efecto'];
           ventaBaja['fecha_efecto'] = baja['fecha_anulacion'];
 
-          final primaExtornada = _money(baja['prima_extornada']);
+          final primaExtornadaOriginal = _money(baja['prima_extornada']);
+          final primaExtornadaComputable = PremiumWeighting.amount(
+            ventaOriginal,
+            primaExtornadaOriginal,
+          );
           final comisionExtornada = _money(baja['comision_extornada']);
 
           // Valores negativos para que resten en nómina.
-          ventaBaja['prima_anual_neta'] = -primaExtornada;
+          ventaBaja['prima_anual_neta'] = -primaExtornadaOriginal;
           ventaBaja['comision'] = -comisionExtornada;
 
           // Valores positivos específicos para mostrarlos claramente
           // en Tramitar facturas y en el detalle/PDF.
-          ventaBaja['prima_extornada'] = primaExtornada;
+          ventaBaja['prima_extornada'] = primaExtornadaComputable;
           ventaBaja['comision_extornada'] = comisionExtornada;
 
           ventaBaja['numero_poliza'] =
@@ -1665,7 +1668,7 @@ class _NominaDetailScreenState extends State<NominaDetailScreen> {
     for (final p in node.polizas) {
       final r = p['revision_nomina'] ?? {};
       if (r['incluida'] == false) continue;
-      total += _money(p['prima_anual_neta']);
+      total += PremiumWeighting.net(p);
     }
 
     for (final h in node.hijos) {
@@ -2523,7 +2526,7 @@ class _NominaDetailScreenState extends State<NominaDetailScreen> {
     final estadoRecibo = _estadoRecibo(venta);
     final estadoFirma = _estadoFirma(venta);
 
-    final prima = _money(venta['prima_anual_neta']);
+    final prima = PremiumWeighting.net(venta);
     final comision = _money(venta['comision']);
     final esBaja = venta['tipo_movimiento'] == 'BAJA';
 

@@ -63,15 +63,17 @@ class _RecibosAgenteScreenState extends State<RecibosAgenteScreen> {
     }
   }
 
-  Future<List<String>> _obtenerAuthIdsEstructura(
-    String authIdLogueado,
-  ) async {
-    final usuariosData = await supabase.from('usuarios').select(
-          'id, auth_id, parent_id, rol_usuario, nombre, apellidos',
+  Future<List<String>> _obtenerAuthIdsEstructura(String authIdLogueado) async {
+    final usuariosData = await supabase
+        .from('usuarios')
+        .select('id, auth_id, parent_id, rol_usuario, nombre, apellidos')
+        .or(
+          'estado.is.null,estado.not.in.(inactivo,Inactivo,INACTIVO,baja,Baja,BAJA,desactivado,Desactivado,DESACTIVADO,bloqueado,Bloqueado,BLOQUEADO,suspendido,Suspendido,SUSPENDIDO)',
         );
 
-    final todosUsuarios =
-        List<Map<String, dynamic>>.from(usuariosData).map((u) {
+    final todosUsuarios = List<Map<String, dynamic>>.from(usuariosData).map((
+      u,
+    ) {
       return <String, dynamic>{
         'id': u['id']?.toString().trim() ?? '',
         'auth_id': u['auth_id']?.toString().trim() ?? '',
@@ -100,13 +102,10 @@ class _RecibosAgenteScreenState extends State<RecibosAgenteScreen> {
         rolLogueado == 'administracion' ||
         rolLogueado == 'administrador' ||
         rolLogueado == 'admin') {
-      usuariosEstructura = todosUsuarios
-          .where((u) {
-            final authId = u['auth_id']?.toString().trim() ?? '';
-            return authId.isNotEmpty && authId.toLowerCase() != 'null';
-          })
-          .toList()
-        ..sort(_ordenarUsuarios);
+      usuariosEstructura = todosUsuarios.where((u) {
+        final authId = u['auth_id']?.toString().trim() ?? '';
+        return authId.isNotEmpty && authId.toLowerCase() != 'null';
+      }).toList()..sort(_ordenarUsuarios);
 
       return usuariosEstructura
           .map((u) => u['auth_id'].toString())
@@ -145,8 +144,7 @@ class _RecibosAgenteScreenState extends State<RecibosAgenteScreen> {
       }
 
       final nivelActual = _nivelRol(rolActual);
-      final hijos =
-          hijosPorParentId[id] ?? <Map<String, dynamic>>[];
+      final hijos = hijosPorParentId[id] ?? <Map<String, dynamic>>[];
 
       for (final hijo in hijos) {
         final nivelHijo = _nivelRol(_normalizarRol(hijo['rol']));
@@ -162,8 +160,7 @@ class _RecibosAgenteScreenState extends State<RecibosAgenteScreen> {
 
     recorrerEstructura(yo);
 
-    usuariosEstructura = usuariosPermitidos
-      ..sort(_ordenarUsuarios);
+    usuariosEstructura = usuariosPermitidos..sort(_ordenarUsuarios);
 
     final resultado = usuariosEstructura
         .map((u) => u['auth_id']?.toString().trim() ?? '')
@@ -184,10 +181,7 @@ class _RecibosAgenteScreenState extends State<RecibosAgenteScreen> {
     return resultado;
   }
 
-  int _ordenarUsuarios(
-    Map<String, dynamic> a,
-    Map<String, dynamic> b,
-  ) {
+  int _ordenarUsuarios(Map<String, dynamic> a, Map<String, dynamic> b) {
     final nivelA = _nivelRol(a['rol']?.toString() ?? '');
     final nivelB = _nivelRol(b['rol']?.toString() ?? '');
 
@@ -195,9 +189,9 @@ class _RecibosAgenteScreenState extends State<RecibosAgenteScreen> {
       return nivelB.compareTo(nivelA);
     }
 
-    return _nombreCompletoUsuario(a)
-        .toLowerCase()
-        .compareTo(_nombreCompletoUsuario(b).toLowerCase());
+    return _nombreCompletoUsuario(
+      a,
+    ).toLowerCase().compareTo(_nombreCompletoUsuario(b).toLowerCase());
   }
 
   String _nombreCompletoUsuario(Map<String, dynamic> usuario) {
@@ -225,19 +219,18 @@ class _RecibosAgenteScreenState extends State<RecibosAgenteScreen> {
       case 'admin':
         return 'Administración';
       default:
-        return rol
-            .replaceAll('_', ' ')
-            .trim();
+        return rol.replaceAll('_', ' ').trim();
     }
   }
 
   List<String> get _figurasDisponibles {
-    final roles = usuariosEstructura
-        .map((u) => _normalizarRol(u['rol']))
-        .where((rol) => rol.isNotEmpty)
-        .toSet()
-        .toList()
-      ..sort((a, b) => _nivelRol(b).compareTo(_nivelRol(a)));
+    final roles =
+        usuariosEstructura
+            .map((u) => _normalizarRol(u['rol']))
+            .where((rol) => rol.isNotEmpty)
+            .toSet()
+            .toList()
+          ..sort((a, b) => _nivelRol(b).compareTo(_nivelRol(a)));
 
     return <String>['Todas', ...roles];
   }
@@ -248,9 +241,7 @@ class _RecibosAgenteScreenState extends State<RecibosAgenteScreen> {
     }
 
     return usuariosEstructura
-        .where(
-          (u) => _normalizarRol(u['rol']) == filtroFigura,
-        )
+        .where((u) => _normalizarRol(u['rol']) == filtroFigura)
         .toList();
   }
 
@@ -287,8 +278,7 @@ class _RecibosAgenteScreenState extends State<RecibosAgenteScreen> {
         resultado.add(auth);
       }
 
-      for (final hijo
-          in hijosPorParentId[id] ?? <Map<String, dynamic>>[]) {
+      for (final hijo in hijosPorParentId[id] ?? <Map<String, dynamic>>[]) {
         recorrer(hijo);
       }
     }
@@ -314,8 +304,7 @@ class _RecibosAgenteScreenState extends State<RecibosAgenteScreen> {
         setState(() => loading = true);
       }
 
-      final authIdsEstructura =
-          await _obtenerAuthIdsEstructura(user.id);
+      final authIdsEstructura = await _obtenerAuthIdsEstructura(user.id);
 
       if (authIdsEstructura.isEmpty) {
         if (!mounted) return;
@@ -352,10 +341,7 @@ class _RecibosAgenteScreenState extends State<RecibosAgenteScreen> {
         loading = false;
       });
 
-      _snack(
-        'Error cargando recibos: $e',
-        color: Colors.redAccent,
-      );
+      _snack('Error cargando recibos: $e', color: Colors.redAccent);
     }
   }
 
@@ -363,13 +349,10 @@ class _RecibosAgenteScreenState extends State<RecibosAgenteScreen> {
     Set<String>? authIdsPermitidos;
 
     if (filtroUsuarioAuthId != 'Todos') {
-      authIdsPermitidos =
-          _authIdsDeEstructuraSeleccionada(filtroUsuarioAuthId);
+      authIdsPermitidos = _authIdsDeEstructuraSeleccionada(filtroUsuarioAuthId);
     } else if (filtroFigura != 'Todas') {
       authIdsPermitidos = usuariosEstructura
-          .where(
-            (u) => _normalizarRol(u['rol']) == filtroFigura,
-          )
+          .where((u) => _normalizarRol(u['rol']) == filtroFigura)
           .map((u) => u['auth_id']?.toString().trim() ?? '')
           .where((id) => id.isNotEmpty)
           .toSet();
@@ -378,19 +361,16 @@ class _RecibosAgenteScreenState extends State<RecibosAgenteScreen> {
     return recibos.where((r) {
       final agente = r['agente']?.toString().trim() ?? '';
 
-      final matchEstructura = authIdsPermitidos == null ||
-          authIdsPermitidos.contains(agente);
+      final matchEstructura =
+          authIdsPermitidos == null || authIdsPermitidos.contains(agente);
 
       final fechaRecibo = _parseFechaRecibo(r['fecha']);
 
-      final matchDesde = fechaDesde == null ||
+      final matchDesde =
+          fechaDesde == null ||
           (fechaRecibo != null &&
               !fechaRecibo.isBefore(
-                DateTime(
-                  fechaDesde!.year,
-                  fechaDesde!.month,
-                  fechaDesde!.day,
-                ),
+                DateTime(fechaDesde!.year, fechaDesde!.month, fechaDesde!.day),
               ));
 
       final limiteHasta = fechaHasta == null
@@ -405,9 +385,9 @@ class _RecibosAgenteScreenState extends State<RecibosAgenteScreen> {
               999,
             );
 
-      final matchHasta = limiteHasta == null ||
-          (fechaRecibo != null &&
-              !fechaRecibo.isAfter(limiteHasta));
+      final matchHasta =
+          limiteHasta == null ||
+          (fechaRecibo != null && !fechaRecibo.isAfter(limiteHasta));
 
       return matchEstructura && matchDesde && matchHasta;
     }).toList();
@@ -423,7 +403,8 @@ class _RecibosAgenteScreenState extends State<RecibosAgenteScreen> {
       final compania = _normalizarTexto(r['compania']);
       final motivo = _normalizarTexto(r['motivo']);
 
-      final matchSearch = search.isEmpty ||
+      final matchSearch =
+          search.isEmpty ||
           poliza.contains(search) ||
           cliente.contains(search) ||
           compania.contains(search) ||
@@ -433,7 +414,8 @@ class _RecibosAgenteScreenState extends State<RecibosAgenteScreen> {
 
       switch (filtro) {
         case 'Pendientes':
-          matchFiltro = estado == 'pendiente' ||
+          matchFiltro =
+              estado == 'pendiente' ||
               estado == 'devuelto' ||
               estado == 'impagado' ||
               estado == 'en gestión' ||
@@ -443,7 +425,8 @@ class _RecibosAgenteScreenState extends State<RecibosAgenteScreen> {
           matchFiltro = estado == 'pagado' || estado == 'cobrado';
           break;
         case 'Para baja':
-          matchFiltro = estado == 'para baja' ||
+          matchFiltro =
+              estado == 'para baja' ||
               estado == 'para_baja' ||
               estado == 'baja';
           break;
@@ -469,10 +452,7 @@ class _RecibosAgenteScreenState extends State<RecibosAgenteScreen> {
     if (value == null) return 0;
     if (value is num) return value.toDouble();
 
-    return double.tryParse(
-          value.toString().replaceAll(',', '.'),
-        ) ??
-        0;
+    return double.tryParse(value.toString().replaceAll(',', '.')) ?? 0;
   }
 
   bool _esPendiente(Map<String, dynamic> r) {
@@ -492,9 +472,7 @@ class _RecibosAgenteScreenState extends State<RecibosAgenteScreen> {
 
   bool _esParaBaja(Map<String, dynamic> r) {
     final estado = _normalizarTexto(r['estado']);
-    return estado == 'para baja' ||
-        estado == 'para_baja' ||
-        estado == 'baja';
+    return estado == 'para baja' || estado == 'para_baja' || estado == 'baja';
   }
 
   double get totalPendiente {
@@ -503,14 +481,11 @@ class _RecibosAgenteScreenState extends State<RecibosAgenteScreen> {
         .fold(0.0, (sum, r) => sum + _money(r['importe']));
   }
 
-  int get pendientes =>
-      recibosConFiltrosAvanzados.where(_esPendiente).length;
+  int get pendientes => recibosConFiltrosAvanzados.where(_esPendiente).length;
 
-  int get cobrados =>
-      recibosConFiltrosAvanzados.where(_esCobrado).length;
+  int get cobrados => recibosConFiltrosAvanzados.where(_esCobrado).length;
 
-  int get paraBaja =>
-      recibosConFiltrosAvanzados.where(_esParaBaja).length;
+  int get paraBaja => recibosConFiltrosAvanzados.where(_esParaBaja).length;
 
   String _formatFecha(dynamic fecha) {
     if (fecha == null) return 'Sin fecha';
@@ -529,23 +504,23 @@ class _RecibosAgenteScreenState extends State<RecibosAgenteScreen> {
     final e = _normalizarTexto(estado);
 
     if (e == 'pagado' || e == 'cobrado') {
-      return const Color(0xFF4ADE80);
+      return const Color(0xFF2563EB);
     }
     if (e == 'pendiente') {
-      return const Color(0xFFFBBF24);
+      return const Color(0xFF1D4ED8);
     }
     if (e == 'devuelto' || e == 'impagado') {
-      return const Color(0xFFFB7185);
+      return const Color(0xFFE74646);
     }
     if (e == 'en gestión' || e == 'en gestion') {
-      return const Color(0xFF22D3EE);
+      return const Color(0xFF2563EB);
     }
     if (e == 'para baja' || e == 'para_baja' || e == 'baja') {
-      return const Color(0xFFC084FC);
+      return const Color(0xFF2563EB);
     }
-    if (e == 'anulado') return Colors.white38;
+    if (e == 'anulado') return const Color(0xFF78909C);
 
-    return Colors.white54;
+    return const Color(0xFF64748B);
   }
 
   IconData _estadoIcon(String estado) {
@@ -582,10 +557,7 @@ class _RecibosAgenteScreenState extends State<RecibosAgenteScreen> {
     return estado;
   }
 
-  void _snack(
-    String texto, {
-    Color color = const Color(0xFF102331),
-  }) {
+  void _snack(String texto, {Color color = const Color(0xFFFFFFFF)}) {
     if (!mounted) return;
 
     ScaffoldMessenger.of(context).showSnackBar(
@@ -593,7 +565,7 @@ class _RecibosAgenteScreenState extends State<RecibosAgenteScreen> {
         content: Text(
           texto,
           style: const TextStyle(
-            color: Colors.white,
+            color: const Color(0xFF111827),
             fontWeight: FontWeight.w700,
           ),
         ),
@@ -606,9 +578,9 @@ class _RecibosAgenteScreenState extends State<RecibosAgenteScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF050A11),
+      backgroundColor: const Color(0xFFF4F6FB),
       appBar: AppBar(
-        backgroundColor: const Color(0xFF050A11),
+        backgroundColor: const Color(0xFFF4F6FB),
         surfaceTintColor: Colors.transparent,
         elevation: 0,
         titleSpacing: 6,
@@ -618,7 +590,7 @@ class _RecibosAgenteScreenState extends State<RecibosAgenteScreen> {
             Text(
               'Recibos',
               style: TextStyle(
-                color: Colors.white,
+                color: const Color(0xFF111827),
                 fontWeight: FontWeight.w900,
                 fontSize: 22,
               ),
@@ -626,7 +598,7 @@ class _RecibosAgenteScreenState extends State<RecibosAgenteScreen> {
             Text(
               'Control y seguimiento de cobros',
               style: TextStyle(
-                color: const Color(0x75FFFFFF),
+                color: const Color(0xFF64748B),
                 fontWeight: FontWeight.w600,
                 fontSize: 11,
               ),
@@ -637,23 +609,18 @@ class _RecibosAgenteScreenState extends State<RecibosAgenteScreen> {
           IconButton(
             tooltip: 'Actualizar',
             onPressed: cargarRecibos,
-            icon: const Icon(
-              Icons.refresh_rounded,
-              color: Colors.white,
-            ),
+            icon: const Icon(Icons.refresh_rounded, color: Color(0xFF111827)),
           ),
           const SizedBox(width: 6),
         ],
       ),
       body: loading
           ? const Center(
-              child: CircularProgressIndicator(
-                color: Color(0xFF22D3EE),
-              ),
+              child: CircularProgressIndicator(color: Color(0xFF2563EB)),
             )
           : RefreshIndicator(
-              color: const Color(0xFF22D3EE),
-              backgroundColor: const Color(0xFF102331),
+              color: const Color(0xFF2563EB),
+              backgroundColor: const Color(0xFFFFFFFF),
               onRefresh: cargarRecibos,
               child: CustomScrollView(
                 physics: const AlwaysScrollableScrollPhysics(),
@@ -678,7 +645,7 @@ class _RecibosAgenteScreenState extends State<RecibosAgenteScreen> {
                               child: Text(
                                 'RECIBOS',
                                 style: TextStyle(
-                                  color: Colors.white54,
+                                  color: const Color(0xFF64748B),
                                   fontSize: 11,
                                   fontWeight: FontWeight.w900,
                                   letterSpacing: 1.1,
@@ -688,7 +655,7 @@ class _RecibosAgenteScreenState extends State<RecibosAgenteScreen> {
                             Text(
                               '${recibosFiltrados.length} resultados',
                               style: const TextStyle(
-                                color: Colors.white38,
+                                color: const Color(0xFF78909C),
                                 fontSize: 11,
                                 fontWeight: FontWeight.w700,
                               ),
@@ -709,12 +676,9 @@ class _RecibosAgenteScreenState extends State<RecibosAgenteScreen> {
                       padding: const EdgeInsets.fromLTRB(16, 0, 16, 110),
                       sliver: SliverList.separated(
                         itemCount: recibosFiltrados.length,
-                        separatorBuilder: (_, __) =>
-                            const SizedBox(height: 12),
+                        separatorBuilder: (_, __) => const SizedBox(height: 12),
                         itemBuilder: (_, index) {
-                          return _reciboCard(
-                            recibosFiltrados[index],
-                          );
+                          return _reciboCard(recibosFiltrados[index]);
                         },
                       ),
                     ),
@@ -732,15 +696,9 @@ class _RecibosAgenteScreenState extends State<RecibosAgenteScreen> {
         gradient: const LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [
-            Color(0xFF0C3B5B),
-            Color(0xFF071A2B),
-            Color(0xFF071019),
-          ],
+          colors: [Color(0xFF111827), Color(0xFF1D4ED8)],
         ),
-        border: Border.all(
-          color: const Color(0xFF22D3EE).withOpacity(0.22),
-        ),
+        border: Border.all(color: Colors.white.withOpacity(0.22)),
       ),
       child: Row(
         children: [
@@ -748,12 +706,12 @@ class _RecibosAgenteScreenState extends State<RecibosAgenteScreen> {
             height: 54,
             width: 54,
             decoration: BoxDecoration(
-              color: const Color(0xFF22D3EE).withOpacity(0.14),
+              color: Colors.white.withOpacity(0.14),
               borderRadius: BorderRadius.circular(18),
             ),
             child: const Icon(
               Icons.account_balance_wallet_rounded,
-              color: Color(0xFF22D3EE),
+              color: Color(0xFF2563EB),
               size: 28,
             ),
           ),
@@ -765,7 +723,7 @@ class _RecibosAgenteScreenState extends State<RecibosAgenteScreen> {
                 const Text(
                   'Importe por gestionar',
                   style: TextStyle(
-                    color: Colors.white60,
+                    color: Colors.white70,
                     fontSize: 12,
                     fontWeight: FontWeight.w700,
                   ),
@@ -788,7 +746,7 @@ class _RecibosAgenteScreenState extends State<RecibosAgenteScreen> {
                 Text(
                   '$pendientes recibos necesitan seguimiento',
                   style: const TextStyle(
-                    color: Color(0xFF67E8F9),
+                    color: Color(0xFF2563EB),
                     fontSize: 11,
                     fontWeight: FontWeight.w700,
                   ),
@@ -809,7 +767,7 @@ class _RecibosAgenteScreenState extends State<RecibosAgenteScreen> {
             titulo: 'Pendientes',
             valor: pendientes.toString(),
             icono: Icons.schedule_rounded,
-            color: const Color(0xFFFBBF24),
+            color: const Color(0xFF1D4ED8),
           ),
         ),
         const SizedBox(width: 9),
@@ -818,7 +776,7 @@ class _RecibosAgenteScreenState extends State<RecibosAgenteScreen> {
             titulo: 'Cobrados',
             valor: cobrados.toString(),
             icono: Icons.check_circle_rounded,
-            color: const Color(0xFF4ADE80),
+            color: const Color(0xFF2563EB),
           ),
         ),
         const SizedBox(width: 9),
@@ -827,7 +785,7 @@ class _RecibosAgenteScreenState extends State<RecibosAgenteScreen> {
             titulo: 'Para baja',
             valor: paraBaja.toString(),
             icono: Icons.person_remove_rounded,
-            color: const Color(0xFFC084FC),
+            color: const Color(0xFF2563EB),
           ),
         ),
       ],
@@ -844,7 +802,7 @@ class _RecibosAgenteScreenState extends State<RecibosAgenteScreen> {
       height: 94,
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: const Color(0xFF0B1620),
+        color: const Color(0xFFFFFFFF),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: color.withOpacity(0.18)),
       ),
@@ -856,7 +814,7 @@ class _RecibosAgenteScreenState extends State<RecibosAgenteScreen> {
           Text(
             valor,
             style: const TextStyle(
-              color: Colors.white,
+              color: const Color(0xFF111827),
               fontSize: 21,
               fontWeight: FontWeight.w900,
             ),
@@ -866,7 +824,7 @@ class _RecibosAgenteScreenState extends State<RecibosAgenteScreen> {
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: const TextStyle(
-              color: const Color(0x75FFFFFF),
+              color: const Color(0xFF64748B),
               fontSize: 10,
               fontWeight: FontWeight.w700,
             ),
@@ -879,53 +837,47 @@ class _RecibosAgenteScreenState extends State<RecibosAgenteScreen> {
   Widget _buscador() {
     return TextField(
       style: const TextStyle(
-        color: Colors.white,
+        color: const Color(0xFF111827),
         fontWeight: FontWeight.w700,
       ),
       onChanged: (v) => setState(() => searchText = v),
       decoration: InputDecoration(
         hintText: 'Buscar cliente, póliza o compañía',
         hintStyle: const TextStyle(
-          color: Colors.white38,
+          color: const Color(0xFF78909C),
           fontSize: 13,
         ),
-        prefixIcon: const Icon(
-          Icons.search_rounded,
-          color: Color(0xFF22D3EE),
-        ),
+        prefixIcon: const Icon(Icons.search_rounded, color: Color(0xFF2563EB)),
         filled: true,
-        fillColor: const Color(0xFF0B1620),
+        fillColor: const Color(0xFFFFFFFF),
         contentPadding: const EdgeInsets.symmetric(vertical: 15),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(19),
-          borderSide: BorderSide(
-            color: Colors.white.withOpacity(0.07),
-          ),
+          borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(19),
-          borderSide: const BorderSide(
-            color: Color(0xFF22D3EE),
-          ),
+          borderSide: const BorderSide(color: Color(0xFF2563EB)),
         ),
       ),
     );
   }
 
   Widget _filtrosAvanzados() {
-    final filtrosActivos = (filtroFigura != 'Todas' ? 1 : 0) +
+    final filtrosActivos =
+        (filtroFigura != 'Todas' ? 1 : 0) +
         (filtroUsuarioAuthId != 'Todos' ? 1 : 0) +
         (fechaDesde != null ? 1 : 0) +
         (fechaHasta != null ? 1 : 0);
 
     return Container(
       decoration: BoxDecoration(
-        color: const Color(0xFF0B1620),
+        color: const Color(0xFFFFFFFF),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
           color: filtrosActivos > 0
-              ? const Color(0xFF22D3EE).withOpacity(0.28)
-              : Colors.white.withOpacity(0.07),
+              ? const Color(0xFF2563EB).withOpacity(0.28)
+              : Colors.white,
         ),
       ),
       child: Column(
@@ -938,22 +890,19 @@ class _RecibosAgenteScreenState extends State<RecibosAgenteScreen> {
               });
             },
             child: Padding(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 15,
-                vertical: 14,
-              ),
+              padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 14),
               child: Row(
                 children: [
                   Container(
                     height: 38,
                     width: 38,
                     decoration: BoxDecoration(
-                      color: const Color(0xFF22D3EE).withOpacity(0.12),
+                      color: const Color(0xFF2563EB).withOpacity(0.12),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: const Icon(
                       Icons.tune_rounded,
-                      color: Color(0xFF22D3EE),
+                      color: Color(0xFF2563EB),
                       size: 20,
                     ),
                   ),
@@ -965,7 +914,7 @@ class _RecibosAgenteScreenState extends State<RecibosAgenteScreen> {
                         Text(
                           'FILTROS AVANZADOS',
                           style: TextStyle(
-                            color: Colors.white,
+                            color: const Color(0xFF111827),
                             fontSize: 12,
                             fontWeight: FontWeight.w900,
                             letterSpacing: 0.7,
@@ -975,7 +924,7 @@ class _RecibosAgenteScreenState extends State<RecibosAgenteScreen> {
                         Text(
                           'Figura, estructura y periodo',
                           style: TextStyle(
-                            color: Color(0x75FFFFFF),
+                            color: Color(0xFF64748B),
                             fontSize: 10,
                             fontWeight: FontWeight.w600,
                           ),
@@ -991,7 +940,7 @@ class _RecibosAgenteScreenState extends State<RecibosAgenteScreen> {
                         vertical: 4,
                       ),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF22D3EE),
+                        color: const Color(0xFF2563EB),
                         borderRadius: BorderRadius.circular(20),
                       ),
                       child: Text(
@@ -1007,7 +956,7 @@ class _RecibosAgenteScreenState extends State<RecibosAgenteScreen> {
                     mostrarFiltrosAvanzados
                         ? Icons.keyboard_arrow_up_rounded
                         : Icons.keyboard_arrow_down_rounded,
-                    color: Colors.white54,
+                    color: const Color(0xFF64748B),
                   ),
                 ],
               ),
@@ -1023,10 +972,7 @@ class _RecibosAgenteScreenState extends State<RecibosAgenteScreen> {
               padding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
               child: Column(
                 children: [
-                  Divider(
-                    color: Colors.white.withOpacity(0.06),
-                    height: 1,
-                  ),
+                  Divider(color: const Color(0xFFD9E9EC), height: 1),
                   const SizedBox(height: 14),
                   _selectorFigura(),
                   const SizedBox(height: 10),
@@ -1070,10 +1016,9 @@ class _RecibosAgenteScreenState extends State<RecibosAgenteScreen> {
                           ),
                         ),
                         style: OutlinedButton.styleFrom(
-                          foregroundColor: const Color(0xFF67E8F9),
+                          foregroundColor: const Color(0xFF2563EB),
                           side: BorderSide(
-                            color: const Color(0xFF22D3EE)
-                                .withOpacity(0.30),
+                            color: const Color(0xFF2563EB).withOpacity(0.30),
                           ),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(14),
@@ -1096,17 +1041,14 @@ class _RecibosAgenteScreenState extends State<RecibosAgenteScreen> {
       value: _figurasDisponibles.contains(filtroFigura)
           ? filtroFigura
           : 'Todas',
-      dropdownColor: const Color(0xFF102331),
-      iconEnabledColor: const Color(0xFF22D3EE),
+      dropdownColor: const Color(0xFFFFFFFF),
+      iconEnabledColor: const Color(0xFF2563EB),
       style: const TextStyle(
-        color: Colors.white,
+        color: const Color(0xFF111827),
         fontSize: 12,
         fontWeight: FontWeight.w700,
       ),
-      decoration: _decoracionFiltro(
-        'Figura',
-        Icons.badge_rounded,
-      ),
+      decoration: _decoracionFiltro('Figura', Icons.badge_rounded),
       items: _figurasDisponibles.map((rol) {
         return DropdownMenuItem<String>(
           value: rol,
@@ -1129,18 +1071,17 @@ class _RecibosAgenteScreenState extends State<RecibosAgenteScreen> {
 
   Widget _selectorUsuarioEstructura() {
     final usuarios = _usuariosParaSelector;
-    final valorValido = filtroUsuarioAuthId == 'Todos' ||
-        usuarios.any(
-          (u) => u['auth_id']?.toString() == filtroUsuarioAuthId,
-        );
+    final valorValido =
+        filtroUsuarioAuthId == 'Todos' ||
+        usuarios.any((u) => u['auth_id']?.toString() == filtroUsuarioAuthId);
 
     return DropdownButtonFormField<String>(
       value: valorValido ? filtroUsuarioAuthId : 'Todos',
       isExpanded: true,
-      dropdownColor: const Color(0xFF102331),
-      iconEnabledColor: const Color(0xFF22D3EE),
+      dropdownColor: const Color(0xFFFFFFFF),
+      iconEnabledColor: const Color(0xFF2563EB),
       style: const TextStyle(
-        color: Colors.white,
+        color: const Color(0xFF111827),
         fontSize: 12,
         fontWeight: FontWeight.w700,
       ),
@@ -1174,39 +1115,25 @@ class _RecibosAgenteScreenState extends State<RecibosAgenteScreen> {
     );
   }
 
-  InputDecoration _decoracionFiltro(
-    String label,
-    IconData icono,
-  ) {
+  InputDecoration _decoracionFiltro(String label, IconData icono) {
     return InputDecoration(
       labelText: label,
       labelStyle: const TextStyle(
-        color: Colors.white54,
+        color: const Color(0xFF64748B),
         fontSize: 11,
         fontWeight: FontWeight.w700,
       ),
-      prefixIcon: Icon(
-        icono,
-        color: const Color(0xFF22D3EE),
-        size: 20,
-      ),
+      prefixIcon: Icon(icono, color: const Color(0xFF2563EB), size: 20),
       filled: true,
       fillColor: Colors.black.withOpacity(0.16),
-      contentPadding: const EdgeInsets.symmetric(
-        horizontal: 12,
-        vertical: 13,
-      ),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 13),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(15),
-        borderSide: BorderSide(
-          color: Colors.white.withOpacity(0.07),
-        ),
+        borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(15),
-        borderSide: const BorderSide(
-          color: Color(0xFF22D3EE),
-        ),
+        borderSide: const BorderSide(color: Color(0xFF2563EB)),
       ),
     );
   }
@@ -1227,15 +1154,15 @@ class _RecibosAgenteScreenState extends State<RecibosAgenteScreen> {
           borderRadius: BorderRadius.circular(15),
           border: Border.all(
             color: fecha != null
-                ? const Color(0xFF22D3EE).withOpacity(0.35)
-                : Colors.white.withOpacity(0.07),
+                ? const Color(0xFF2563EB).withOpacity(0.35)
+                : Colors.white,
           ),
         ),
         child: Row(
           children: [
             const Icon(
               Icons.calendar_month_rounded,
-              color: Color(0xFF22D3EE),
+              color: Color(0xFF2563EB),
               size: 20,
             ),
             const SizedBox(width: 9),
@@ -1247,19 +1174,18 @@ class _RecibosAgenteScreenState extends State<RecibosAgenteScreen> {
                   Text(
                     titulo,
                     style: const TextStyle(
-                      color: Colors.white38,
+                      color: const Color(0xFF78909C),
                       fontSize: 9,
                       fontWeight: FontWeight.w700,
                     ),
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    fecha == null
-                        ? 'Sin fecha'
-                        : _formatFechaCorta(fecha),
+                    fecha == null ? 'Sin fecha' : _formatFechaCorta(fecha),
                     style: TextStyle(
-                      color:
-                          fecha == null ? Colors.white60 : Colors.white,
+                      color: fecha == null
+                          ? const Color(0xFF64748B)
+                          : Colors.white,
                       fontSize: 11,
                       fontWeight: FontWeight.w800,
                     ),
@@ -1280,7 +1206,7 @@ class _RecibosAgenteScreenState extends State<RecibosAgenteScreen> {
                 },
                 child: const Icon(
                   Icons.close_rounded,
-                  color: Colors.white38,
+                  color: const Color(0xFF78909C),
                   size: 17,
                 ),
               ),
@@ -1307,12 +1233,12 @@ class _RecibosAgenteScreenState extends State<RecibosAgenteScreen> {
         return Theme(
           data: Theme.of(context).copyWith(
             colorScheme: const ColorScheme.dark(
-              primary: Color(0xFF22D3EE),
+              primary: Color(0xFF2563EB),
               onPrimary: Colors.black,
-              surface: Color(0xFF0B1620),
+              surface: Color(0xFFFFFFFF),
               onSurface: Colors.white,
             ),
-            dialogBackgroundColor: const Color(0xFF0B1620),
+            dialogBackgroundColor: const Color(0xFFFFFFFF),
           ),
           child: child!,
         );
@@ -1321,22 +1247,18 @@ class _RecibosAgenteScreenState extends State<RecibosAgenteScreen> {
 
     if (seleccionada == null || !mounted) return;
 
-    if (esDesde &&
-        fechaHasta != null &&
-        seleccionada.isAfter(fechaHasta!)) {
+    if (esDesde && fechaHasta != null && seleccionada.isAfter(fechaHasta!)) {
       _snack(
         'La fecha desde no puede ser posterior a la fecha hasta.',
-        color: const Color(0xFFF59E0B),
+        color: const Color(0xFF1D4ED8),
       );
       return;
     }
 
-    if (!esDesde &&
-        fechaDesde != null &&
-        seleccionada.isBefore(fechaDesde!)) {
+    if (!esDesde && fechaDesde != null && seleccionada.isBefore(fechaDesde!)) {
       _snack(
         'La fecha hasta no puede ser anterior a la fecha desde.',
-        color: const Color(0xFFF59E0B),
+        color: const Color(0xFF1D4ED8),
       );
       return;
     }
@@ -1366,12 +1288,7 @@ class _RecibosAgenteScreenState extends State<RecibosAgenteScreen> {
   }
 
   Widget _filtros() {
-    const filtros = [
-      'Todos',
-      'Pendientes',
-      'Cobrados',
-      'Para baja',
-    ];
+    const filtros = ['Todos', 'Pendientes', 'Cobrados', 'Para baja'];
 
     return SizedBox(
       height: 41,
@@ -1392,19 +1309,17 @@ class _RecibosAgenteScreenState extends State<RecibosAgenteScreen> {
               alignment: Alignment.center,
               decoration: BoxDecoration(
                 color: selected
-                    ? const Color(0xFF22D3EE)
-                    : const Color(0xFF0B1620),
+                    ? const Color(0xFF2563EB)
+                    : const Color(0xFFFFFFFF),
                 borderRadius: BorderRadius.circular(30),
                 border: Border.all(
-                  color: selected
-                      ? const Color(0xFF22D3EE)
-                      : Colors.white.withOpacity(0.08),
+                  color: selected ? const Color(0xFF2563EB) : Colors.white,
                 ),
               ),
               child: Text(
                 item,
                 style: TextStyle(
-                  color: selected ? Colors.black : Colors.white70,
+                  color: selected ? Colors.black : const Color(0xFF475569),
                   fontWeight: FontWeight.w900,
                   fontSize: 11,
                 ),
@@ -1434,9 +1349,7 @@ class _RecibosAgenteScreenState extends State<RecibosAgenteScreen> {
         onTap: () async {
           final actualizado = await Navigator.push<bool>(
             context,
-            MaterialPageRoute(
-              builder: (_) => ReciboDetalleScreen(recibo: r),
-            ),
+            MaterialPageRoute(builder: (_) => ReciboDetalleScreen(recibo: r)),
           );
 
           if (actualizado == true || mounted) {
@@ -1446,11 +1359,9 @@ class _RecibosAgenteScreenState extends State<RecibosAgenteScreen> {
         child: Ink(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: const Color(0xFF0B1620),
+            color: const Color(0xFFFFFFFF),
             borderRadius: BorderRadius.circular(23),
-            border: Border.all(
-              color: color.withOpacity(0.20),
-            ),
+            border: Border.all(color: color.withOpacity(0.20)),
           ),
           child: Column(
             children: [
@@ -1464,11 +1375,7 @@ class _RecibosAgenteScreenState extends State<RecibosAgenteScreen> {
                       color: color.withOpacity(0.12),
                       borderRadius: BorderRadius.circular(15),
                     ),
-                    child: Icon(
-                      _estadoIcon(estado),
-                      color: color,
-                      size: 23,
-                    ),
+                    child: Icon(_estadoIcon(estado), color: color, size: 23),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -1480,7 +1387,7 @@ class _RecibosAgenteScreenState extends State<RecibosAgenteScreen> {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
-                            color: Colors.white,
+                            color: const Color(0xFF111827),
                             fontSize: 15,
                             fontWeight: FontWeight.w900,
                           ),
@@ -1491,7 +1398,7 @@ class _RecibosAgenteScreenState extends State<RecibosAgenteScreen> {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
-                            color: const Color(0x75FFFFFF),
+                            color: const Color(0xFF64748B),
                             fontSize: 11,
                             fontWeight: FontWeight.w600,
                           ),
@@ -1506,7 +1413,7 @@ class _RecibosAgenteScreenState extends State<RecibosAgenteScreen> {
                       Text(
                         '${importe.toStringAsFixed(2)} €',
                         style: const TextStyle(
-                          color: Colors.white,
+                          color: const Color(0xFF111827),
                           fontSize: 15,
                           fontWeight: FontWeight.w900,
                         ),
@@ -1522,14 +1429,14 @@ class _RecibosAgenteScreenState extends State<RecibosAgenteScreen> {
                 children: [
                   Icon(
                     Icons.calendar_today_rounded,
-                    color: Colors.white.withOpacity(0.35),
+                    color: const Color(0xFF78909C),
                     size: 14,
                   ),
                   const SizedBox(width: 6),
                   Text(
                     fecha,
                     style: const TextStyle(
-                      color: const Color(0x75FFFFFF),
+                      color: const Color(0xFF64748B),
                       fontSize: 11,
                       fontWeight: FontWeight.w600,
                     ),
@@ -1538,7 +1445,7 @@ class _RecibosAgenteScreenState extends State<RecibosAgenteScreen> {
                   const Text(
                     'Abrir gestión',
                     style: TextStyle(
-                      color: Color(0xFF67E8F9),
+                      color: Color(0xFF2563EB),
                       fontSize: 11,
                       fontWeight: FontWeight.w800,
                     ),
@@ -1546,7 +1453,7 @@ class _RecibosAgenteScreenState extends State<RecibosAgenteScreen> {
                   const SizedBox(width: 4),
                   const Icon(
                     Icons.arrow_forward_rounded,
-                    color: Color(0xFF67E8F9),
+                    color: Color(0xFF2563EB),
                     size: 16,
                   ),
                 ],
@@ -1557,7 +1464,7 @@ class _RecibosAgenteScreenState extends State<RecibosAgenteScreen> {
                   width: double.infinity,
                   padding: const EdgeInsets.all(11),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFFB7185).withOpacity(0.08),
+                    color: const Color(0xFFE74646).withOpacity(0.08),
                     borderRadius: BorderRadius.circular(14),
                   ),
                   child: Text(
@@ -1565,7 +1472,7 @@ class _RecibosAgenteScreenState extends State<RecibosAgenteScreen> {
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
-                      color: Colors.white60,
+                      color: const Color(0xFF64748B),
                       fontSize: 11,
                       fontWeight: FontWeight.w600,
                     ),
@@ -1583,10 +1490,7 @@ class _RecibosAgenteScreenState extends State<RecibosAgenteScreen> {
     final color = _estadoColor(estado);
 
     return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: 8,
-        vertical: 4,
-      ),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
         color: color.withOpacity(0.12),
         borderRadius: BorderRadius.circular(20),
@@ -1613,20 +1517,20 @@ class _RecibosAgenteScreenState extends State<RecibosAgenteScreen> {
               height: 80,
               width: 80,
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.04),
+                color: Colors.white,
                 shape: BoxShape.circle,
               ),
               child: Icon(
                 Icons.receipt_long_outlined,
                 size: 40,
-                color: Colors.white.withOpacity(0.20),
+                color: const Color(0xFF9AAAB5),
               ),
             ),
             const SizedBox(height: 18),
             const Text(
               'No hay recibos',
               style: TextStyle(
-                color: Colors.white,
+                color: const Color(0xFF111827),
                 fontSize: 20,
                 fontWeight: FontWeight.w900,
               ),
@@ -1636,7 +1540,7 @@ class _RecibosAgenteScreenState extends State<RecibosAgenteScreen> {
               'No existen recibos que coincidan con esta búsqueda o filtro.',
               textAlign: TextAlign.center,
               style: TextStyle(
-                color: const Color(0x75FFFFFF),
+                color: const Color(0xFF64748B),
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -1650,14 +1554,10 @@ class _RecibosAgenteScreenState extends State<RecibosAgenteScreen> {
 class ReciboDetalleScreen extends StatefulWidget {
   final Map<String, dynamic> recibo;
 
-  const ReciboDetalleScreen({
-    super.key,
-    required this.recibo,
-  });
+  const ReciboDetalleScreen({super.key, required this.recibo});
 
   @override
-  State<ReciboDetalleScreen> createState() =>
-      _ReciboDetalleScreenState();
+  State<ReciboDetalleScreen> createState() => _ReciboDetalleScreenState();
 }
 
 class _ReciboDetalleScreenState extends State<ReciboDetalleScreen> {
@@ -1673,8 +1573,7 @@ class _ReciboDetalleScreenState extends State<ReciboDetalleScreen> {
   List<Map<String, dynamic>> comentarios = [];
   List<Map<String, dynamic>> pagos = [];
 
-  final TextEditingController comentarioController =
-      TextEditingController();
+  final TextEditingController comentarioController = TextEditingController();
 
   String? resultadoGestion;
 
@@ -1695,10 +1594,7 @@ class _ReciboDetalleScreenState extends State<ReciboDetalleScreen> {
     if (value == null) return 0;
     if (value is num) return value.toDouble();
 
-    return double.tryParse(
-          value.toString().replaceAll(',', '.'),
-        ) ??
-        0;
+    return double.tryParse(value.toString().replaceAll(',', '.')) ?? 0;
   }
 
   String _normalizar(dynamic value) {
@@ -1724,20 +1620,20 @@ class _ReciboDetalleScreenState extends State<ReciboDetalleScreen> {
     final e = _normalizar(estado);
 
     if (e == 'pagado' || e == 'cobrado') {
-      return const Color(0xFF4ADE80);
+      return const Color(0xFF2563EB);
     }
-    if (e == 'pendiente') return const Color(0xFFFBBF24);
+    if (e == 'pendiente') return const Color(0xFF1D4ED8);
     if (e == 'devuelto' || e == 'impagado') {
-      return const Color(0xFFFB7185);
+      return const Color(0xFFE74646);
     }
     if (e == 'en gestión' || e == 'en gestion') {
-      return const Color(0xFF22D3EE);
+      return const Color(0xFF2563EB);
     }
     if (e == 'para baja' || e == 'para_baja' || e == 'baja') {
-      return const Color(0xFFC084FC);
+      return const Color(0xFF2563EB);
     }
 
-    return Colors.white54;
+    return const Color(0xFF64748B);
   }
 
   String _estadoVisible(String estado) {
@@ -1783,8 +1679,7 @@ class _ReciboDetalleScreenState extends State<ReciboDetalleScreen> {
       if (!mounted) return;
 
       setState(() {
-        comentarios =
-            List<Map<String, dynamic>>.from(resultados[0]);
+        comentarios = List<Map<String, dynamic>>.from(resultados[0]);
         pagos = List<Map<String, dynamic>>.from(resultados[1]);
         loading = false;
       });
@@ -1804,7 +1699,7 @@ class _ReciboDetalleScreenState extends State<ReciboDetalleScreen> {
     if (comentario.isEmpty) {
       _snack(
         'Escribe primero el resultado de la gestión.',
-        color: const Color(0xFFF59E0B),
+        color: const Color(0xFF1D4ED8),
       );
       return;
     }
@@ -1812,7 +1707,7 @@ class _ReciboDetalleScreenState extends State<ReciboDetalleScreen> {
     if (resultadoGestion == null) {
       _snack(
         'Selecciona: Cobrado, Pendiente o Para baja.',
-        color: const Color(0xFFF59E0B),
+        color: const Color(0xFF1D4ED8),
       );
       return;
     }
@@ -1820,16 +1715,14 @@ class _ReciboDetalleScreenState extends State<ReciboDetalleScreen> {
     final user = supabase.auth.currentUser;
     final poliza = reciboActual['poliza'];
     final nuevoEstado = resultadoGestion!;
-    final usuario =
-        user?.email ?? user?.id ?? 'Usuario';
+    final usuario = user?.email ?? user?.id ?? 'Usuario';
 
     setState(() => guardandoGestion = true);
 
     try {
       await supabase.from('recibos_comentarios').insert({
         'poliza': poliza,
-        'comentario':
-            '[$nuevoEstado] $comentario',
+        'comentario': '[$nuevoEstado] $comentario',
         'usuario': usuario,
       });
 
@@ -1876,23 +1769,18 @@ class _ReciboDetalleScreenState extends State<ReciboDetalleScreen> {
 
     final emailController = TextEditingController();
 
-    final cliente =
-        reciboActual['cliente']?.toString() ?? '';
-    final poliza =
-        reciboActual['poliza']?.toString() ?? '';
-    final compania =
-        reciboActual['compania']?.toString() ?? '';
+    final cliente = reciboActual['cliente']?.toString() ?? '';
+    final poliza = reciboActual['poliza']?.toString() ?? '';
+    final compania = reciboActual['compania']?.toString() ?? '';
     final importe = _money(reciboActual['importe']);
 
     await showModalBottomSheet<void>(
       context: context,
-      backgroundColor: const Color(0xFF0A1722),
+      backgroundColor: const Color(0xFFFFFFFF),
       isScrollControlled: true,
       useSafeArea: true,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(
-          top: Radius.circular(28),
-        ),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
       ),
       builder: (modalContext) {
         return Padding(
@@ -1900,8 +1788,7 @@ class _ReciboDetalleScreenState extends State<ReciboDetalleScreen> {
             left: 18,
             right: 18,
             top: 14,
-            bottom:
-                MediaQuery.of(modalContext).viewInsets.bottom + 22,
+            bottom: MediaQuery.of(modalContext).viewInsets.bottom + 22,
           ),
           child: SingleChildScrollView(
             child: Column(
@@ -1913,7 +1800,7 @@ class _ReciboDetalleScreenState extends State<ReciboDetalleScreen> {
                     width: 42,
                     height: 5,
                     decoration: BoxDecoration(
-                      color: Colors.white24,
+                      color: const Color(0xFFB7D7DA),
                       borderRadius: BorderRadius.circular(20),
                     ),
                   ),
@@ -1922,7 +1809,7 @@ class _ReciboDetalleScreenState extends State<ReciboDetalleScreen> {
                 const Text(
                   'Enviar enlace de pago',
                   style: TextStyle(
-                    color: Colors.white,
+                    color: const Color(0xFF111827),
                     fontSize: 22,
                     fontWeight: FontWeight.w900,
                   ),
@@ -1931,7 +1818,7 @@ class _ReciboDetalleScreenState extends State<ReciboDetalleScreen> {
                 const Text(
                   'El envío quedará registrado automáticamente en el histórico.',
                   style: TextStyle(
-                    color: const Color(0x75FFFFFF),
+                    color: const Color(0xFF64748B),
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
                   ),
@@ -1940,17 +1827,13 @@ class _ReciboDetalleScreenState extends State<ReciboDetalleScreen> {
                 _modalInfo('Cliente', cliente),
                 _modalInfo('Póliza', poliza),
                 _modalInfo('Compañía', compania),
-                _modalInfo(
-                  'Importe',
-                  '${importe.toStringAsFixed(2)} €',
-                ),
+                _modalInfo('Importe', '${importe.toStringAsFixed(2)} €'),
                 const SizedBox(height: 12),
                 TextField(
                   controller: emailController,
                   keyboardType: TextInputType.emailAddress,
-                  style: const TextStyle(color: Colors.white),
-                  decoration:
-                      _inputDecoration('Email destinatario'),
+                  style: const TextStyle(color: const Color(0xFF111827)),
+                  decoration: _inputDecoration('Email destinatario'),
                 ),
                 const SizedBox(height: 16),
                 SizedBox(
@@ -1958,8 +1841,7 @@ class _ReciboDetalleScreenState extends State<ReciboDetalleScreen> {
                   height: 54,
                   child: ElevatedButton.icon(
                     onPressed: () {
-                      final email =
-                          emailController.text.trim();
+                      final email = emailController.text.trim();
 
                       Navigator.pop(modalContext);
                       enviarEmailTpv(email);
@@ -1967,13 +1849,10 @@ class _ReciboDetalleScreenState extends State<ReciboDetalleScreen> {
                     icon: const Icon(Icons.send_rounded),
                     label: const Text(
                       'ENVIAR ENLACE',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w900,
-                      ),
+                      style: TextStyle(fontWeight: FontWeight.w900),
                     ),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor:
-                          const Color(0xFF22D3EE),
+                      backgroundColor: const Color(0xFF2563EB),
                       foregroundColor: Colors.black,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(17),
@@ -1992,8 +1871,7 @@ class _ReciboDetalleScreenState extends State<ReciboDetalleScreen> {
   }
 
   Future<void> enviarEmailTpv(String emailDestino) async {
-    if (emailDestino.isEmpty ||
-        !emailDestino.contains('@')) {
+    if (emailDestino.isEmpty || !emailDestino.contains('@')) {
       _snack('Introduce un email válido.');
       return;
     }
@@ -2003,13 +1881,10 @@ class _ReciboDetalleScreenState extends State<ReciboDetalleScreen> {
       return;
     }
 
-    const url =
-        'https://www.fiatc.es/atencion-cliente/pago-recibos';
+    const url = 'https://www.fiatc.es/atencion-cliente/pago-recibos';
 
-    final poliza =
-        reciboActual['poliza']?.toString() ?? '';
-    final cliente =
-        reciboActual['cliente']?.toString() ?? '';
+    final poliza = reciboActual['poliza']?.toString() ?? '';
+    final cliente = reciboActual['cliente']?.toString() ?? '';
     final importe = _money(reciboActual['importe']);
 
     setState(() => enviandoTpv = true);
@@ -2032,9 +1907,9 @@ class _ReciboDetalleScreenState extends State<ReciboDetalleScreen> {
 
       await supabase.from('recibos_comentarios').insert({
         'poliza': poliza,
-        'comentario':
-            '[En gestión] Enlace TPV enviado a $emailDestino',
-        'usuario': supabase.auth.currentUser?.email ??
+        'comentario': '[En gestión] Enlace TPV enviado a $emailDestino',
+        'usuario':
+            supabase.auth.currentUser?.email ??
             supabase.auth.currentUser?.id ??
             'Usuario',
       });
@@ -2054,10 +1929,7 @@ class _ReciboDetalleScreenState extends State<ReciboDetalleScreen> {
 
       await cargarDetalle();
 
-      _snack(
-        'Email enviado correctamente.',
-        color: const Color(0xFF15803D),
-      );
+      _snack('Email enviado correctamente.', color: const Color(0xFF15803D));
     } catch (e) {
       debugPrint('ERROR ENVIANDO EMAIL TPV: $e');
 
@@ -2065,17 +1937,12 @@ class _ReciboDetalleScreenState extends State<ReciboDetalleScreen> {
 
       setState(() => enviandoTpv = false);
 
-      _snack(
-        'No se pudo enviar el email.',
-        color: const Color(0xFFBE123C),
-      );
+      _snack('No se pudo enviar el email.', color: const Color(0xFFBE123C));
     }
   }
 
   Future<void> abrirTpvEnNavegador() async {
-    final uri = Uri.parse(
-      'https://www.fiatc.es/atencion-cliente/pago-recibos',
-    );
+    final uri = Uri.parse('https://www.fiatc.es/atencion-cliente/pago-recibos');
 
     try {
       final abierto = await launchUrl(
@@ -2092,15 +1959,10 @@ class _ReciboDetalleScreenState extends State<ReciboDetalleScreen> {
   }
 
   void _accionNoPermitida() {
-    _snack(
-      'Este recibo ya está cerrado y no admite nuevas acciones de cobro.',
-    );
+    _snack('Este recibo ya está cerrado y no admite nuevas acciones de cobro.');
   }
 
-  void _snack(
-    String texto, {
-    Color color = const Color(0xFF102331),
-  }) {
+  void _snack(String texto, {Color color = const Color(0xFFFFFFFF)}) {
     if (!mounted) return;
 
     ScaffoldMessenger.of(context).showSnackBar(
@@ -2110,7 +1972,7 @@ class _ReciboDetalleScreenState extends State<ReciboDetalleScreen> {
         content: Text(
           texto,
           style: const TextStyle(
-            color: Colors.white,
+            color: const Color(0xFF111827),
             fontWeight: FontWeight.w700,
           ),
         ),
@@ -2125,39 +1987,33 @@ class _ReciboDetalleScreenState extends State<ReciboDetalleScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final estado =
-        (reciboActual['estado'] ?? 'Pendiente').toString();
+    final estado = (reciboActual['estado'] ?? 'Pendiente').toString();
     final color = _estadoColor(estado);
     final importe = _money(reciboActual['importe']);
-    final poliza =
-        (reciboActual['poliza'] ?? '').toString();
-    final cliente =
-        (reciboActual['cliente'] ?? 'Sin cliente').toString();
-    final compania =
-        (reciboActual['compania'] ?? 'Sin compañía').toString();
-    final motivo =
-        (reciboActual['motivo'] ?? '').toString();
+    final poliza = (reciboActual['poliza'] ?? '').toString();
+    final cliente = (reciboActual['cliente'] ?? 'Sin cliente').toString();
+    final compania = (reciboActual['compania'] ?? 'Sin compañía').toString();
+    final motivo = (reciboActual['motivo'] ?? '').toString();
 
     return WillPopScope(
       onWillPop: _onWillPop,
       child: Scaffold(
-        backgroundColor: const Color(0xFF050A11),
+        backgroundColor: const Color(0xFFF4F6FB),
         appBar: AppBar(
-          backgroundColor: const Color(0xFF050A11),
+          backgroundColor: const Color(0xFFF4F6FB),
           surfaceTintColor: Colors.transparent,
           elevation: 0,
           leading: IconButton(
-            onPressed: () =>
-                Navigator.pop(context, huboCambios),
+            onPressed: () => Navigator.pop(context, huboCambios),
             icon: const Icon(
               Icons.arrow_back_rounded,
-              color: Colors.white,
+              color: Color(0xFF111827),
             ),
           ),
           title: const Text(
             'Gestión del recibo',
             style: TextStyle(
-              color: Colors.white,
+              color: const Color(0xFF111827),
               fontWeight: FontWeight.w900,
               fontSize: 20,
             ),
@@ -2165,13 +2021,10 @@ class _ReciboDetalleScreenState extends State<ReciboDetalleScreen> {
         ),
         body: loading
             ? const Center(
-                child: CircularProgressIndicator(
-                  color: Color(0xFF22D3EE),
-                ),
+                child: CircularProgressIndicator(color: Color(0xFF2563EB)),
               )
             : ListView(
-                padding:
-                    const EdgeInsets.fromLTRB(16, 8, 16, 110),
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 110),
                 children: [
                   _cabeceraDetalle(
                     cliente: cliente,
@@ -2210,10 +2063,7 @@ class _ReciboDetalleScreenState extends State<ReciboDetalleScreen> {
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [
-            color.withOpacity(0.18),
-            const Color(0xFF0B1620),
-          ],
+          colors: [color.withOpacity(0.18), const Color(0xFFFFFFFF)],
         ),
         border: Border.all(color: color.withOpacity(0.24)),
       ),
@@ -2227,7 +2077,7 @@ class _ReciboDetalleScreenState extends State<ReciboDetalleScreen> {
                 child: Text(
                   cliente,
                   style: const TextStyle(
-                    color: Colors.white,
+                    color: const Color(0xFF111827),
                     fontSize: 21,
                     fontWeight: FontWeight.w900,
                     letterSpacing: -0.4,
@@ -2242,7 +2092,7 @@ class _ReciboDetalleScreenState extends State<ReciboDetalleScreen> {
           Text(
             '$compania · Póliza $poliza',
             style: const TextStyle(
-              color: Colors.white54,
+              color: const Color(0xFF64748B),
               fontSize: 12,
               fontWeight: FontWeight.w700,
             ),
@@ -2251,7 +2101,7 @@ class _ReciboDetalleScreenState extends State<ReciboDetalleScreen> {
           Text(
             '${importe.toStringAsFixed(2)} €',
             style: const TextStyle(
-              color: Colors.white,
+              color: const Color(0xFF111827),
               fontSize: 38,
               fontWeight: FontWeight.w900,
               letterSpacing: -1.4,
@@ -2263,11 +2113,10 @@ class _ReciboDetalleScreenState extends State<ReciboDetalleScreen> {
               width: double.infinity,
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: const Color(0xFFFB7185).withOpacity(0.08),
+                color: const Color(0xFFE74646).withOpacity(0.08),
                 borderRadius: BorderRadius.circular(15),
                 border: Border.all(
-                  color:
-                      const Color(0xFFFB7185).withOpacity(0.18),
+                  color: const Color(0xFFE74646).withOpacity(0.18),
                 ),
               ),
               child: Row(
@@ -2275,7 +2124,7 @@ class _ReciboDetalleScreenState extends State<ReciboDetalleScreen> {
                 children: [
                   const Icon(
                     Icons.info_outline_rounded,
-                    color: Color(0xFFFB7185),
+                    color: Color(0xFFE74646),
                     size: 18,
                   ),
                   const SizedBox(width: 8),
@@ -2283,7 +2132,7 @@ class _ReciboDetalleScreenState extends State<ReciboDetalleScreen> {
                     child: Text(
                       motivo,
                       style: const TextStyle(
-                        color: Colors.white70,
+                        color: const Color(0xFF475569),
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
                       ),
@@ -2302,28 +2151,22 @@ class _ReciboDetalleScreenState extends State<ReciboDetalleScreen> {
     return Container(
       padding: const EdgeInsets.all(17),
       decoration: BoxDecoration(
-        color: const Color(0xFF0B1620),
+        color: const Color(0xFFFFFFFF),
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(
-          color: const Color(0xFF22D3EE).withOpacity(0.16),
-        ),
+        border: Border.all(color: const Color(0xFF2563EB).withOpacity(0.16)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Row(
             children: [
-              Icon(
-                Icons.edit_note_rounded,
-                color: Color(0xFF22D3EE),
-                size: 23,
-              ),
+              Icon(Icons.edit_note_rounded, color: Color(0xFF2563EB), size: 23),
               SizedBox(width: 9),
               Expanded(
                 child: Text(
                   'NUEVA GESTIÓN',
                   style: TextStyle(
-                    color: Colors.white,
+                    color: const Color(0xFF111827),
                     fontSize: 13,
                     fontWeight: FontWeight.w900,
                     letterSpacing: 0.7,
@@ -2336,7 +2179,7 @@ class _ReciboDetalleScreenState extends State<ReciboDetalleScreen> {
           const Text(
             'Describe qué has hecho y selecciona el resultado. Ambos campos son obligatorios.',
             style: TextStyle(
-              color: const Color(0x75FFFFFF),
+              color: const Color(0xFF64748B),
               fontSize: 11,
               fontWeight: FontWeight.w600,
             ),
@@ -2348,7 +2191,7 @@ class _ReciboDetalleScreenState extends State<ReciboDetalleScreen> {
             maxLines: 5,
             textCapitalization: TextCapitalization.sentences,
             style: const TextStyle(
-              color: Colors.white,
+              color: const Color(0xFF111827),
               fontWeight: FontWeight.w600,
             ),
             decoration: _inputDecoration(
@@ -2359,7 +2202,7 @@ class _ReciboDetalleScreenState extends State<ReciboDetalleScreen> {
           const Text(
             'RESULTADO DE LA GESTIÓN',
             style: TextStyle(
-              color: const Color(0x75FFFFFF),
+              color: const Color(0xFF64748B),
               fontSize: 10,
               fontWeight: FontWeight.w900,
               letterSpacing: 0.7,
@@ -2373,7 +2216,7 @@ class _ReciboDetalleScreenState extends State<ReciboDetalleScreen> {
                   valor: 'Pagado',
                   titulo: 'Cobrado',
                   icono: Icons.check_circle_rounded,
-                  color: const Color(0xFF4ADE80),
+                  color: const Color(0xFF2563EB),
                 ),
               ),
               const SizedBox(width: 8),
@@ -2382,7 +2225,7 @@ class _ReciboDetalleScreenState extends State<ReciboDetalleScreen> {
                   valor: 'Pendiente',
                   titulo: 'Pendiente',
                   icono: Icons.schedule_rounded,
-                  color: const Color(0xFFFBBF24),
+                  color: const Color(0xFF1D4ED8),
                 ),
               ),
               const SizedBox(width: 8),
@@ -2391,7 +2234,7 @@ class _ReciboDetalleScreenState extends State<ReciboDetalleScreen> {
                   valor: 'Para baja',
                   titulo: 'Para baja',
                   icono: Icons.person_remove_rounded,
-                  color: const Color(0xFFC084FC),
+                  color: const Color(0xFF2563EB),
                 ),
               ),
             ],
@@ -2401,8 +2244,7 @@ class _ReciboDetalleScreenState extends State<ReciboDetalleScreen> {
             width: double.infinity,
             height: 54,
             child: ElevatedButton.icon(
-              onPressed:
-                  guardandoGestion ? null : guardarGestion,
+              onPressed: guardandoGestion ? null : guardarGestion,
               icon: guardandoGestion
                   ? const SizedBox(
                       width: 19,
@@ -2414,18 +2256,15 @@ class _ReciboDetalleScreenState extends State<ReciboDetalleScreen> {
                     )
                   : const Icon(Icons.save_rounded),
               label: Text(
-                guardandoGestion
-                    ? 'GUARDANDO...'
-                    : 'GUARDAR GESTIÓN',
-                style: const TextStyle(
-                  fontWeight: FontWeight.w900,
-                ),
+                guardandoGestion ? 'GUARDANDO...' : 'GUARDAR GESTIÓN',
+                style: const TextStyle(fontWeight: FontWeight.w900),
               ),
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF22D3EE),
+                backgroundColor: const Color(0xFF2563EB),
                 foregroundColor: Colors.black,
-                disabledBackgroundColor:
-                    const Color(0xFF22D3EE).withOpacity(0.45),
+                disabledBackgroundColor: const Color(
+                  0xFF20C7C2,
+                ).withOpacity(0.45),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(17),
                 ),
@@ -2451,19 +2290,14 @@ class _ReciboDetalleScreenState extends State<ReciboDetalleScreen> {
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 170),
         height: 76,
-        padding: const EdgeInsets.symmetric(
-          horizontal: 5,
-          vertical: 9,
-        ),
+        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 9),
         decoration: BoxDecoration(
           color: selected
               ? color.withOpacity(0.18)
               : Colors.white.withOpacity(0.035),
           borderRadius: BorderRadius.circular(17),
           border: Border.all(
-            color: selected
-                ? color
-                : Colors.white.withOpacity(0.08),
+            color: selected ? color : Colors.white,
             width: selected ? 1.4 : 1,
           ),
         ),
@@ -2477,7 +2311,7 @@ class _ReciboDetalleScreenState extends State<ReciboDetalleScreen> {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
-                color: selected ? Colors.white : Colors.white60,
+                color: selected ? Colors.white : const Color(0xFF64748B),
                 fontSize: 10,
                 fontWeight: FontWeight.w900,
               ),
@@ -2492,11 +2326,9 @@ class _ReciboDetalleScreenState extends State<ReciboDetalleScreen> {
     return Container(
       padding: const EdgeInsets.all(17),
       decoration: BoxDecoration(
-        color: const Color(0xFF0B1620),
+        color: const Color(0xFFFFFFFF),
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(
-          color: Colors.white.withOpacity(0.07),
-        ),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -2504,7 +2336,7 @@ class _ReciboDetalleScreenState extends State<ReciboDetalleScreen> {
           const Text(
             'HERRAMIENTAS DE COBRO',
             style: TextStyle(
-              color: Colors.white54,
+              color: const Color(0xFF64748B),
               fontSize: 11,
               fontWeight: FontWeight.w900,
               letterSpacing: 0.8,
@@ -2513,9 +2345,7 @@ class _ReciboDetalleScreenState extends State<ReciboDetalleScreen> {
           const SizedBox(height: 12),
           _accionRapida(
             icono: Icons.email_rounded,
-            color: accionesPermitidas
-                ? const Color(0xFF22D3EE)
-                : Colors.grey,
+            color: accionesPermitidas ? const Color(0xFF2563EB) : Colors.grey,
             titulo: 'Enviar enlace TPV',
             subtitulo: accionesPermitidas
                 ? 'Enviar al cliente por email'
@@ -2540,11 +2370,9 @@ class _ReciboDetalleScreenState extends State<ReciboDetalleScreen> {
     return Container(
       padding: const EdgeInsets.all(17),
       decoration: BoxDecoration(
-        color: const Color(0xFF0B1620),
+        color: const Color(0xFFFFFFFF),
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(
-          color: Colors.white.withOpacity(0.07),
-        ),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -2555,7 +2383,7 @@ class _ReciboDetalleScreenState extends State<ReciboDetalleScreen> {
                 child: Text(
                   'HISTÓRICO DE GESTIONES',
                   style: TextStyle(
-                    color: Colors.white54,
+                    color: const Color(0xFF64748B),
                     fontSize: 11,
                     fontWeight: FontWeight.w900,
                     letterSpacing: 0.8,
@@ -2564,7 +2392,7 @@ class _ReciboDetalleScreenState extends State<ReciboDetalleScreen> {
               ),
               Icon(
                 Icons.history_rounded,
-                color: Colors.white38,
+                color: const Color(0xFF78909C),
                 size: 19,
               ),
             ],
@@ -2577,7 +2405,7 @@ class _ReciboDetalleScreenState extends State<ReciboDetalleScreen> {
                 child: Text(
                   'Todavía no hay gestiones registradas.',
                   style: TextStyle(
-                    color: const Color(0x75FFFFFF),
+                    color: const Color(0xFF64748B),
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -2585,15 +2413,14 @@ class _ReciboDetalleScreenState extends State<ReciboDetalleScreen> {
             )
           else
             ...comentarios.map((c) {
-              final texto =
-                  c['comentario']?.toString() ?? '';
+              final texto = c['comentario']?.toString() ?? '';
               final color = texto.startsWith('[Pagado]')
-                  ? const Color(0xFF4ADE80)
+                  ? const Color(0xFF2563EB)
                   : texto.startsWith('[Para baja]')
-                      ? const Color(0xFFC084FC)
-                      : texto.startsWith('[Pendiente]')
-                          ? const Color(0xFFFBBF24)
-                          : const Color(0xFF22D3EE);
+                  ? const Color(0xFF2563EB)
+                  : texto.startsWith('[Pendiente]')
+                  ? const Color(0xFF1D4ED8)
+                  : const Color(0xFF2563EB);
 
               return _historyRow(
                 icono: Icons.chat_bubble_rounded,
@@ -2605,14 +2432,12 @@ class _ReciboDetalleScreenState extends State<ReciboDetalleScreen> {
             }),
           if (pagos.isNotEmpty) ...[
             const SizedBox(height: 8),
-            Divider(
-              color: Colors.white.withOpacity(0.06),
-            ),
+            Divider(color: const Color(0xFFD9E9EC)),
             const SizedBox(height: 8),
             const Text(
               'PAGOS REGISTRADOS',
               style: TextStyle(
-                color: Colors.white38,
+                color: const Color(0xFF78909C),
                 fontSize: 10,
                 fontWeight: FontWeight.w900,
                 letterSpacing: 0.7,
@@ -2622,7 +2447,7 @@ class _ReciboDetalleScreenState extends State<ReciboDetalleScreen> {
             ...pagos.map((p) {
               return _historyRow(
                 icono: Icons.payments_rounded,
-                color: const Color(0xFF4ADE80),
+                color: const Color(0xFF2563EB),
                 titulo:
                     '${_money(p['importe']).toStringAsFixed(2)} € · ${p['metodo'] ?? ''}',
                 subtitulo:
@@ -2639,10 +2464,7 @@ class _ReciboDetalleScreenState extends State<ReciboDetalleScreen> {
     final color = _estadoColor(estado);
 
     return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: 10,
-        vertical: 6,
-      ),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
         color: color.withOpacity(0.13),
         borderRadius: BorderRadius.circular(30),
@@ -2677,9 +2499,7 @@ class _ReciboDetalleScreenState extends State<ReciboDetalleScreen> {
           decoration: BoxDecoration(
             color: Colors.white.withOpacity(0.035),
             borderRadius: BorderRadius.circular(18),
-            border: Border.all(
-              color: color.withOpacity(0.15),
-            ),
+            border: Border.all(color: color.withOpacity(0.15)),
           ),
           child: Row(
             children: [
@@ -2708,7 +2528,7 @@ class _ReciboDetalleScreenState extends State<ReciboDetalleScreen> {
                     Text(
                       titulo,
                       style: const TextStyle(
-                        color: Colors.white,
+                        color: const Color(0xFF111827),
                         fontSize: 14,
                         fontWeight: FontWeight.w800,
                       ),
@@ -2717,7 +2537,7 @@ class _ReciboDetalleScreenState extends State<ReciboDetalleScreen> {
                     Text(
                       subtitulo,
                       style: const TextStyle(
-                        color: const Color(0x75FFFFFF),
+                        color: const Color(0xFF64748B),
                         fontSize: 11,
                         fontWeight: FontWeight.w600,
                       ),
@@ -2727,7 +2547,7 @@ class _ReciboDetalleScreenState extends State<ReciboDetalleScreen> {
               ),
               const Icon(
                 Icons.chevron_right_rounded,
-                color: Colors.white30,
+                color: const Color(0xFF78909C),
               ),
             ],
           ),
@@ -2748,9 +2568,7 @@ class _ReciboDetalleScreenState extends State<ReciboDetalleScreen> {
       decoration: BoxDecoration(
         color: Colors.black.withOpacity(0.16),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: Colors.white.withOpacity(0.05),
-        ),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -2772,7 +2590,7 @@ class _ReciboDetalleScreenState extends State<ReciboDetalleScreen> {
                 Text(
                   titulo,
                   style: const TextStyle(
-                    color: Colors.white,
+                    color: const Color(0xFF111827),
                     fontSize: 12,
                     fontWeight: FontWeight.w700,
                   ),
@@ -2781,7 +2599,7 @@ class _ReciboDetalleScreenState extends State<ReciboDetalleScreen> {
                 Text(
                   subtitulo,
                   style: const TextStyle(
-                    color: Colors.white38,
+                    color: const Color(0xFF78909C),
                     fontSize: 10,
                     fontWeight: FontWeight.w600,
                   ),
@@ -2800,11 +2618,9 @@ class _ReciboDetalleScreenState extends State<ReciboDetalleScreen> {
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.04),
+        color: Colors.white,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: Colors.white.withOpacity(0.06),
-        ),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -2812,7 +2628,7 @@ class _ReciboDetalleScreenState extends State<ReciboDetalleScreen> {
           Text(
             titulo,
             style: const TextStyle(
-              color: const Color(0x75FFFFFF),
+              color: const Color(0xFF64748B),
               fontSize: 10,
               fontWeight: FontWeight.w700,
             ),
@@ -2821,7 +2637,7 @@ class _ReciboDetalleScreenState extends State<ReciboDetalleScreen> {
           Text(
             valor.isEmpty ? 'Sin dato' : valor,
             style: const TextStyle(
-              color: Colors.white,
+              color: const Color(0xFF111827),
               fontWeight: FontWeight.w800,
             ),
           ),
@@ -2833,24 +2649,17 @@ class _ReciboDetalleScreenState extends State<ReciboDetalleScreen> {
   InputDecoration _inputDecoration(String label) {
     return InputDecoration(
       hintText: label,
-      hintStyle: const TextStyle(
-        color: Colors.white38,
-        fontSize: 12,
-      ),
+      hintStyle: const TextStyle(color: const Color(0xFF78909C), fontSize: 12),
       filled: true,
-      fillColor: Colors.white.withOpacity(0.04),
+      fillColor: Colors.white,
       contentPadding: const EdgeInsets.all(14),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(16),
-        borderSide: BorderSide(
-          color: Colors.white.withOpacity(0.08),
-        ),
+        borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(16),
-        borderSide: const BorderSide(
-          color: Color(0xFF22D3EE),
-        ),
+        borderSide: const BorderSide(color: Color(0xFF2563EB)),
       ),
     );
   }

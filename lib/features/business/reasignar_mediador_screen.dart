@@ -36,127 +36,135 @@ class _ReasignarMediadorScreenState extends State<ReasignarMediadorScreen> {
   }
 
   Future<void> cargarDatos() async {
-  final user = supabase.auth.currentUser;
+    final user = supabase.auth.currentUser;
 
-  if (user == null) {
-    setState(() => loading = false);
-    return;
-  }
-
-  try {
-    final perfil = await supabase
-        .from('usuarios')
-        .select('id, auth_id, rol_usuario, parent_id, nombre, apellidos, email')
-        .eq('auth_id', user.id)
-        .maybeSingle();
-
-    role = perfil?['rol_usuario']?.toString() ?? '';
-    myId = perfil?['id']?.toString();
-    myAuthId = perfil?['auth_id']?.toString();
-
-    print('ROLE ACTUAL: $role');
-    print('MI ID: $myId');
-
-    final data = await supabase
-        .from('usuarios')
-        .select('id, auth_id, parent_id, rol_usuario, nombre, apellidos, email')
-        .order('nombre', ascending: true);
-
-    usuarios = List<Map<String, dynamic>>.from(data);
-
-    print('TOTAL USUARIOS: ${usuarios.length}');
-
-    List<Map<String, dynamic>> listaPermitida = [];
-
-    if (role == 'director_nacional' || role == 'administracion') {
-      listaPermitida = usuarios;
-      print('VE TODA LA RED');
-    } else {
-      final idsPermitidos = _idsEstructuraPermitida();
-
-      print('IDS PERMITIDOS: $idsPermitidos');
-
-      listaPermitida = usuarios.where((u) {
-        final id = u['id']?.toString();
-        return id != null && idsPermitidos.contains(id);
-      }).toList();
+    if (user == null) {
+      setState(() => loading = false);
+      return;
     }
 
-    mediadores = listaPermitida.where((u) {
-      final r = u['rol_usuario']?.toString().trim();
+    try {
+      final perfil = await supabase
+          .from('usuarios')
+          .select(
+            'id, auth_id, rol_usuario, parent_id, nombre, apellidos, email',
+          )
+          .or(
+            'estado.is.null,estado.not.in.(inactivo,Inactivo,INACTIVO,baja,Baja,BAJA,desactivado,Desactivado,DESACTIVADO,bloqueado,Bloqueado,BLOQUEADO,suspendido,Suspendido,SUSPENDIDO)',
+          )
+          .eq('auth_id', user.id)
+          .maybeSingle();
 
-      return r == 'agente' ||
-          r == 'mediador' ||
-          r == 'comercial';
-    }).toList();
+      role = perfil?['rol_usuario']?.toString() ?? '';
+      myId = perfil?['id']?.toString();
+      myAuthId = perfil?['auth_id']?.toString();
 
-    jefesEquipo = listaPermitida.where((u) {
-      final r = u['rol_usuario']?.toString().trim();
+      print('ROLE ACTUAL: $role');
+      print('MI ID: $myId');
 
-      return r == 'jefe_equipo';
-    }).toList();
+      final data = await supabase
+          .from('usuarios')
+          .select(
+            'id, auth_id, parent_id, rol_usuario, nombre, apellidos, email',
+          )
+          .or(
+            'estado.is.null,estado.not.in.(inactivo,Inactivo,INACTIVO,baja,Baja,BAJA,desactivado,Desactivado,DESACTIVADO,bloqueado,Bloqueado,BLOQUEADO,suspendido,Suspendido,SUSPENDIDO)',
+          )
+          .order('nombre', ascending: true);
 
-    print('MEDIADORES CARGADOS: ${mediadores.length}');
-    print('JEFES EQUIPO CARGADOS: ${jefesEquipo.length}');
+      usuarios = List<Map<String, dynamic>>.from(data);
 
-    if (!mounted) return;
+      print('TOTAL USUARIOS: ${usuarios.length}');
 
-    setState(() => loading = false);
-  } catch (e) {
-    print('ERROR CARGAR REASIGNAR MEDIADOR: $e');
+      List<Map<String, dynamic>> listaPermitida = [];
 
-    if (!mounted) return;
+      if (role == 'director_nacional' || role == 'administracion') {
+        listaPermitida = usuarios;
+        print('VE TODA LA RED');
+      } else {
+        final idsPermitidos = _idsEstructuraPermitida();
 
-    setState(() => loading = false);
-    _snack('Error cargando datos: $e');
+        print('IDS PERMITIDOS: $idsPermitidos');
+
+        listaPermitida = usuarios.where((u) {
+          final id = u['id']?.toString();
+          return id != null && idsPermitidos.contains(id);
+        }).toList();
+      }
+
+      mediadores = listaPermitida.where((u) {
+        final r = u['rol_usuario']?.toString().trim();
+
+        return r == 'agente' || r == 'mediador' || r == 'comercial';
+      }).toList();
+
+      jefesEquipo = listaPermitida.where((u) {
+        final r = u['rol_usuario']?.toString().trim();
+
+        return r == 'jefe_equipo';
+      }).toList();
+
+      print('MEDIADORES CARGADOS: ${mediadores.length}');
+      print('JEFES EQUIPO CARGADOS: ${jefesEquipo.length}');
+
+      if (!mounted) return;
+
+      setState(() => loading = false);
+    } catch (e) {
+      print('ERROR CARGAR REASIGNAR MEDIADOR: $e');
+
+      if (!mounted) return;
+
+      setState(() => loading = false);
+      _snack('Error cargando datos: $e');
+    }
   }
-}
 
   bool _veTodaLaRed() {
     return role == 'director_nacional' || role == 'administracion';
   }
 
- Set<String> _idsEstructuraPermitida() {
-  final Set<String> ids = {};
+  Set<String> _idsEstructuraPermitida() {
+    final Set<String> ids = {};
 
-  if (myId == null || myId!.isEmpty) return ids;
+    if (myId == null || myId!.isEmpty) return ids;
 
-  ids.add(myId!);
+    ids.add(myId!);
 
-  bool hayCambios = true;
+    bool hayCambios = true;
 
-  while (hayCambios) {
-    hayCambios = false;
+    while (hayCambios) {
+      hayCambios = false;
 
-    for (final u in usuarios) {
-      final id = u['id']?.toString();
-      final parentId = u['parent_id']?.toString();
+      for (final u in usuarios) {
+        final id = u['id']?.toString();
+        final parentId = u['parent_id']?.toString();
 
-      if (id == null || id.isEmpty) continue;
-      if (parentId == null || parentId.isEmpty) continue;
+        if (id == null || id.isEmpty) continue;
+        if (parentId == null || parentId.isEmpty) continue;
 
-      if (ids.contains(parentId) && !ids.contains(id)) {
-        ids.add(id);
-        hayCambios = true;
+        if (ids.contains(parentId) && !ids.contains(id)) {
+          ids.add(id);
+          hayCambios = true;
+        }
       }
     }
+
+    return ids;
   }
 
-  return ids;
-}
-
   List<Map<String, dynamic>> get mediadoresFiltrados {
-  final text = busqueda.toLowerCase().trim();
+    final text = busqueda.toLowerCase().trim();
 
-  if (text.isEmpty) return mediadores;
+    if (text.isEmpty) return mediadores;
 
-  return mediadores.where((u) {
-    final nombre = u['nombre']?.toString().toLowerCase() ?? '';
-    final email = u['email']?.toString().toLowerCase() ?? '';
+    return mediadores.where((u) {
+      final nombre = u['nombre']?.toString().toLowerCase() ?? '';
+      final email = u['email']?.toString().toLowerCase() ?? '';
 
-    return nombre.contains(text) || email.contains(text);
-  }).toList();
-}
+      return nombre.contains(text) || email.contains(text);
+    }).toList();
+  }
 
   String _nombreJefeActual(Map<String, dynamic> mediador) {
     final parentId = mediador['parent_id']?.toString();
@@ -193,9 +201,10 @@ class _ReasignarMediadorScreenState extends State<ReasignarMediadorScreen> {
     setState(() => guardando = true);
 
     try {
-      await supabase.from('usuarios').update({
-        'parent_id': jefeId,
-      }).eq('id', mediadorId);
+      await supabase
+          .from('usuarios')
+          .update({'parent_id': jefeId})
+          .eq('id', mediadorId);
 
       await supabase.from('historial_reasignaciones').insert({
         'tipo': 'reasignar_mediador',
@@ -228,10 +237,7 @@ class _ReasignarMediadorScreenState extends State<ReasignarMediadorScreen> {
     if (!mounted) return;
 
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(text),
-        backgroundColor: const Color(0xFF0F172A),
-      ),
+      SnackBar(content: Text(text), backgroundColor: const Color(0xFF0F172A)),
     );
   }
 
@@ -245,9 +251,7 @@ class _ReasignarMediadorScreenState extends State<ReasignarMediadorScreen> {
           SafeArea(
             child: loading
                 ? const Center(
-                    child: CircularProgressIndicator(
-                      color: Color(0xFF0284C7),
-                    ),
+                    child: CircularProgressIndicator(color: Color(0xFF0284C7)),
                   )
                 : Padding(
                     padding: const EdgeInsets.all(18),
@@ -258,20 +262,11 @@ class _ReasignarMediadorScreenState extends State<ReasignarMediadorScreen> {
                         Expanded(
                           child: Row(
                             children: [
-                              Expanded(
-                                flex: 5,
-                                child: _panelMediadores(),
-                              ),
+                              Expanded(flex: 5, child: _panelMediadores()),
                               const SizedBox(width: 18),
-                              Expanded(
-                                flex: 4,
-                                child: _panelJefes(),
-                              ),
+                              Expanded(flex: 4, child: _panelJefes()),
                               const SizedBox(width: 18),
-                              Expanded(
-                                flex: 4,
-                                child: _panelResumen(),
-                              ),
+                              Expanded(flex: 4, child: _panelResumen()),
                             ],
                           ),
                         ),
@@ -351,10 +346,7 @@ class _ReasignarMediadorScreenState extends State<ReasignarMediadorScreen> {
       ),
       child: Row(
         children: [
-          const Icon(
-            Icons.verified_user_rounded,
-            color: Color(0xFF0284C7),
-          ),
+          const Icon(Icons.verified_user_rounded, color: Color(0xFF0284C7)),
           const SizedBox(width: 8),
           Text(
             role.replaceAll('_', ' ').toUpperCase(),
@@ -406,7 +398,7 @@ class _ReasignarMediadorScreenState extends State<ReasignarMediadorScreen> {
                       final m = mediadoresFiltrados[index];
                       final selected =
                           mediadorSeleccionado?['id']?.toString() ==
-                              m['id']?.toString();
+                          m['id']?.toString();
 
                       return _userCard(
                         user: m,
@@ -446,7 +438,7 @@ class _ReasignarMediadorScreenState extends State<ReasignarMediadorScreen> {
                       final j = jefesEquipo[index];
                       final selected =
                           jefeSeleccionado?['id']?.toString() ==
-                              j['id']?.toString();
+                          j['id']?.toString();
 
                       return _userCard(
                         user: j,
@@ -512,10 +504,7 @@ class _ReasignarMediadorScreenState extends State<ReasignarMediadorScreen> {
             ),
             child: const Row(
               children: [
-                Icon(
-                  Icons.info_rounded,
-                  color: Color(0xFFD97706),
-                ),
+                Icon(Icons.info_rounded, color: Color(0xFFD97706)),
                 SizedBox(width: 10),
                 Expanded(
                   child: Text(
@@ -573,11 +562,12 @@ class _ReasignarMediadorScreenState extends State<ReasignarMediadorScreen> {
     required VoidCallback onTap,
   }) {
     final nombre = user['nombre']?.toString() ?? '';
-final apellidos = user['apellidos']?.toString() ?? '';
-final nombreCompleto = '$nombre $apellidos'.trim();
+    final apellidos = user['apellidos']?.toString() ?? '';
+    final nombreCompleto = '$nombre $apellidos'.trim();
 
-final nombreMostrar =
-    nombreCompleto.isEmpty ? 'Sin nombre' : nombreCompleto;
+    final nombreMostrar = nombreCompleto.isEmpty
+        ? 'Sin nombre'
+        : nombreCompleto;
     final email = user['email']?.toString() ?? '';
 
     return Padding(
@@ -615,8 +605,8 @@ final nombreMostrar =
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                   Text(
-  nombreMostrar,
+                    Text(
+                      nombreMostrar,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
@@ -651,11 +641,7 @@ final nombreMostrar =
                   ],
                 ),
               ),
-              if (selected)
-                Icon(
-                  Icons.check_circle_rounded,
-                  color: color,
-                ),
+              if (selected) Icon(Icons.check_circle_rounded, color: color),
             ],
           ),
         ),
@@ -695,10 +681,7 @@ final nombreMostrar =
                 ),
                 Text(
                   value,
-                  style: TextStyle(
-                    color: color,
-                    fontWeight: FontWeight.w900,
-                  ),
+                  style: TextStyle(color: color, fontWeight: FontWeight.w900),
                 ),
               ],
             ),

@@ -1,4 +1,5 @@
 import 'dart:ui';
+import 'package:safebrok_andalucia/core/production/premium_weighting.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -6,8 +7,7 @@ class RankingComercialScreen extends StatefulWidget {
   const RankingComercialScreen({super.key});
 
   @override
-  State<RankingComercialScreen> createState() =>
-      _RankingComercialScreenState();
+  State<RankingComercialScreen> createState() => _RankingComercialScreenState();
 }
 
 class _RankingComercialScreenState extends State<RankingComercialScreen> {
@@ -40,7 +40,10 @@ class _RankingComercialScreenState extends State<RankingComercialScreen> {
 
       final usuariosRaw = await supabase
           .from('usuarios')
-          .select('id, auth_id, nombre, apellidos, rol_usuario, parent_id');
+          .select('id, auth_id, nombre, apellidos, rol_usuario, parent_id')
+          .or(
+            'estado.is.null,estado.not.in.(inactivo,Inactivo,INACTIVO,baja,Baja,BAJA,desactivado,Desactivado,DESACTIVADO,bloqueado,Bloqueado,BLOQUEADO,suspendido,Suspendido,SUSPENDIDO)',
+          );
 
       final ventas = List<Map<String, dynamic>>.from(ventasRaw);
       final usuarios = List<Map<String, dynamic>>.from(usuariosRaw);
@@ -96,7 +99,7 @@ class _RankingComercialScreenState extends State<RankingComercialScreen> {
         };
 
         for (final v in ventasUsuario) {
-          final prima = _toDouble(v['prima_anual_neta']);
+          final prima = PremiumWeighting.net(v);
           final producto = _categoriaProducto(v['producto']);
 
           primas += prima;
@@ -213,6 +216,16 @@ class _RankingComercialScreenState extends State<RankingComercialScreen> {
   String _categoriaProducto(dynamic producto) {
     final p = producto?.toString().toLowerCase() ?? '';
 
+    if (p.contains('transporte') && p.contains('constru'))
+      return 'Transportes construcción';
+    if (p.contains('cauci')) return 'Caución';
+    if (p.contains('camion') || p.contains('camión')) return 'Camión';
+    if (p.contains('decenal')) return 'Decenal';
+    if (p.contains('pyme')) return 'Pymes';
+    if (p.contains('accidente') && p.contains('colectiv'))
+      return 'Accidentes colectivos';
+    if (p.contains('salud') && p.contains('colectiv')) return 'Salud colectivo';
+    if (p.contains('transporte')) return 'Transportes';
     if (p.contains('deceso')) return 'Decesos';
     if (p.contains('hogar')) return 'Hogar';
     if (p.contains('vida')) return 'Vida';
@@ -226,10 +239,7 @@ class _RankingComercialScreenState extends State<RankingComercialScreen> {
     if (value == null) return 0;
     if (value is num) return value.toDouble();
 
-    return double.tryParse(
-          value.toString().replaceAll(',', '.'),
-        ) ??
-        0;
+    return double.tryParse(value.toString().replaceAll(',', '.')) ?? 0;
   }
 
   List<Map<String, dynamic>> get rankingOrdenado {
@@ -269,39 +279,10 @@ class _RankingComercialScreenState extends State<RankingComercialScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF061018),
+      backgroundColor: const Color(0xFFF4F6FB),
       body: Stack(
         children: [
-          Container(
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  Color(0xFF050B12),
-                  Color(0xFF071A2E),
-                  Color(0xFF123D63),
-                ],
-              ),
-            ),
-          ),
-
-          Positioned(
-            top: -140,
-            right: -100,
-            child: _glowRanking(330, Colors.cyanAccent, 0.16),
-          ),
-
-          Positioned(
-            bottom: -150,
-            left: -120,
-            child: _glowRanking(360, Colors.blueAccent, 0.15),
-          ),
-
-          BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 45, sigmaY: 45),
-            child: Container(color: Colors.black.withOpacity(0.08)),
-          ),
+          const Positioned.fill(child: ColoredBox(color: Color(0xFFF4F6FB))),
 
           SafeArea(
             child: Column(
@@ -314,7 +295,7 @@ class _RankingComercialScreenState extends State<RankingComercialScreen> {
                         onPressed: () => Navigator.pop(context),
                         icon: const Icon(
                           Icons.arrow_back_ios_new_rounded,
-                          color: Colors.white,
+                          color: Color(0xFF111827),
                         ),
                       ),
                       const SizedBox(width: 6),
@@ -322,7 +303,7 @@ class _RankingComercialScreenState extends State<RankingComercialScreen> {
                         child: Text(
                           "Ranking Comercial",
                           style: TextStyle(
-                            color: Colors.white,
+                            color: const Color(0xFF111827),
                             fontSize: 25,
                             fontWeight: FontWeight.w900,
                           ),
@@ -332,7 +313,7 @@ class _RankingComercialScreenState extends State<RankingComercialScreen> {
                         onPressed: cargarRanking,
                         icon: const Icon(
                           Icons.refresh_rounded,
-                          color: Colors.cyanAccent,
+                          color: const Color(0xFF2563EB),
                         ),
                       ),
                     ],
@@ -343,7 +324,7 @@ class _RankingComercialScreenState extends State<RankingComercialScreen> {
                   child: cargando
                       ? const Center(
                           child: CircularProgressIndicator(
-                            color: Colors.cyanAccent,
+                            color: const Color(0xFF2563EB),
                           ),
                         )
                       : ListView(
@@ -376,7 +357,21 @@ class _RankingComercialScreenState extends State<RankingComercialScreen> {
   Widget _headerRanking() {
     return Container(
       padding: const EdgeInsets.all(22),
-      decoration: _glassRanking(28),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF111827), Color(0xFF1D4ED8)],
+        ),
+        borderRadius: BorderRadius.circular(28),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF1D4ED8).withOpacity(0.20),
+            blurRadius: 28,
+            offset: const Offset(0, 14),
+          ),
+        ],
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -391,10 +386,7 @@ class _RankingComercialScreenState extends State<RankingComercialScreen> {
           const SizedBox(height: 6),
           Text(
             "Ranking por estructura, producción y ventas acumuladas",
-            style: TextStyle(
-              color: Colors.white.withOpacity(0.56),
-              fontSize: 13,
-            ),
+            style: const TextStyle(color: Color(0xFFD8E2F2), fontSize: 13),
           ),
           const SizedBox(height: 18),
           Row(
@@ -404,7 +396,7 @@ class _RankingComercialScreenState extends State<RankingComercialScreen> {
                   "Participantes",
                   ranking.length.toString(),
                   Icons.groups_rounded,
-                  Colors.cyanAccent,
+                  const Color(0xFF2563EB),
                 ),
               ),
               const SizedBox(width: 12),
@@ -413,7 +405,7 @@ class _RankingComercialScreenState extends State<RankingComercialScreen> {
                   "Ventas",
                   totalVentasRanking.toString(),
                   Icons.shopping_cart_outlined,
-                  Colors.greenAccent,
+                  const Color(0xFF2563EB),
                 ),
               ),
               const SizedBox(width: 12),
@@ -442,7 +434,7 @@ class _RankingComercialScreenState extends State<RankingComercialScreen> {
           const Text(
             "Filtros profesionales",
             style: TextStyle(
-              color: Colors.white,
+              color: const Color(0xFF111827),
               fontWeight: FontWeight.bold,
               fontSize: 17,
             ),
@@ -455,8 +447,16 @@ class _RankingComercialScreenState extends State<RankingComercialScreen> {
             child: Row(
               children: [
                 _chipFiltroRol("agente", "Agentes", Icons.person_rounded),
-                _chipFiltroRol("jefe_equipo", "Jefes Equipo", Icons.groups_rounded),
-                _chipFiltroRol("jefe_ventas", "Jefes Ventas", Icons.workspace_premium_rounded),
+                _chipFiltroRol(
+                  "jefe_equipo",
+                  "Jefes Equipo",
+                  Icons.groups_rounded,
+                ),
+                _chipFiltroRol(
+                  "jefe_ventas",
+                  "Jefes Ventas",
+                  Icons.workspace_premium_rounded,
+                ),
               ],
             ),
           ),
@@ -473,6 +473,14 @@ class _RankingComercialScreenState extends State<RankingComercialScreen> {
                 _chipProducto("Vida"),
                 _chipProducto("Salud"),
                 _chipProducto("Auto"),
+                _chipProducto("Transportes construcción"),
+                _chipProducto("Caución"),
+                _chipProducto("Camión"),
+                _chipProducto("Decenal"),
+                _chipProducto("Pymes"),
+                _chipProducto("Accidentes colectivos"),
+                _chipProducto("Salud colectivo"),
+                _chipProducto("Transportes"),
                 _chipProducto("Otros"),
               ],
             ),
@@ -482,9 +490,7 @@ class _RankingComercialScreenState extends State<RankingComercialScreen> {
 
           Row(
             children: [
-              Expanded(
-                child: _ordenButton("Primas", Icons.euro_rounded),
-              ),
+              Expanded(child: _ordenButton("Primas", Icons.euro_rounded)),
               const SizedBox(width: 10),
               Expanded(
                 child: _ordenButton("Ventas", Icons.shopping_bag_outlined),
@@ -507,7 +513,7 @@ class _RankingComercialScreenState extends State<RankingComercialScreen> {
           "No hay datos para este ranking.",
           textAlign: TextAlign.center,
           style: TextStyle(
-            color: Colors.white.withOpacity(0.6),
+            color: const Color(0xFF64748B),
             fontWeight: FontWeight.w600,
           ),
         ),
@@ -523,7 +529,7 @@ class _RankingComercialScreenState extends State<RankingComercialScreen> {
           const Text(
             "Podio",
             style: TextStyle(
-              color: Colors.white,
+              color: const Color(0xFF111827),
               fontSize: 18,
               fontWeight: FontWeight.bold,
             ),
@@ -537,15 +543,17 @@ class _RankingComercialScreenState extends State<RankingComercialScreen> {
 
               return Expanded(
                 child: Container(
-                  margin: EdgeInsets.only(right: index == top.length - 1 ? 0 : 10),
+                  margin: EdgeInsets.only(
+                    right: index == top.length - 1 ? 0 : 10,
+                  ),
                   padding: const EdgeInsets.all(14),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.055),
+                    color: Colors.white,
                     borderRadius: BorderRadius.circular(20),
                     border: Border.all(
                       color: index == 0
                           ? Colors.amberAccent.withOpacity(0.35)
-                          : Colors.white.withOpacity(0.08),
+                          : Colors.white,
                     ),
                   ),
                   child: Column(
@@ -554,8 +562,8 @@ class _RankingComercialScreenState extends State<RankingComercialScreen> {
                         index == 0
                             ? "🥇"
                             : index == 1
-                                ? "🥈"
-                                : "🥉",
+                            ? "🥈"
+                            : "🥉",
                         style: const TextStyle(fontSize: 28),
                       ),
                       const SizedBox(height: 8),
@@ -564,7 +572,7 @@ class _RankingComercialScreenState extends State<RankingComercialScreen> {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
-                          color: Colors.white,
+                          color: const Color(0xFF111827),
                           fontWeight: FontWeight.bold,
                         ),
                       ),
@@ -572,7 +580,7 @@ class _RankingComercialScreenState extends State<RankingComercialScreen> {
                       Text(
                         "${_getPrimas(r).toStringAsFixed(0)} €",
                         style: const TextStyle(
-                          color: Colors.cyanAccent,
+                          color: const Color(0xFF2563EB),
                           fontWeight: FontWeight.bold,
                         ),
                       ),
@@ -597,7 +605,7 @@ class _RankingComercialScreenState extends State<RankingComercialScreen> {
           const Text(
             "Clasificación completa",
             style: TextStyle(
-              color: Colors.white,
+              color: const Color(0xFF111827),
               fontWeight: FontWeight.bold,
               fontSize: 18,
             ),
@@ -624,30 +632,25 @@ class _RankingComercialScreenState extends State<RankingComercialScreen> {
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: index == 0
-            ? Colors.amberAccent.withOpacity(0.10)
-            : Colors.white.withOpacity(0.045),
+        color: index == 0 ? Colors.amberAccent.withOpacity(0.10) : Colors.white,
         borderRadius: BorderRadius.circular(18),
         border: Border.all(
           color: index == 0
               ? Colors.amberAccent.withOpacity(0.28)
-              : Colors.white.withOpacity(0.06),
+              : Colors.white,
         ),
       ),
       child: Row(
         children: [
-          SizedBox(
-            width: 34,
-            child: _medalla(index),
-          ),
+          SizedBox(width: 34, child: _medalla(index)),
 
           CircleAvatar(
             radius: 20,
-            backgroundColor: Colors.cyanAccent.withOpacity(0.16),
+            backgroundColor: const Color(0xFF2563EB).withOpacity(0.16),
             child: Text(
               inicial,
               style: const TextStyle(
-                color: Colors.white,
+                color: const Color(0xFF111827),
                 fontWeight: FontWeight.bold,
               ),
             ),
@@ -664,7 +667,7 @@ class _RankingComercialScreenState extends State<RankingComercialScreen> {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
-                    color: Colors.white,
+                    color: const Color(0xFF111827),
                     fontWeight: FontWeight.bold,
                   ),
                 ),
@@ -672,7 +675,7 @@ class _RankingComercialScreenState extends State<RankingComercialScreen> {
                 Text(
                   "${_getVentasProducto(r)} ventas · ${r['estructura']} usuarios estructura",
                   style: TextStyle(
-                    color: Colors.white.withOpacity(0.52),
+                    color: const Color(0xFF64748B),
                     fontSize: 12,
                   ),
                 ),
@@ -686,7 +689,7 @@ class _RankingComercialScreenState extends State<RankingComercialScreen> {
               Text(
                 "${_getPrimas(r).toStringAsFixed(0)} €",
                 style: const TextStyle(
-                  color: Colors.cyanAccent,
+                  color: const Color(0xFF2563EB),
                   fontWeight: FontWeight.bold,
                   fontSize: 15,
                 ),
@@ -694,10 +697,7 @@ class _RankingComercialScreenState extends State<RankingComercialScreen> {
               const SizedBox(height: 3),
               Text(
                 ordenFiltro,
-                style: TextStyle(
-                  color: Colors.white.withOpacity(0.45),
-                  fontSize: 11,
-                ),
+                style: TextStyle(color: const Color(0xFF64748B), fontSize: 11),
               ),
             ],
           ),
@@ -714,7 +714,7 @@ class _RankingComercialScreenState extends State<RankingComercialScreen> {
     return Text(
       "${index + 1}",
       style: TextStyle(
-        color: Colors.white.withOpacity(0.55),
+        color: const Color(0xFF64748B),
         fontWeight: FontWeight.bold,
       ),
     );
@@ -737,12 +737,10 @@ class _RankingComercialScreenState extends State<RankingComercialScreen> {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 10),
           decoration: BoxDecoration(
-            color: selected ? Colors.cyanAccent : Colors.white.withOpacity(0.06),
+            color: selected ? const Color(0xFF2563EB) : Colors.white,
             borderRadius: BorderRadius.circular(30),
             border: Border.all(
-              color: selected
-                  ? Colors.cyanAccent
-                  : Colors.white.withOpacity(0.08),
+              color: selected ? const Color(0xFF2563EB) : Colors.white,
             ),
           ),
           child: Row(
@@ -783,12 +781,10 @@ class _RankingComercialScreenState extends State<RankingComercialScreen> {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 9),
           decoration: BoxDecoration(
-            color: selected ? Colors.greenAccent : Colors.white.withOpacity(0.06),
+            color: selected ? const Color(0xFF2563EB) : Colors.white,
             borderRadius: BorderRadius.circular(30),
             border: Border.all(
-              color: selected
-                  ? Colors.greenAccent
-                  : Colors.white.withOpacity(0.08),
+              color: selected ? const Color(0xFF2563EB) : Colors.white,
             ),
           ),
           child: Text(
@@ -817,12 +813,12 @@ class _RankingComercialScreenState extends State<RankingComercialScreen> {
       child: Container(
         padding: const EdgeInsets.all(13),
         decoration: BoxDecoration(
-          color: selected ? Colors.white.withOpacity(0.14) : Colors.white.withOpacity(0.045),
+          color: selected ? Colors.white.withOpacity(0.14) : Colors.white,
           borderRadius: BorderRadius.circular(18),
           border: Border.all(
             color: selected
-                ? Colors.cyanAccent.withOpacity(0.35)
-                : Colors.white.withOpacity(0.06),
+                ? const Color(0xFF2563EB).withOpacity(0.35)
+                : Colors.white,
           ),
         ),
         child: Row(
@@ -830,14 +826,18 @@ class _RankingComercialScreenState extends State<RankingComercialScreen> {
           children: [
             Icon(
               icon,
-              color: selected ? Colors.cyanAccent : Colors.white70,
+              color: selected
+                  ? const Color(0xFF2563EB)
+                  : const Color(0xFF64748B),
               size: 18,
             ),
             const SizedBox(width: 8),
             Text(
               "Ordenar por $text",
               style: TextStyle(
-                color: selected ? Colors.cyanAccent : Colors.white70,
+                color: selected
+                    ? const Color(0xFF2563EB)
+                    : const Color(0xFF64748B),
                 fontWeight: FontWeight.bold,
                 fontSize: 12,
               ),
@@ -848,20 +848,13 @@ class _RankingComercialScreenState extends State<RankingComercialScreen> {
     );
   }
 
-  Widget _kpiRanking(
-    String title,
-    String value,
-    IconData icon,
-    Color color,
-  ) {
+  Widget _kpiRanking(String title, String value, IconData icon, Color color) {
     return Container(
       padding: const EdgeInsets.all(13),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.045),
+        color: Colors.white,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: Colors.white.withOpacity(0.06),
-        ),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
       ),
       child: Column(
         children: [
@@ -872,7 +865,7 @@ class _RankingComercialScreenState extends State<RankingComercialScreen> {
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: const TextStyle(
-              color: Colors.white,
+              color: const Color(0xFF111827),
               fontWeight: FontWeight.bold,
               fontSize: 15,
             ),
@@ -880,10 +873,7 @@ class _RankingComercialScreenState extends State<RankingComercialScreen> {
           const SizedBox(height: 3),
           Text(
             title,
-            style: TextStyle(
-              color: Colors.white.withOpacity(0.48),
-              fontSize: 11,
-            ),
+            style: TextStyle(color: const Color(0xFF64748B), fontSize: 11),
           ),
         ],
       ),
@@ -915,11 +905,9 @@ class _RankingComercialScreenState extends State<RankingComercialScreen> {
 
   BoxDecoration _glassRanking(double radius) {
     return BoxDecoration(
-      color: Colors.white.withOpacity(0.075),
+      color: Colors.white,
       borderRadius: BorderRadius.circular(radius),
-      border: Border.all(
-        color: Colors.white.withOpacity(0.09),
-      ),
+      border: Border.all(color: const Color(0xFFE2E8F0)),
       boxShadow: [
         BoxShadow(
           color: Colors.black.withOpacity(0.16),

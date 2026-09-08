@@ -84,9 +84,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   Widget build(BuildContext context) {
     if (loading) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      );
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
     final email = usuario?['email'] ?? '';
@@ -164,9 +162,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
                       Text(
                         email,
-                        style: TextStyle(
-                          color: Colors.white.withOpacity(0.7),
-                        ),
+                        style: TextStyle(color: Colors.white.withOpacity(0.7)),
                       ),
                     ],
                   ),
@@ -212,17 +208,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 SizedBox(
                   height: 55,
                   child: ElevatedButton.icon(
-                   onPressed: () async {
-  await Supabase.instance.client.auth.signOut();
+                    onPressed: () async {
+                      await Supabase.instance.client.auth.signOut();
 
-  if (!mounted) return;
+                      if (!mounted) return;
 
-  Navigator.pushAndRemoveUntil(
-    context,
-    MaterialPageRoute(builder: (_) => LoginScreen()),
-    (route) => false,
-  );
-},
+                      Navigator.pushAndRemoveUntil(
+                        context,
+                        MaterialPageRoute(builder: (_) => LoginScreen()),
+                        (route) => false,
+                      );
+                    },
                     icon: const Icon(Icons.logout),
                     label: const Text("Cerrar sesión"),
                   ),
@@ -255,11 +251,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
           : Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(label,
-                    style: TextStyle(color: Colors.white.withOpacity(0.7))),
-                Text(controller.text,
-                    style: const TextStyle(
-                        color: Colors.white, fontWeight: FontWeight.w600)),
+                Text(
+                  label,
+                  style: TextStyle(color: Colors.white.withOpacity(0.7)),
+                ),
+                Text(
+                  controller.text,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
               ],
             ),
     );

@@ -199,9 +199,9 @@ class _MisTareasScreenState extends State<MisTareasScreen> {
 
     final now = DateTime.now();
 
-    final filtradas = List<Map<String, dynamic>>.from(data)
-        .where((r) => esReferenciaActiva(r, now))
-        .toList();
+    final filtradas = List<Map<String, dynamic>>.from(
+      data,
+    ).where((r) => esReferenciaActiva(r, now)).toList();
 
     llamadasPendientes = filtradas.length;
 
@@ -246,62 +246,54 @@ class _MisTareasScreenState extends State<MisTareasScreen> {
     return data.length;
   }
 
- Future<void> cargarDatosSeguimiento() async {
-  final user = supabase.auth.currentUser;
-  if (user == null) return;
+  Future<void> cargarDatosSeguimiento() async {
+    final user = supabase.auth.currentUser;
+    if (user == null) return;
 
-  final now = DateTime.now();
+    final now = DateTime.now();
 
-  final hoy = DateTime(
-    now.year,
-    now.month,
-    now.day,
-  );
+    final hoy = DateTime(now.year, now.month, now.day);
 
-  final data = await supabase
-      .from('seguimiento_clientes')
-      .select()
-      .eq('auth_id', user.id);
+    final data = await supabase
+        .from('seguimiento_clientes')
+        .select()
+        .eq('auth_id', user.id);
 
-  int pendientesHoy = 0;
-  int realizadasHoy = 0;
+    int pendientesHoy = 0;
+    int realizadasHoy = 0;
 
-  for (final item in data) {
-    if (item['proxima_llamada'] == null) continue;
+    for (final item in data) {
+      if (item['proxima_llamada'] == null) continue;
 
-    final fecha = DateTime.parse(item['proxima_llamada']);
+      final fecha = DateTime.parse(item['proxima_llamada']);
 
-    final fechaLlamada = DateTime(
-      fecha.year,
-      fecha.month,
-      fecha.day,
+      final fechaLlamada = DateTime(fecha.year, fecha.month, fecha.day);
+
+      final esDeHoyOVencida = !fechaLlamada.isAfter(hoy);
+
+      if (!esDeHoyOVencida) continue;
+
+      if (item['estado'] == 'Pendiente') {
+        pendientesHoy++;
+      }
+
+      if (item['estado'] == 'Realizada') {
+        realizadasHoy++;
+      }
+    }
+
+    final totalTareaHoy = pendientesHoy + realizadasHoy;
+
+    _actualizarTarea(
+      "Seguimiento de clientes",
+      detalle: totalTareaHoy == 0
+          ? "Sin seguimientos para hoy"
+          : "$realizadasHoy / $totalTareaHoy realizadas",
+      completada: pendientesHoy == 0,
+      actual: realizadasHoy,
+      objetivo: totalTareaHoy,
     );
-
-    final esDeHoyOVencida = !fechaLlamada.isAfter(hoy);
-
-    if (!esDeHoyOVencida) continue;
-
-    if (item['estado'] == 'Pendiente') {
-      pendientesHoy++;
-    }
-
-    if (item['estado'] == 'Realizada') {
-      realizadasHoy++;
-    }
   }
-
-  final totalTareaHoy = pendientesHoy + realizadasHoy;
-
-  _actualizarTarea(
-    "Seguimiento de clientes",
-    detalle: totalTareaHoy == 0
-        ? "Sin seguimientos para hoy"
-        : "$realizadasHoy / $totalTareaHoy realizadas",
-    completada: pendientesHoy == 0,
-    actual: realizadasHoy,
-    objetivo: totalTareaHoy,
-  );
-}
 
   Future<void> cargarDatosVisitas() async {
     final user = supabase.auth.currentUser;
@@ -392,14 +384,14 @@ class _MisTareasScreenState extends State<MisTareasScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF061018),
+      backgroundColor: const Color(0xFFFFFFFF),
       body: Stack(
         children: [
           const _PremiumBackground(),
           SafeArea(
             child: RefreshIndicator(
               color: Colors.cyanAccent,
-              backgroundColor: const Color(0xFF0B1D2A),
+              backgroundColor: const Color(0xFFEAF8F8),
               onRefresh: _refreshAll,
               child: CustomScrollView(
                 physics: const AlwaysScrollableScrollPhysics(),
@@ -438,17 +430,14 @@ class _MisTareasScreenState extends State<MisTareasScreen> {
               borderRadius: BorderRadius.circular(16),
               border: Border.all(color: Colors.white.withOpacity(0.10)),
             ),
-            child: const Icon(
-              Icons.menu_rounded,
-              color: Colors.white,
-            ),
+            child: const Icon(Icons.menu_rounded, color: Colors.white),
           ),
           const SizedBox(width: 14),
           const Expanded(
             child: Text(
               "Mis tareas",
               style: TextStyle(
-                color: Colors.white,
+                color: const Color(0xFF071A3A),
                 fontSize: 34,
                 fontWeight: FontWeight.w900,
                 letterSpacing: -1,
@@ -502,14 +491,12 @@ class _MisTareasScreenState extends State<MisTareasScreen> {
           colors: [
             Colors.cyanAccent.withOpacity(0.16),
             const Color(0xFF081A2A).withOpacity(0.92),
-            const Color(0xFF061018).withOpacity(0.95),
+            const Color(0xFFFFFFFF).withOpacity(0.95),
           ],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
-        border: Border.all(
-          color: Colors.cyanAccent.withOpacity(0.32),
-        ),
+        border: Border.all(color: Colors.cyanAccent.withOpacity(0.32)),
         boxShadow: [
           BoxShadow(
             color: Colors.cyanAccent.withOpacity(0.12),
@@ -554,7 +541,7 @@ class _MisTareasScreenState extends State<MisTareasScreen> {
                         Text(
                           "/ ${tareas.length}",
                           style: const TextStyle(
-                            color: Colors.white,
+                            color: const Color(0xFF071A3A),
                             fontSize: 46,
                             fontWeight: FontWeight.w800,
                             height: 1,
@@ -566,7 +553,7 @@ class _MisTareasScreenState extends State<MisTareasScreen> {
                     const Text(
                       "completadas",
                       style: TextStyle(
-                        color: Colors.white70,
+                        color: const Color(0xFF53627A),
                         fontSize: 24,
                         fontWeight: FontWeight.w700,
                       ),
@@ -713,11 +700,7 @@ class _MisTareasScreenState extends State<MisTareasScreen> {
                 ),
                 border: Border.all(color: color.withOpacity(0.55)),
               ),
-              child: Icon(
-                tarea["icono"],
-                color: color,
-                size: 34,
-              ),
+              child: Icon(tarea["icono"], color: color, size: 34),
             ),
             const SizedBox(width: 16),
             Container(
@@ -733,7 +716,7 @@ class _MisTareasScreenState extends State<MisTareasScreen> {
                   Text(
                     tarea["titulo"],
                     style: const TextStyle(
-                      color: Colors.white,
+                      color: const Color(0xFF071A3A),
                       fontSize: 17,
                       fontWeight: FontWeight.w900,
                       height: 1.2,
@@ -866,11 +849,7 @@ class _PremiumBackground extends StatelessWidget {
         Container(
           decoration: const BoxDecoration(
             gradient: LinearGradient(
-              colors: [
-                Color(0xFF02060A),
-                Color(0xFF061018),
-                Color(0xFF071827),
-              ],
+              colors: [Color(0xFF02060A), Color(0xFFFFFFFF), Color(0xFF071827)],
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
             ),
@@ -902,13 +881,7 @@ class _PremiumBackground extends StatelessWidget {
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         color: color,
-        boxShadow: [
-          BoxShadow(
-            color: color,
-            blurRadius: 80,
-            spreadRadius: 45,
-          ),
-        ],
+        boxShadow: [BoxShadow(color: color, blurRadius: 80, spreadRadius: 45)],
       ),
     );
   }

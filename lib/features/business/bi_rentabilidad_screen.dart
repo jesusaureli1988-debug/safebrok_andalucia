@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:safebrok_andalucia/core/production/premium_weighting.dart';
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -98,6 +99,9 @@ class _BiRentabilidadScreenState extends State<BiRentabilidadScreen>
       final profile = await _supabase
           .from('usuarios')
           .select('rol_usuario')
+          .or(
+            'estado.is.null,estado.not.in.(inactivo,Inactivo,INACTIVO,baja,Baja,BAJA,desactivado,Desactivado,DESACTIVADO,bloqueado,Bloqueado,BLOQUEADO,suspendido,Suspendido,SUSPENDIDO)',
+          )
           .eq('auth_id', user.id)
           .maybeSingle();
       final role = _normalize(
@@ -139,7 +143,10 @@ class _BiRentabilidadScreenState extends State<BiRentabilidadScreen>
         _supabase.from('comisiones_aseguradoras').select().order('compania'),
         _supabase
             .from('usuarios')
-            .select('id, auth_id, nombre, apellidos, rol_usuario, parent_id'),
+            .select('id, auth_id, nombre, apellidos, rol_usuario, parent_id')
+            .or(
+              'estado.is.null,estado.not.in.(inactivo,Inactivo,INACTIVO,baja,Baja,BAJA,desactivado,Desactivado,DESACTIVADO,bloqueado,Bloqueado,BLOQUEADO,suspendido,Suspendido,SUSPENDIDO)',
+            ),
         _supabase
             .from('cierres_produccion')
             .select('anio, mes, fecha_desde, fecha_hasta')
@@ -508,7 +515,7 @@ class _BiRentabilidadScreenState extends State<BiRentabilidadScreen>
     return Scaffold(
       backgroundColor: const Color(0xFFF3F6FA),
       appBar: AppBar(
-        backgroundColor: const Color(0xFF0B1F33),
+        backgroundColor: const Color(0xFFF2FCFD),
         foregroundColor: Colors.white,
         title: const Text(
           'BI de Rentabilidad',
@@ -518,7 +525,7 @@ class _BiRentabilidadScreenState extends State<BiRentabilidadScreen>
           controller: _tabs,
           indicatorColor: const Color(0xFF39D2C0),
           labelColor: Colors.white,
-          unselectedLabelColor: Colors.white60,
+          unselectedLabelColor: const Color(0xFF64748B),
           tabs: const [
             Tab(
               icon: Icon(Icons.analytics_rounded),
@@ -562,23 +569,23 @@ class _BiRentabilidadScreenState extends State<BiRentabilidadScreen>
                 'Coste comercial',
                 _money.format(_cost),
                 Icons.payments_rounded,
-                const Color(0xFFD97706),
+                const Color(0xFF0A7F91),
               ),
               _kpi(
                 'Resultado',
                 _money.format(_result),
                 _result >= 0 ? Icons.trending_up : Icons.trending_down,
                 _result >= 0
-                    ? const Color(0xFF16845B)
-                    : const Color(0xFFC63C3C),
+                    ? const Color(0xFF0AAEAE)
+                    : const Color(0xFFE74646),
               ),
               _kpi(
                 'Margen de beneficio',
                 '${_margin.toStringAsFixed(2)} %',
                 Icons.percent_rounded,
                 _margin >= 0
-                    ? const Color(0xFF2563EB)
-                    : const Color(0xFFC63C3C),
+                    ? const Color(0xFF0A7F91)
+                    : const Color(0xFFE74646),
               ),
             ],
           ),
@@ -602,7 +609,7 @@ class _BiRentabilidadScreenState extends State<BiRentabilidadScreen>
     padding: const EdgeInsets.all(24),
     decoration: BoxDecoration(
       gradient: const LinearGradient(
-        colors: [Color(0xFF0B1F33), Color(0xFF123B57)],
+        colors: [Color(0xFFF2FCFD), Color(0xFF123B57)],
       ),
       borderRadius: BorderRadius.circular(24),
     ),
@@ -612,7 +619,7 @@ class _BiRentabilidadScreenState extends State<BiRentabilidadScreen>
         Text(
           'Inteligencia financiera de SafeBrok',
           style: TextStyle(
-            color: Colors.white,
+            color: const Color(0xFF071A3A),
             fontSize: 24,
             fontWeight: FontWeight.w900,
           ),
@@ -621,7 +628,7 @@ class _BiRentabilidadScreenState extends State<BiRentabilidadScreen>
         Text(
           'Ingresos de aseguradoras, coste real de la red comercial y '
           'margen neto operativo en una única cuenta de resultados.',
-          style: TextStyle(color: Colors.white70, height: 1.4),
+          style: TextStyle(color: const Color(0xFF53627A), height: 1.4),
         ),
       ],
     ),
@@ -824,9 +831,9 @@ class _BiRentabilidadScreenState extends State<BiRentabilidadScreen>
             fontSize: total ? 20 : 15,
             fontWeight: total ? FontWeight.w900 : FontWeight.w700,
             color: positive
-                ? const Color(0xFF16845B)
+                ? const Color(0xFF0AAEAE)
                 : total && amount < 0
-                ? const Color(0xFFC63C3C)
+                ? const Color(0xFFE74646)
                 : null,
           ),
         ),
@@ -894,8 +901,8 @@ class _BiRentabilidadScreenState extends State<BiRentabilidadScreen>
                         style: TextStyle(
                           fontWeight: FontWeight.w900,
                           color: row.result >= 0
-                              ? const Color(0xFF16845B)
-                              : const Color(0xFFC63C3C),
+                              ? const Color(0xFF0AAEAE)
+                              : const Color(0xFFE74646),
                         ),
                       ),
                     ),
@@ -976,7 +983,7 @@ class _BiRentabilidadScreenState extends State<BiRentabilidadScreen>
             elevation: 0,
             child: ListTile(
               leading: CircleAvatar(
-                backgroundColor: const Color(0xFF0B1F33),
+                backgroundColor: const Color(0xFFF2FCFD),
                 foregroundColor: Colors.white,
                 child: const Icon(Icons.shield_outlined),
               ),

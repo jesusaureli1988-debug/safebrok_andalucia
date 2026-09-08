@@ -22,14 +22,14 @@ class _DirectorNacionalUsuariosScreenState
   String selectedRole = 'Todos';
 
   final roles = const [
-  'Todos',
-  'director_nacional',
-  'director_zona',
-  'jefe_ventas',
-  'jefe_equipo',
-  'agente',
-  'administracion',
-];
+    'Todos',
+    'director_nacional',
+    'director_zona',
+    'jefe_ventas',
+    'jefe_equipo',
+    'agente',
+    'administracion',
+  ];
 
   @override
   void initState() {
@@ -38,155 +38,155 @@ class _DirectorNacionalUsuariosScreenState
   }
 
   Future<void> cargarUsuarios() async {
-  try {
-    if (!mounted) return;
-    setState(() => loading = true);
-
-    final authUser = supabase.auth.currentUser;
-
-    if (authUser == null) {
+    try {
       if (!mounted) return;
-      setState(() {
-        usuarios = [];
-        loading = false;
-      });
-      return;
-    }
+      setState(() => loading = true);
 
-    final todosUsuarios = List<Map<String, dynamic>>.from(
-      await supabase
-          .from('usuarios')
-          .select('id, auth_id, parent_id, rol_usuario, nombre, apellidos, email')
-          .order('rol_usuario', ascending: true),
-    );
+      final authUser = supabase.auth.currentUser;
 
-    String limpiar(dynamic value) {
-      return (value ?? '').toString().trim().toLowerCase();
-    }
-
-    String limpiarRol(dynamic value) {
-      return limpiar(value)
-          .replaceAll(' ', '_')
-          .replaceAll('-', '_');
-    }
-
-    final authIdLogin = limpiar(authUser.id);
-    final emailLogin = limpiar(authUser.email);
-
-    final miUsuario = todosUsuarios.firstWhere(
-      (u) =>
-          limpiar(u['auth_id']) == authIdLogin ||
-          limpiar(u['email']) == emailLogin,
-      orElse: () => {},
-    );
-
-    if (miUsuario.isEmpty) {
-      debugPrint('NO ENCUENTRO USUARIO LOGUEADO');
-      debugPrint('AUTH LOGIN: $authIdLogin');
-      debugPrint('EMAIL LOGIN: $emailLogin');
-
-      if (!mounted) return;
-      setState(() {
-        usuarios = [];
-        loading = false;
-      });
-      return;
-    }
-
-    final miRol = limpiarRol(miUsuario['rol_usuario']);
-    final miId = limpiar(miUsuario['id']);
-
-    List<Map<String, dynamic>> visibles = [];
-
-    if (miRol == 'director_nacional') {
-      visibles = todosUsuarios;
-    } else {
-      final idsPermitidos = <String>{miId};
-
-      void buscarDescendientes(String parentId) {
-        for (final u in todosUsuarios) {
-          final idUsuario = limpiar(u['id']);
-          final parentUsuario = limpiar(u['parent_id']);
-
-          if (parentUsuario == parentId &&
-              idUsuario.isNotEmpty &&
-              !idsPermitidos.contains(idUsuario)) {
-            idsPermitidos.add(idUsuario);
-            buscarDescendientes(idUsuario);
-          }
-        }
+      if (authUser == null) {
+        if (!mounted) return;
+        setState(() {
+          usuarios = [];
+          loading = false;
+        });
+        return;
       }
 
-      buscarDescendientes(miId);
+      final todosUsuarios = List<Map<String, dynamic>>.from(
+        await supabase
+            .from('usuarios')
+            .select(
+              'id, auth_id, parent_id, rol_usuario, nombre, apellidos, email',
+            )
+            .or(
+              'estado.is.null,estado.not.in.(inactivo,Inactivo,INACTIVO,baja,Baja,BAJA,desactivado,Desactivado,DESACTIVADO,bloqueado,Bloqueado,BLOQUEADO,suspendido,Suspendido,SUSPENDIDO)',
+            )
+            .order('rol_usuario', ascending: true),
+      );
 
-      visibles = todosUsuarios.where((u) {
-        final idUsuario = limpiar(u['id']);
-        return idsPermitidos.contains(idUsuario);
-      }).toList();
+      String limpiar(dynamic value) {
+        return (value ?? '').toString().trim().toLowerCase();
+      }
 
-      visibles.removeWhere((u) {
-        final rol = limpiarRol(u['rol_usuario']);
-        final id = limpiar(u['id']);
+      String limpiarRol(dynamic value) {
+        return limpiar(value).replaceAll(' ', '_').replaceAll('-', '_');
+      }
 
-        return id != miId &&
-            (rol == 'director_nacional' || rol == 'director_zona');
+      final authIdLogin = limpiar(authUser.id);
+      final emailLogin = limpiar(authUser.email);
+
+      final miUsuario = todosUsuarios.firstWhere(
+        (u) =>
+            limpiar(u['auth_id']) == authIdLogin ||
+            limpiar(u['email']) == emailLogin,
+        orElse: () => {},
+      );
+
+      if (miUsuario.isEmpty) {
+        debugPrint('NO ENCUENTRO USUARIO LOGUEADO');
+        debugPrint('AUTH LOGIN: $authIdLogin');
+        debugPrint('EMAIL LOGIN: $emailLogin');
+
+        if (!mounted) return;
+        setState(() {
+          usuarios = [];
+          loading = false;
+        });
+        return;
+      }
+
+      final miRol = limpiarRol(miUsuario['rol_usuario']);
+      final miId = limpiar(miUsuario['id']);
+
+      List<Map<String, dynamic>> visibles = [];
+
+      if (miRol == 'director_nacional') {
+        visibles = todosUsuarios;
+      } else {
+        final idsPermitidos = <String>{miId};
+
+        void buscarDescendientes(String parentId) {
+          for (final u in todosUsuarios) {
+            final idUsuario = limpiar(u['id']);
+            final parentUsuario = limpiar(u['parent_id']);
+
+            if (parentUsuario == parentId &&
+                idUsuario.isNotEmpty &&
+                !idsPermitidos.contains(idUsuario)) {
+              idsPermitidos.add(idUsuario);
+              buscarDescendientes(idUsuario);
+            }
+          }
+        }
+
+        buscarDescendientes(miId);
+
+        visibles = todosUsuarios.where((u) {
+          final idUsuario = limpiar(u['id']);
+          return idsPermitidos.contains(idUsuario);
+        }).toList();
+
+        visibles.removeWhere((u) {
+          final rol = limpiarRol(u['rol_usuario']);
+          final id = limpiar(u['id']);
+
+          return id != miId &&
+              (rol == 'director_nacional' || rol == 'director_zona');
+        });
+      }
+
+      debugPrint('========== DEBUG USUARIOS ==========');
+      debugPrint('MI ID: $miId');
+      debugPrint('MI ROL: $miRol');
+      debugPrint('TOTAL TABLA: ${todosUsuarios.length}');
+      debugPrint('TOTAL VISIBLES: ${visibles.length}');
+      debugPrint('===================================');
+
+      if (!mounted) return;
+      setState(() {
+        usuarios = visibles;
+        loading = false;
+      });
+    } catch (e) {
+      debugPrint('ERROR CARGAR USUARIOS: $e');
+
+      if (!mounted) return;
+      setState(() {
+        usuarios = [];
+        loading = false;
       });
     }
-
-    debugPrint('========== DEBUG USUARIOS ==========');
-    debugPrint('MI ID: $miId');
-    debugPrint('MI ROL: $miRol');
-    debugPrint('TOTAL TABLA: ${todosUsuarios.length}');
-    debugPrint('TOTAL VISIBLES: ${visibles.length}');
-    debugPrint('===================================');
-
-    if (!mounted) return;
-    setState(() {
-      usuarios = visibles;
-      loading = false;
-    });
-  } catch (e) {
-    debugPrint('ERROR CARGAR USUARIOS: $e');
-
-    if (!mounted) return;
-    setState(() {
-      usuarios = [];
-      loading = false;
-    });
   }
-}
 
   List<Map<String, dynamic>> get usuariosFiltrados {
-  return usuarios.where((u) {
-    final role = (u['rol_usuario'] ?? '')
-        .toString()
-        .toLowerCase()
-        .trim();
+    return usuarios.where((u) {
+      final role = (u['rol_usuario'] ?? '').toString().toLowerCase().trim();
 
-    final selected = selectedRole
-        .toLowerCase()
-        .trim();
+      final selected = selectedRole.toLowerCase().trim();
 
-    final nombre =
-        "${u['nombre'] ?? ''} ${u['apellidos'] ?? ''}".toLowerCase().trim();
+      final nombre = "${u['nombre'] ?? ''} ${u['apellidos'] ?? ''}"
+          .toLowerCase()
+          .trim();
 
-    final email = (u['email'] ?? '').toString().toLowerCase().trim();
-    final telefono = (u['telefono'] ?? '').toString().toLowerCase().trim();
+      final email = (u['email'] ?? '').toString().toLowerCase().trim();
+      final telefono = (u['telefono'] ?? '').toString().toLowerCase().trim();
 
-    final query = searchText.toLowerCase().trim();
+      final query = searchText.toLowerCase().trim();
 
-    final matchRole = selected == 'todos' || role == selected;
+      final matchRole = selected == 'todos' || role == selected;
 
-    final matchSearch = query.isEmpty ||
-        nombre.contains(query) ||
-        email.contains(query) ||
-        telefono.contains(query) ||
-        role.contains(query) ||
-        _roleName(role).toLowerCase().contains(query);
+      final matchSearch =
+          query.isEmpty ||
+          nombre.contains(query) ||
+          email.contains(query) ||
+          telefono.contains(query) ||
+          role.contains(query) ||
+          _roleName(role).toLowerCase().contains(query);
 
-    return matchRole && matchSearch;
-  }).toList();
-}
+      return matchRole && matchSearch;
+    }).toList();
+  }
 
   Map<String, dynamic>? _parentOf(Map<String, dynamic> user) {
     final parentId = user['parent_id']?.toString();
@@ -196,9 +196,7 @@ class _DirectorNacionalUsuariosScreenState
     }
 
     try {
-      return usuarios.firstWhere(
-        (u) => u['id']?.toString() == parentId,
-      );
+      return usuarios.firstWhere((u) => u['id']?.toString() == parentId);
     } catch (_) {
       return null;
     }
@@ -300,9 +298,7 @@ class _DirectorNacionalUsuariosScreenState
           SafeArea(
             child: loading
                 ? const Center(
-                    child: CircularProgressIndicator(
-                      color: Colors.cyanAccent,
-                    ),
+                    child: CircularProgressIndicator(color: Colors.cyanAccent),
                   )
                 : RefreshIndicator(
                     color: Colors.cyanAccent,
@@ -321,8 +317,12 @@ class _DirectorNacionalUsuariosScreenState
                                 child: _emptyState(),
                               )
                             : SliverPadding(
-                                padding:
-                                    const EdgeInsets.fromLTRB(18, 8, 18, 40),
+                                padding: const EdgeInsets.fromLTRB(
+                                  18,
+                                  8,
+                                  18,
+                                  40,
+                                ),
                                 sliver: SliverList.builder(
                                   itemCount: usuariosOrdenados.length,
                                   itemBuilder: (context, index) {
@@ -385,10 +385,7 @@ class _DirectorNacionalUsuariosScreenState
               ),
               borderRadius: BorderRadius.circular(18),
             ),
-            child: const Icon(
-              Icons.account_tree_rounded,
-              color: Colors.white,
-            ),
+            child: const Icon(Icons.account_tree_rounded, color: Colors.white),
           ),
         ],
       ),
@@ -414,9 +411,7 @@ class _DirectorNacionalUsuariosScreenState
                 ],
               ),
               borderRadius: BorderRadius.circular(34),
-              border: Border.all(
-                color: Colors.cyanAccent.withOpacity(0.25),
-              ),
+              border: Border.all(color: Colors.cyanAccent.withOpacity(0.25)),
             ),
             child: Stack(
               children: [
@@ -484,9 +479,7 @@ class _DirectorNacionalUsuariosScreenState
         decoration: BoxDecoration(
           color: color.withOpacity(0.13),
           borderRadius: BorderRadius.circular(99),
-          border: Border.all(
-            color: color.withOpacity(0.28),
-          ),
+          border: Border.all(color: color.withOpacity(0.28)),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -550,12 +543,7 @@ class _DirectorNacionalUsuariosScreenState
     );
   }
 
-  Widget _summaryCard(
-    String title,
-    String value,
-    IconData icon,
-    Color color,
-  ) {
+  Widget _summaryCard(String title, String value, IconData icon, Color color) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: _cardDecoration(color),
@@ -623,9 +611,7 @@ class _DirectorNacionalUsuariosScreenState
               fillColor: Colors.white.withOpacity(0.07),
               enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(22),
-                borderSide: BorderSide(
-                  color: Colors.white.withOpacity(0.08),
-                ),
+                borderSide: BorderSide(color: Colors.white.withOpacity(0.08)),
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(22),
@@ -642,9 +628,7 @@ class _DirectorNacionalUsuariosScreenState
             decoration: BoxDecoration(
               color: Colors.white.withOpacity(0.075),
               borderRadius: BorderRadius.circular(20),
-              border: Border.all(
-                color: Colors.cyanAccent.withOpacity(0.18),
-              ),
+              border: Border.all(color: Colors.cyanAccent.withOpacity(0.18)),
             ),
             child: Row(
               children: [
@@ -714,9 +698,7 @@ class _DirectorNacionalUsuariosScreenState
             decoration: BoxDecoration(
               color: color.withOpacity(0.14),
               shape: BoxShape.circle,
-              border: Border.all(
-                color: color.withOpacity(0.30),
-              ),
+              border: Border.all(color: color.withOpacity(0.30)),
             ),
             child: Center(
               child: Text(
@@ -790,9 +772,7 @@ class _DirectorNacionalUsuariosScreenState
       decoration: BoxDecoration(
         color: color.withOpacity(0.11),
         borderRadius: BorderRadius.circular(99),
-        border: Border.all(
-          color: color.withOpacity(0.18),
-        ),
+        border: Border.all(color: color.withOpacity(0.18)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -836,9 +816,7 @@ class _DirectorNacionalUsuariosScreenState
       decoration: BoxDecoration(
         color: color.withOpacity(0.16),
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: color.withOpacity(0.28),
-        ),
+        border: Border.all(color: color.withOpacity(0.28)),
       ),
       child: Icon(icon, color: color),
     );
@@ -856,9 +834,7 @@ class _DirectorNacionalUsuariosScreenState
         end: Alignment.bottomRight,
       ),
       borderRadius: BorderRadius.circular(26),
-      border: Border.all(
-        color: color.withOpacity(0.28),
-      ),
+      border: Border.all(color: color.withOpacity(0.28)),
       boxShadow: [
         BoxShadow(
           color: color.withOpacity(0.08),
@@ -895,9 +871,7 @@ class _UsuariosBackground extends StatelessWidget {
         ),
         BackdropFilter(
           filter: ImageFilter.blur(sigmaX: 70, sigmaY: 70),
-          child: Container(
-            color: Colors.black.withOpacity(0.08),
-          ),
+          child: Container(color: Colors.black.withOpacity(0.08)),
         ),
       ],
     );

@@ -48,6 +48,9 @@ class _AgendaJefeVentasScreenState extends State<AgendaJefeVentasScreen> {
       final me = await supabase
           .from('usuarios')
           .select('id, auth_id')
+          .or(
+            'estado.is.null,estado.not.in.(inactivo,Inactivo,INACTIVO,baja,Baja,BAJA,desactivado,Desactivado,DESACTIVADO,bloqueado,Bloqueado,BLOQUEADO,suspendido,Suspendido,SUSPENDIDO)',
+          )
           .eq('auth_id', user.id)
           .single();
 
@@ -56,6 +59,9 @@ class _AgendaJefeVentasScreenState extends State<AgendaJefeVentasScreen> {
       final jefesEquipo = await supabase
           .from('usuarios')
           .select('id, auth_id')
+          .or(
+            'estado.is.null,estado.not.in.(inactivo,Inactivo,INACTIVO,baja,Baja,BAJA,desactivado,Desactivado,DESACTIVADO,bloqueado,Bloqueado,BLOQUEADO,suspendido,Suspendido,SUSPENDIDO)',
+          )
           .eq('parent_id', myUserId!)
           .eq('rol_usuario', 'jefe_equipo');
 
@@ -73,6 +79,9 @@ class _AgendaJefeVentasScreenState extends State<AgendaJefeVentasScreen> {
         final agentes = await supabase
             .from('usuarios')
             .select('auth_id')
+            .or(
+              'estado.is.null,estado.not.in.(inactivo,Inactivo,INACTIVO,baja,Baja,BAJA,desactivado,Desactivado,DESACTIVADO,bloqueado,Bloqueado,BLOQUEADO,suspendido,Suspendido,SUSPENDIDO)',
+            )
             .eq('parent_id', jefeId)
             .eq('rol_usuario', 'agente');
 
@@ -143,7 +152,7 @@ class _AgendaJefeVentasScreenState extends State<AgendaJefeVentasScreen> {
       Color color;
 
       if (esPropio) {
-        color = const Color(0xFF4DA3FF);
+        color = const Color(0xFF20C7C2);
       } else if (origen == 'manual') {
         color = Colors.orangeAccent;
       } else {
@@ -241,11 +250,19 @@ class _AgendaJefeVentasScreenState extends State<AgendaJefeVentasScreen> {
       final current = calendarController.displayDate ?? DateTime.now();
 
       if (currentView == CalendarView.month) {
-        calendarController.displayDate = DateTime(current.year, current.month - 1, 1);
+        calendarController.displayDate = DateTime(
+          current.year,
+          current.month - 1,
+          1,
+        );
       } else if (currentView == CalendarView.week) {
-        calendarController.displayDate = current.subtract(const Duration(days: 7));
+        calendarController.displayDate = current.subtract(
+          const Duration(days: 7),
+        );
       } else {
-        calendarController.displayDate = current.subtract(const Duration(days: 1));
+        calendarController.displayDate = current.subtract(
+          const Duration(days: 1),
+        );
       }
     });
   }
@@ -255,7 +272,11 @@ class _AgendaJefeVentasScreenState extends State<AgendaJefeVentasScreen> {
       final current = calendarController.displayDate ?? DateTime.now();
 
       if (currentView == CalendarView.month) {
-        calendarController.displayDate = DateTime(current.year, current.month + 1, 1);
+        calendarController.displayDate = DateTime(
+          current.year,
+          current.month + 1,
+          1,
+        );
       } else if (currentView == CalendarView.week) {
         calendarController.displayDate = current.add(const Duration(days: 7));
       } else {
@@ -276,13 +297,16 @@ class _AgendaJefeVentasScreenState extends State<AgendaJefeVentasScreen> {
     );
   }
 
-  Future<void> _openEventDetails(Appointment event, DateTime selectedDate) async {
+  Future<void> _openEventDetails(
+    Appointment event,
+    DateTime selectedDate,
+  ) async {
     await showDialog(
       context: context,
       barrierColor: Colors.black.withOpacity(0.72),
       builder: (_) {
         return Dialog(
-          backgroundColor: Colors.transparent,
+          backgroundColor: Colors.white,
           insetPadding: const EdgeInsets.all(18),
           child: ClipRRect(
             borderRadius: BorderRadius.circular(28),
@@ -291,14 +315,14 @@ class _AgendaJefeVentasScreenState extends State<AgendaJefeVentasScreen> {
               child: Container(
                 padding: const EdgeInsets.all(22),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF061018).withOpacity(0.96),
+                  color: const Color(0xFFFFFFFF).withOpacity(0.96),
                   borderRadius: BorderRadius.circular(28),
                   border: Border.all(
-                    color: Colors.cyanAccent.withOpacity(0.32),
+                    color: const Color(0xFF2563EB).withOpacity(0.32),
                   ),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.cyanAccent.withOpacity(0.12),
+                      color: const Color(0xFF2563EB).withOpacity(0.12),
                       blurRadius: 36,
                     ),
                   ],
@@ -330,7 +354,7 @@ class _AgendaJefeVentasScreenState extends State<AgendaJefeVentasScreen> {
                           child: Text(
                             event.subject,
                             style: const TextStyle(
-                              color: Colors.white,
+                              color: const Color(0xFF111827),
                               fontSize: 22,
                               fontWeight: FontWeight.w900,
                             ),
@@ -345,7 +369,7 @@ class _AgendaJefeVentasScreenState extends State<AgendaJefeVentasScreen> {
                       Icons.calendar_month_rounded,
                       'Fecha',
                       '${event.startTime.day}/${event.startTime.month}/${event.startTime.year}',
-                      Colors.cyanAccent,
+                      const Color(0xFF2563EB),
                     ),
 
                     _detailLine(
@@ -361,16 +385,14 @@ class _AgendaJefeVentasScreenState extends State<AgendaJefeVentasScreen> {
                         margin: const EdgeInsets.only(top: 14),
                         padding: const EdgeInsets.all(15),
                         decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.07),
+                          color: Colors.white,
                           borderRadius: BorderRadius.circular(18),
-                          border: Border.all(
-                            color: Colors.white.withOpacity(0.10),
-                          ),
+                          border: Border.all(color: const Color(0xFFE2E8F0)),
                         ),
                         child: Text(
                           event.notes ?? '',
                           style: const TextStyle(
-                            color: Colors.white70,
+                            color: const Color(0xFF64748B),
                             height: 1.4,
                           ),
                         ),
@@ -408,8 +430,10 @@ class _AgendaJefeVentasScreenState extends State<AgendaJefeVentasScreen> {
                                     'titulo': event.subject,
                                     'descripcion': event.notes,
                                     'room_id': event.location,
-                                    'fecha_inicio': event.startTime.toIso8601String(),
-                                    'fecha_fin': event.endTime.toIso8601String(),
+                                    'fecha_inicio': event.startTime
+                                        .toIso8601String(),
+                                    'fecha_fin': event.endTime
+                                        .toIso8601String(),
                                   },
                                   onSaved: refreshCalendar,
                                 ),
@@ -423,15 +447,18 @@ class _AgendaJefeVentasScreenState extends State<AgendaJefeVentasScreen> {
                             icon: const Icon(Icons.video_call_rounded),
                             label: const Text('Entrar'),
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.cyanAccent,
-                              foregroundColor: const Color(0xFF031018),
+                              backgroundColor: const Color(0xFF2563EB),
+                              foregroundColor: const Color(0xFFFFFFFF),
                               padding: const EdgeInsets.symmetric(vertical: 14),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(16),
                               ),
                             ),
                             onPressed: () async {
-                              final room = event.location ?? event.id?.toString() ?? 'safebrok';
+                              final room =
+                                  event.location ??
+                                  event.id?.toString() ??
+                                  'safebrok';
 
                               final url = Uri.parse(
                                 'https://meet.jit.si/$room',
@@ -463,15 +490,18 @@ class _AgendaJefeVentasScreenState extends State<AgendaJefeVentasScreen> {
                           final id = event.id?.toString();
 
                           if (id != null && id.isNotEmpty) {
-                            await supabase.from('reuniones').delete().eq('id', id);
+                            await supabase
+                                .from('reuniones')
+                                .delete()
+                                .eq('id', id);
                           } else {
                             await supabase
                                 .from('reuniones')
                                 .delete()
                                 .eq(
-  'room_id',
-  event.location ?? event.id ?? '',
-);
+                                  'room_id',
+                                  event.location ?? event.id ?? '',
+                                );
                           }
 
                           await refreshCalendar();
@@ -479,9 +509,7 @@ class _AgendaJefeVentasScreenState extends State<AgendaJefeVentasScreen> {
                           if (!mounted) return;
 
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Reunión eliminada'),
-                            ),
+                            const SnackBar(content: Text('Reunión eliminada')),
                           );
                         },
                       ),
@@ -514,7 +542,7 @@ class _AgendaJefeVentasScreenState extends State<AgendaJefeVentasScreen> {
             child: Text(
               label,
               style: const TextStyle(
-                color: Colors.white54,
+                color: const Color(0xFF64748B),
                 fontWeight: FontWeight.w700,
               ),
             ),
@@ -523,10 +551,7 @@ class _AgendaJefeVentasScreenState extends State<AgendaJefeVentasScreen> {
             child: Text(
               value,
               textAlign: TextAlign.right,
-              style: TextStyle(
-                color: color,
-                fontWeight: FontWeight.w900,
-              ),
+              style: TextStyle(color: color, fontWeight: FontWeight.w900),
             ),
           ),
         ],
@@ -537,11 +562,11 @@ class _AgendaJefeVentasScreenState extends State<AgendaJefeVentasScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF020617),
+      backgroundColor: const Color(0xFFF4F6FB),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _openMeetingDialog(DateTime.now()),
-        backgroundColor: Colors.cyanAccent,
-        foregroundColor: const Color(0xFF031018),
+        backgroundColor: const Color(0xFF2563EB),
+        foregroundColor: const Color(0xFFFFFFFF),
         icon: const Icon(Icons.add_rounded),
         label: const Text(
           'Nueva reunión',
@@ -556,180 +581,202 @@ class _AgendaJefeVentasScreenState extends State<AgendaJefeVentasScreen> {
             child: loading
                 ? const Center(
                     child: CircularProgressIndicator(
-                      color: Colors.cyanAccent,
+                      color: const Color(0xFF2563EB),
                     ),
                   )
                 : error != null
-                    ? Center(
-                        child: Padding(
-                          padding: const EdgeInsets.all(22),
-                          child: _glassCard(
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const Icon(
-                                  Icons.error_outline_rounded,
-                                  color: Colors.orangeAccent,
-                                  size: 48,
+                ? Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(22),
+                      child: _glassCard(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(
+                              Icons.error_outline_rounded,
+                              color: const Color(0xFF2563EB),
+                              size: 48,
+                            ),
+                            const SizedBox(height: 12),
+                            const Text(
+                              'No se pudo cargar la agenda',
+                              style: TextStyle(
+                                color: const Color(0xFF111827),
+                                fontSize: 20,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              error!,
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(
+                                color: const Color(0xFF64748B),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  )
+                : Column(
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(18, 12, 18, 0),
+                        child: Column(
+                          children: [
+                            _header(),
+                            const SizedBox(height: 16),
+                            _kpis(),
+                            const SizedBox(height: 14),
+                            _viewSelector(),
+                            const SizedBox(height: 10),
+                            _calendarNavigator(),
+                          ],
+                        ),
+                      ),
+
+                      Expanded(
+                        child: Container(
+                          margin: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(26),
+                            border: Border.all(color: const Color(0xFFD7DFEA)),
+                            boxShadow: [
+                              BoxShadow(
+                                color: const Color(
+                                  0xFF0F172A,
+                                ).withOpacity(0.08),
+                                blurRadius: 24,
+                                offset: const Offset(0, 10),
+                              ),
+                            ],
+                          ),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(26),
+                            child: SfCalendar(
+                              key: ValueKey(currentView),
+                              view: currentView,
+                              controller: calendarController,
+                              backgroundColor: Colors.white,
+                              initialDisplayDate:
+                                  calendarController.displayDate ??
+                                  DateTime.now(),
+                              dataSource: AgendaDataSource(appointments),
+
+                              onViewChanged: (ViewChangedDetails details) {
+                                WidgetsBinding.instance.addPostFrameCallback((
+                                  _,
+                                ) {
+                                  if (!mounted) return;
+
+                                  setState(() {
+                                    displayDate = details.visibleDates.first;
+                                  });
+                                });
+                              },
+
+                              onTap: (CalendarTapDetails details) {
+                                final selectedDate =
+                                    details.date ?? DateTime.now();
+                                final appointment = details.appointments;
+
+                                if (appointment != null &&
+                                    appointment.isNotEmpty) {
+                                  final event =
+                                      appointment.first as Appointment;
+                                  _openEventDetails(event, selectedDate);
+                                } else {
+                                  _openMeetingDialog(selectedDate);
+                                }
+                              },
+
+                              todayHighlightColor: const Color(0xFF2563EB),
+                              cellBorderColor: const Color(0xFFE2E8F0),
+
+                              selectionDecoration: BoxDecoration(
+                                border: Border.all(
+                                  color: const Color(0xFF2563EB),
+                                  width: 2,
                                 ),
-                                const SizedBox(height: 12),
-                                const Text(
-                                  'No se pudo cargar la agenda',
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 20,
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+
+                              headerHeight: 0,
+
+                              viewHeaderStyle: const ViewHeaderStyle(
+                                backgroundColor: Color(0xFFF8FAFC),
+                                dateTextStyle: TextStyle(
+                                  color: const Color(0xFF111827),
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w900,
+                                ),
+                                dayTextStyle: TextStyle(
+                                  color: const Color(0xFF64748B),
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+
+                              timeSlotViewSettings: const TimeSlotViewSettings(
+                                timeTextStyle: TextStyle(
+                                  color: const Color(0xFF64748B),
+                                  fontWeight: FontWeight.w600,
+                                ),
+                                dateFormat: 'd',
+                                dayFormat: 'EEE',
+                              ),
+
+                              monthViewSettings: const MonthViewSettings(
+                                showAgenda: true,
+                                appointmentDisplayMode:
+                                    MonthAppointmentDisplayMode.indicator,
+                                dayFormat: 'EEE',
+                                agendaStyle: AgendaStyle(
+                                  backgroundColor: Color(0xFFF8FAFC),
+                                  appointmentTextStyle: TextStyle(
+                                    color: const Color(0xFF111827),
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                  dateTextStyle: TextStyle(
+                                    color: const Color(0xFF2563EB),
                                     fontWeight: FontWeight.w900,
                                   ),
+                                  dayTextStyle: TextStyle(
+                                    color: const Color(0xFF64748B),
+                                  ),
                                 ),
-                                const SizedBox(height: 8),
-                                Text(
-                                  error!,
-                                  textAlign: TextAlign.center,
-                                  style: const TextStyle(color: Colors.white60),
+                                monthCellStyle: MonthCellStyle(
+                                  backgroundColor: Color(0xFFFFFFFF),
+                                  trailingDatesBackgroundColor: Color(
+                                    0xFFF8FAFC,
+                                  ),
+                                  leadingDatesBackgroundColor: Color(
+                                    0xFFF8FAFC,
+                                  ),
+                                  textStyle: TextStyle(
+                                    color: const Color(0xFF111827),
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                  todayTextStyle: TextStyle(
+                                    color: const Color(0xFF2563EB),
+                                    fontWeight: FontWeight.w900,
+                                  ),
+                                  trailingDatesTextStyle: TextStyle(
+                                    color: const Color(0xFF94A3B8),
+                                  ),
+                                  leadingDatesTextStyle: TextStyle(
+                                    color: const Color(0xFF94A3B8),
+                                  ),
                                 ),
-                              ],
+                              ),
                             ),
                           ),
                         ),
-                      )
-                    : Column(
-                        children: [
-                          Padding(
-                            padding: const EdgeInsets.fromLTRB(18, 12, 18, 0),
-                            child: Column(
-                              children: [
-                                _header(),
-                                const SizedBox(height: 16),
-                                _kpis(),
-                                const SizedBox(height: 14),
-                                _viewSelector(),
-                                const SizedBox(height: 10),
-                                _calendarNavigator(),
-                              ],
-                            ),
-                          ),
-
-                          Expanded(
-                            child: Container(
-                              margin: const EdgeInsets.fromLTRB(12, 8, 12, 12),
-                              decoration: BoxDecoration(
-                                color: Colors.white.withOpacity(0.055),
-                                borderRadius: BorderRadius.circular(26),
-                                border: Border.all(
-                                  color: Colors.white.withOpacity(0.10),
-                                ),
-                              ),
-                              child: ClipRRect(
-                                borderRadius: BorderRadius.circular(26),
-                                child: SfCalendar(
-                                  key: ValueKey(currentView),
-                                  view: currentView,
-                                  controller: calendarController,
-                                  backgroundColor: Colors.transparent,
-                                  initialDisplayDate:
-                                      calendarController.displayDate ?? DateTime.now(),
-                                  dataSource: AgendaDataSource(appointments),
-
-                                  onViewChanged: (ViewChangedDetails details) {
-                                    WidgetsBinding.instance.addPostFrameCallback((_) {
-                                      if (!mounted) return;
-
-                                      setState(() {
-                                        displayDate = details.visibleDates.first;
-                                      });
-                                    });
-                                  },
-
-                                  onTap: (CalendarTapDetails details) {
-                                    final selectedDate = details.date ?? DateTime.now();
-                                    final appointment = details.appointments;
-
-                                    if (appointment != null && appointment.isNotEmpty) {
-                                      final event = appointment.first as Appointment;
-                                      _openEventDetails(event, selectedDate);
-                                    } else {
-                                      _openMeetingDialog(selectedDate);
-                                    }
-                                  },
-
-                                  todayHighlightColor: Colors.cyanAccent,
-                                  cellBorderColor: Colors.white10,
-
-                                  selectionDecoration: BoxDecoration(
-                                    border: Border.all(
-                                      color: Colors.cyanAccent,
-                                      width: 2,
-                                    ),
-                                    borderRadius: BorderRadius.circular(10),
-                                  ),
-
-                                  headerHeight: 0,
-
-                                  viewHeaderStyle: const ViewHeaderStyle(
-                                    backgroundColor: Color(0xFF07111F),
-                                    dateTextStyle: TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w900,
-                                    ),
-                                    dayTextStyle: TextStyle(
-                                      color: Colors.white70,
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                  ),
-
-                                  timeSlotViewSettings: const TimeSlotViewSettings(
-                                    timeTextStyle: TextStyle(
-                                      color: Colors.white70,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                    dateFormat: 'd',
-                                    dayFormat: 'EEE',
-                                  ),
-
-                                  monthViewSettings: const MonthViewSettings(
-                                    showAgenda: true,
-                                    appointmentDisplayMode:
-                                        MonthAppointmentDisplayMode.indicator,
-                                    dayFormat: 'EEE',
-                                    agendaStyle: AgendaStyle(
-                                      backgroundColor: Color(0xFF07111F),
-                                      appointmentTextStyle: TextStyle(
-                                        color: Colors.white,
-                                        fontWeight: FontWeight.w700,
-                                      ),
-                                      dateTextStyle: TextStyle(
-                                        color: Colors.cyanAccent,
-                                        fontWeight: FontWeight.w900,
-                                      ),
-                                      dayTextStyle: TextStyle(
-                                        color: Colors.white60,
-                                      ),
-                                    ),
-                                    monthCellStyle: MonthCellStyle(
-                                      textStyle: TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                      todayTextStyle: TextStyle(
-                                        color: Colors.cyanAccent,
-                                        fontWeight: FontWeight.w900,
-                                      ),
-                                      trailingDatesTextStyle: TextStyle(
-                                        color: Colors.white24,
-                                      ),
-                                      leadingDatesTextStyle: TextStyle(
-                                        color: Colors.white24,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
                       ),
+                    ],
+                  ),
           ),
         ],
       ),
@@ -746,21 +793,21 @@ class _AgendaJefeVentasScreenState extends State<AgendaJefeVentasScreen> {
             height: 54,
             width: 54,
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.08),
+              color: Colors.white,
               borderRadius: BorderRadius.circular(18),
               border: Border.all(
-                color: Colors.cyanAccent.withOpacity(0.45),
+                color: const Color(0xFF2563EB).withOpacity(0.45),
               ),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.cyanAccent.withOpacity(0.16),
+                  color: const Color(0xFF2563EB).withOpacity(0.16),
                   blurRadius: 22,
                 ),
               ],
             ),
             child: const Icon(
               Icons.arrow_back_rounded,
-              color: Colors.white,
+              color: Color(0xFF111827),
             ),
           ),
         ),
@@ -772,7 +819,7 @@ class _AgendaJefeVentasScreenState extends State<AgendaJefeVentasScreen> {
               Text(
                 'Agenda Global',
                 style: TextStyle(
-                  color: Colors.white,
+                  color: const Color(0xFF111827),
                   fontSize: 27,
                   fontWeight: FontWeight.w900,
                   letterSpacing: -0.8,
@@ -781,10 +828,7 @@ class _AgendaJefeVentasScreenState extends State<AgendaJefeVentasScreen> {
               SizedBox(height: 3),
               Text(
                 'Reuniones, equipo y planificación comercial',
-                style: TextStyle(
-                  color: Colors.white60,
-                  fontSize: 13,
-                ),
+                style: TextStyle(color: const Color(0xFF64748B), fontSize: 13),
               ),
             ],
           ),
@@ -794,14 +838,14 @@ class _AgendaJefeVentasScreenState extends State<AgendaJefeVentasScreen> {
           width: 52,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            color: Colors.cyanAccent.withOpacity(0.12),
+            color: const Color(0xFF2563EB).withOpacity(0.12),
             border: Border.all(
-              color: Colors.cyanAccent.withOpacity(0.38),
+              color: const Color(0xFF2563EB).withOpacity(0.38),
             ),
           ),
           child: const Icon(
             Icons.calendar_month_rounded,
-            color: Colors.cyanAccent,
+            color: const Color(0xFF2563EB),
           ),
         ),
       ],
@@ -816,7 +860,7 @@ class _AgendaJefeVentasScreenState extends State<AgendaJefeVentasScreen> {
             title: 'Eventos',
             value: appointments.length.toString(),
             icon: Icons.event_available_rounded,
-            color: Colors.cyanAccent,
+            color: const Color(0xFF2563EB),
           ),
         ),
         const SizedBox(width: 10),
@@ -825,7 +869,7 @@ class _AgendaJefeVentasScreenState extends State<AgendaJefeVentasScreen> {
             title: 'Hoy',
             value: reunionesHoy.toString(),
             icon: Icons.today_rounded,
-            color: Colors.orangeAccent,
+            color: const Color(0xFF2563EB),
           ),
         ),
         const SizedBox(width: 10),
@@ -834,7 +878,7 @@ class _AgendaJefeVentasScreenState extends State<AgendaJefeVentasScreen> {
             title: 'Semana',
             value: reunionesSemana.toString(),
             icon: Icons.date_range_rounded,
-            color: Colors.greenAccent,
+            color: const Color(0xFF2563EB),
           ),
         ),
       ],
@@ -850,7 +894,7 @@ class _AgendaJefeVentasScreenState extends State<AgendaJefeVentasScreen> {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.075),
+        color: Colors.white,
         borderRadius: BorderRadius.circular(22),
         border: Border.all(color: color.withOpacity(0.25)),
         boxShadow: [
@@ -877,7 +921,7 @@ class _AgendaJefeVentasScreenState extends State<AgendaJefeVentasScreen> {
           Text(
             title,
             style: const TextStyle(
-              color: Colors.white60,
+              color: const Color(0xFF64748B),
               fontSize: 12,
               fontWeight: FontWeight.w700,
             ),
@@ -888,13 +932,42 @@ class _AgendaJefeVentasScreenState extends State<AgendaJefeVentasScreen> {
   }
 
   Widget _viewSelector() {
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(6),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF0F172A).withOpacity(0.06),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
       child: Row(
         children: [
-          _viewChip('Mes', CalendarView.month, Icons.calendar_view_month_rounded),
-          _viewChip('Semana', CalendarView.week, Icons.view_week_rounded),
-          _viewChip('Día', CalendarView.day, Icons.today_rounded),
+          Expanded(
+            child: _viewChip(
+              'Mes',
+              CalendarView.month,
+              Icons.calendar_view_month_rounded,
+            ),
+          ),
+          const SizedBox(width: 6),
+          Expanded(
+            child: _viewChip(
+              'Semana',
+              CalendarView.week,
+              Icons.view_week_rounded,
+            ),
+          ),
+          const SizedBox(width: 6),
+          Expanded(
+            child: _viewChip('Día', CalendarView.day, Icons.today_rounded),
+          ),
         ],
       ),
     );
@@ -903,7 +976,8 @@ class _AgendaJefeVentasScreenState extends State<AgendaJefeVentasScreen> {
   Widget _viewChip(String label, CalendarView view, IconData icon) {
     final isSelected = currentView == view;
 
-    return GestureDetector(
+    return InkWell(
+      borderRadius: BorderRadius.circular(17),
       onTap: () {
         setState(() {
           currentView = view;
@@ -912,39 +986,35 @@ class _AgendaJefeVentasScreenState extends State<AgendaJefeVentasScreen> {
       },
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 220),
-        margin: const EdgeInsets.only(right: 8),
-        padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 10),
+        height: 52,
+        padding: const EdgeInsets.symmetric(horizontal: 10),
         decoration: BoxDecoration(
-          color: isSelected ? Colors.cyanAccent : const Color(0xFF162033),
-          borderRadius: BorderRadius.circular(30),
+          color: isSelected ? const Color(0xFF1D4ED8) : const Color(0xFFF8FAFC),
+          borderRadius: BorderRadius.circular(17),
           border: Border.all(
             color: isSelected
-                ? Colors.cyanAccent
-                : Colors.white.withOpacity(0.12),
+                ? const Color(0xFF1D4ED8)
+                : const Color(0xFFE2E8F0),
           ),
-          boxShadow: isSelected
-              ? [
-                  BoxShadow(
-                    color: Colors.cyanAccent.withOpacity(0.24),
-                    blurRadius: 18,
-                    offset: const Offset(0, 8),
-                  ),
-                ]
-              : [],
         ),
         child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(
               icon,
-              color: isSelected ? const Color(0xFF061018) : Colors.white,
-              size: 17,
+              color: isSelected ? Colors.white : const Color(0xFF334155),
+              size: 19,
             ),
             const SizedBox(width: 7),
-            Text(
-              label,
-              style: TextStyle(
-                color: isSelected ? const Color(0xFF061018) : Colors.white,
-                fontWeight: FontWeight.w900,
+            Flexible(
+              child: Text(
+                label,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: isSelected ? Colors.white : const Color(0xFF111827),
+                  fontSize: 14,
+                  fontWeight: FontWeight.w900,
+                ),
               ),
             ),
           ],
@@ -962,17 +1032,15 @@ class _AgendaJefeVentasScreenState extends State<AgendaJefeVentasScreen> {
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.07),
+              color: Colors.white,
               borderRadius: BorderRadius.circular(20),
-              border: Border.all(
-                color: Colors.white.withOpacity(0.10),
-              ),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
             ),
             child: Text(
               _getHeaderTitle(),
               textAlign: TextAlign.center,
               style: const TextStyle(
-                color: Colors.white,
+                color: const Color(0xFF111827),
                 fontSize: 17,
                 fontWeight: FontWeight.w900,
               ),
@@ -993,13 +1061,11 @@ class _AgendaJefeVentasScreenState extends State<AgendaJefeVentasScreen> {
         height: 48,
         width: 48,
         decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.08),
+          color: Colors.white,
           borderRadius: BorderRadius.circular(18),
-          border: Border.all(
-            color: Colors.cyanAccent.withOpacity(0.28),
-          ),
+          border: Border.all(color: const Color(0xFF2563EB).withOpacity(0.28)),
         ),
-        child: Icon(icon, color: Colors.white, size: 30),
+        child: Icon(icon, color: const Color(0xFF111827), size: 30),
       ),
     );
   }
@@ -1016,9 +1082,9 @@ class _AgendaJefeVentasScreenState extends State<AgendaJefeVentasScreen> {
           width: double.infinity,
           padding: padding,
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.075),
+            color: Colors.white,
             borderRadius: BorderRadius.circular(26),
-            border: Border.all(color: Colors.white.withOpacity(0.12)),
+            border: Border.all(color: const Color(0xFFE2E8F0)),
             boxShadow: [
               BoxShadow(
                 color: Colors.black.withOpacity(0.28),
@@ -1085,8 +1151,12 @@ class _MeetingCreateDialogState extends State<MeetingCreateDialog> {
       descripcionCtrl.text = widget.editData!['descripcion'] ?? '';
       invitados = List<String>.from(widget.editData!['invitados'] ?? []);
 
-      final inicio = DateTime.tryParse(widget.editData!['fecha_inicio']?.toString() ?? '');
-      final fin = DateTime.tryParse(widget.editData!['fecha_fin']?.toString() ?? '');
+      final inicio = DateTime.tryParse(
+        widget.editData!['fecha_inicio']?.toString() ?? '',
+      );
+      final fin = DateTime.tryParse(
+        widget.editData!['fecha_fin']?.toString() ?? '',
+      );
 
       if (inicio != null) {
         selectedDate = inicio;
@@ -1112,6 +1182,9 @@ class _MeetingCreateDialogState extends State<MeetingCreateDialog> {
     final res = await widget.supabase
         .from('usuarios')
         .select('id, nombre, apellidos, auth_id')
+        .or(
+          'estado.is.null,estado.not.in.(inactivo,Inactivo,INACTIVO,baja,Baja,BAJA,desactivado,Desactivado,DESACTIVADO,bloqueado,Bloqueado,BLOQUEADO,suspendido,Suspendido,SUSPENDIDO)',
+        )
         .order('nombre', ascending: true);
 
     setState(() {
@@ -1129,11 +1202,11 @@ class _MeetingCreateDialogState extends State<MeetingCreateDialog> {
         return Theme(
           data: ThemeData.dark().copyWith(
             colorScheme: const ColorScheme.dark(
-              primary: Colors.cyanAccent,
-              surface: Color(0xFF061018),
+              primary: const Color(0xFF2563EB),
+              surface: Color(0xFFFFFFFF),
               onSurface: Colors.white,
             ),
-            dialogBackgroundColor: const Color(0xFF061018),
+            dialogBackgroundColor: const Color(0xFFFFFFFF),
           ),
           child: child!,
         );
@@ -1149,11 +1222,11 @@ class _MeetingCreateDialogState extends State<MeetingCreateDialog> {
         return Theme(
           data: ThemeData.dark().copyWith(
             colorScheme: const ColorScheme.dark(
-              primary: Colors.cyanAccent,
-              surface: Color(0xFF061018),
+              primary: const Color(0xFF2563EB),
+              surface: Color(0xFFFFFFFF),
               onSurface: Colors.white,
             ),
-            dialogBackgroundColor: const Color(0xFF061018),
+            dialogBackgroundColor: const Color(0xFFFFFFFF),
           ),
           child: child!,
         );
@@ -1192,8 +1265,7 @@ class _MeetingCreateDialogState extends State<MeetingCreateDialog> {
     }
 
     try {
-      final creadorAuthId =
-          widget.supabase.auth.currentUser?.id ?? '';
+      final creadorAuthId = widget.supabase.auth.currentUser?.id ?? '';
       final invitadosAnteriores = widget.editData == null
           ? <String>{}
           : List<String>.from(
@@ -1233,17 +1305,19 @@ class _MeetingCreateDialogState extends State<MeetingCreateDialog> {
         reunionId = reunionCreada['id'];
         roomIdFinal = reunionCreada['room_id']?.toString() ?? roomId;
       } else {
-        await widget.supabase.from('reuniones').update({
-          'titulo': tituloCtrl.text.trim(),
-          'descripcion': descripcionCtrl.text.trim(),
-          'fecha_inicio': start.toIso8601String(),
-          'fecha_fin': end.toIso8601String(),
-          'invitados': invitados.toSet().toList(),
-        }).eq('id', widget.editData!['id']);
+        await widget.supabase
+            .from('reuniones')
+            .update({
+              'titulo': tituloCtrl.text.trim(),
+              'descripcion': descripcionCtrl.text.trim(),
+              'fecha_inicio': start.toIso8601String(),
+              'fecha_fin': end.toIso8601String(),
+              'invitados': invitados.toSet().toList(),
+            })
+            .eq('id', widget.editData!['id']);
 
         reunionId = widget.editData!['id'];
-        roomIdFinal =
-            widget.editData!['room_id']?.toString() ?? '';
+        roomIdFinal = widget.editData!['room_id']?.toString() ?? '';
       }
 
       // Se ejecuta después de guardar. Cualquier fallo del push se captura
@@ -1266,9 +1340,9 @@ class _MeetingCreateDialogState extends State<MeetingCreateDialog> {
     } catch (e) {
       setState(() => saving = false);
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error al guardar: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error al guardar: $e')));
     }
   }
 
@@ -1286,17 +1360,16 @@ class _MeetingCreateDialogState extends State<MeetingCreateDialog> {
 
     try {
       final creador = usuarios.firstWhere(
-        (usuario) =>
-            usuario['auth_id']?.toString().trim() == creadorAuthId,
+        (usuario) => usuario['auth_id']?.toString().trim() == creadorAuthId,
         orElse: () => <String, dynamic>{},
       );
 
       final nombre = creador['nombre']?.toString().trim() ?? '';
-      final apellidos =
-          creador['apellidos']?.toString().trim() ?? '';
+      final apellidos = creador['apellidos']?.toString().trim() ?? '';
       final nombreCreador = '$nombre $apellidos'.trim();
-      final organizador =
-          nombreCreador.isEmpty ? 'Tu responsable' : nombreCreador;
+      final organizador = nombreCreador.isEmpty
+          ? 'Tu responsable'
+          : nombreCreador;
 
       final fecha =
           '${inicio.day.toString().padLeft(2, '0')}/'
@@ -1339,9 +1412,7 @@ class _MeetingCreateDialogState extends State<MeetingCreateDialog> {
             );
           }
         } catch (errorPush) {
-          debugPrint(
-            'ERROR PUSH INVITACIÓN A $authIdDestino: $errorPush',
-          );
+          debugPrint('ERROR PUSH INVITACIÓN A $authIdDestino: $errorPush');
         }
       }
     } catch (error) {
@@ -1359,7 +1430,7 @@ class _MeetingCreateDialogState extends State<MeetingCreateDialog> {
     final editando = widget.editData != null;
 
     return Dialog(
-      backgroundColor: Colors.transparent,
+      backgroundColor: Colors.white,
       insetPadding: const EdgeInsets.all(18),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(30),
@@ -1369,14 +1440,14 @@ class _MeetingCreateDialogState extends State<MeetingCreateDialog> {
             constraints: const BoxConstraints(maxHeight: 720),
             padding: const EdgeInsets.all(22),
             decoration: BoxDecoration(
-              color: const Color(0xFF061018).withOpacity(0.97),
+              color: const Color(0xFFFFFFFF).withOpacity(0.97),
               borderRadius: BorderRadius.circular(30),
               border: Border.all(
-                color: Colors.cyanAccent.withOpacity(0.32),
+                color: const Color(0xFF2563EB).withOpacity(0.32),
               ),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.cyanAccent.withOpacity(0.13),
+                  color: const Color(0xFF2563EB).withOpacity(0.13),
                   blurRadius: 36,
                 ),
               ],
@@ -1392,16 +1463,16 @@ class _MeetingCreateDialogState extends State<MeetingCreateDialog> {
                         height: 54,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          color: Colors.cyanAccent.withOpacity(0.13),
+                          color: const Color(0xFF2563EB).withOpacity(0.13),
                           border: Border.all(
-                            color: Colors.cyanAccent.withOpacity(0.38),
+                            color: const Color(0xFF2563EB).withOpacity(0.38),
                           ),
                         ),
                         child: Icon(
                           editando
                               ? Icons.edit_calendar_rounded
                               : Icons.video_call_rounded,
-                          color: Colors.cyanAccent,
+                          color: const Color(0xFF2563EB),
                           size: 29,
                         ),
                       ),
@@ -1410,7 +1481,7 @@ class _MeetingCreateDialogState extends State<MeetingCreateDialog> {
                         child: Text(
                           editando ? 'Editar reunión' : 'Nueva reunión',
                           style: const TextStyle(
-                            color: Colors.white,
+                            color: const Color(0xFF111827),
                             fontSize: 24,
                             fontWeight: FontWeight.w900,
                             letterSpacing: -0.4,
@@ -1446,7 +1517,7 @@ class _MeetingCreateDialogState extends State<MeetingCreateDialog> {
                           icon: Icons.calendar_month_rounded,
                           title: 'Fecha',
                           value: _dateText(),
-                          color: Colors.cyanAccent,
+                          color: const Color(0xFF2563EB),
                           onTap: () async {
                             final picked = await _pickDate();
                             if (picked != null) {
@@ -1469,7 +1540,7 @@ class _MeetingCreateDialogState extends State<MeetingCreateDialog> {
                           icon: Icons.access_time_rounded,
                           title: 'Inicio',
                           value: startTime.format(context),
-                          color: Colors.orangeAccent,
+                          color: const Color(0xFF2563EB),
                           onTap: () async {
                             final picked = await _pickTime(startTime);
                             if (picked != null) {
@@ -1486,7 +1557,7 @@ class _MeetingCreateDialogState extends State<MeetingCreateDialog> {
                           icon: Icons.timer_rounded,
                           title: 'Fin',
                           value: endTime.format(context),
-                          color: Colors.greenAccent,
+                          color: const Color(0xFF2563EB),
                           onTap: () async {
                             final picked = await _pickTime(endTime);
                             if (picked != null) {
@@ -1506,14 +1577,14 @@ class _MeetingCreateDialogState extends State<MeetingCreateDialog> {
                     children: [
                       const Icon(
                         Icons.groups_rounded,
-                        color: Colors.cyanAccent,
+                        color: const Color(0xFF2563EB),
                       ),
                       const SizedBox(width: 8),
                       const Expanded(
                         child: Text(
                           'Invitados',
                           style: TextStyle(
-                            color: Colors.white,
+                            color: const Color(0xFF111827),
                             fontSize: 18,
                             fontWeight: FontWeight.w900,
                           ),
@@ -1525,16 +1596,16 @@ class _MeetingCreateDialogState extends State<MeetingCreateDialog> {
                           vertical: 6,
                         ),
                         decoration: BoxDecoration(
-                          color: Colors.cyanAccent.withOpacity(0.12),
+                          color: const Color(0xFF2563EB).withOpacity(0.12),
                           borderRadius: BorderRadius.circular(999),
                           border: Border.all(
-                            color: Colors.cyanAccent.withOpacity(0.30),
+                            color: const Color(0xFF2563EB).withOpacity(0.30),
                           ),
                         ),
                         child: Text(
                           '${invitados.length}',
                           style: const TextStyle(
-                            color: Colors.cyanAccent,
+                            color: const Color(0xFF2563EB),
                             fontWeight: FontWeight.w900,
                           ),
                         ),
@@ -1547,11 +1618,9 @@ class _MeetingCreateDialogState extends State<MeetingCreateDialog> {
                   Container(
                     constraints: const BoxConstraints(maxHeight: 260),
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.055),
+                      color: Colors.white,
                       borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
-                        color: Colors.white.withOpacity(0.10),
-                      ),
+                      border: Border.all(color: const Color(0xFFE2E8F0)),
                     ),
                     child: usuarios.isEmpty
                         ? const Padding(
@@ -1559,7 +1628,9 @@ class _MeetingCreateDialogState extends State<MeetingCreateDialog> {
                             child: Center(
                               child: Text(
                                 'Cargando usuarios...',
-                                style: TextStyle(color: Colors.white54),
+                                style: TextStyle(
+                                  color: const Color(0xFF64748B),
+                                ),
                               ),
                             ),
                           )
@@ -1570,17 +1641,20 @@ class _MeetingCreateDialogState extends State<MeetingCreateDialog> {
                               final u = usuarios[index];
                               final authId = u['auth_id']?.toString();
                               final nombre =
-                                  '${u['nombre'] ?? ''} ${u['apellidos'] ?? ''}'.trim();
+                                  '${u['nombre'] ?? ''} ${u['apellidos'] ?? ''}'
+                                      .trim();
                               final isSelected = invitados.contains(authId);
 
                               return CheckboxListTile(
                                 value: isSelected,
-                                activeColor: Colors.cyanAccent,
-                                checkColor: const Color(0xFF061018),
+                                activeColor: const Color(0xFF2563EB),
+                                checkColor: const Color(0xFFFFFFFF),
                                 title: Text(
-                                  nombre.isEmpty ? 'Usuario sin nombre' : nombre,
+                                  nombre.isEmpty
+                                      ? 'Usuario sin nombre'
+                                      : nombre,
                                   style: const TextStyle(
-                                    color: Colors.white,
+                                    color: const Color(0xFF111827),
                                     fontWeight: FontWeight.w700,
                                   ),
                                 ),
@@ -1589,7 +1663,7 @@ class _MeetingCreateDialogState extends State<MeetingCreateDialog> {
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                   style: const TextStyle(
-                                    color: Colors.white38,
+                                    color: const Color(0xFF78909C),
                                     fontSize: 11,
                                   ),
                                 ),
@@ -1615,9 +1689,11 @@ class _MeetingCreateDialogState extends State<MeetingCreateDialog> {
                     children: [
                       Expanded(
                         child: OutlinedButton(
-                          onPressed: saving ? null : () => Navigator.pop(context),
+                          onPressed: saving
+                              ? null
+                              : () => Navigator.pop(context),
                           style: OutlinedButton.styleFrom(
-                            foregroundColor: Colors.white70,
+                            foregroundColor: const Color(0xFF64748B),
                             side: BorderSide(
                               color: Colors.white.withOpacity(0.22),
                             ),
@@ -1639,7 +1715,7 @@ class _MeetingCreateDialogState extends State<MeetingCreateDialog> {
                                   height: 17,
                                   child: CircularProgressIndicator(
                                     strokeWidth: 2,
-                                    color: Color(0xFF061018),
+                                    color: Color(0xFFFFFFFF),
                                   ),
                                 )
                               : Icon(
@@ -1649,13 +1725,11 @@ class _MeetingCreateDialogState extends State<MeetingCreateDialog> {
                                 ),
                           label: Text(
                             editando ? 'Guardar' : 'Crear',
-                            style: const TextStyle(
-                              fontWeight: FontWeight.w900,
-                            ),
+                            style: const TextStyle(fontWeight: FontWeight.w900),
                           ),
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.cyanAccent,
-                            foregroundColor: const Color(0xFF061018),
+                            backgroundColor: const Color(0xFF2563EB),
+                            foregroundColor: const Color(0xFFFFFFFF),
                             padding: const EdgeInsets.symmetric(vertical: 15),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(17),
@@ -1683,23 +1757,21 @@ class _MeetingCreateDialogState extends State<MeetingCreateDialog> {
     return TextField(
       controller: controller,
       maxLines: maxLines,
-      style: const TextStyle(color: Colors.white),
+      style: const TextStyle(color: const Color(0xFF111827)),
       decoration: InputDecoration(
         labelText: label,
-        labelStyle: const TextStyle(color: Colors.white60),
-        prefixIcon: Icon(icon, color: Colors.cyanAccent),
+        labelStyle: const TextStyle(color: const Color(0xFF64748B)),
+        prefixIcon: Icon(icon, color: const Color(0xFF2563EB)),
         filled: true,
-        fillColor: Colors.white.withOpacity(0.065),
+        fillColor: Colors.white,
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(18),
-          borderSide: BorderSide(
-            color: Colors.white.withOpacity(0.10),
-          ),
+          borderSide: BorderSide(color: Colors.white),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(18),
           borderSide: BorderSide(
-            color: Colors.cyanAccent.withOpacity(0.65),
+            color: const Color(0xFF2563EB).withOpacity(0.65),
           ),
         ),
       ),
@@ -1719,11 +1791,9 @@ class _MeetingCreateDialogState extends State<MeetingCreateDialog> {
       child: Container(
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.065),
+          color: Colors.white,
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: color.withOpacity(0.26),
-          ),
+          border: Border.all(color: color.withOpacity(0.26)),
         ),
         child: Row(
           children: [
@@ -1736,7 +1806,7 @@ class _MeetingCreateDialogState extends State<MeetingCreateDialog> {
                   Text(
                     title,
                     style: const TextStyle(
-                      color: Colors.white54,
+                      color: const Color(0xFF64748B),
                       fontSize: 12,
                       fontWeight: FontWeight.w700,
                     ),
@@ -1765,55 +1835,6 @@ class _AgendaBackground extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Stack(
-      children: [
-        Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                Color(0xFF020617),
-                Color(0xFF061A2D),
-                Color(0xFF0B1026),
-              ],
-            ),
-          ),
-        ),
-        Positioned(
-          top: -110,
-          right: -90,
-          child: _glow(260, Colors.cyanAccent),
-        ),
-        Positioned(
-          bottom: 160,
-          left: -120,
-          child: _glow(280, Colors.purpleAccent),
-        ),
-        Positioned(
-          bottom: -120,
-          right: -80,
-          child: _glow(240, Colors.blueAccent),
-        ),
-      ],
-    );
-  }
-
-  Widget _glow(double size, Color color) {
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: color.withOpacity(0.15),
-        boxShadow: [
-          BoxShadow(
-            color: color.withOpacity(0.20),
-            blurRadius: 120,
-            spreadRadius: 45,
-          ),
-        ],
-      ),
-    );
+    return const Positioned.fill(child: ColoredBox(color: Color(0xFFF4F6FB)));
   }
 }

@@ -143,7 +143,9 @@ class _SecurityScreenState extends State<SecurityScreen> {
     } on PostgrestException catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('No se pudo registrar la solicitud: ${error.message}')),
+        SnackBar(
+          content: Text('No se pudo registrar la solicitud: ${error.message}'),
+        ),
       );
     } finally {
       reasonController.dispose();
@@ -240,7 +242,7 @@ class _SecurityScreenState extends State<SecurityScreen> {
     final email = user?.email ?? "Usuario";
 
     return Scaffold(
-      backgroundColor: const Color(0xFF08121C),
+      backgroundColor: const Color(0xFFF2FCFD),
 
       appBar: AppBar(
         title: const Text("Seguridad"),
@@ -254,7 +256,7 @@ class _SecurityScreenState extends State<SecurityScreen> {
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.08),
+              color: Colors.white,
               borderRadius: BorderRadius.circular(16),
             ),
             child: Row(
@@ -270,7 +272,7 @@ class _SecurityScreenState extends State<SecurityScreen> {
                 Expanded(
                   child: Text(
                     email,
-                    style: const TextStyle(color: Colors.white),
+                    style: const TextStyle(color: const Color(0xFF071A3A)),
                   ),
                 ),
               ],
@@ -287,10 +289,10 @@ class _SecurityScreenState extends State<SecurityScreen> {
                 TextField(
                   controller: passwordController,
                   obscureText: true,
-                  style: const TextStyle(color: Colors.white),
+                  style: const TextStyle(color: const Color(0xFF071A3A)),
                   decoration: const InputDecoration(
                     hintText: "Nueva contraseña",
-                    hintStyle: TextStyle(color: Colors.white38),
+                    hintStyle: TextStyle(color: const Color(0xFF78909C)),
                   ),
                 ),
 
@@ -320,41 +322,44 @@ class _SecurityScreenState extends State<SecurityScreen> {
                   leading: const Icon(Icons.logout, color: Colors.red),
                   title: const Text(
                     "Cerrar sesión",
-                    style: TextStyle(color: Colors.white),
+                    style: TextStyle(color: const Color(0xFF071A3A)),
                   ),
                   onTap: logout,
                 ),
 
-                const Divider(color: Colors.white24),
+                const Divider(color: const Color(0xFFB7D7DA)),
 
                 ListTile(
                   leading: const Icon(Icons.warning, color: Colors.orange),
                   title: const Text(
                     "Cerrar todas las sesiones",
-                    style: TextStyle(color: Colors.white),
+                    style: TextStyle(color: const Color(0xFF071A3A)),
                   ),
                   subtitle: const Text(
                     "Se cerrará en todos los dispositivos",
-                    style: TextStyle(color: Colors.white54),
+                    style: TextStyle(color: const Color(0xFF64748B)),
                   ),
                   onTap: logoutAll,
                 ),
 
-                const Divider(color: Colors.white24),
+                const Divider(color: const Color(0xFFB7D7DA)),
 
                 ListTile(
-                  leading: const Icon(Icons.person_remove_rounded, color: Colors.redAccent),
+                  leading: const Icon(
+                    Icons.person_remove_rounded,
+                    color: Colors.redAccent,
+                  ),
                   title: Text(
                     pendingDeletion == null
                         ? 'Solicitar eliminación de mi cuenta'
                         : 'Eliminación de cuenta solicitada',
-                    style: const TextStyle(color: Colors.white),
+                    style: const TextStyle(color: const Color(0xFF071A3A)),
                   ),
                   subtitle: Text(
                     pendingDeletion == null
                         ? 'Inicia la eliminación de la cuenta y los datos personales no sujetos a conservación legal.'
                         : 'La solicitud está ${pendingDeletion!['estado'] == 'en_proceso' ? 'en proceso' : 'pendiente'}. Plazo máximo: 30 días.',
-                    style: const TextStyle(color: Colors.white54),
+                    style: const TextStyle(color: const Color(0xFF64748B)),
                   ),
                   trailing: deletionLoading
                       ? const SizedBox(
@@ -405,7 +410,7 @@ class _SecurityScreenState extends State<SecurityScreen> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.08),
+        color: Colors.white,
         borderRadius: BorderRadius.circular(16),
       ),
       child: Column(
@@ -414,7 +419,7 @@ class _SecurityScreenState extends State<SecurityScreen> {
           Text(
             title,
             style: const TextStyle(
-              color: Colors.white,
+              color: const Color(0xFF071A3A),
               fontSize: 16,
               fontWeight: FontWeight.bold,
             ),

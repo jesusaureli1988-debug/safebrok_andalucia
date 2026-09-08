@@ -5,10 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 class DetalleVisitaScreen extends StatefulWidget {
   final Map<String, dynamic> visita;
 
-  const DetalleVisitaScreen({
-    super.key,
-    required this.visita,
-  });
+  const DetalleVisitaScreen({super.key, required this.visita});
 
   @override
   State<DetalleVisitaScreen> createState() => _DetalleVisitaScreenState();
@@ -28,7 +25,7 @@ class _DetalleVisitaScreenState extends State<DetalleVisitaScreen> {
     final realizada = estado == 'Realizada';
 
     return Scaffold(
-      backgroundColor: const Color(0xFF07111B),
+      backgroundColor: const Color(0xFFF2FCFD),
       appBar: AppBar(
         title: const Text(
           "Detalle visita",
@@ -116,16 +113,14 @@ class _DetalleVisitaScreenState extends State<DetalleVisitaScreen> {
                       width: double.infinity,
                       padding: const EdgeInsets.all(15),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF0B1724),
+                        color: const Color(0xFFFFFFFF),
                         borderRadius: BorderRadius.circular(18),
-                        border: Border.all(
-                          color: Colors.white.withOpacity(0.08),
-                        ),
+                        border: Border.all(color: Colors.white),
                       ),
                       child: Text(
                         v['observaciones'],
                         style: const TextStyle(
-                          color: Colors.white70,
+                          color: const Color(0xFF53627A),
                           height: 1.4,
                           fontSize: 13,
                         ),
@@ -166,14 +161,9 @@ class _DetalleVisitaScreenState extends State<DetalleVisitaScreen> {
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(30),
         gradient: const LinearGradient(
-          colors: [
-            Color(0xFF0F172A),
-            Color(0xFF123044),
-          ],
+          colors: [Color(0xFFEAF8F8), Color(0xFFFFFFFF)],
         ),
-        border: Border.all(
-          color: Colors.white.withOpacity(0.10),
-        ),
+        border: Border.all(color: Colors.white),
         boxShadow: [
           BoxShadow(
             color: Colors.cyanAccent.withOpacity(0.10),
@@ -193,10 +183,7 @@ class _DetalleVisitaScreenState extends State<DetalleVisitaScreen> {
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   gradient: const LinearGradient(
-                    colors: [
-                      Color(0xFF22D3EE),
-                      Color(0xFF2563EB),
-                    ],
+                    colors: [Color(0xFF20C7C2), Color(0xFF0A7F91)],
                   ),
                   boxShadow: [
                     BoxShadow(
@@ -216,7 +203,7 @@ class _DetalleVisitaScreenState extends State<DetalleVisitaScreen> {
                 child: Text(
                   nombre.isEmpty ? "Visita comercial" : nombre,
                   style: const TextStyle(
-                    color: Colors.white,
+                    color: const Color(0xFF071A3A),
                     fontSize: 23,
                     fontWeight: FontWeight.w900,
                   ),
@@ -243,23 +230,21 @@ class _DetalleVisitaScreenState extends State<DetalleVisitaScreen> {
         child: Container(
           padding: const EdgeInsets.all(18),
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.055),
+            color: Colors.white,
             borderRadius: BorderRadius.circular(26),
-            border: Border.all(
-              color: Colors.white.withOpacity(0.10),
-            ),
+            border: Border.all(color: Colors.white),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
                 children: [
-                  Icon(icon, color: const Color(0xFF22D3EE), size: 20),
+                  Icon(icon, color: const Color(0xFF20C7C2), size: 20),
                   const SizedBox(width: 10),
                   Text(
                     title,
                     style: const TextStyle(
-                      color: Colors.white,
+                      color: const Color(0xFF071A3A),
                       fontWeight: FontWeight.w900,
                       fontSize: 15,
                     ),
@@ -284,16 +269,14 @@ class _DetalleVisitaScreenState extends State<DetalleVisitaScreen> {
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: const Color(0xFF0B1724),
+        color: const Color(0xFFFFFFFF),
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: Colors.white.withOpacity(0.08),
-        ),
+        border: Border.all(color: Colors.white),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, color: const Color(0xFF22D3EE), size: 21),
+          Icon(icon, color: const Color(0xFF20C7C2), size: 21),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -302,7 +285,7 @@ class _DetalleVisitaScreenState extends State<DetalleVisitaScreen> {
                 Text(
                   label,
                   style: const TextStyle(
-                    color: Colors.white54,
+                    color: const Color(0xFF64748B),
                     fontSize: 12,
                     fontWeight: FontWeight.w700,
                   ),
@@ -311,7 +294,7 @@ class _DetalleVisitaScreenState extends State<DetalleVisitaScreen> {
                 Text(
                   value,
                   style: const TextStyle(
-                    color: Colors.white,
+                    color: const Color(0xFF071A3A),
                     fontSize: 14,
                     fontWeight: FontWeight.w800,
                     height: 1.3,
@@ -333,21 +316,19 @@ class _DetalleVisitaScreenState extends State<DetalleVisitaScreen> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFF0B1724),
+        color: const Color(0xFFFFFFFF),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: Colors.white.withOpacity(0.08),
-        ),
+        border: Border.all(color: Colors.white),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, color: const Color(0xFF22D3EE)),
+          Icon(icon, color: const Color(0xFF20C7C2)),
           const SizedBox(height: 12),
           Text(
             label,
             style: const TextStyle(
-              color: Colors.white54,
+              color: const Color(0xFF64748B),
               fontSize: 12,
               fontWeight: FontWeight.w700,
             ),
@@ -356,7 +337,7 @@ class _DetalleVisitaScreenState extends State<DetalleVisitaScreen> {
           Text(
             value,
             style: const TextStyle(
-              color: Colors.white,
+              color: const Color(0xFF071A3A),
               fontSize: 15,
               fontWeight: FontWeight.w900,
             ),
@@ -397,9 +378,9 @@ class _DetalleVisitaScreenState extends State<DetalleVisitaScreen> {
       child: ElevatedButton(
         onPressed: saving ? null : gestionarVisita,
         style: ElevatedButton.styleFrom(
-          backgroundColor: const Color(0xFF22D3EE),
+          backgroundColor: const Color(0xFF20C7C2),
           disabledBackgroundColor: Colors.white12,
-          foregroundColor: const Color(0xFF07111B),
+          foregroundColor: const Color(0xFFF2FCFD),
           elevation: 0,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(20),
@@ -421,10 +402,7 @@ class _DetalleVisitaScreenState extends State<DetalleVisitaScreen> {
                   SizedBox(width: 10),
                   Text(
                     "Gestionar visita",
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w900,
-                    ),
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900),
                   ),
                 ],
               ),
@@ -456,11 +434,9 @@ class _DetalleVisitaScreenState extends State<DetalleVisitaScreen> {
                   child: Container(
                     padding: const EdgeInsets.all(22),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF102331).withOpacity(0.96),
+                      color: const Color(0xFFFFFFFF).withOpacity(0.96),
                       borderRadius: BorderRadius.circular(30),
-                      border: Border.all(
-                        color: Colors.white.withOpacity(0.10),
-                      ),
+                      border: Border.all(color: Colors.white),
                     ),
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
@@ -469,7 +445,7 @@ class _DetalleVisitaScreenState extends State<DetalleVisitaScreen> {
                           width: 44,
                           height: 5,
                           decoration: BoxDecoration(
-                            color: Colors.white24,
+                            color: const Color(0xFFB7D7DA),
                             borderRadius: BorderRadius.circular(999),
                           ),
                         ),
@@ -479,13 +455,13 @@ class _DetalleVisitaScreenState extends State<DetalleVisitaScreen> {
                           children: [
                             Icon(
                               Icons.fact_check_rounded,
-                              color: Color(0xFF22D3EE),
+                              color: Color(0xFF20C7C2),
                             ),
                             SizedBox(width: 10),
                             Text(
                               "Gestionar visita",
                               style: TextStyle(
-                                color: Colors.white,
+                                color: const Color(0xFF071A3A),
                                 fontSize: 20,
                                 fontWeight: FontWeight.w900,
                               ),
@@ -497,30 +473,30 @@ class _DetalleVisitaScreenState extends State<DetalleVisitaScreen> {
 
                         DropdownButtonFormField<String>(
                           value: resultado,
-                          dropdownColor: const Color(0xFF0B1724),
+                          dropdownColor: const Color(0xFFFFFFFF),
                           style: const TextStyle(
-                            color: Colors.white,
+                            color: const Color(0xFF071A3A),
                             fontWeight: FontWeight.w800,
                           ),
                           decoration: InputDecoration(
                             labelText: "Resultado",
-                            labelStyle: const TextStyle(color: Colors.white54),
+                            labelStyle: const TextStyle(
+                              color: const Color(0xFF64748B),
+                            ),
                             prefixIcon: const Icon(
                               Icons.verified_rounded,
-                              color: Color(0xFF22D3EE),
+                              color: Color(0xFF20C7C2),
                             ),
                             filled: true,
-                            fillColor: const Color(0xFF0B1724),
+                            fillColor: const Color(0xFFFFFFFF),
                             enabledBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(18),
-                              borderSide: BorderSide(
-                                color: Colors.white.withOpacity(0.10),
-                              ),
+                              borderSide: BorderSide(color: Colors.white),
                             ),
                             focusedBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(18),
                               borderSide: const BorderSide(
-                                color: Color(0xFF22D3EE),
+                                color: Color(0xFF20C7C2),
                               ),
                             ),
                           ),
@@ -559,8 +535,8 @@ class _DetalleVisitaScreenState extends State<DetalleVisitaScreen> {
                                   return Theme(
                                     data: ThemeData.dark().copyWith(
                                       colorScheme: const ColorScheme.dark(
-                                        primary: Color(0xFF22D3EE),
-                                        surface: Color(0xFF0F172A),
+                                        primary: Color(0xFF20C7C2),
+                                        surface: Color(0xFFEAF8F8),
                                       ),
                                     ),
                                     child: child!,
@@ -578,17 +554,15 @@ class _DetalleVisitaScreenState extends State<DetalleVisitaScreen> {
                               width: double.infinity,
                               padding: const EdgeInsets.all(16),
                               decoration: BoxDecoration(
-                                color: const Color(0xFF0B1724),
+                                color: const Color(0xFFFFFFFF),
                                 borderRadius: BorderRadius.circular(20),
-                                border: Border.all(
-                                  color: Colors.white.withOpacity(0.10),
-                                ),
+                                border: Border.all(color: Colors.white),
                               ),
                               child: Row(
                                 children: [
                                   const Icon(
                                     Icons.event_repeat_rounded,
-                                    color: Color(0xFF22D3EE),
+                                    color: Color(0xFF20C7C2),
                                   ),
                                   const SizedBox(width: 12),
                                   Expanded(
@@ -597,7 +571,7 @@ class _DetalleVisitaScreenState extends State<DetalleVisitaScreen> {
                                           ? "Seleccionar nueva fecha"
                                           : "${nuevaFecha!.day.toString().padLeft(2, '0')}/${nuevaFecha!.month.toString().padLeft(2, '0')}/${nuevaFecha!.year}",
                                       style: const TextStyle(
-                                        color: Colors.white,
+                                        color: const Color(0xFF071A3A),
                                         fontWeight: FontWeight.w800,
                                       ),
                                     ),
@@ -622,7 +596,7 @@ class _DetalleVisitaScreenState extends State<DetalleVisitaScreen> {
                                     content: const Text(
                                       "Selecciona la nueva fecha",
                                     ),
-                                    backgroundColor: const Color(0xFFE11D48),
+                                    backgroundColor: const Color(0xFFE74646),
                                     behavior: SnackBarBehavior.floating,
                                     shape: RoundedRectangleBorder(
                                       borderRadius: BorderRadius.circular(14),
@@ -638,8 +612,8 @@ class _DetalleVisitaScreenState extends State<DetalleVisitaScreen> {
                               );
                             },
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF22D3EE),
-                              foregroundColor: const Color(0xFF07111B),
+                              backgroundColor: const Color(0xFF20C7C2),
+                              foregroundColor: const Color(0xFFF2FCFD),
                               elevation: 0,
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(20),
@@ -674,15 +648,18 @@ class _DetalleVisitaScreenState extends State<DetalleVisitaScreen> {
       setState(() => saving = true);
 
       if (resultado == "Pospuesta") {
-        await supabase.from('visitas').update({
-          'estado': 'Pendiente',
-          'fecha_visita': nuevaFecha!.toIso8601String(),
-        }).eq('id', widget.visita['id']);
+        await supabase
+            .from('visitas')
+            .update({
+              'estado': 'Pendiente',
+              'fecha_visita': nuevaFecha!.toIso8601String(),
+            })
+            .eq('id', widget.visita['id']);
       } else {
-        await supabase.from('visitas').update({
-          'estado': 'Realizada',
-          'resultado': resultado,
-        }).eq('id', widget.visita['id']);
+        await supabase
+            .from('visitas')
+            .update({'estado': 'Realizada', 'resultado': resultado})
+            .eq('id', widget.visita['id']);
       }
 
       if (!mounted) return;
@@ -697,7 +674,7 @@ class _DetalleVisitaScreenState extends State<DetalleVisitaScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: const Text("Error al guardar la gestión"),
-          backgroundColor: const Color(0xFFE11D48),
+          backgroundColor: const Color(0xFFE74646),
           behavior: SnackBarBehavior.floating,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(14),
@@ -719,16 +696,17 @@ class _DetalleVisitaScreenState extends State<DetalleVisitaScreen> {
   }
 
   String _direccionCompleta(Map<String, dynamic> v) {
-    final partes = [
-      v['direccion'],
-      v['numero'],
-      v['codigo_postal'] ?? v['cp'],
-      v['poblacion'],
-      v['provincia'],
-    ]
-        .where((e) => e != null && e.toString().trim().isNotEmpty)
-        .map((e) => e.toString().trim())
-        .toList();
+    final partes =
+        [
+              v['direccion'],
+              v['numero'],
+              v['codigo_postal'] ?? v['cp'],
+              v['poblacion'],
+              v['provincia'],
+            ]
+            .where((e) => e != null && e.toString().trim().isNotEmpty)
+            .map((e) => e.toString().trim())
+            .toList();
 
     if (partes.isEmpty) return "Sin dirección";
 
@@ -757,27 +735,18 @@ class _PremiumBackground extends StatelessWidget {
         Positioned(
           top: -90,
           right: -70,
-          child: _glow(
-            color: const Color(0xFF22D3EE),
-            size: 230,
-          ),
+          child: _glow(color: const Color(0xFF20C7C2), size: 230),
         ),
         Positioned(
           bottom: -110,
           left: -80,
-          child: _glow(
-            color: const Color(0xFF2563EB),
-            size: 260,
-          ),
+          child: _glow(color: const Color(0xFF0A7F91), size: 260),
         ),
       ],
     );
   }
 
-  Widget _glow({
-    required Color color,
-    required double size,
-  }) {
+  Widget _glow({required Color color, required double size}) {
     return Container(
       width: size,
       height: size,

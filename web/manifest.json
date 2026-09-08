@@ -1,6 +1,6 @@
 {
-    "name": "safebrok_andalucia",
-    "short_name": "safebrok_andalucia",
+    "name": "SafeBrok",
+    "short_name": "SafeBrok",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:safebrok_andalucia/core/production/premium_weighting.dart';
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -31,7 +32,7 @@ class _PlanComercialAnualScreenState extends State<PlanComercialAnualScreen>
       subtitle: 'Crecimiento interanual excluyendo vehículos',
       unit: _MetricUnit.currency,
       icon: Icons.trending_up_rounded,
-      color: Color(0xFF2563EB),
+      color: Color(0xFF0A7F91),
     ),
     _MetricDefinition(
       keyName: 'incremento_asegurados',
@@ -39,7 +40,7 @@ class _PlanComercialAnualScreenState extends State<PlanComercialAnualScreen>
       subtitle: 'Variación anual del número de asegurados',
       unit: _MetricUnit.number,
       icon: Icons.groups_rounded,
-      color: Color(0xFF7C3AED),
+      color: Color(0xFF0A7F91),
     ),
     _MetricDefinition(
       keyName: 'incremento_ventas_netas',
@@ -56,7 +57,7 @@ class _PlanComercialAnualScreenState extends State<PlanComercialAnualScreen>
       unit: _MetricUnit.percentage,
       inverse: true,
       icon: Icons.pending_actions_rounded,
-      color: Color(0xFFD97706),
+      color: Color(0xFF0A7F91),
     ),
     _MetricDefinition(
       keyName: 'anulaciones_decesos',
@@ -74,7 +75,7 @@ class _PlanComercialAnualScreenState extends State<PlanComercialAnualScreen>
       unit: _MetricUnit.number,
       inverse: true,
       icon: Icons.remove_circle_outline_rounded,
-      color: Color(0xFFE11D48),
+      color: Color(0xFFE74646),
     ),
     _MetricDefinition(
       keyName: 'ventas_netas',
@@ -82,7 +83,7 @@ class _PlanComercialAnualScreenState extends State<PlanComercialAnualScreen>
       subtitle: 'Altas menos anulaciones del año',
       unit: _MetricUnit.number,
       icon: Icons.shopping_bag_outlined,
-      color: Color(0xFF059669),
+      color: Color(0xFF0AAEAE),
     ),
     _MetricDefinition(
       keyName: 'facturacion',
@@ -200,6 +201,9 @@ class _PlanComercialAnualScreenState extends State<PlanComercialAnualScreen>
       final profile = await _supabase
           .from('usuarios')
           .select('id, auth_id, parent_id, nombre, apellidos, rol_usuario')
+          .or(
+            'estado.is.null,estado.not.in.(inactivo,Inactivo,INACTIVO,baja,Baja,BAJA,desactivado,Desactivado,DESACTIVADO,bloqueado,Bloqueado,BLOQUEADO,suspendido,Suspendido,SUSPENDIDO)',
+          )
           .eq('auth_id', authUser.id)
           .maybeSingle();
       if (profile == null) throw Exception('Perfil de usuario no encontrado.');
@@ -237,6 +241,9 @@ class _PlanComercialAnualScreenState extends State<PlanComercialAnualScreen>
             .from('usuarios')
             .select(
               'id, auth_id, parent_id, nombre, apellidos, rol_usuario, estado',
+            )
+            .or(
+              'estado.is.null,estado.not.in.(inactivo,Inactivo,INACTIVO,baja,Baja,BAJA,desactivado,Desactivado,DESACTIVADO,bloqueado,Bloqueado,BLOQUEADO,suspendido,Suspendido,SUSPENDIDO)',
             ),
         _supabase
             .from('objetivos_comerciales_anuales')
@@ -407,7 +414,7 @@ class _PlanComercialAnualScreenState extends State<PlanComercialAnualScreen>
             if (onlyDeaths && !deaths(sale)) return false;
             return true;
           })
-          .fold(0, (sum, sale) => sum + _value(sale['prima_anual_neta']));
+          .fold(0, (sum, sale) => sum + PremiumWeighting.net(sale));
 
       double insured(Iterable<Map<String, dynamic>> rows) =>
           rows.fold(0, (sum, sale) => sum + _value(sale['numero_asegurados']));
@@ -429,7 +436,12 @@ class _PlanComercialAnualScreenState extends State<PlanComercialAnualScreen>
       }).length;
       final deathReversals = deathsCancellations.fold(
         0.0,
-        (sum, row) => sum + _value(row['prima_extornada']),
+        (sum, row) =>
+            sum +
+            PremiumWeighting.amount(
+              salesById[_text(row['venta_id'])] ?? const <String, dynamic>{},
+              row['prima_extornada'],
+            ),
       );
       final currentMonthSales = currentSales.where((sale) {
         final date = _date(sale['fecha_efecto']);
@@ -473,7 +485,12 @@ class _PlanComercialAnualScreenState extends State<PlanComercialAnualScreen>
       }).toList();
       final monthDeathReversals = monthDeathsCancellations.fold(
         0.0,
-        (sum, row) => sum + _value(row['prima_extornada']),
+        (sum, row) =>
+            sum +
+            PremiumWeighting.amount(
+              salesById[_text(row['venta_id'])] ?? const <String, dynamic>{},
+              row['prima_extornada'],
+            ),
       );
       final cumulativeSales = currentSales.where((sale) {
         final date = _date(sale['fecha_efecto']);
@@ -523,7 +540,12 @@ class _PlanComercialAnualScreenState extends State<PlanComercialAnualScreen>
       }).toList();
       final cumulativeDeathReversals = cumulativeDeathsCancellations.fold(
         0.0,
-        (sum, row) => sum + _value(row['prima_extornada']),
+        (sum, row) =>
+            sum +
+            PremiumWeighting.amount(
+              salesById[_text(row['venta_id'])] ?? const <String, dynamic>{},
+              row['prima_extornada'],
+            ),
       );
 
       final actuals = <String, double>{
@@ -1084,19 +1106,19 @@ class _PlanComercialAnualScreenState extends State<PlanComercialAnualScreen>
           'Cumplidos en ${_monthName(_month)}',
           '$monthlyAchieved / $configured',
           Icons.verified_rounded,
-          const Color(0xFF059669),
+          const Color(0xFF0AAEAE),
         ),
         _summaryCard(
           'Avance del ejercicio',
           '${(elapsed * 100).clamp(0, 100).toStringAsFixed(1)} %',
           Icons.calendar_month_rounded,
-          const Color(0xFF2563EB),
+          const Color(0xFF0A7F91),
         ),
         _summaryCard(
           'Estructura incluida',
           '${_structureOf(_selectedFigure ?? _profile!).length} personas',
           Icons.account_tree_rounded,
-          const Color(0xFF7C3AED),
+          const Color(0xFF0A7F91),
         ),
       ],
     );
@@ -1233,7 +1255,7 @@ class _PlanComercialAnualScreenState extends State<PlanComercialAnualScreen>
                     painter: _ProgressRingPainter(
                       progress: progress,
                       color: achieved
-                          ? const Color(0xFF059669)
+                          ? const Color(0xFF0AAEAE)
                           : definition.color,
                     ),
                     child: Center(
@@ -1268,7 +1290,7 @@ class _PlanComercialAnualScreenState extends State<PlanComercialAnualScreen>
               value: progress,
               minHeight: 7,
               borderRadius: BorderRadius.circular(20),
-              color: achieved ? const Color(0xFF059669) : definition.color,
+              color: achieved ? const Color(0xFF0AAEAE) : definition.color,
               backgroundColor: definition.color.withValues(alpha: .10),
             ),
             const SizedBox(height: 11),
@@ -1384,7 +1406,7 @@ class _PlanComercialAnualScreenState extends State<PlanComercialAnualScreen>
       padding: const EdgeInsets.all(24),
       child: Column(
         children: [
-          const Icon(Icons.flag_outlined, size: 42, color: Color(0xFFD97706)),
+          const Icon(Icons.flag_outlined, size: 42, color: Color(0xFF0A7F91)),
           const SizedBox(height: 10),
           Text(
             'Todavía no existe un plan comercial para $_year.',
@@ -1439,8 +1461,8 @@ class _PlanComercialAnualScreenState extends State<PlanComercialAnualScreen>
                         ? const Color(0xFFE8F7F0)
                         : const Color(0xFFFFF4E5),
                     foregroundColor: configured
-                        ? const Color(0xFF059669)
-                        : const Color(0xFFD97706),
+                        ? const Color(0xFF0AAEAE)
+                        : const Color(0xFF0A7F91),
                     child: Icon(
                       configured ? Icons.verified_rounded : Icons.flag_outlined,
                     ),

@@ -10,8 +10,7 @@ class ReasignarJefeEquipoScreen extends StatefulWidget {
       _ReasignarJefeEquipoScreenState();
 }
 
-class _ReasignarJefeEquipoScreenState
-    extends State<ReasignarJefeEquipoScreen> {
+class _ReasignarJefeEquipoScreenState extends State<ReasignarJefeEquipoScreen> {
   final supabase = Supabase.instance.client;
 
   bool loading = true;
@@ -47,7 +46,12 @@ class _ReasignarJefeEquipoScreenState
     try {
       final perfil = await supabase
           .from('usuarios')
-          .select('id, auth_id, rol_usuario, parent_id, nombre, apellidos, email')
+          .select(
+            'id, auth_id, rol_usuario, parent_id, nombre, apellidos, email',
+          )
+          .or(
+            'estado.is.null,estado.not.in.(inactivo,Inactivo,INACTIVO,baja,Baja,BAJA,desactivado,Desactivado,DESACTIVADO,bloqueado,Bloqueado,BLOQUEADO,suspendido,Suspendido,SUSPENDIDO)',
+          )
           .eq('auth_id', user.id)
           .maybeSingle();
 
@@ -57,7 +61,12 @@ class _ReasignarJefeEquipoScreenState
 
       final data = await supabase
           .from('usuarios')
-          .select('id, auth_id, parent_id, rol_usuario, nombre, apellidos, email')
+          .select(
+            'id, auth_id, parent_id, rol_usuario, nombre, apellidos, email',
+          )
+          .or(
+            'estado.is.null,estado.not.in.(inactivo,Inactivo,INACTIVO,baja,Baja,BAJA,desactivado,Desactivado,DESACTIVADO,bloqueado,Bloqueado,BLOQUEADO,suspendido,Suspendido,SUSPENDIDO)',
+          )
           .order('nombre', ascending: true);
 
       usuarios = List<Map<String, dynamic>>.from(data);
@@ -184,9 +193,10 @@ class _ReasignarJefeEquipoScreenState
     setState(() => guardando = true);
 
     try {
-      await supabase.from('usuarios').update({
-        'parent_id': jefeVentasId,
-      }).eq('id', jefeEquipoId);
+      await supabase
+          .from('usuarios')
+          .update({'parent_id': jefeVentasId})
+          .eq('id', jefeEquipoId);
 
       await supabase.from('historial_reasignaciones').insert({
         'tipo': 'reasignar_jefe_equipo',
@@ -219,10 +229,7 @@ class _ReasignarJefeEquipoScreenState
     if (!mounted) return;
 
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(text),
-        backgroundColor: const Color(0xFF0F172A),
-      ),
+      SnackBar(content: Text(text), backgroundColor: const Color(0xFF0F172A)),
     );
   }
 
@@ -238,41 +245,30 @@ class _ReasignarJefeEquipoScreenState
           SafeArea(
             child: loading
                 ? const Center(
-                    child: CircularProgressIndicator(
-                      color: Color(0xFF0284C7),
-                    ),
+                    child: CircularProgressIndicator(color: Color(0xFF0284C7)),
                   )
                 : bloqueado
-                    ? _pantallaBloqueada()
-                    : Padding(
-                        padding: const EdgeInsets.all(18),
-                        child: Column(
-                          children: [
-                            _header(),
-                            const SizedBox(height: 18),
-                            Expanded(
-                              child: Row(
-                                children: [
-                                  Expanded(
-                                    flex: 5,
-                                    child: _panelJefesEquipo(),
-                                  ),
-                                  const SizedBox(width: 18),
-                                  Expanded(
-                                    flex: 4,
-                                    child: _panelJefesVentas(),
-                                  ),
-                                  const SizedBox(width: 18),
-                                  Expanded(
-                                    flex: 4,
-                                    child: _panelResumen(),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
+                ? _pantallaBloqueada()
+                : Padding(
+                    padding: const EdgeInsets.all(18),
+                    child: Column(
+                      children: [
+                        _header(),
+                        const SizedBox(height: 18),
+                        Expanded(
+                          child: Row(
+                            children: [
+                              Expanded(flex: 5, child: _panelJefesEquipo()),
+                              const SizedBox(width: 18),
+                              Expanded(flex: 4, child: _panelJefesVentas()),
+                              const SizedBox(width: 18),
+                              Expanded(flex: 4, child: _panelResumen()),
+                            ],
+                          ),
                         ),
-                      ),
+                      ],
+                    ),
+                  ),
           ),
         ],
       ),
@@ -402,10 +398,7 @@ class _ReasignarJefeEquipoScreenState
       ),
       child: Row(
         children: [
-          const Icon(
-            Icons.verified_user_rounded,
-            color: Color(0xFF0284C7),
-          ),
+          const Icon(Icons.verified_user_rounded, color: Color(0xFF0284C7)),
           const SizedBox(width: 8),
           Text(
             role.replaceAll('_', ' ').toUpperCase(),
@@ -457,7 +450,7 @@ class _ReasignarJefeEquipoScreenState
                       final j = jefesEquipoFiltrados[index];
                       final selected =
                           jefeEquipoSeleccionado?['id']?.toString() ==
-                              j['id']?.toString();
+                          j['id']?.toString();
 
                       return _userCard(
                         user: j,
@@ -498,7 +491,7 @@ class _ReasignarJefeEquipoScreenState
                       final j = jefesVentas[index];
                       final selected =
                           jefeVentasSeleccionado?['id']?.toString() ==
-                              j['id']?.toString();
+                          j['id']?.toString();
 
                       return _userCard(
                         user: j,
@@ -568,10 +561,7 @@ class _ReasignarJefeEquipoScreenState
             ),
             child: const Row(
               children: [
-                Icon(
-                  Icons.info_rounded,
-                  color: Color(0xFFD97706),
-                ),
+                Icon(Icons.info_rounded, color: Color(0xFFD97706)),
                 SizedBox(width: 10),
                 Expanded(
                   child: Text(
@@ -702,11 +692,7 @@ class _ReasignarJefeEquipoScreenState
                   ],
                 ),
               ),
-              if (selected)
-                Icon(
-                  Icons.check_circle_rounded,
-                  color: color,
-                ),
+              if (selected) Icon(Icons.check_circle_rounded, color: color),
             ],
           ),
         ),
@@ -746,10 +732,7 @@ class _ReasignarJefeEquipoScreenState
                 ),
                 Text(
                   value,
-                  style: TextStyle(
-                    color: color,
-                    fontWeight: FontWeight.w900,
-                  ),
+                  style: TextStyle(color: color, fontWeight: FontWeight.w900),
                 ),
               ],
             ),

@@ -11,6 +11,8 @@ import 'package:safebrok_andalucia/features/business/crear_visita_screen.dart';
 import 'package:safebrok_andalucia/features/business/mis_visitas_screen.dart';
 import 'package:safebrok_andalucia/features/admin/admin_panel_screen.dart';
 import 'package:safebrok_andalucia/core/auth/app_role.dart';
+import 'package:safebrok_andalucia/features/incorporaciones/incorporaciones_screen.dart';
+import 'package:safebrok_andalucia/features/admin/cambios_rol_panel.dart';
 
 class SettingsScreen extends StatelessWidget {
   final String role;
@@ -28,7 +30,7 @@ class SettingsScreen extends StatelessWidget {
     final bool showAdmin = AppRole.isLeadership(normalizedRole);
 
     return Scaffold(
-      backgroundColor: const Color(0xFF050B12),
+      backgroundColor: const Color(0xFFF4F6FB),
       extendBodyBehindAppBar: true,
 
       appBar: AppBar(
@@ -36,7 +38,10 @@ class SettingsScreen extends StatelessWidget {
         elevation: 0,
         title: const Text(
           'Ajustes',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900),
+          style: TextStyle(
+            color: const Color(0xFF111827),
+            fontWeight: FontWeight.w900,
+          ),
         ),
       ),
 
@@ -56,10 +61,31 @@ class SettingsScreen extends StatelessWidget {
                   title: 'Cuenta',
                   children: [
                     _item(
+                      icon: Icons.description_outlined,
+                      title: 'Cambio de figura y contrato',
+                      subtitle: 'Revisar, firmar y seguir el nuevo contrato',
+                      color: Colors.orangeAccent,
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => CambiosRolPanel(
+                              canManage:
+                                  normalizedRole ==
+                                      AppRole.administracion.value ||
+                                  normalizedRole ==
+                                      AppRole.directorNacional.value,
+                              embedded: false,
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                    _item(
                       icon: Icons.person_rounded,
                       title: 'Mi perfil',
                       subtitle: 'Datos personales y configuración',
-                      color: Colors.cyanAccent,
+                      color: const Color(0xFF2563EB),
                       onTap: () {
                         Navigator.push(
                           context,
@@ -92,6 +118,22 @@ class SettingsScreen extends StatelessWidget {
                   title: 'Actividad comercial',
                   children: [
                     _item(
+                      icon: Icons.badge_outlined,
+                      title: 'Incorporaciones',
+                      subtitle: normalizedRole == AppRole.administracion.value
+                          ? 'Revisar expedientes, contratos y altas'
+                          : 'Preparar y seguir altas de candidatos',
+                      color: const Color(0xFF2563EB),
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const IncorporacionesScreen(),
+                          ),
+                        );
+                      },
+                    ),
+                    _item(
                       icon: Icons.calendar_month_rounded,
                       title: 'Crear visita',
                       subtitle: 'Registra una nueva visita comercial',
@@ -109,7 +151,7 @@ class SettingsScreen extends StatelessWidget {
                       icon: Icons.list_alt_rounded,
                       title: 'Mis visitas',
                       subtitle: 'Consulta y revisa tus visitas',
-                      color: Colors.lightBlueAccent,
+                      color: const Color(0xFF2563EB),
                       onTap: () {
                         Navigator.push(
                           context,
@@ -159,7 +201,7 @@ class SettingsScreen extends StatelessWidget {
                       icon: Icons.info_outline_rounded,
                       title: 'Información de la app',
                       subtitle: 'Versión, sistema y detalles',
-                      color: Colors.cyanAccent,
+                      color: const Color(0xFF2563EB),
                       onTap: () {
                         Navigator.push(
                           context,
@@ -216,13 +258,12 @@ class SettingsScreen extends StatelessWidget {
           padding: const EdgeInsets.all(22),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(32),
-            gradient: LinearGradient(
-              colors: [
-                Colors.white.withOpacity(0.14),
-                Colors.white.withOpacity(0.045),
-              ],
+            gradient: const LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [Color(0xFF111827), Color(0xFF1D4ED8)],
             ),
-            border: Border.all(color: Colors.white.withOpacity(0.12)),
+            border: Border.all(color: Colors.white.withOpacity(0.14)),
           ),
           child: Row(
             children: [
@@ -232,11 +273,11 @@ class SettingsScreen extends StatelessWidget {
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   gradient: const LinearGradient(
-                    colors: [Colors.cyanAccent, Color(0xFF1D7CFF)],
+                    colors: [const Color(0xFF2563EB), Color(0xFF1D7CFF)],
                   ),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.cyanAccent.withOpacity(0.25),
+                      color: const Color(0xFF2563EB).withOpacity(0.25),
                       blurRadius: 28,
                       offset: const Offset(0, 12),
                     ),
@@ -246,7 +287,7 @@ class SettingsScreen extends StatelessWidget {
                   child: Text(
                     initial,
                     style: const TextStyle(
-                      color: Colors.black,
+                      color: Colors.white,
                       fontSize: 25,
                       fontWeight: FontWeight.w900,
                     ),
@@ -263,7 +304,7 @@ class SettingsScreen extends StatelessWidget {
                     Text(
                       'Usuario conectado',
                       style: TextStyle(
-                        color: Colors.white.withOpacity(0.58),
+                        color: const Color(0xFFD8E2F2),
                         fontSize: 12,
                         fontWeight: FontWeight.w700,
                       ),
@@ -286,13 +327,13 @@ class SettingsScreen extends StatelessWidget {
                         vertical: 6,
                       ),
                       decoration: BoxDecoration(
-                        color: Colors.cyanAccent.withOpacity(0.13),
+                        color: const Color(0xFF2563EB).withOpacity(0.13),
                         borderRadius: BorderRadius.circular(30),
                       ),
                       child: Text(
                         role,
                         style: const TextStyle(
-                          color: Colors.cyanAccent,
+                          color: Colors.white,
                           fontSize: 12,
                           fontWeight: FontWeight.w900,
                         ),
@@ -312,9 +353,9 @@ class SettingsScreen extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.055),
+        color: Colors.white,
         borderRadius: BorderRadius.circular(28),
-        border: Border.all(color: Colors.white.withOpacity(0.08)),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -324,7 +365,7 @@ class SettingsScreen extends StatelessWidget {
             child: Text(
               title.toUpperCase(),
               style: TextStyle(
-                color: Colors.white.withOpacity(0.48),
+                color: const Color(0xFF64748B),
                 fontSize: 11,
                 fontWeight: FontWeight.w900,
                 letterSpacing: 0.9,
@@ -345,33 +386,23 @@ class SettingsScreen extends StatelessWidget {
     required VoidCallback onTap,
     bool premium = false,
   }) {
+    const accent = Color(0xFF2563EB);
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: Material(
-        color: Colors.transparent,
-        borderRadius: BorderRadius.circular(22),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
         child: InkWell(
-          borderRadius: BorderRadius.circular(22),
+          borderRadius: BorderRadius.circular(20),
           onTap: onTap,
-          splashColor: color.withOpacity(0.10),
-          highlightColor: color.withOpacity(0.06),
+          splashColor: accent.withOpacity(0.08),
+          highlightColor: accent.withOpacity(0.04),
           child: Ink(
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(22),
-              gradient: LinearGradient(
-                colors: premium
-                    ? [color.withOpacity(0.22), Colors.white.withOpacity(0.05)]
-                    : [
-                        Colors.white.withOpacity(0.07),
-                        Colors.white.withOpacity(0.025),
-                      ],
-              ),
-              border: Border.all(
-                color: premium
-                    ? color.withOpacity(0.32)
-                    : Colors.white.withOpacity(0.07),
-              ),
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
             ),
             child: Row(
               children: [
@@ -379,50 +410,34 @@ class SettingsScreen extends StatelessWidget {
                   width: 48,
                   height: 48,
                   decoration: BoxDecoration(
-                    color: color.withOpacity(0.14),
-                    borderRadius: BorderRadius.circular(18),
-                    border: Border.all(color: color.withOpacity(0.22)),
+                    color: const Color(0xFFEFF6FF),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: const Color(0xFFBFDBFE)),
                   ),
-                  child: Icon(icon, color: color, size: 25),
+                  child: Icon(icon, color: accent, size: 25),
                 ),
-
                 const SizedBox(width: 13),
-
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Row(
-                        children: [
-                          Flexible(
-                            child: Text(
-                              title,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 15,
-                                fontWeight: FontWeight.w900,
-                              ),
-                            ),
-                          ),
-                          if (premium) ...[
-                            const SizedBox(width: 8),
-                            const Icon(
-                              Icons.workspace_premium_rounded,
-                              color: Colors.amberAccent,
-                              size: 17,
-                            ),
-                          ],
-                        ],
+                      Text(
+                        title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: Color(0xFF111827),
+                          fontSize: 15,
+                          fontWeight: FontWeight.w900,
+                        ),
                       ),
                       const SizedBox(height: 4),
                       Text(
                         subtitle,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: Colors.white.withOpacity(0.48),
+                        style: const TextStyle(
+                          color: Color(0xFF64748B),
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
                         ),
@@ -430,12 +445,10 @@ class SettingsScreen extends StatelessWidget {
                     ],
                   ),
                 ),
-
                 const SizedBox(width: 8),
-
-                Icon(
+                const Icon(
                   Icons.arrow_forward_ios_rounded,
-                  color: Colors.white.withOpacity(0.35),
+                  color: Color(0xFF475569),
                   size: 15,
                 ),
               ],
@@ -452,52 +465,6 @@ class _SettingsBackground extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Stack(
-      children: [
-        Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [Color(0xFF050B12), Color(0xFF071A2E), Color(0xFF050B12)],
-            ),
-          ),
-        ),
-
-        Positioned(
-          top: -150,
-          right: -110,
-          child: _glow(Colors.cyanAccent, 330, 0.15),
-        ),
-
-        Positioned(
-          bottom: -170,
-          left: -120,
-          child: _glow(Colors.blueAccent, 370, 0.14),
-        ),
-
-        Positioned(
-          top: 310,
-          left: -120,
-          child: _glow(Colors.purpleAccent, 250, 0.08),
-        ),
-
-        BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 60, sigmaY: 60),
-          child: Container(color: Colors.black.withOpacity(0.05)),
-        ),
-      ],
-    );
-  }
-
-  Widget _glow(Color color, double size, double opacity) {
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: color.withOpacity(opacity),
-      ),
-    );
+    return const Positioned.fill(child: ColoredBox(color: Color(0xFFF4F6FB)));
   }
 }

@@ -7,8 +7,7 @@ class ContactosDiariosScreen extends StatefulWidget {
   const ContactosDiariosScreen({super.key});
 
   @override
-  State<ContactosDiariosScreen> createState() =>
-      _ContactosDiariosScreenState();
+  State<ContactosDiariosScreen> createState() => _ContactosDiariosScreenState();
 }
 
 class _ContactosDiariosScreenState extends State<ContactosDiariosScreen> {
@@ -50,11 +49,15 @@ class _ContactosDiariosScreenState extends State<ContactosDiariosScreen> {
 
   List<Map<String, dynamic>> get registrosFiltrados {
     if (filtro == 'Objetivo cumplido') {
-      return registros.where((r) => _int(r['contactos_positivos']) >= 6).toList();
+      return registros
+          .where((r) => _int(r['contactos_positivos']) >= 6)
+          .toList();
     }
 
     if (filtro == 'Pendientes') {
-      return registros.where((r) => _int(r['contactos_positivos']) < 6).toList();
+      return registros
+          .where((r) => _int(r['contactos_positivos']) < 6)
+          .toList();
     }
 
     return registros;
@@ -116,9 +119,7 @@ class _ContactosDiariosScreenState extends State<ContactosDiariosScreen> {
   Future<void> _abrirNuevoRegistro() async {
     await Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (_) => const AddContactosDiariosScreen(),
-      ),
+      MaterialPageRoute(builder: (_) => const AddContactosDiariosScreen()),
     );
 
     cargarHistorial();
@@ -127,7 +128,7 @@ class _ContactosDiariosScreenState extends State<ContactosDiariosScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF061018),
+      backgroundColor: const Color(0xFFFFFFFF),
       extendBodyBehindAppBar: true,
 
       appBar: AppBar(
@@ -136,7 +137,7 @@ class _ContactosDiariosScreenState extends State<ContactosDiariosScreen> {
         title: const Text(
           'Contactos diarios',
           style: TextStyle(
-            color: Colors.white,
+            color: const Color(0xFF071A3A),
             fontWeight: FontWeight.w900,
             letterSpacing: -0.4,
           ),
@@ -169,9 +170,7 @@ class _ContactosDiariosScreenState extends State<ContactosDiariosScreen> {
           SafeArea(
             child: loading
                 ? const Center(
-                    child: CircularProgressIndicator(
-                      color: Colors.cyanAccent,
-                    ),
+                    child: CircularProgressIndicator(color: Colors.cyanAccent),
                   )
                 : RefreshIndicator(
                     color: Colors.cyanAccent,
@@ -237,10 +236,7 @@ class _ContactosDiariosScreenState extends State<ContactosDiariosScreen> {
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     gradient: const LinearGradient(
-                      colors: [
-                        Colors.cyanAccent,
-                        Color(0xFF2D7DFF),
-                      ],
+                      colors: [Colors.cyanAccent, Color(0xFF2D7DFF)],
                     ),
                     boxShadow: [
                       BoxShadow(
@@ -266,7 +262,7 @@ class _ContactosDiariosScreenState extends State<ContactosDiariosScreen> {
                       const Text(
                         'Control de actividad',
                         style: TextStyle(
-                          color: Colors.white,
+                          color: const Color(0xFF071A3A),
                           fontSize: 20,
                           fontWeight: FontWeight.w900,
                           letterSpacing: -0.5,
@@ -378,7 +374,7 @@ class _ContactosDiariosScreenState extends State<ContactosDiariosScreen> {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
-                    color: Colors.white,
+                    color: const Color(0xFF071A3A),
                     fontSize: 21,
                     fontWeight: FontWeight.w900,
                   ),
@@ -432,7 +428,7 @@ class _ContactosDiariosScreenState extends State<ContactosDiariosScreen> {
               child: Text(
                 item,
                 style: TextStyle(
-                  color: selected ? Colors.black : Colors.white70,
+                  color: selected ? Colors.black : const Color(0xFF53627A),
                   fontWeight: FontWeight.w900,
                 ),
               ),
@@ -529,7 +525,7 @@ class _ContactosDiariosScreenState extends State<ContactosDiariosScreen> {
                             Text(
                               _formatFecha(r['fecha'].toString()),
                               style: const TextStyle(
-                                color: Colors.white,
+                                color: const Color(0xFF071A3A),
                                 fontSize: 17,
                                 fontWeight: FontWeight.w900,
                               ),
@@ -660,12 +656,7 @@ class _ContactosDiariosScreenState extends State<ContactosDiariosScreen> {
     );
   }
 
-  Widget _miniMetric(
-    String label,
-    int value,
-    IconData icon,
-    Color color,
-  ) {
+  Widget _miniMetric(String label, int value, IconData icon, Color color) {
     return Column(
       children: [
         Icon(icon, color: color, size: 20),
@@ -673,7 +664,7 @@ class _ContactosDiariosScreenState extends State<ContactosDiariosScreen> {
         Text(
           value.toString(),
           style: const TextStyle(
-            color: Colors.white,
+            color: const Color(0xFF071A3A),
             fontSize: 18,
             fontWeight: FontWeight.w900,
           ),
@@ -706,7 +697,7 @@ class _ContactosDiariosScreenState extends State<ContactosDiariosScreen> {
           child: Text(
             'Sin registros todavía',
             style: TextStyle(
-              color: Colors.white,
+              color: const Color(0xFF071A3A),
               fontSize: 22,
               fontWeight: FontWeight.w900,
             ),
@@ -734,7 +725,7 @@ class _PremiumBackground extends StatelessWidget {
   Widget build(BuildContext context) {
     return Stack(
       children: [
-        Container(color: const Color(0xFF061018)),
+        Container(color: const Color(0xFFFFFFFF)),
 
         Positioned(
           top: -120,
@@ -766,23 +757,14 @@ class _PremiumBackground extends StatelessWidget {
     );
   }
 
-  Widget _blurCircle({
-    required Color color,
-    required double size,
-  }) {
+  Widget _blurCircle({required Color color, required double size}) {
     return Container(
       width: size,
       height: size,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         color: color,
-        boxShadow: [
-          BoxShadow(
-            color: color,
-            blurRadius: 90,
-            spreadRadius: 35,
-          ),
-        ],
+        boxShadow: [BoxShadow(color: color, blurRadius: 90, spreadRadius: 35)],
       ),
     );
   }

@@ -16,9 +16,9 @@ class _TeamAgentsScreenState extends State<TeamAgentsScreen> {
 
   String search = '';
 
-  static const Color bg = Color(0xFF07111D);
-  static const Color card = Color(0xFF101C2B);
-  static const Color card2 = Color(0xFF132437);
+  static const Color bg = Color(0xFFF4F6FB);
+  static const Color card = Color(0xFFFFFFFF);
+  static const Color card2 = Color(0xFFF1F5F9);
   static const Color blue = Color(0xFF2563EB);
   static const Color green = Color(0xFF22C55E);
   static const Color orange = Color(0xFFF59E0B);
@@ -43,6 +43,9 @@ class _TeamAgentsScreenState extends State<TeamAgentsScreen> {
       final userData = await supabase
           .from('usuarios')
           .select('id, auth_id, rol_usuario')
+          .or(
+            'estado.is.null,estado.not.in.(inactivo,Inactivo,INACTIVO,baja,Baja,BAJA,desactivado,Desactivado,DESACTIVADO,bloqueado,Bloqueado,BLOQUEADO,suspendido,Suspendido,SUSPENDIDO)',
+          )
           .eq('auth_id', user.id)
           .single();
 
@@ -51,6 +54,9 @@ class _TeamAgentsScreenState extends State<TeamAgentsScreen> {
       final response = await supabase
           .from('usuarios')
           .select('*')
+          .or(
+            'estado.is.null,estado.not.in.(inactivo,Inactivo,INACTIVO,baja,Baja,BAJA,desactivado,Desactivado,DESACTIVADO,bloqueado,Bloqueado,BLOQUEADO,suspendido,Suspendido,SUSPENDIDO)',
+          )
           .eq('parent_id', myId)
           .order('nombre');
 
@@ -86,7 +92,9 @@ class _TeamAgentsScreenState extends State<TeamAgentsScreen> {
 
   int get activos {
     return agents.where((a) {
-      final status = (a['status'] ?? a['estado'] ?? '').toString().toLowerCase();
+      final status = (a['status'] ?? a['estado'] ?? '')
+          .toString()
+          .toLowerCase();
       return status == 'activo' || status == 'activa' || status == 'alta';
     }).length;
   }
@@ -171,10 +179,7 @@ class _TeamAgentsScreenState extends State<TeamAgentsScreen> {
         backgroundColor: bg,
         title: const Text(
           "Mis Agentes",
-          style: TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.w900,
-          ),
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900),
         ),
         actions: [
           IconButton(
@@ -187,9 +192,7 @@ class _TeamAgentsScreenState extends State<TeamAgentsScreen> {
         color: blue,
         onRefresh: loadAgents,
         child: loading
-            ? const Center(
-                child: CircularProgressIndicator(color: blue),
-              )
+            ? const Center(child: CircularProgressIndicator(color: blue))
             : ListView(
                 padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
                 children: [
@@ -216,10 +219,7 @@ class _TeamAgentsScreenState extends State<TeamAgentsScreen> {
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
-          colors: [
-            Color(0xFF102A43),
-            Color(0xFF0B1624),
-          ],
+          colors: [Color(0xFF102A43), Color(0xFF0B1624)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
@@ -327,7 +327,7 @@ class _TeamAgentsScreenState extends State<TeamAgentsScreen> {
           Text(
             value,
             style: const TextStyle(
-              color: Colors.white,
+              color: Color(0xFF111827),
               fontSize: 22,
               fontWeight: FontWeight.w900,
             ),
@@ -358,7 +358,7 @@ class _TeamAgentsScreenState extends State<TeamAgentsScreen> {
       ),
       child: TextField(
         onChanged: (v) => setState(() => search = v),
-        style: const TextStyle(color: Colors.white),
+        style: const TextStyle(color: Color(0xFF111827)),
         decoration: InputDecoration(
           border: InputBorder.none,
           icon: Icon(
@@ -436,7 +436,7 @@ class _TeamAgentsScreenState extends State<TeamAgentsScreen> {
           child: Text(
             initials(a),
             style: const TextStyle(
-              color: Colors.white,
+              color: Color(0xFF111827),
               fontWeight: FontWeight.w900,
             ),
           ),
@@ -446,7 +446,7 @@ class _TeamAgentsScreenState extends State<TeamAgentsScreen> {
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
           style: const TextStyle(
-            color: Colors.white,
+            color: Color(0xFF111827),
             fontWeight: FontWeight.w900,
             fontSize: 16,
           ),
@@ -472,7 +472,11 @@ class _TeamAgentsScreenState extends State<TeamAgentsScreen> {
         ),
         children: [
           _detailRow(Icons.email_rounded, "Email", email.isEmpty ? "-" : email),
-          _detailRow(Icons.phone_rounded, "Teléfono", phone.isEmpty ? "-" : phone),
+          _detailRow(
+            Icons.phone_rounded,
+            "Teléfono",
+            phone.isEmpty ? "-" : phone,
+          ),
           _detailRow(Icons.badge_rounded, "Rol", role),
           _detailRow(Icons.verified_user_rounded, "Estado", status),
         ],
@@ -527,7 +531,7 @@ class _TeamAgentsScreenState extends State<TeamAgentsScreen> {
               textAlign: TextAlign.right,
               overflow: TextOverflow.ellipsis,
               style: const TextStyle(
-                color: Colors.white,
+                color: Color(0xFF111827),
                 fontWeight: FontWeight.w800,
               ),
             ),
@@ -568,9 +572,7 @@ class _TeamAgentsScreenState extends State<TeamAgentsScreen> {
                 ? "Todavía no tienes agentes asignados a tu estructura."
                 : "No hay resultados con ese filtro de búsqueda.",
             textAlign: TextAlign.center,
-            style: TextStyle(
-              color: Colors.white.withOpacity(0.55),
-            ),
+            style: TextStyle(color: Colors.white.withOpacity(0.55)),
           ),
         ],
       ),

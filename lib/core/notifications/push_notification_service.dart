@@ -8,14 +8,11 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 class PushNotificationService {
   PushNotificationService._();
 
-  static final PushNotificationService instance =
-      PushNotificationService._();
+  static final PushNotificationService instance = PushNotificationService._();
 
-  final FirebaseMessaging _messaging =
-      FirebaseMessaging.instance;
+  final FirebaseMessaging _messaging = FirebaseMessaging.instance;
 
-  final SupabaseClient _supabase =
-      Supabase.instance.client;
+  final SupabaseClient _supabase = Supabase.instance.client;
 
   StreamSubscription<String>? _tokenSubscription;
   StreamSubscription<AuthState>? _authSubscription;
@@ -34,8 +31,7 @@ class PushNotificationService {
       await _requestPermission();
 
       if (Platform.isIOS) {
-        await _messaging
-            .setForegroundNotificationPresentationOptions(
+        await _messaging.setForegroundNotificationPresentationOptions(
           alert: true,
           badge: true,
           sound: true,
@@ -49,25 +45,18 @@ class PushNotificationService {
         await registerCurrentToken();
       }
     } catch (error, stackTrace) {
-      debugPrint(
-        'ERROR INICIALIZANDO PUSH NOTIFICATIONS: $error',
-      );
+      debugPrint('ERROR INICIALIZANDO PUSH NOTIFICATIONS: $error');
 
-      debugPrintStack(
-        stackTrace: stackTrace,
-      );
+      debugPrintStack(stackTrace: stackTrace);
     }
   }
 
   void _listenAuthChanges() {
     _authSubscription?.cancel();
 
-    _authSubscription =
-        _supabase.auth.onAuthStateChange.listen(
+    _authSubscription = _supabase.auth.onAuthStateChange.listen(
       (AuthState authState) async {
-        debugPrint(
-          'EVENTO AUTH PUSH: ${authState.event}',
-        );
+        debugPrint('EVENTO AUTH PUSH: ${authState.event}');
 
         final session = authState.session;
 
@@ -93,17 +82,10 @@ class PushNotificationService {
             break;
         }
       },
-      onError: (
-        Object error,
-        StackTrace stackTrace,
-      ) {
-        debugPrint(
-          'ERROR EN LISTENER AUTH PUSH: $error',
-        );
+      onError: (Object error, StackTrace stackTrace) {
+        debugPrint('ERROR EN LISTENER AUTH PUSH: $error');
 
-        debugPrintStack(
-          stackTrace: stackTrace,
-        );
+        debugPrintStack(stackTrace: stackTrace);
       },
     );
   }
@@ -111,33 +93,22 @@ class PushNotificationService {
   void _listenTokenChanges() {
     _tokenSubscription?.cancel();
 
-    _tokenSubscription =
-        _messaging.onTokenRefresh.listen(
+    _tokenSubscription = _messaging.onTokenRefresh.listen(
       (String token) async {
-        debugPrint(
-          'FIREBASE HA RENOVADO EL TOKEN PUSH.',
-        );
+        debugPrint('FIREBASE HA RENOVADO EL TOKEN PUSH.');
 
         await _saveToken(token);
       },
-      onError: (
-        Object error,
-        StackTrace stackTrace,
-      ) {
-        debugPrint(
-          'ERROR EN RENOVACIÓN DEL TOKEN PUSH: $error',
-        );
+      onError: (Object error, StackTrace stackTrace) {
+        debugPrint('ERROR EN RENOVACIÓN DEL TOKEN PUSH: $error');
 
-        debugPrintStack(
-          stackTrace: stackTrace,
-        );
+        debugPrintStack(stackTrace: stackTrace);
       },
     );
   }
 
   Future<void> _requestPermission() async {
-    final settings =
-        await _messaging.requestPermission(
+    final settings = await _messaging.requestPermission(
       alert: true,
       badge: true,
       sound: true,
@@ -159,17 +130,12 @@ class PushNotificationService {
     for (var intento = 1; intento <= 10; intento++) {
       final apnsToken = await _messaging.getAPNSToken();
 
-      if (apnsToken != null &&
-          apnsToken.trim().isNotEmpty) {
-        debugPrint(
-          'TOKEN APNS DISPONIBLE EN IOS.',
-        );
+      if (apnsToken != null && apnsToken.trim().isNotEmpty) {
+        debugPrint('TOKEN APNS DISPONIBLE EN IOS.');
         return true;
       }
 
-      await Future<void>.delayed(
-        const Duration(milliseconds: 500),
-      );
+      await Future<void>.delayed(const Duration(milliseconds: 500));
     }
 
     debugPrint(
@@ -202,8 +168,7 @@ class PushNotificationService {
         return;
       }
 
-      final apnsDisponible =
-          await _waitForApnsToken();
+      final apnsDisponible = await _waitForApnsToken();
 
       if (!apnsDisponible) {
         return;
@@ -221,21 +186,15 @@ class PushNotificationService {
 
       await _saveToken(token);
     } catch (error, stackTrace) {
-      debugPrint(
-        'ERROR OBTENIENDO TOKEN PUSH: $error',
-      );
+      debugPrint('ERROR OBTENIENDO TOKEN PUSH: $error');
 
-      debugPrintStack(
-        stackTrace: stackTrace,
-      );
+      debugPrintStack(stackTrace: stackTrace);
     } finally {
       _registrandoToken = false;
     }
   }
 
-  Future<void> _saveToken(
-    String token,
-  ) async {
+  Future<void> _saveToken(String token) async {
     try {
       final user = _supabase.auth.currentUser;
       final session = _supabase.auth.currentSession;
@@ -258,8 +217,7 @@ class PushNotificationService {
         return;
       }
 
-      final plataforma =
-          Platform.isIOS ? 'ios' : 'android';
+      final plataforma = Platform.isIOS ? 'ios' : 'android';
 
       await _supabase.rpc(
         'registrar_dispositivo_push',
@@ -277,41 +235,27 @@ class PushNotificationService {
         'PARA EL USUARIO ${user.id} '
         'EN $plataforma.',
       );
-    } on PostgrestException catch (
-  error,
-  stackTrace
-) {
+    } on PostgrestException catch (error, stackTrace) {
       debugPrint(
         'ERROR SUPABASE GUARDANDO TOKEN PUSH: '
         '${error.message}',
       );
 
-      debugPrint(
-        'CÓDIGO SUPABASE: ${error.code}',
-      );
+      debugPrint('CÓDIGO SUPABASE: ${error.code}');
 
-      debugPrint(
-        'DETALLES SUPABASE: ${error.details}',
-      );
+      debugPrint('DETALLES SUPABASE: ${error.details}');
 
-      debugPrintStack(
-        stackTrace: stackTrace,
-      );
+      debugPrintStack(stackTrace: stackTrace);
     } catch (error, stackTrace) {
-      debugPrint(
-        'ERROR GUARDANDO TOKEN PUSH: $error',
-      );
+      debugPrint('ERROR GUARDANDO TOKEN PUSH: $error');
 
-      debugPrintStack(
-        stackTrace: stackTrace,
-      );
+      debugPrintStack(stackTrace: stackTrace);
     }
   }
 
   Future<String?> getCurrentToken() async {
     try {
-      final apnsDisponible =
-          await _waitForApnsToken();
+      final apnsDisponible = await _waitForApnsToken();
 
       if (!apnsDisponible) {
         return null;
@@ -325,13 +269,9 @@ class PushNotificationService {
 
       return token.trim();
     } catch (error, stackTrace) {
-      debugPrint(
-        'ERROR LEYENDO TOKEN PUSH: $error',
-      );
+      debugPrint('ERROR LEYENDO TOKEN PUSH: $error');
 
-      debugPrintStack(
-        stackTrace: stackTrace,
-      );
+      debugPrintStack(stackTrace: stackTrace);
 
       return null;
     }

@@ -27,6 +27,9 @@ class _IncidenciasScreenState extends State<IncidenciasScreen> {
     final role = await supabase
         .from('usuarios')
         .select('rol_usuario')
+        .or(
+          'estado.is.null,estado.not.in.(inactivo,Inactivo,INACTIVO,baja,Baja,BAJA,desactivado,Desactivado,DESACTIVADO,bloqueado,Bloqueado,BLOQUEADO,suspendido,Suspendido,SUSPENDIDO)',
+        )
         .eq('auth_id', user.id)
         .single();
 
@@ -71,15 +74,13 @@ class _IncidenciasScreenState extends State<IncidenciasScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF08121C),
+      backgroundColor: const Color(0xFFF2FCFD),
 
       floatingActionButton: FloatingActionButton(
         onPressed: () {
           Navigator.push(
             context,
-            MaterialPageRoute(
-              builder: (_) => const NuevaIncidenciaScreen(),
-            ),
+            MaterialPageRoute(builder: (_) => const NuevaIncidenciaScreen()),
           ).then((_) => loadIncidencias());
         },
         child: const Icon(Icons.add),
@@ -97,7 +98,7 @@ class _IncidenciasScreenState extends State<IncidenciasScreen> {
                   margin: const EdgeInsets.only(bottom: 12),
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.08),
+                    color: Colors.white,
                     borderRadius: BorderRadius.circular(16),
                   ),
                   child: Column(
@@ -106,7 +107,7 @@ class _IncidenciasScreenState extends State<IncidenciasScreen> {
                       Text(
                         item['titulo'] ?? '',
                         style: const TextStyle(
-                          color: Colors.white,
+                          color: const Color(0xFF071A3A),
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
                         ),
@@ -116,9 +117,7 @@ class _IncidenciasScreenState extends State<IncidenciasScreen> {
 
                       Text(
                         item['descripcion'] ?? '',
-                        style: TextStyle(
-                          color: Colors.white.withOpacity(0.7),
-                        ),
+                        style: TextStyle(color: const Color(0xFF53627A)),
                       ),
 
                       const SizedBox(height: 10),
@@ -134,9 +133,7 @@ class _IncidenciasScreenState extends State<IncidenciasScreen> {
                         ),
                         child: Text(
                           item['estado'] ?? 'abierta',
-                          style: TextStyle(
-                            color: getColor(item['estado']),
-                          ),
+                          style: TextStyle(color: getColor(item['estado'])),
                         ),
                       ),
                     ],
@@ -147,12 +144,12 @@ class _IncidenciasScreenState extends State<IncidenciasScreen> {
     );
   }
 }
-  class NuevaIncidenciaScreen extends StatefulWidget {
+
+class NuevaIncidenciaScreen extends StatefulWidget {
   const NuevaIncidenciaScreen({super.key});
 
   @override
-  State<NuevaIncidenciaScreen> createState() =>
-      _NuevaIncidenciaScreenState();
+  State<NuevaIncidenciaScreen> createState() => _NuevaIncidenciaScreenState();
 }
 
 class _NuevaIncidenciaScreenState extends State<NuevaIncidenciaScreen> {
@@ -182,29 +179,24 @@ class _NuevaIncidenciaScreenState extends State<NuevaIncidenciaScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF08121C),
+      backgroundColor: const Color(0xFFF2FCFD),
       appBar: AppBar(title: const Text("Nueva incidencia")),
 
       body: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
-
             TextField(
               controller: titulo,
-              style: const TextStyle(color: Colors.white),
-              decoration: const InputDecoration(
-                labelText: "Título",
-              ),
+              style: const TextStyle(color: const Color(0xFF071A3A)),
+              decoration: const InputDecoration(labelText: "Título"),
             ),
 
             TextField(
               controller: descripcion,
-              style: const TextStyle(color: Colors.white),
+              style: const TextStyle(color: const Color(0xFF071A3A)),
               maxLines: 4,
-              decoration: const InputDecoration(
-                labelText: "Descripción",
-              ),
+              decoration: const InputDecoration(labelText: "Descripción"),
             ),
 
             const SizedBox(height: 20),

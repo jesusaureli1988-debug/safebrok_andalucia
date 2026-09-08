@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'package:safebrok_andalucia/core/production/premium_weighting.dart';
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
@@ -114,6 +115,9 @@ class _DirectorNacionalKpisScreenState
           .select(
             'id, auth_id, parent_id, rol_usuario, nombre, apellidos, email',
           )
+          .or(
+            'estado.is.null,estado.not.in.(inactivo,Inactivo,INACTIVO,baja,Baja,BAJA,desactivado,Desactivado,DESACTIVADO,bloqueado,Bloqueado,BLOQUEADO,suspendido,Suspendido,SUSPENDIDO)',
+          )
           .eq('auth_id', authUser.id)
           .maybeSingle();
 
@@ -132,11 +136,12 @@ class _DirectorNacionalKpisScreenState
           .from('usuarios')
           .select(
             'id, auth_id, parent_id, rol_usuario, nombre, apellidos, email',
+          )
+          .or(
+            'estado.is.null,estado.not.in.(inactivo,Inactivo,INACTIVO,baja,Baja,BAJA,desactivado,Desactivado,DESACTIVADO,bloqueado,Bloqueado,BLOQUEADO,suspendido,Suspendido,SUSPENDIDO)',
           );
 
-      final todosUsuarios = List<Map<String, dynamic>>.from(
-        usuariosData,
-      );
+      final todosUsuarios = List<Map<String, dynamic>>.from(usuariosData);
 
       final estructura = _construirEstructuraValida(
         perfil: perfil,
@@ -156,21 +161,13 @@ class _DirectorNacionalKpisScreenState
         final ventasData = await supabase
             .from('ventas')
             .select()
-            .inFilter(
-              'agente_auth_id',
-              authIdsAutorizados,
-            )
-            .order(
-              'created_at',
-              ascending: false,
-            );
+            .inFilter('agente_auth_id', authIdsAutorizados)
+            .order('created_at', ascending: false);
 
-        ventasEstructura = List<Map<String, dynamic>>.from(
-          ventasData,
-        ).where((venta) {
-          final authId = _idTexto(
-            venta['agente_auth_id'],
-          );
+        ventasEstructura = List<Map<String, dynamic>>.from(ventasData).where((
+          venta,
+        ) {
+          final authId = _idTexto(venta['agente_auth_id']);
 
           return authIdsAutorizados.contains(authId);
         }).toList();
@@ -178,24 +175,16 @@ class _DirectorNacionalKpisScreenState
         final clientesData = await supabase
             .from('clientes')
             .select()
-            .inFilter(
-              'auth_id',
-              authIdsAutorizados,
-            )
-            .order(
-              'created_at',
-              ascending: false,
-            );
+            .inFilter('auth_id', authIdsAutorizados)
+            .order('created_at', ascending: false);
 
-        clientesEstructura = List<Map<String, dynamic>>.from(
-          clientesData,
-        ).where((cliente) {
-          final authId = _idTexto(
-            cliente['auth_id'],
-          );
+        clientesEstructura = List<Map<String, dynamic>>.from(clientesData)
+            .where((cliente) {
+              final authId = _idTexto(cliente['auth_id']);
 
-          return authIdsAutorizados.contains(authId);
-        }).toList();
+              return authIdsAutorizados.contains(authId);
+            })
+            .toList();
       }
 
       usuarioLogueado = perfil;
@@ -287,9 +276,7 @@ class _DirectorNacionalKpisScreenState
     final authActual = supabase.auth.currentUser?.id ?? '';
 
     if (idRaiz.isEmpty) {
-      throw Exception(
-        'El usuario conectado no tiene un id válido.',
-      );
+      throw Exception('El usuario conectado no tiene un id válido.');
     }
 
     if (authIdRaiz.isEmpty || authIdRaiz != authActual) {
@@ -327,16 +314,11 @@ class _DirectorNacionalKpisScreenState
       if (parentId.isEmpty) continue;
 
       hijosPorParent
-          .putIfAbsent(
-            parentId,
-            () => <Map<String, dynamic>>[],
-          )
+          .putIfAbsent(parentId, () => <Map<String, dynamic>>[])
           .add(usuario);
     }
 
-    final resultado = <Map<String, dynamic>>[
-      Map<String, dynamic>.from(perfil),
-    ];
+    final resultado = <Map<String, dynamic>>[Map<String, dynamic>.from(perfil)];
 
     final visitados = <String>{idRaiz};
     final pendientes = <Map<String, dynamic>>[
@@ -354,13 +336,10 @@ class _DirectorNacionalKpisScreenState
       final padreId = _idTexto(padre['id']);
       final nivelPadre = _nivelRol(padre['rol_usuario']);
 
-      final hijos = hijosPorParent[padreId] ??
-          <Map<String, dynamic>>[];
+      final hijos = hijosPorParent[padreId] ?? <Map<String, dynamic>>[];
 
       for (final hijoOriginal in hijos) {
-        final hijo = Map<String, dynamic>.from(
-          hijoOriginal,
-        );
+        final hijo = Map<String, dynamic>.from(hijoOriginal);
 
         final hijoId = _idTexto(hijo['id']);
         final parentId = _idTexto(hijo['parent_id']);
@@ -392,9 +371,7 @@ class _DirectorNacionalKpisScreenState
          * y terminan incorporando toda la organización.
          */
         final jerarquiaValida =
-            nivelPadre > 0 &&
-            nivelHijo > 0 &&
-            nivelHijo < nivelPadre;
+            nivelPadre > 0 && nivelHijo > 0 && nivelHijo < nivelPadre;
 
         if (!jerarquiaValida) {
           debugPrint(
@@ -415,9 +392,7 @@ class _DirectorNacionalKpisScreenState
 
     debugPrint('-----------------------------------------');
     debugPrint('ESTRUCTURA VALIDADA TERMINADA');
-    debugPrint(
-      'TOTAL INCLUYENDO AL LOGUEADO: ${resultado.length}',
-    );
+    debugPrint('TOTAL INCLUYENDO AL LOGUEADO: ${resultado.length}');
 
     for (final usuario in resultado) {
       debugPrint(
@@ -447,10 +422,7 @@ class _DirectorNacionalKpisScreenState
         .where((rol) => rol.isNotEmpty)
         .toSet();
 
-    return [
-      'Todos',
-      ...orden.where(existentes.contains),
-    ];
+    return ['Todos', ...orden.where(existentes.contains)];
   }
 
   List<Map<String, dynamic>> get personasFiltroEstructura {
@@ -463,9 +435,9 @@ class _DirectorNacionalKpisScreenState
     }).toList();
 
     personas.sort((a, b) {
-      return _nombreCompleto(a)
-          .toLowerCase()
-          .compareTo(_nombreCompleto(b).toLowerCase());
+      return _nombreCompleto(
+        a,
+      ).toLowerCase().compareTo(_nombreCompleto(b).toLowerCase());
     });
 
     return personas;
@@ -493,10 +465,7 @@ class _DirectorNacionalKpisScreenState
 
       if (parentId.isNotEmpty) {
         hijosPorParent
-            .putIfAbsent(
-              parentId,
-              () => <Map<String, dynamic>>[],
-            )
+            .putIfAbsent(parentId, () => <Map<String, dynamic>>[])
             .add(usuario);
       }
     }
@@ -513,8 +482,7 @@ class _DirectorNacionalKpisScreenState
       raicesSeleccionadas.addAll(
         usuariosPermitidosBase.where(
           (usuario) =>
-              _normalizarRol(usuario['rol_usuario']) ==
-              selectedStructureRole,
+              _normalizarRol(usuario['rol_usuario']) == selectedStructureRole,
         ),
       );
     } else {
@@ -527,9 +495,7 @@ class _DirectorNacionalKpisScreenState
       debugPrint('======= FILTRO ESTRUCTURA KPIS =======');
       debugPrint('FIGURA: $selectedStructureRole');
       debugPrint('PERSONA: $selectedStructureUserId');
-      debugPrint(
-        'PERSONAS INCLUIDAS: ${usuariosEstructura.length}',
-      );
+      debugPrint('PERSONAS INCLUIDAS: ${usuariosEstructura.length}');
       debugPrint('VENTAS INCLUIDAS: ${ventas.length}');
       debugPrint('CLIENTES INCLUIDOS: ${clientes.length}');
       debugPrint('======================================');
@@ -539,9 +505,7 @@ class _DirectorNacionalKpisScreenState
 
     final idsIncluidos = <String>{};
 
-    void recorrerSubestructura(
-      Map<String, dynamic> raiz,
-    ) {
+    void recorrerSubestructura(Map<String, dynamic> raiz) {
       final raizId = _idTexto(raiz['id']);
 
       if (raizId.isEmpty || idsIncluidos.contains(raizId)) {
@@ -550,9 +514,7 @@ class _DirectorNacionalKpisScreenState
 
       idsIncluidos.add(raizId);
 
-      final hijos =
-          hijosPorParent[raizId] ??
-          <Map<String, dynamic>>[];
+      final hijos = hijosPorParent[raizId] ?? <Map<String, dynamic>>[];
 
       for (final hijo in hijos) {
         recorrerSubestructura(hijo);
@@ -563,21 +525,17 @@ class _DirectorNacionalKpisScreenState
       recorrerSubestructura(raiz);
     }
 
-    usuariosEstructura = usuariosPermitidosBase.where(
-      (usuario) {
-        final id = _idTexto(usuario['id']);
-        return id.isNotEmpty && idsIncluidos.contains(id);
-      },
-    ).toList();
+    usuariosEstructura = usuariosPermitidosBase.where((usuario) {
+      final id = _idTexto(usuario['id']);
+      return id.isNotEmpty && idsIncluidos.contains(id);
+    }).toList();
 
     _filtrarVentasYClientesPorUsuarios();
 
     debugPrint('======= FILTRO ESTRUCTURA KPIS =======');
     debugPrint('FIGURA: $selectedStructureRole');
     debugPrint('PERSONA: $selectedStructureUserId');
-    debugPrint(
-      'PERSONAS INCLUIDAS: ${usuariosEstructura.length}',
-    );
+    debugPrint('PERSONAS INCLUIDAS: ${usuariosEstructura.length}');
     debugPrint('VENTAS INCLUIDAS: ${ventas.length}');
     debugPrint('CLIENTES INCLUIDOS: ${clientes.length}');
     debugPrint('======================================');
@@ -585,33 +543,22 @@ class _DirectorNacionalKpisScreenState
 
   void _filtrarVentasYClientesPorUsuarios() {
     final authIds = usuariosEstructura
-        .map(
-          (usuario) => _idTexto(usuario['auth_id']),
-        )
+        .map((usuario) => _idTexto(usuario['auth_id']))
         .where((id) => id.isNotEmpty)
         .toSet();
 
-    ventas = ventasPermitidasBase.where(
-      (venta) {
-        final agenteAuthId = _idTexto(
-          venta['agente_auth_id'],
-        );
+    ventas = ventasPermitidasBase.where((venta) {
+      final agenteAuthId = _idTexto(venta['agente_auth_id']);
 
-        return agenteAuthId.isNotEmpty &&
-            authIds.contains(agenteAuthId);
-      },
-    ).toList();
+      return agenteAuthId.isNotEmpty && authIds.contains(agenteAuthId);
+    }).toList();
 
-    clientes = clientesPermitidosBase.where(
-      (cliente) {
-        final propietarioAuthId = _idTexto(
-          cliente['auth_id'],
-        );
+    clientes = clientesPermitidosBase.where((cliente) {
+      final propietarioAuthId = _idTexto(cliente['auth_id']);
 
-        return propietarioAuthId.isNotEmpty &&
-            authIds.contains(propietarioAuthId);
-      },
-    ).toList();
+      return propietarioAuthId.isNotEmpty &&
+          authIds.contains(propietarioAuthId);
+    }).toList();
   }
 
   String _fechaTexto(DateTime? fecha) {
@@ -759,16 +706,20 @@ class _DirectorNacionalKpisScreenState
   bool _cumpleFiltroFecha(Map<String, dynamic> row) {
     final fecha = _parseDate(row);
 
-    final okYear = selectedYear == 'Todos' ||
+    final okYear =
+        selectedYear == 'Todos' ||
         (fecha != null && fecha.year.toString() == selectedYear);
 
-    final okMonth = selectedMonth == 'Todos' ||
+    final okMonth =
+        selectedMonth == 'Todos' ||
         (fecha != null && monthNames[fecha.month] == selectedMonth);
 
-    final okDesde = selectedDateFrom == null ||
+    final okDesde =
+        selectedDateFrom == null ||
         (fecha != null && !fecha.isBefore(selectedDateFrom!));
 
-    final okHasta = selectedDateTo == null ||
+    final okHasta =
+        selectedDateTo == null ||
         (fecha != null && !fecha.isAfter(selectedDateTo!));
 
     return okYear && okMonth && okDesde && okHasta;
@@ -868,8 +819,7 @@ class _DirectorNacionalKpisScreenState
       final authId = venta['agente_auth_id']?.toString();
       if (authId == null || !primasPorAuth.containsKey(authId)) continue;
 
-      primasPorAuth[authId] =
-          (primasPorAuth[authId] ?? 0) + _primaNeta(venta);
+      primasPorAuth[authId] = (primasPorAuth[authId] ?? 0) + _primaNeta(venta);
       ventasPorAuth[authId] = (ventasPorAuth[authId] ?? 0) + 1;
     }
 
@@ -934,8 +884,12 @@ class _DirectorNacionalKpisScreenState
     }
 
     if (selectedDateFrom != null || selectedDateTo != null) {
-      final desde = selectedDateFrom ??
-          ventas.map(_parseDate).whereType<DateTime>().fold<DateTime?>(
+      final desde =
+          selectedDateFrom ??
+          ventas
+              .map(_parseDate)
+              .whereType<DateTime>()
+              .fold<DateTime?>(
                 null,
                 (minimo, fecha) =>
                     minimo == null || fecha.isBefore(minimo) ? fecha : minimo,
@@ -946,10 +900,7 @@ class _DirectorNacionalKpisScreenState
 
       final meses = math.max(
         1,
-        ((hasta.year - desde.year) * 12) +
-            hasta.month -
-            desde.month +
-            1,
+        ((hasta.year - desde.year) * 12) + hasta.month - desde.month + 1,
       );
 
       return objetivoMensual * meses;
@@ -1030,7 +981,7 @@ class _DirectorNacionalKpisScreenState
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF020617),
+      backgroundColor: const Color(0xFFF4F6FB),
       body: Stack(
         children: [
           const _DirectorBackground(),
@@ -1038,12 +989,12 @@ class _DirectorNacionalKpisScreenState
             child: loading
                 ? const Center(
                     child: CircularProgressIndicator(
-                      color: Colors.cyanAccent,
+                      color: const Color(0xFF2563EB),
                     ),
                   )
                 : RefreshIndicator(
-                    color: Colors.cyanAccent,
-                    backgroundColor: const Color(0xFF071A3A),
+                    color: const Color(0xFF2563EB),
+                    backgroundColor: const Color(0xFFFFFFFF),
                     onRefresh: cargarDatos,
                     child: CustomScrollView(
                       physics: const AlwaysScrollableScrollPhysics(),
@@ -1059,9 +1010,7 @@ class _DirectorNacionalKpisScreenState
                           SliverToBoxAdapter(child: _rolesCard()),
                           SliverToBoxAdapter(child: _rankingCard()),
                         ],
-                        const SliverToBoxAdapter(
-                          child: SizedBox(height: 40),
-                        ),
+                        const SliverToBoxAdapter(child: SizedBox(height: 40)),
                       ],
                     ),
                   ),
@@ -1088,7 +1037,7 @@ class _DirectorNacionalKpisScreenState
                 height: 50,
                 child: Icon(
                   Icons.arrow_back_rounded,
-                  color: Color(0xFF020617),
+                  color: Color(0xFF111827),
                   size: 30,
                 ),
               ),
@@ -1099,7 +1048,7 @@ class _DirectorNacionalKpisScreenState
             child: Text(
               'KPIs de mi estructura',
               style: TextStyle(
-                color: Colors.white,
+                color: const Color(0xFF111827),
                 fontSize: 25,
                 fontWeight: FontWeight.w900,
               ),
@@ -1114,17 +1063,14 @@ class _DirectorNacionalKpisScreenState
               decoration: BoxDecoration(
                 gradient: const LinearGradient(
                   colors: [
-                    Color(0xFF22D3EE),
                     Color(0xFF2563EB),
-                    Color(0xFF7C3AED),
+                    Color(0xFF1D4ED8),
+                    Color(0xFF1D4ED8),
                   ],
                 ),
                 borderRadius: BorderRadius.circular(18),
               ),
-              child: const Icon(
-                Icons.refresh_rounded,
-                color: Colors.white,
-              ),
+              child: const Icon(Icons.refresh_rounded, color: Colors.white),
             ),
           ),
         ],
@@ -1136,9 +1082,7 @@ class _DirectorNacionalKpisScreenState
     final progresoReal = cumplimientoObjetivo;
     final progresoVisual = progresoReal.clamp(0.0, 1.0);
     final nombre = _nombreCompleto(usuarioLogueado);
-    final rol = _rolTexto(
-      usuarioLogueado?['rol_usuario']?.toString() ?? '',
-    );
+    final rol = _rolTexto(usuarioLogueado?['rol_usuario']?.toString() ?? '');
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(18, 12, 18, 16),
@@ -1150,16 +1094,10 @@ class _DirectorNacionalKpisScreenState
             padding: const EdgeInsets.all(24),
             decoration: BoxDecoration(
               gradient: LinearGradient(
-                colors: [
-                  const Color(0xFF22D3EE).withOpacity(0.22),
-                  const Color(0xFF071A3A).withOpacity(0.94),
-                  const Color(0xFF020617).withOpacity(0.96),
-                ],
+                colors: const [Color(0xFF111827), Color(0xFF1D4ED8)],
               ),
               borderRadius: BorderRadius.circular(34),
-              border: Border.all(
-                color: Colors.cyanAccent.withOpacity(0.25),
-              ),
+              border: Border.all(color: Colors.white24),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1176,7 +1114,7 @@ class _DirectorNacionalKpisScreenState
                 Text(
                   '$rol · ${usuariosEstructura.length} personas en la selección',
                   style: TextStyle(
-                    color: Colors.cyanAccent.withOpacity(0.86),
+                    color: Colors.white70,
                     fontWeight: FontWeight.w800,
                   ),
                 ),
@@ -1185,7 +1123,7 @@ class _DirectorNacionalKpisScreenState
                   'Usuario autenticado: '
                   '${usuarioLogueado?['email']?.toString() ?? 'Sin email'}',
                   style: TextStyle(
-                    color: Colors.white.withOpacity(0.42),
+                    color: Colors.white70,
                     fontSize: 11,
                     fontWeight: FontWeight.w600,
                   ),
@@ -1194,7 +1132,7 @@ class _DirectorNacionalKpisScreenState
                 Text(
                   'Los datos de esta pantalla incluyen únicamente tus cifras propias y las de todos los usuarios que dependen de ti.',
                   style: TextStyle(
-                    color: Colors.white.withOpacity(0.62),
+                    color: Colors.white70,
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
                     height: 1.35,
@@ -1209,8 +1147,8 @@ class _DirectorNacionalKpisScreenState
                         child: LinearProgressIndicator(
                           value: progresoVisual,
                           minHeight: 11,
-                          backgroundColor: Colors.white.withOpacity(0.10),
-                          color: Colors.cyanAccent,
+                          backgroundColor: Colors.white,
+                          color: const Color(0xFF2563EB),
                         ),
                       ),
                     ),
@@ -1218,7 +1156,7 @@ class _DirectorNacionalKpisScreenState
                     Text(
                       '${(progresoReal * 100).round()}%',
                       style: const TextStyle(
-                        color: Colors.cyanAccent,
+                        color: const Color(0xFF2563EB),
                         fontSize: 22,
                         fontWeight: FontWeight.w900,
                       ),
@@ -1229,7 +1167,7 @@ class _DirectorNacionalKpisScreenState
                 Text(
                   'Objetivo del periodo: ${_formatearEuros(objetivoPeriodo)}',
                   style: TextStyle(
-                    color: Colors.white.withOpacity(0.52),
+                    color: Colors.white70,
                     fontSize: 12,
                     fontWeight: FontWeight.w700,
                   ),
@@ -1245,10 +1183,9 @@ class _DirectorNacionalKpisScreenState
   Widget _filters() {
     final personas = personasFiltroEstructura;
 
-    final personaValida = selectedStructureUserId == 'Todos' ||
-        personas.any(
-          (u) => u['id']?.toString() == selectedStructureUserId,
-        );
+    final personaValida =
+        selectedStructureUserId == 'Todos' ||
+        personas.any((u) => u['id']?.toString() == selectedStructureUserId);
 
     if (!personaValida) {
       selectedStructureUserId = 'Todos';
@@ -1258,21 +1195,18 @@ class _DirectorNacionalKpisScreenState
       padding: const EdgeInsets.fromLTRB(18, 0, 18, 16),
       child: Container(
         padding: const EdgeInsets.all(16),
-        decoration: _cardDecoration(const Color(0xFF22D3EE)),
+        decoration: _cardDecoration(const Color(0xFF2563EB)),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Row(
               children: [
-                Icon(
-                  Icons.tune_rounded,
-                  color: Colors.cyanAccent,
-                ),
+                Icon(Icons.tune_rounded, color: const Color(0xFF2563EB)),
                 SizedBox(width: 8),
                 Text(
                   'Filtros avanzados',
                   style: TextStyle(
-                    color: Colors.white,
+                    color: const Color(0xFF111827),
                     fontSize: 17,
                     fontWeight: FontWeight.w900,
                   ),
@@ -1307,11 +1241,7 @@ class _DirectorNacionalKpisScreenState
 
                 if (estrecho) {
                   return Column(
-                    children: [
-                      year,
-                      const SizedBox(height: 10),
-                      month,
-                    ],
+                    children: [year, const SizedBox(height: 10), month],
                   );
                 }
 
@@ -1353,11 +1283,7 @@ class _DirectorNacionalKpisScreenState
 
                 if (estrecho) {
                   return Column(
-                    children: [
-                      desde,
-                      const SizedBox(height: 10),
-                      hasta,
-                    ],
+                    children: [desde, const SizedBox(height: 10), hasta],
                   );
                 }
 
@@ -1377,9 +1303,8 @@ class _DirectorNacionalKpisScreenState
               value: selectedStructureRole,
               items: rolesEstructuraDisponibles,
               icon: Icons.account_tree_rounded,
-              displayText: (value) => value == 'Todos'
-                  ? 'Toda mi estructura'
-                  : _rolTexto(value),
+              displayText: (value) =>
+                  value == 'Todos' ? 'Toda mi estructura' : _rolTexto(value),
               onChanged: (value) {
                 if (value == null) return;
 
@@ -1407,7 +1332,7 @@ class _DirectorNacionalKpisScreenState
                     '${usuariosEstructura.length} personas · '
                     '${ventasFiltradas.length} pólizas filtradas',
                     style: TextStyle(
-                      color: Colors.white.withOpacity(0.56),
+                      color: const Color(0xFF475569),
                       fontSize: 12,
                       fontWeight: FontWeight.w700,
                     ),
@@ -1415,13 +1340,10 @@ class _DirectorNacionalKpisScreenState
                 ),
                 TextButton.icon(
                   onPressed: _limpiarFiltrosAvanzados,
-                  icon: const Icon(
-                    Icons.filter_alt_off_rounded,
-                    size: 18,
-                  ),
+                  icon: const Icon(Icons.filter_alt_off_rounded, size: 18),
                   label: const Text('Limpiar'),
                   style: TextButton.styleFrom(
-                    foregroundColor: Colors.cyanAccent,
+                    foregroundColor: const Color(0xFF2563EB),
                   ),
                 ),
               ],
@@ -1449,15 +1371,15 @@ class _DirectorNacionalKpisScreenState
           height: 62,
           padding: const EdgeInsets.symmetric(horizontal: 13),
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.075),
+            color: Colors.white,
             borderRadius: BorderRadius.circular(20),
             border: Border.all(
-              color: Colors.cyanAccent.withOpacity(0.18),
+              color: const Color(0xFF2563EB).withOpacity(0.18),
             ),
           ),
           child: Row(
             children: [
-              Icon(icon, color: Colors.cyanAccent, size: 20),
+              Icon(icon, color: const Color(0xFF2563EB), size: 20),
               const SizedBox(width: 9),
               Expanded(
                 child: Column(
@@ -1467,7 +1389,7 @@ class _DirectorNacionalKpisScreenState
                     Text(
                       title,
                       style: const TextStyle(
-                        color: Colors.white54,
+                        color: const Color(0xFF64748B),
                         fontSize: 10,
                         fontWeight: FontWeight.w800,
                       ),
@@ -1477,7 +1399,7 @@ class _DirectorNacionalKpisScreenState
                       value,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
-                        color: Colors.white,
+                        color: const Color(0xFF111827),
                         fontSize: 13,
                         fontWeight: FontWeight.w900,
                       ),
@@ -1491,14 +1413,14 @@ class _DirectorNacionalKpisScreenState
                   onPressed: onClear,
                   icon: const Icon(
                     Icons.close_rounded,
-                    color: Colors.white54,
+                    color: const Color(0xFF64748B),
                     size: 18,
                   ),
                 )
               else
                 const Icon(
                   Icons.calendar_today_rounded,
-                  color: Colors.white38,
+                  color: const Color(0xFF78909C),
                   size: 17,
                 ),
             ],
@@ -1516,21 +1438,17 @@ class _DirectorNacionalKpisScreenState
       height: 58,
       padding: const EdgeInsets.symmetric(horizontal: 14),
       decoration: BoxDecoration(
-        color: enabled
-            ? Colors.white.withOpacity(0.075)
-            : Colors.white.withOpacity(0.035),
+        color: enabled ? Colors.white : Colors.white.withOpacity(0.035),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: enabled
-              ? Colors.purpleAccent.withOpacity(0.25)
-              : Colors.white.withOpacity(0.07),
+          color: enabled ? Colors.purpleAccent.withOpacity(0.25) : Colors.white,
         ),
       ),
       child: Row(
         children: [
           Icon(
             Icons.person_search_rounded,
-            color: enabled ? Colors.purpleAccent : Colors.white30,
+            color: enabled ? Colors.purpleAccent : const Color(0xFF94A3B8),
             size: 20,
           ),
           const SizedBox(width: 9),
@@ -1539,11 +1457,12 @@ class _DirectorNacionalKpisScreenState
               child: DropdownButton<String>(
                 value: selectedStructureUserId,
                 isExpanded: true,
-                dropdownColor: const Color(0xFF071A3A),
-                iconEnabledColor:
-                    enabled ? Colors.purpleAccent : Colors.white30,
+                dropdownColor: const Color(0xFFFFFFFF),
+                iconEnabledColor: enabled
+                    ? Colors.purpleAccent
+                    : const Color(0xFF94A3B8),
                 style: TextStyle(
-                  color: enabled ? Colors.white : Colors.white38,
+                  color: enabled ? Colors.white : const Color(0xFF78909C),
                   fontWeight: FontWeight.w800,
                 ),
                 items: [
@@ -1595,25 +1514,23 @@ class _DirectorNacionalKpisScreenState
       height: 56,
       padding: const EdgeInsets.symmetric(horizontal: 14),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.075),
+        color: Colors.white,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: Colors.cyanAccent.withOpacity(0.18),
-        ),
+        border: Border.all(color: const Color(0xFF2563EB).withOpacity(0.18)),
       ),
       child: Row(
         children: [
-          Icon(icon, color: Colors.cyanAccent, size: 20),
+          Icon(icon, color: const Color(0xFF2563EB), size: 20),
           const SizedBox(width: 8),
           Expanded(
             child: DropdownButtonHideUnderline(
               child: DropdownButton<String>(
                 value: items.contains(value) ? value : 'Todos',
                 isExpanded: true,
-                dropdownColor: const Color(0xFF071A3A),
-                iconEnabledColor: Colors.cyanAccent,
+                dropdownColor: const Color(0xFFFFFFFF),
+                iconEnabledColor: const Color(0xFF2563EB),
                 style: const TextStyle(
-                  color: Colors.white,
+                  color: const Color(0xFF111827),
                   fontWeight: FontWeight.w800,
                 ),
                 items: items
@@ -1657,7 +1574,7 @@ class _DirectorNacionalKpisScreenState
             'Pólizas',
             ventasFiltradas.length.toString(),
             Icons.receipt_long_rounded,
-            Colors.cyanAccent,
+            const Color(0xFF2563EB),
           ),
           _kpiCard(
             'Clientes',
@@ -1676,12 +1593,7 @@ class _DirectorNacionalKpisScreenState
     );
   }
 
-  Widget _kpiCard(
-    String title,
-    String value,
-    IconData icon,
-    Color color,
-  ) {
+  Widget _kpiCard(String title, String value, IconData icon, Color color) {
     return Container(
       padding: const EdgeInsets.all(17),
       decoration: _cardDecoration(color),
@@ -1695,7 +1607,7 @@ class _DirectorNacionalKpisScreenState
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: const TextStyle(
-              color: Colors.white,
+              color: const Color(0xFF111827),
               fontSize: 28,
               fontWeight: FontWeight.w900,
               height: 1,
@@ -1705,7 +1617,7 @@ class _DirectorNacionalKpisScreenState
           Text(
             title,
             style: TextStyle(
-              color: Colors.white.withOpacity(0.62),
+              color: const Color(0xFF475569),
               fontSize: 12,
               fontWeight: FontWeight.w700,
             ),
@@ -1718,22 +1630,20 @@ class _DirectorNacionalKpisScreenState
   Widget _chartCard() {
     final data = primasPorMes;
     final totalGrafico = data.fold<double>(0, (a, b) => a + b);
-    final mejorMes = data.isEmpty
-        ? 0
-        : data.indexOf(data.reduce(math.max));
+    final mejorMes = data.isEmpty ? 0 : data.indexOf(data.reduce(math.max));
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(18, 0, 18, 16),
       child: Container(
         padding: const EdgeInsets.fromLTRB(18, 18, 18, 16),
-        decoration: _cardDecoration(const Color(0xFF22D3EE)),
+        decoration: _cardDecoration(const Color(0xFF2563EB)),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
               'Evolución mensual de primas',
               style: TextStyle(
-                color: Colors.white,
+                color: const Color(0xFF111827),
                 fontSize: 19,
                 fontWeight: FontWeight.w900,
               ),
@@ -1744,7 +1654,7 @@ class _DirectorNacionalKpisScreenState
                   ? 'Prima neta acumulada por mes en todos los años'
                   : 'Prima neta mensual durante $selectedYear',
               style: TextStyle(
-                color: Colors.white.withOpacity(0.52),
+                color: const Color(0xFF475569),
                 fontWeight: FontWeight.w600,
                 fontSize: 12,
               ),
@@ -1755,14 +1665,12 @@ class _DirectorNacionalKpisScreenState
                 _chartStat(
                   'Total',
                   _formatearEuros(totalGrafico),
-                  Colors.cyanAccent,
+                  const Color(0xFF2563EB),
                 ),
                 const SizedBox(width: 10),
                 _chartStat(
                   'Mejor mes',
-                  totalGrafico == 0
-                      ? 'Sin datos'
-                      : monthNames[mejorMes + 1],
+                  totalGrafico == 0 ? 'Sin datos' : monthNames[mejorMes + 1],
                   Colors.amberAccent,
                 ),
               ],
@@ -1813,7 +1721,7 @@ class _DirectorNacionalKpisScreenState
             Text(
               title,
               style: const TextStyle(
-                color: Colors.white54,
+                color: const Color(0xFF64748B),
                 fontSize: 11,
                 fontWeight: FontWeight.w700,
               ),
@@ -1834,14 +1742,14 @@ class _DirectorNacionalKpisScreenState
       padding: const EdgeInsets.fromLTRB(18, 0, 18, 16),
       child: Container(
         padding: const EdgeInsets.all(18),
-        decoration: _cardDecoration(const Color(0xFFA855F7)),
+        decoration: _cardDecoration(const Color(0xFF10AAA6)),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
               'Primas por figura',
               style: TextStyle(
-                color: Colors.white,
+                color: const Color(0xFF111827),
                 fontSize: 19,
                 fontWeight: FontWeight.w900,
               ),
@@ -1851,7 +1759,7 @@ class _DirectorNacionalKpisScreenState
               Text(
                 'Sin primas en el periodo seleccionado.',
                 style: TextStyle(
-                  color: Colors.white.withOpacity(0.58),
+                  color: const Color(0xFF475569),
                   fontWeight: FontWeight.w600,
                 ),
               )
@@ -1882,7 +1790,7 @@ class _DirectorNacionalKpisScreenState
                 child: Text(
                   title,
                   style: const TextStyle(
-                    color: Colors.white,
+                    color: const Color(0xFF111827),
                     fontWeight: FontWeight.w800,
                   ),
                 ),
@@ -1890,7 +1798,7 @@ class _DirectorNacionalKpisScreenState
               Text(
                 _formatearEuros(value),
                 style: const TextStyle(
-                  color: Colors.cyanAccent,
+                  color: const Color(0xFF2563EB),
                   fontWeight: FontWeight.w900,
                 ),
               ),
@@ -1902,7 +1810,7 @@ class _DirectorNacionalKpisScreenState
             child: LinearProgressIndicator(
               value: progress,
               minHeight: 8,
-              backgroundColor: Colors.white.withOpacity(0.10),
+              backgroundColor: Colors.white,
               color: Colors.purpleAccent,
             ),
           ),
@@ -1926,7 +1834,7 @@ class _DirectorNacionalKpisScreenState
             const Text(
               'Top agentes',
               style: TextStyle(
-                color: Colors.white,
+                color: const Color(0xFF111827),
                 fontSize: 19,
                 fontWeight: FontWeight.w900,
               ),
@@ -1935,7 +1843,7 @@ class _DirectorNacionalKpisScreenState
             Text(
               'Todos los agentes de tu estructura, ordenados por prima neta.',
               style: TextStyle(
-                color: Colors.white.withOpacity(0.52),
+                color: const Color(0xFF475569),
                 fontSize: 12,
                 fontWeight: FontWeight.w600,
               ),
@@ -1945,7 +1853,7 @@ class _DirectorNacionalKpisScreenState
               Text(
                 'No hay agentes en la estructura del usuario conectado.',
                 style: TextStyle(
-                  color: Colors.white.withOpacity(0.58),
+                  color: const Color(0xFF475569),
                   fontWeight: FontWeight.w600,
                 ),
               )
@@ -1965,7 +1873,7 @@ class _DirectorNacionalKpisScreenState
                     border: Border.all(
                       color: index == 0
                           ? Colors.amberAccent.withOpacity(0.28)
-                          : Colors.white.withOpacity(0.07),
+                          : Colors.white,
                     ),
                   ),
                   child: Row(
@@ -1976,7 +1884,7 @@ class _DirectorNacionalKpisScreenState
                         decoration: BoxDecoration(
                           color: index == 0
                               ? Colors.amberAccent.withOpacity(0.22)
-                              : Colors.white.withOpacity(0.08),
+                              : Colors.white,
                           shape: BoxShape.circle,
                         ),
                         child: Center(
@@ -1985,7 +1893,7 @@ class _DirectorNacionalKpisScreenState
                             style: TextStyle(
                               color: index == 0
                                   ? Colors.amberAccent
-                                  : Colors.white70,
+                                  : const Color(0xFF475569),
                               fontWeight: FontWeight.w900,
                               fontSize: 12,
                             ),
@@ -2002,7 +1910,7 @@ class _DirectorNacionalKpisScreenState
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: const TextStyle(
-                                color: Colors.white,
+                                color: const Color(0xFF111827),
                                 fontWeight: FontWeight.w800,
                               ),
                             ),
@@ -2012,18 +1920,17 @@ class _DirectorNacionalKpisScreenState
                               child: LinearProgressIndicator(
                                 value: progreso,
                                 minHeight: 6,
-                                backgroundColor:
-                                    Colors.white.withOpacity(0.08),
+                                backgroundColor: Colors.white,
                                 color: index == 0
                                     ? Colors.amberAccent
-                                    : Colors.cyanAccent,
+                                    : const Color(0xFF2563EB),
                               ),
                             ),
                             const SizedBox(height: 5),
                             Text(
                               '${agente.ventas} pólizas',
                               style: const TextStyle(
-                                color: Colors.white54,
+                                color: const Color(0xFF64748B),
                                 fontSize: 11,
                                 fontWeight: FontWeight.w700,
                               ),
@@ -2037,7 +1944,7 @@ class _DirectorNacionalKpisScreenState
                         style: TextStyle(
                           color: index == 0
                               ? Colors.amberAccent
-                              : Colors.cyanAccent,
+                              : const Color(0xFF2563EB),
                           fontSize: 15,
                           fontWeight: FontWeight.w900,
                         ),
@@ -2069,7 +1976,7 @@ class _DirectorNacionalKpisScreenState
             const Text(
               'No se pudieron cargar los KPIs',
               style: TextStyle(
-                color: Colors.white,
+                color: const Color(0xFF111827),
                 fontSize: 20,
                 fontWeight: FontWeight.w900,
               ),
@@ -2078,9 +1985,7 @@ class _DirectorNacionalKpisScreenState
             Text(
               error ?? '',
               textAlign: TextAlign.center,
-              style: const TextStyle(
-                color: Colors.white60,
-              ),
+              style: const TextStyle(color: const Color(0xFF64748B)),
             ),
           ],
         ),
@@ -2103,15 +2008,7 @@ class _DirectorNacionalKpisScreenState
 
   BoxDecoration _cardDecoration(Color color) {
     return BoxDecoration(
-      gradient: LinearGradient(
-        colors: [
-          color.withOpacity(0.20),
-          const Color(0xFF071A3A).withOpacity(0.92),
-          const Color(0xFF020617).withOpacity(0.96),
-        ],
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-      ),
+      color: Colors.white,
       borderRadius: BorderRadius.circular(28),
       border: Border.all(color: color.withOpacity(0.30)),
       boxShadow: [
@@ -2141,10 +2038,7 @@ class _PremiumLineChartPainter extends CustomPainter {
   final List<double> values;
   final List<String> labels;
 
-  const _PremiumLineChartPainter({
-    required this.values,
-    required this.labels,
-  });
+  const _PremiumLineChartPainter({required this.values, required this.labels});
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -2158,22 +2052,15 @@ class _PremiumLineChartPainter extends CustomPainter {
 
     final maxValue = values.isEmpty
         ? 1.0
-        : math.max(
-            1.0,
-            values.reduce(math.max) * 1.15,
-          );
+        : math.max(1.0, values.reduce(math.max) * 1.15);
 
     final gridPaint = Paint()
-      ..color = Colors.white.withOpacity(0.08)
+      ..color = Colors.white
       ..strokeWidth = 1;
 
     for (int i = 0; i <= 4; i++) {
       final y = top + chartHeight * (i / 4);
-      canvas.drawLine(
-        Offset(left, y),
-        Offset(left + chartWidth, y),
-        gridPaint,
-      );
+      canvas.drawLine(Offset(left, y), Offset(left + chartWidth, y), gridPaint);
     }
 
     final points = <Offset>[];
@@ -2215,18 +2102,16 @@ class _PremiumLineChartPainter extends CustomPainter {
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
           colors: [
-            const Color(0xFF22D3EE).withOpacity(0.30),
-            const Color(0xFF2563EB).withOpacity(0.08),
+            const Color(0xFF2563EB).withOpacity(0.30),
+            const Color(0xFF1D4ED8).withOpacity(0.08),
             Colors.transparent,
           ],
-        ).createShader(
-          Rect.fromLTWH(left, top, chartWidth, chartHeight),
-        );
+        ).createShader(Rect.fromLTWH(left, top, chartWidth, chartHeight));
 
       canvas.drawPath(areaPath, areaPaint);
 
       final glowPaint = Paint()
-        ..color = const Color(0xFF22D3EE).withOpacity(0.25)
+        ..color = const Color(0xFF2563EB).withOpacity(0.25)
         ..style = PaintingStyle.stroke
         ..strokeWidth = 8
         ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8);
@@ -2236,14 +2121,12 @@ class _PremiumLineChartPainter extends CustomPainter {
       final linePaint = Paint()
         ..shader = const LinearGradient(
           colors: [
-            Color(0xFF67E8F9),
-            Color(0xFF22D3EE),
             Color(0xFF2563EB),
-            Color(0xFFA855F7),
+            Color(0xFF2563EB),
+            Color(0xFF1D4ED8),
+            Color(0xFF10AAA6),
           ],
-        ).createShader(
-          Rect.fromLTWH(left, top, chartWidth, chartHeight),
-        )
+        ).createShader(Rect.fromLTWH(left, top, chartWidth, chartHeight))
         ..style = PaintingStyle.stroke
         ..strokeWidth = 3.5
         ..strokeCap = StrokeCap.round
@@ -2254,17 +2137,9 @@ class _PremiumLineChartPainter extends CustomPainter {
       for (int i = 0; i < points.length; i++) {
         final point = points[i];
 
-        canvas.drawCircle(
-          point,
-          6,
-          Paint()..color = const Color(0xFF061329),
-        );
+        canvas.drawCircle(point, 6, Paint()..color = const Color(0xFFFFFFFF));
 
-        canvas.drawCircle(
-          point,
-          4,
-          Paint()..color = const Color(0xFF67E8F9),
-        );
+        canvas.drawCircle(point, 4, Paint()..color = const Color(0xFF2563EB));
 
         if (values[i] > 0) {
           final valueText = _compactMoney(values[i]);
@@ -2273,7 +2148,7 @@ class _PremiumLineChartPainter extends CustomPainter {
             text: TextSpan(
               text: valueText,
               style: const TextStyle(
-                color: Colors.white70,
+                color: const Color(0xFF475569),
                 fontSize: 9,
                 fontWeight: FontWeight.w800,
               ),
@@ -2281,8 +2156,10 @@ class _PremiumLineChartPainter extends CustomPainter {
             textDirection: TextDirection.ltr,
           )..layout();
 
-          final valueX = (point.dx - valuePainter.width / 2)
-              .clamp(0.0, size.width - valuePainter.width);
+          final valueX = (point.dx - valuePainter.width / 2).clamp(
+            0.0,
+            size.width - valuePainter.width,
+          );
 
           valuePainter.paint(
             canvas,
@@ -2301,7 +2178,7 @@ class _PremiumLineChartPainter extends CustomPainter {
         text: TextSpan(
           text: labels[i],
           style: TextStyle(
-            color: Colors.white.withOpacity(0.48),
+            color: const Color(0xFF475569),
             fontSize: 9,
             fontWeight: FontWeight.w800,
           ),
@@ -2309,13 +2186,12 @@ class _PremiumLineChartPainter extends CustomPainter {
         textDirection: TextDirection.ltr,
       )..layout();
 
-      final labelX = (x - labelPainter.width / 2)
-          .clamp(0.0, size.width - labelPainter.width);
-
-      labelPainter.paint(
-        canvas,
-        Offset(labelX, size.height - bottom + 12),
+      final labelX = (x - labelPainter.width / 2).clamp(
+        0.0,
+        size.width - labelPainter.width,
       );
+
+      labelPainter.paint(canvas, Offset(labelX, size.height - bottom + 12));
     }
   }
 
@@ -2342,16 +2218,16 @@ class _DirectorBackground extends StatelessWidget {
   Widget build(BuildContext context) {
     return Stack(
       children: [
-        Container(color: const Color(0xFF020617)),
+        Container(color: const Color(0xFFF4F6FB)),
         Positioned(
           top: -120,
           right: -90,
-          child: _glow(const Color(0xFF22D3EE), 300),
+          child: _glow(const Color(0xFF2563EB), 300),
         ),
         Positioned(
           top: 300,
           left: -140,
-          child: _glow(const Color(0xFF7C3AED), 320),
+          child: _glow(const Color(0xFF1D4ED8), 320),
         ),
         Positioned(
           bottom: -140,
@@ -2360,9 +2236,7 @@ class _DirectorBackground extends StatelessWidget {
         ),
         BackdropFilter(
           filter: ImageFilter.blur(sigmaX: 70, sigmaY: 70),
-          child: Container(
-            color: Colors.black.withOpacity(0.08),
-          ),
+          child: Container(color: Colors.black.withOpacity(0.08)),
         ),
       ],
     );

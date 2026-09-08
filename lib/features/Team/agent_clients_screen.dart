@@ -79,9 +79,8 @@ class _AgentClientsScreenState extends State<AgentClientsScreen> {
     final query = searchText.toLowerCase().trim();
 
     return clients.where((client) {
-      final fullName =
-          "${client['nombre'] ?? ''} ${client['apellidos'] ?? ''}"
-              .toLowerCase();
+      final fullName = "${client['nombre'] ?? ''} ${client['apellidos'] ?? ''}"
+          .toLowerCase();
 
       final phone = (client['telefono'] ?? '').toString().toLowerCase();
       final email = (client['email'] ?? '').toString().toLowerCase();
@@ -110,7 +109,7 @@ class _AgentClientsScreenState extends State<AgentClientsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF07111B),
+      backgroundColor: const Color(0xFFF2FCFD),
       appBar: AppBar(
         title: Text(
           widget.agentName,
@@ -143,14 +142,12 @@ class _AgentClientsScreenState extends State<AgentClientsScreen> {
           SafeArea(
             child: loading
                 ? const Center(
-                    child: CircularProgressIndicator(
-                      color: Colors.white,
-                    ),
+                    child: CircularProgressIndicator(color: Colors.white),
                   )
                 : RefreshIndicator(
                     onRefresh: () => loadClients(isRefresh: true),
-                    color: const Color(0xFF38BDF8),
-                    backgroundColor: const Color(0xFF0F172A),
+                    color: const Color(0xFF20C7C2),
+                    backgroundColor: const Color(0xFFEAF8F8),
                     child: CustomScrollView(
                       physics: const AlwaysScrollableScrollPhysics(),
                       slivers: [
@@ -187,7 +184,7 @@ class _AgentClientsScreenState extends State<AgentClientsScreen> {
                                       child: Text(
                                         "Cartera de clientes",
                                         style: TextStyle(
-                                          color: Colors.white,
+                                          color: const Color(0xFF071A3A),
                                           fontSize: 19,
                                           fontWeight: FontWeight.w900,
                                           letterSpacing: -0.4,
@@ -203,7 +200,7 @@ class _AgentClientsScreenState extends State<AgentClientsScreen> {
                                 Text(
                                   "Pulsa sobre un cliente para abrir su ficha completa.",
                                   style: TextStyle(
-                                    color: Colors.white.withOpacity(0.58),
+                                    color: const Color(0xFF53627A),
                                     fontSize: 13,
                                     fontWeight: FontWeight.w500,
                                   ),
@@ -233,8 +230,7 @@ class _AgentClientsScreenState extends State<AgentClientsScreen> {
                                 return _ClientCard(
                                   initials: _initial(client),
                                   name: _clientName(client),
-                                  phone:
-                                      (client['telefono'] ?? '').toString(),
+                                  phone: (client['telefono'] ?? '').toString(),
                                   email: (client['email'] ?? '').toString(),
                                   onTap: () {
                                     Navigator.push(
@@ -272,11 +268,7 @@ class _ClientsBackground extends StatelessWidget {
             gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
-              colors: [
-                Color(0xFF07111B),
-                Color(0xFF0B1F2E),
-                Color(0xFF12384E),
-              ],
+              colors: [Color(0xFFF2FCFD), Color(0xFFFFFFFF), Color(0xFFFFFFFF)],
             ),
           ),
         ),
@@ -285,7 +277,7 @@ class _ClientsBackground extends StatelessWidget {
           right: -80,
           child: _GlowCircle(
             size: 230,
-            color: const Color(0xFF38BDF8).withOpacity(0.24),
+            color: const Color(0xFF20C7C2).withOpacity(0.24),
           ),
         ),
         Positioned(
@@ -293,14 +285,12 @@ class _ClientsBackground extends StatelessWidget {
           left: -90,
           child: _GlowCircle(
             size: 260,
-            color: const Color(0xFF22C55E).withOpacity(0.16),
+            color: const Color(0xFF0AAEAE).withOpacity(0.16),
           ),
         ),
         BackdropFilter(
           filter: ImageFilter.blur(sigmaX: 34, sigmaY: 34),
-          child: Container(
-            color: Colors.black.withOpacity(0.08),
-          ),
+          child: Container(color: Colors.black.withOpacity(0.08)),
         ),
       ],
     );
@@ -311,20 +301,14 @@ class _GlowCircle extends StatelessWidget {
   final double size;
   final Color color;
 
-  const _GlowCircle({
-    required this.size,
-    required this.color,
-  });
+  const _GlowCircle({required this.size, required this.color});
 
   @override
   Widget build(BuildContext context) {
     return Container(
       width: size,
       height: size,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: color,
-      ),
+      decoration: BoxDecoration(shape: BoxShape.circle, color: color),
     );
   }
 }
@@ -346,10 +330,8 @@ class _AgentHeaderPanel extends StatelessWidget {
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(28),
-        color: Colors.white.withOpacity(0.08),
-        border: Border.all(
-          color: Colors.white.withOpacity(0.10),
-        ),
+        color: Colors.white,
+        border: Border.all(color: Colors.white),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.28),
@@ -366,10 +348,7 @@ class _AgentHeaderPanel extends StatelessWidget {
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(20),
               gradient: const LinearGradient(
-                colors: [
-                  Color(0xFF38BDF8),
-                  Color(0xFF2563EB),
-                ],
+                colors: [Color(0xFF20C7C2), Color(0xFF0A7F91)],
               ),
             ),
             child: const Icon(
@@ -388,7 +367,7 @@ class _AgentHeaderPanel extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
-                    color: Colors.white,
+                    color: const Color(0xFF071A3A),
                     fontSize: 18,
                     fontWeight: FontWeight.w900,
                     letterSpacing: -0.4,
@@ -398,7 +377,7 @@ class _AgentHeaderPanel extends StatelessWidget {
                 Text(
                   "$totalClients clientes asignados",
                   style: const TextStyle(
-                    color: Colors.white60,
+                    color: const Color(0xFF64748B),
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
                   ),
@@ -425,38 +404,26 @@ class _MiniMetric extends StatelessWidget {
   final IconData icon;
   final String text;
 
-  const _MiniMetric({
-    required this.icon,
-    required this.text,
-  });
+  const _MiniMetric({required this.icon, required this.text});
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: 10,
-        vertical: 6,
-      ),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: const Color(0xFF38BDF8).withOpacity(0.13),
+        color: const Color(0xFF20C7C2).withOpacity(0.13),
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(
-          color: const Color(0xFF38BDF8).withOpacity(0.25),
-        ),
+        border: Border.all(color: const Color(0xFF20C7C2).withOpacity(0.25)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(
-            icon,
-            size: 14,
-            color: const Color(0xFF7DD3FC),
-          ),
+          Icon(icon, size: 14, color: const Color(0xFF20C7C2)),
           const SizedBox(width: 6),
           Text(
             text,
             style: const TextStyle(
-              color: Color(0xFFBAE6FD),
+              color: Color(0xFFEAF8F8),
               fontSize: 12,
               fontWeight: FontWeight.w800,
             ),
@@ -470,23 +437,21 @@ class _MiniMetric extends StatelessWidget {
 class _SearchBox extends StatelessWidget {
   final ValueChanged<String> onChanged;
 
-  const _SearchBox({
-    required this.onChanged,
-  });
+  const _SearchBox({required this.onChanged});
 
   @override
   Widget build(BuildContext context) {
     return TextField(
       onChanged: onChanged,
       style: const TextStyle(
-        color: Colors.white,
+        color: const Color(0xFF071A3A),
         fontWeight: FontWeight.w600,
       ),
-      cursorColor: const Color(0xFF38BDF8),
+      cursorColor: const Color(0xFF20C7C2),
       decoration: InputDecoration(
         hintText: 'Buscar por nombre, teléfono o email...',
         hintStyle: TextStyle(
-          color: Colors.white.withOpacity(0.42),
+          color: const Color(0xFF53627A),
           fontWeight: FontWeight.w500,
         ),
         prefixIcon: Icon(
@@ -494,23 +459,18 @@ class _SearchBox extends StatelessWidget {
           color: Colors.white.withOpacity(0.48),
         ),
         filled: true,
-        fillColor: Colors.white.withOpacity(0.075),
+        fillColor: Colors.white,
         contentPadding: const EdgeInsets.symmetric(
           horizontal: 16,
           vertical: 16,
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(20),
-          borderSide: BorderSide(
-            color: Colors.white.withOpacity(0.08),
-          ),
+          borderSide: BorderSide(color: Colors.white),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(20),
-          borderSide: const BorderSide(
-            color: Color(0xFF38BDF8),
-            width: 1.2,
-          ),
+          borderSide: const BorderSide(color: Color(0xFF20C7C2), width: 1.2),
         ),
       ),
     );
@@ -520,28 +480,21 @@ class _SearchBox extends StatelessWidget {
 class _CounterBadge extends StatelessWidget {
   final String text;
 
-  const _CounterBadge({
-    required this.text,
-  });
+  const _CounterBadge({required this.text});
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: 11,
-        vertical: 7,
-      ),
+      padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.09),
+        color: Colors.white,
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(
-          color: Colors.white.withOpacity(0.10),
-        ),
+        border: Border.all(color: Colors.white),
       ),
       child: Text(
         text,
         style: const TextStyle(
-          color: Colors.white,
+          color: const Color(0xFF071A3A),
           fontSize: 12,
           fontWeight: FontWeight.w900,
         ),
@@ -578,11 +531,9 @@ class _ClientCard extends StatelessWidget {
         child: Ink(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.075),
+            color: Colors.white,
             borderRadius: BorderRadius.circular(24),
-            border: Border.all(
-              color: Colors.white.withOpacity(0.10),
-            ),
+            border: Border.all(color: Colors.white),
           ),
           child: Row(
             children: [
@@ -592,14 +543,11 @@ class _ClientCard extends StatelessWidget {
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   gradient: const LinearGradient(
-                    colors: [
-                      Color(0xFF22C55E),
-                      Color(0xFF38BDF8),
-                    ],
+                    colors: [Color(0xFF0AAEAE), Color(0xFF20C7C2)],
                   ),
                   boxShadow: [
                     BoxShadow(
-                      color: const Color(0xFF38BDF8).withOpacity(0.18),
+                      color: const Color(0xFF20C7C2).withOpacity(0.18),
                       blurRadius: 18,
                       offset: const Offset(0, 8),
                     ),
@@ -609,7 +557,7 @@ class _ClientCard extends StatelessWidget {
                   child: Text(
                     initials,
                     style: const TextStyle(
-                      color: Colors.white,
+                      color: const Color(0xFF071A3A),
                       fontSize: 20,
                       fontWeight: FontWeight.w900,
                     ),
@@ -626,7 +574,7 @@ class _ClientCard extends StatelessWidget {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
-                        color: Colors.white,
+                        color: const Color(0xFF071A3A),
                         fontSize: 16,
                         fontWeight: FontWeight.w900,
                       ),
@@ -651,12 +599,12 @@ class _ClientCard extends StatelessWidget {
                 width: 34,
                 height: 34,
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.08),
+                  color: Colors.white,
                   shape: BoxShape.circle,
                 ),
                 child: const Icon(
                   Icons.chevron_right_rounded,
-                  color: Colors.white70,
+                  color: const Color(0xFF53627A),
                 ),
               ),
             ],
@@ -672,11 +620,7 @@ class _InfoLine extends StatelessWidget {
   final String text;
   final bool muted;
 
-  const _InfoLine({
-    required this.icon,
-    required this.text,
-    this.muted = false,
-  });
+  const _InfoLine({required this.icon, required this.text, this.muted = false});
 
   @override
   Widget build(BuildContext context) {
@@ -687,7 +631,7 @@ class _InfoLine extends StatelessWidget {
           size: 15,
           color: muted
               ? Colors.white.withOpacity(0.30)
-              : const Color(0xFF7DD3FC),
+              : const Color(0xFF20C7C2),
         ),
         const SizedBox(width: 7),
         Expanded(
@@ -712,9 +656,7 @@ class _InfoLine extends StatelessWidget {
 class _EmptyState extends StatelessWidget {
   final bool searching;
 
-  const _EmptyState({
-    required this.searching,
-  });
+  const _EmptyState({required this.searching});
 
   @override
   Widget build(BuildContext context) {
@@ -725,9 +667,7 @@ class _EmptyState extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(
-              searching
-                  ? Icons.search_off_rounded
-                  : Icons.folder_open_rounded,
+              searching ? Icons.search_off_rounded : Icons.folder_open_rounded,
               size: 58,
               color: Colors.white.withOpacity(0.35),
             ),
@@ -738,7 +678,7 @@ class _EmptyState extends StatelessWidget {
                   : "Este agente no tiene clientes",
               textAlign: TextAlign.center,
               style: const TextStyle(
-                color: Colors.white,
+                color: const Color(0xFF071A3A),
                 fontSize: 18,
                 fontWeight: FontWeight.w800,
               ),
@@ -750,7 +690,7 @@ class _EmptyState extends StatelessWidget {
                   : "Cuando este agente tenga clientes asignados aparecerán aquí.",
               textAlign: TextAlign.center,
               style: TextStyle(
-                color: Colors.white.withOpacity(0.55),
+                color: const Color(0xFF53627A),
                 fontSize: 13,
                 height: 1.4,
               ),
@@ -766,10 +706,7 @@ class _ErrorBox extends StatelessWidget {
   final String message;
   final VoidCallback onRetry;
 
-  const _ErrorBox({
-    required this.message,
-    required this.onRetry,
-  });
+  const _ErrorBox({required this.message, required this.onRetry});
 
   @override
   Widget build(BuildContext context) {
@@ -778,30 +715,22 @@ class _ErrorBox extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.redAccent.withOpacity(0.12),
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: Colors.redAccent.withOpacity(0.25),
-        ),
+        border: Border.all(color: Colors.redAccent.withOpacity(0.25)),
       ),
       child: Row(
         children: [
-          const Icon(
-            Icons.error_outline_rounded,
-            color: Colors.redAccent,
-          ),
+          const Icon(Icons.error_outline_rounded, color: Colors.redAccent),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
               message,
               style: const TextStyle(
-                color: Colors.white,
+                color: const Color(0xFF071A3A),
                 fontWeight: FontWeight.w700,
               ),
             ),
           ),
-          TextButton(
-            onPressed: onRetry,
-            child: const Text("Reintentar"),
-          ),
+          TextButton(onPressed: onRetry, child: const Text("Reintentar")),
         ],
       ),
     );

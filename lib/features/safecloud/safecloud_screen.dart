@@ -33,10 +33,10 @@ class _SafeCloudScreenState extends State<SafeCloudScreen> {
   List<Map<String, dynamic>> allFolders = [];
   List<Map<String, dynamic>> usuarios = [];
 
-  static const bg = Color(0xFF07111D);
-  static const card = Color(0xFF101C2B);
-  static const card2 = Color(0xFF132437);
-  static const blue = Color(0xFF2563EB);
+  static const bg = Color(0xFFF2FCFD);
+  static const card = Color(0xFFFFFFFF);
+  static const card2 = Color(0xFFEAF8F8);
+  static const blue = Color(0xFF0AAEAE);
 
   @override
   void initState() {
@@ -56,6 +56,9 @@ class _SafeCloudScreenState extends State<SafeCloudScreen> {
     final res = await supabase
         .from('usuarios')
         .select('id, nombre, auth_id, rol_usuario')
+        .or(
+          'estado.is.null,estado.not.in.(inactivo,Inactivo,INACTIVO,baja,Baja,BAJA,desactivado,Desactivado,DESACTIVADO,bloqueado,Bloqueado,BLOQUEADO,suspendido,Suspendido,SUSPENDIDO)',
+        )
         .neq('auth_id', user.id)
         .order('nombre');
 
@@ -107,9 +110,9 @@ class _SafeCloudScreenState extends State<SafeCloudScreen> {
               .select('item_id')
               .eq('shared_with_auth_id', user.id);
 
-          final ids = List<Map<String, dynamic>>.from(shares)
-              .map((e) => e['item_id'].toString())
-              .toList();
+          final ids = List<Map<String, dynamic>>.from(
+            shares,
+          ).map((e) => e['item_id'].toString()).toList();
 
           if (ids.isEmpty) {
             items = [];
@@ -200,7 +203,9 @@ class _SafeCloudScreenState extends State<SafeCloudScreen> {
 
     final bytes = Uint8List.fromList(utf8.encode(contenido));
 
-    await supabase.storage.from('safecloud').uploadBinary(
+    await supabase.storage
+        .from('safecloud')
+        .uploadBinary(
           storagePath,
           bytes,
           fileOptions: const FileOptions(
@@ -244,7 +249,9 @@ class _SafeCloudScreenState extends State<SafeCloudScreen> {
         final storagePath =
             "${user.id}/${DateTime.now().millisecondsSinceEpoch}_$fileName";
 
-        await supabase.storage.from('safecloud').uploadBinary(
+        await supabase.storage
+            .from('safecloud')
+            .uploadBinary(
               storagePath,
               bytes,
               fileOptions: const FileOptions(upsert: false),
@@ -276,10 +283,7 @@ class _SafeCloudScreenState extends State<SafeCloudScreen> {
         .from('safecloud')
         .createSignedUrl(storagePath, 60 * 10);
 
-    await launchUrl(
-      Uri.parse(signedUrl),
-      mode: LaunchMode.externalApplication,
-    );
+    await launchUrl(Uri.parse(signedUrl), mode: LaunchMode.externalApplication);
   }
 
   void abrirCarpeta(Map<String, dynamic> item) {
@@ -337,7 +341,7 @@ class _SafeCloudScreenState extends State<SafeCloudScreen> {
                 const Text(
                   "Compartir con compañero",
                   style: TextStyle(
-                    color: Colors.white,
+                    color: const Color(0xFF071A3A),
                     fontSize: 20,
                     fontWeight: FontWeight.w900,
                   ),
@@ -358,15 +362,13 @@ class _SafeCloudScreenState extends State<SafeCloudScreen> {
                         title: Text(
                           u['nombre'] ?? 'Sin nombre',
                           style: const TextStyle(
-                            color: Colors.white,
+                            color: const Color(0xFF071A3A),
                             fontWeight: FontWeight.w800,
                           ),
                         ),
                         subtitle: Text(
                           u['rol_usuario'] ?? '',
-                          style: TextStyle(
-                            color: Colors.white.withOpacity(0.55),
-                          ),
+                          style: TextStyle(color: const Color(0xFF53627A)),
                         ),
                         onTap: () {
                           Navigator.pop(context, u['auth_id'].toString());
@@ -391,9 +393,7 @@ class _SafeCloudScreenState extends State<SafeCloudScreen> {
     });
 
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text("Archivo/carpeta compartido correctamente"),
-      ),
+      const SnackBar(content: Text("Archivo/carpeta compartido correctamente")),
     );
   }
 
@@ -444,9 +444,7 @@ class _SafeCloudScreenState extends State<SafeCloudScreen> {
     if (ok != true) return;
 
     if (item['tipo'] == 'archivo' && item['storage_path'] != null) {
-      await supabase.storage.from('safecloud').remove([
-        item['storage_path'],
-      ]);
+      await supabase.storage.from('safecloud').remove([item['storage_path']]);
     }
 
     await supabase.from('safecloud_items').delete().eq('id', item['id']);
@@ -461,9 +459,10 @@ class _SafeCloudScreenState extends State<SafeCloudScreen> {
 
     if (destinoId == 'cancel') return;
 
-    await supabase.from('safecloud_items').update({
-      'parent_id': destinoId == 'root' ? null : destinoId,
-    }).eq('id', item['id']);
+    await supabase
+        .from('safecloud_items')
+        .update({'parent_id': destinoId == 'root' ? null : destinoId})
+        .eq('id', item['id']);
 
     loadItems();
   }
@@ -491,7 +490,7 @@ class _SafeCloudScreenState extends State<SafeCloudScreen> {
                 const Text(
                   "Mover a...",
                   style: TextStyle(
-                    color: Colors.white,
+                    color: const Color(0xFF071A3A),
                     fontSize: 20,
                     fontWeight: FontWeight.w900,
                   ),
@@ -502,7 +501,7 @@ class _SafeCloudScreenState extends State<SafeCloudScreen> {
                   leading: const Icon(Icons.home_rounded, color: Colors.white),
                   title: const Text(
                     "Inicio",
-                    style: TextStyle(color: Colors.white),
+                    style: TextStyle(color: const Color(0xFF071A3A)),
                   ),
                 ),
                 ...folders.map((f) {
@@ -514,7 +513,7 @@ class _SafeCloudScreenState extends State<SafeCloudScreen> {
                     ),
                     title: Text(
                       f['nombre'] ?? '',
-                      style: const TextStyle(color: Colors.white),
+                      style: const TextStyle(color: const Color(0xFF071A3A)),
                     ),
                   );
                 }),
@@ -545,10 +544,7 @@ class _SafeCloudScreenState extends State<SafeCloudScreen> {
         content: TextField(
           controller: controller,
           autofocus: true,
-          decoration: InputDecoration(
-            labelText: label,
-            hintText: hint,
-          ),
+          decoration: InputDecoration(labelText: label, hintText: hint),
         ),
         actions: [
           TextButton(
@@ -671,14 +667,12 @@ class _SafeCloudScreenState extends State<SafeCloudScreen> {
             _breadcrumb(),
             Expanded(
               child: loading
-                  ? const Center(
-                      child: CircularProgressIndicator(color: blue),
-                    )
+                  ? const Center(child: CircularProgressIndicator(color: blue))
                   : data.isEmpty
-                      ? _emptyState()
-                      : gridView
-                          ? _grid(data)
-                          : _list(data),
+                  ? _emptyState()
+                  : gridView
+                  ? _grid(data)
+                  : _list(data),
             ),
           ],
         ),
@@ -692,13 +686,10 @@ class _SafeCloudScreenState extends State<SafeCloudScreen> {
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
-          colors: [
-            Color(0xFF102A43),
-            Color(0xFF0B1624),
-          ],
+          colors: [Color(0xFF071A3A), Color(0xFF0A7F91)],
         ),
         borderRadius: BorderRadius.circular(26),
-        border: Border.all(color: Colors.white.withOpacity(0.08)),
+        border: Border.all(color: const Color(0xFFC7ECEC)),
       ),
       child: Row(
         children: [
@@ -719,7 +710,7 @@ class _SafeCloudScreenState extends State<SafeCloudScreen> {
                 SizedBox(height: 4),
                 Text(
                   "Tu nube interna de documentos",
-                  style: TextStyle(color: Colors.white70),
+                  style: TextStyle(color: Color(0xFFD7F7F6)),
                 ),
               ],
             ),
@@ -746,7 +737,7 @@ class _SafeCloudScreenState extends State<SafeCloudScreen> {
         decoration: BoxDecoration(
           color: card,
           borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: Colors.white.withOpacity(0.08)),
+          border: Border.all(color: const Color(0xFFC7ECEC)),
         ),
         child: Row(
           children: [
@@ -790,12 +781,16 @@ class _SafeCloudScreenState extends State<SafeCloudScreen> {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, color: Colors.white, size: 18),
+            Icon(
+              icon,
+              color: active ? Colors.white : const Color(0xFF071A3A),
+              size: 18,
+            ),
             const SizedBox(width: 7),
             Text(
               title,
               style: const TextStyle(
-                color: Colors.white,
+                color: const Color(0xFF071A3A),
                 fontWeight: FontWeight.w800,
               ),
             ),
@@ -816,19 +811,19 @@ class _SafeCloudScreenState extends State<SafeCloudScreen> {
               decoration: BoxDecoration(
                 color: card,
                 borderRadius: BorderRadius.circular(18),
-                border: Border.all(color: Colors.white.withOpacity(0.08)),
+                border: Border.all(color: const Color(0xFFC7ECEC)),
               ),
               child: TextField(
                 onChanged: (v) => setState(() => search = v),
-                style: const TextStyle(color: Colors.white),
+                style: const TextStyle(color: const Color(0xFF071A3A)),
                 decoration: InputDecoration(
                   border: InputBorder.none,
                   icon: Icon(
                     Icons.search_rounded,
-                    color: Colors.white.withOpacity(0.55),
+                    color: const Color(0xFF53627A),
                   ),
                   hintText: "Buscar en esta carpeta",
-                  hintStyle: TextStyle(color: Colors.white.withOpacity(0.45)),
+                  hintStyle: TextStyle(color: const Color(0xFF53627A)),
                 ),
               ),
             ),
@@ -838,12 +833,12 @@ class _SafeCloudScreenState extends State<SafeCloudScreen> {
             onPressed: () => setState(() => gridView = !gridView),
             icon: Icon(
               gridView ? Icons.view_list_rounded : Icons.grid_view_rounded,
-              color: Colors.white,
+              color: const Color(0xFF071A3A),
             ),
           ),
           IconButton(
             onPressed: loadItems,
-            icon: const Icon(Icons.refresh_rounded, color: Colors.white),
+            icon: const Icon(Icons.refresh_rounded, color: Color(0xFF071A3A)),
           ),
         ],
       ),
@@ -859,20 +854,22 @@ class _SafeCloudScreenState extends State<SafeCloudScreen> {
             onPressed: path.isEmpty ? null : volverAtras,
             icon: Icon(
               Icons.arrow_back_rounded,
-              color: path.isEmpty ? Colors.white24 : Colors.white,
+              color: path.isEmpty
+                  ? const Color(0xFFB7C7CE)
+                  : const Color(0xFF071A3A),
             ),
           ),
           Expanded(
             child: Text(
               path.isEmpty
                   ? sharedMode
-                      ? "Compartido conmigo"
-                      : "Mi unidad"
+                        ? "Compartido conmigo"
+                        : "Mi unidad"
                   : "${sharedMode ? 'Compartido' : 'Mi unidad'} / ${path.map((e) => e['nombre']).join(' / ')}",
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: const TextStyle(
-                color: Colors.white,
+                color: const Color(0xFF071A3A),
                 fontWeight: FontWeight.w800,
               ),
             ),
@@ -917,7 +914,7 @@ class _SafeCloudScreenState extends State<SafeCloudScreen> {
           decoration: BoxDecoration(
             color: card,
             borderRadius: BorderRadius.circular(24),
-            border: Border.all(color: Colors.white.withOpacity(0.08)),
+            border: Border.all(color: const Color(0xFFC7ECEC)),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -935,7 +932,7 @@ class _SafeCloudScreenState extends State<SafeCloudScreen> {
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
-                  color: Colors.white,
+                  color: const Color(0xFF071A3A),
                   fontWeight: FontWeight.w900,
                   fontSize: 15,
                 ),
@@ -947,7 +944,7 @@ class _SafeCloudScreenState extends State<SafeCloudScreen> {
                     child: Text(
                       isFolder ? "Carpeta" : formatSize(item['size_bytes']),
                       style: TextStyle(
-                        color: Colors.white.withOpacity(0.50),
+                        color: const Color(0xFF53627A),
                         fontSize: 12,
                       ),
                     ),
@@ -955,7 +952,7 @@ class _SafeCloudScreenState extends State<SafeCloudScreen> {
                   if (!isMine(item))
                     Icon(
                       Icons.group_rounded,
-                      color: Colors.white.withOpacity(0.55),
+                      color: const Color(0xFF53627A),
                       size: 16,
                     ),
                 ],
@@ -975,7 +972,7 @@ class _SafeCloudScreenState extends State<SafeCloudScreen> {
       decoration: BoxDecoration(
         color: card,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: Colors.white.withOpacity(0.08)),
+        border: Border.all(color: const Color(0xFFC7ECEC)),
       ),
       child: ListTile(
         onTap: () => isFolder ? abrirCarpeta(item) : abrirArchivo(item),
@@ -985,13 +982,13 @@ class _SafeCloudScreenState extends State<SafeCloudScreen> {
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
           style: const TextStyle(
-            color: Colors.white,
+            color: const Color(0xFF071A3A),
             fontWeight: FontWeight.w800,
           ),
         ),
         subtitle: Text(
           isFolder ? "Carpeta" : formatSize(item['size_bytes']),
-          style: TextStyle(color: Colors.white.withOpacity(0.5)),
+          style: TextStyle(color: const Color(0xFF53627A)),
         ),
         trailing: _menu(item),
       ),
@@ -1003,7 +1000,7 @@ class _SafeCloudScreenState extends State<SafeCloudScreen> {
 
     return PopupMenuButton<String>(
       color: card2,
-      iconColor: Colors.white70,
+      iconColor: const Color(0xFF071A3A),
       onSelected: (value) {
         if (value == 'open') {
           item['tipo'] == 'carpeta' ? abrirCarpeta(item) : abrirArchivo(item);
@@ -1016,27 +1013,42 @@ class _SafeCloudScreenState extends State<SafeCloudScreen> {
       itemBuilder: (_) => [
         const PopupMenuItem(
           value: 'open',
-          child: Text("Abrir", style: TextStyle(color: Colors.white)),
+          child: Text(
+            "Abrir",
+            style: TextStyle(color: const Color(0xFF071A3A)),
+          ),
         ),
         if (mine)
           const PopupMenuItem(
             value: 'share',
-            child: Text("Compartir", style: TextStyle(color: Colors.white)),
+            child: Text(
+              "Compartir",
+              style: TextStyle(color: const Color(0xFF071A3A)),
+            ),
           ),
         if (mine)
           const PopupMenuItem(
             value: 'rename',
-            child: Text("Renombrar", style: TextStyle(color: Colors.white)),
+            child: Text(
+              "Renombrar",
+              style: TextStyle(color: const Color(0xFF071A3A)),
+            ),
           ),
         if (mine)
           const PopupMenuItem(
             value: 'move',
-            child: Text("Mover a carpeta", style: TextStyle(color: Colors.white)),
+            child: Text(
+              "Mover a carpeta",
+              style: TextStyle(color: const Color(0xFF071A3A)),
+            ),
           ),
         if (mine)
           const PopupMenuItem(
             value: 'delete',
-            child: Text("Eliminar", style: TextStyle(color: Colors.white)),
+            child: Text(
+              "Eliminar",
+              style: TextStyle(color: const Color(0xFF071A3A)),
+            ),
           ),
       ],
     );
@@ -1060,7 +1072,7 @@ class _SafeCloudScreenState extends State<SafeCloudScreen> {
                   ? "No tienes archivos compartidos"
                   : "Esta carpeta está vacía",
               style: const TextStyle(
-                color: Colors.white,
+                color: const Color(0xFF071A3A),
                 fontSize: 21,
                 fontWeight: FontWeight.w900,
               ),
@@ -1071,7 +1083,7 @@ class _SafeCloudScreenState extends State<SafeCloudScreen> {
                   ? "Cuando un compañero comparta algo contigo aparecerá aquí."
                   : "Crea una carpeta, sube archivos o crea una nota interna.",
               textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.white.withOpacity(0.55)),
+              style: TextStyle(color: const Color(0xFF53627A)),
             ),
           ],
         ),
@@ -1143,13 +1155,13 @@ class _SafeCloudScreenState extends State<SafeCloudScreen> {
       title: Text(
         title,
         style: const TextStyle(
-          color: Colors.white,
+          color: const Color(0xFF071A3A),
           fontWeight: FontWeight.w900,
         ),
       ),
       subtitle: Text(
         subtitle,
-        style: TextStyle(color: Colors.white.withOpacity(0.55)),
+        style: TextStyle(color: const Color(0xFF53627A)),
       ),
     );
   }

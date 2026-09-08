@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:safebrok_andalucia/features/incorporaciones/incorporaciones_screen.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:safebrok_andalucia/core/storage/private_storage_reference.dart';
@@ -129,7 +130,10 @@ class _DetalleCandidatoScreenState extends State<DetalleCandidatoScreen> {
 
       final data = await supabase
           .from('usuarios')
-          .select('id, auth_id, parent_id, rol_usuario, nombre, apellidos');
+          .select('id, auth_id, parent_id, rol_usuario, nombre, apellidos')
+          .or(
+            'estado.is.null,estado.not.in.(inactivo,Inactivo,INACTIVO,baja,Baja,BAJA,desactivado,Desactivado,DESACTIVADO,bloqueado,Bloqueado,BLOQUEADO,suspendido,Suspendido,SUSPENDIDO)',
+          );
 
       final usuarios = List<Map<String, dynamic>>.from(data).map((u) {
         return <String, dynamic>{
@@ -461,6 +465,9 @@ class _DetalleCandidatoScreenState extends State<DetalleCandidatoScreen> {
       final usuarioRemitente = await supabase
           .from('usuarios')
           .select('nombre, apellidos')
+          .or(
+            'estado.is.null,estado.not.in.(inactivo,Inactivo,INACTIVO,baja,Baja,BAJA,desactivado,Desactivado,DESACTIVADO,bloqueado,Bloqueado,BLOQUEADO,suspendido,Suspendido,SUSPENDIDO)',
+          )
           .eq('auth_id', remitenteAuthId)
           .maybeSingle();
 
@@ -995,6 +1002,27 @@ class _DetalleCandidatoScreenState extends State<DetalleCandidatoScreen> {
                         _responsableCard(),
                         const SizedBox(height: 18),
                         _pipelineCard(color),
+                        if (estado == 'SELECCIONADO') ...[
+                          const SizedBox(height: 18),
+                          Card(
+                            child: ListTile(
+                              leading: const Icon(Icons.badge_outlined),
+                              title: const Text('Iniciar incorporación'),
+                              subtitle: const Text(
+                                'Datos, figura, responsable y documentación',
+                              ),
+                              trailing: const Icon(Icons.chevron_right),
+                              onTap: () => Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => IncorporacionWizard(
+                                    candidate: widget.candidato,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
                         const SizedBox(height: 18),
                         _datesCard(),
                         const SizedBox(height: 18),

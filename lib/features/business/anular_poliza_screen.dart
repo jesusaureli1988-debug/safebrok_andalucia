@@ -54,18 +54,14 @@ class _AnularPolizaScreenState extends State<AnularPolizaScreen> {
 
   void _snack(String msg) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(msg)),
-    );
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
   }
 
   bool get recibosAnulados {
     if (recibos.isEmpty) return true;
 
     return recibos.every((r) {
-      final estado = _text(
-        r['estado_recibo'] ?? r['estado'],
-      ).toUpperCase();
+      final estado = _text(r['estado_recibo'] ?? r['estado']).toUpperCase();
 
       return estado == 'ANULADO' || estado == 'ANULADA';
     });
@@ -120,9 +116,7 @@ class _AnularPolizaScreenState extends State<AnularPolizaScreen> {
 
         final c = v['clientes'] as Map<String, dynamic>?;
 
-        final dni = normalizarBusqueda(
-          c?['dni']?.toString() ?? '',
-        );
+        final dni = normalizarBusqueda(c?['dni']?.toString() ?? '');
 
         if (numeroPoliza.contains(busqueda) || dni.contains(busqueda)) {
           ventaEncontrada = v;
@@ -162,9 +156,9 @@ class _AnularPolizaScreenState extends State<AnularPolizaScreen> {
     }
 
     final data = await supabase
-    .from('recibos')
-    .select()
-    .eq('poliza', numeroPoliza);
+        .from('recibos')
+        .select()
+        .eq('poliza', numeroPoliza);
 
     setState(() {
       recibos = List<Map<String, dynamic>>.from(data);
@@ -205,67 +199,67 @@ class _AnularPolizaScreenState extends State<AnularPolizaScreen> {
   }
 
   Future<void> anularRecibos() async {
-  if (venta == null) return;
+    if (venta == null) return;
 
-  final numeroPoliza = venta?['numero_poliza']?.toString();
+    final numeroPoliza = venta?['numero_poliza']?.toString();
 
-  if (numeroPoliza == null || numeroPoliza.trim().isEmpty) {
-    _snack('La póliza no tiene número');
-    return;
+    if (numeroPoliza == null || numeroPoliza.trim().isEmpty) {
+      _snack('La póliza no tiene número');
+      return;
+    }
+
+    setState(() => anulandoRecibos = true);
+
+    try {
+      final user = supabase.auth.currentUser;
+
+      await supabase
+          .from('recibos')
+          .update({
+            'estado_recibo': 'ANULADO',
+            'fecha_anulacion': DateTime.now().toIso8601String(),
+            'motivo_anulacion': motivoCtrl.text.trim(),
+            'observaciones_anulacion': observacionesCtrl.text.trim(),
+            'anulado_por': user?.id,
+          })
+          .eq('poliza', numeroPoliza);
+
+      await cargarRecibos();
+
+      _snack('Recibos anulados correctamente');
+    } catch (e) {
+      _snack('Error anulando recibos: $e');
+    } finally {
+      if (mounted) setState(() => anulandoRecibos = false);
+    }
   }
-
-  setState(() => anulandoRecibos = true);
-
-  try {
-    final user = supabase.auth.currentUser;
-
-    await supabase
-        .from('recibos')
-        .update({
-          'estado_recibo': 'ANULADO',
-          'fecha_anulacion': DateTime.now().toIso8601String(),
-          'motivo_anulacion': motivoCtrl.text.trim(),
-          'observaciones_anulacion': observacionesCtrl.text.trim(),
-          'anulado_por': user?.id,
-        })
-        .eq('poliza', numeroPoliza);
-
-    await cargarRecibos();
-
-    _snack('Recibos anulados correctamente');
-  } catch (e) {
-    _snack('Error anulando recibos: $e');
-  } finally {
-    if (mounted) setState(() => anulandoRecibos = false);
-  }
-}
 
   Future<void> anularUnRecibo(Map<String, dynamic> recibo) async {
-  setState(() => anulandoRecibos = true);
+    setState(() => anulandoRecibos = true);
 
-  try {
-    final user = supabase.auth.currentUser;
+    try {
+      final user = supabase.auth.currentUser;
 
-    await supabase
-        .from('recibos')
-        .update({
-          'estado_recibo': 'ANULADO',
-          'fecha_anulacion': DateTime.now().toIso8601String(),
-          'motivo_anulacion': motivoCtrl.text.trim(),
-          'observaciones_anulacion': observacionesCtrl.text.trim(),
-          'anulado_por': user?.id,
-        })
-        .eq('id', recibo['id']);
+      await supabase
+          .from('recibos')
+          .update({
+            'estado_recibo': 'ANULADO',
+            'fecha_anulacion': DateTime.now().toIso8601String(),
+            'motivo_anulacion': motivoCtrl.text.trim(),
+            'observaciones_anulacion': observacionesCtrl.text.trim(),
+            'anulado_por': user?.id,
+          })
+          .eq('id', recibo['id']);
 
-    await cargarRecibos();
+      await cargarRecibos();
 
-    _snack('Recibo anulado correctamente');
-  } catch (e) {
-    _snack('Error anulando recibo: $e');
-  } finally {
-    if (mounted) setState(() => anulandoRecibos = false);
+      _snack('Recibo anulado correctamente');
+    } catch (e) {
+      _snack('Error anulando recibo: $e');
+    } finally {
+      if (mounted) setState(() => anulandoRecibos = false);
+    }
   }
-}
 
   Future<void> anularPoliza() async {
     if (venta == null) return;
@@ -320,27 +314,31 @@ class _AnularPolizaScreenState extends State<AnularPolizaScreen> {
           .select()
           .single();
 
-      await supabase.from('ventas').update({
-        'estado_poliza': 'ANULADA',
-        'fecha_anulacion': DateTime.now().toIso8601String(),
-        'motivo_anulacion': motivoCtrl.text.trim(),
-        'observaciones_anulacion': observacionesCtrl.text.trim(),
-        'prima_extornada': extorno['prima_extornada'],
-        'comision_extornada': extorno['comision_extornada'],
-        'anulacion_id': anulacion['id'],
-        'anulada_por': user?.id,
-      }).eq('id', venta?['id']);
+      await supabase
+          .from('ventas')
+          .update({
+            'estado_poliza': 'ANULADA',
+            'fecha_anulacion': DateTime.now().toIso8601String(),
+            'motivo_anulacion': motivoCtrl.text.trim(),
+            'observaciones_anulacion': observacionesCtrl.text.trim(),
+            'prima_extornada': extorno['prima_extornada'],
+            'comision_extornada': extorno['comision_extornada'],
+            'anulacion_id': anulacion['id'],
+            'anulada_por': user?.id,
+          })
+          .eq('id', venta?['id']);
 
-     final numeroPoliza = venta?['numero_poliza']?.toString();
+      final numeroPoliza = venta?['numero_poliza']?.toString();
 
-if (numeroPoliza == null || numeroPoliza.trim().isEmpty) {
-  _snack('La póliza no tiene número');
-  return;
-}
+      if (numeroPoliza == null || numeroPoliza.trim().isEmpty) {
+        _snack('La póliza no tiene número');
+        return;
+      }
 
-await supabase.from('recibos').update({
-  'anulacion_id': anulacion['id'],
-}).eq('poliza', numeroPoliza);
+      await supabase
+          .from('recibos')
+          .update({'anulacion_id': anulacion['id']})
+          .eq('poliza', numeroPoliza);
 
       // El aviso comienza únicamente después de completar la anulación.
       // Gestiona sus propios errores y nunca revierte la operación principal.
@@ -384,7 +382,10 @@ await supabase.from('recibos').update({
 
       final usuariosResponse = await supabase
           .from('usuarios')
-          .select('id, auth_id, parent_id');
+          .select('id, auth_id, parent_id')
+          .or(
+            'estado.is.null,estado.not.in.(inactivo,Inactivo,INACTIVO,baja,Baja,BAJA,desactivado,Desactivado,DESACTIVADO,bloqueado,Bloqueado,BLOQUEADO,suspendido,Suspendido,SUSPENDIDO)',
+          );
 
       final usuarios = List<Map<String, dynamic>>.from(usuariosResponse);
       final usuariosPorId = <String, Map<String, dynamic>>{};
@@ -400,13 +401,11 @@ await supabase.from('recibos').update({
 
       final destinatarios = <String>{agenteAuthId};
       final idsVisitados = <String>{};
-      Map<String, dynamic>? usuarioActual =
-          usuariosPorAuthId[agenteAuthId];
+      Map<String, dynamic>? usuarioActual = usuariosPorAuthId[agenteAuthId];
 
       while (usuarioActual != null) {
         final id = usuarioActual['id']?.toString().trim() ?? '';
-        final authId =
-            usuarioActual['auth_id']?.toString().trim() ?? '';
+        final authId = usuarioActual['auth_id']?.toString().trim() ?? '';
 
         if (id.isNotEmpty && !idsVisitados.add(id)) {
           debugPrint(
@@ -417,33 +416,30 @@ await supabase.from('recibos').update({
 
         if (authId.isNotEmpty) destinatarios.add(authId);
 
-        final parentId =
-            usuarioActual['parent_id']?.toString().trim() ?? '';
-        usuarioActual =
-            parentId.isEmpty ? null : usuariosPorId[parentId];
+        final parentId = usuarioActual['parent_id']?.toString().trim() ?? '';
+        usuarioActual = parentId.isEmpty ? null : usuariosPorId[parentId];
       }
 
       final numeroPoliza =
           ventaAnulada['numero_poliza']?.toString().trim() ?? '';
-      final producto =
-          ventaAnulada['producto']?.toString().trim() ?? '';
-      final compania =
-          ventaAnulada['compania']?.toString().trim() ?? '';
+      final producto = ventaAnulada['producto']?.toString().trim() ?? '';
+      final compania = ventaAnulada['compania']?.toString().trim() ?? '';
 
       final partesNombre = [
         clienteAnulado?['nombre']?.toString().trim() ?? '',
         clienteAnulado?['apellidos']?.toString().trim() ?? '',
       ].where((parte) => parte.isNotEmpty).toList();
 
-      final nombreCliente =
-          partesNombre.isEmpty ? 'Cliente' : partesNombre.join(' ');
+      final nombreCliente = partesNombre.isEmpty
+          ? 'Cliente'
+          : partesNombre.join(' ');
       final primaExtornada = _money(extorno['prima_extornada']);
       final comisionExtornada = _money(extorno['comision_extornada']);
 
       final detalleExtorno = primaExtornada > 0 || comisionExtornada > 0
           ? ' Extorno calculado: prima '
-              '${primaExtornada.toStringAsFixed(2)} € y comisión '
-              '${comisionExtornada.toStringAsFixed(2)} €.'
+                '${primaExtornada.toStringAsFixed(2)} € y comisión '
+                '${comisionExtornada.toStringAsFixed(2)} €.'
           : '';
 
       final mensaje =
@@ -473,9 +469,7 @@ await supabase.from('recibos').update({
             },
           );
         } catch (errorPush) {
-          debugPrint(
-            'ERROR PUSH PÓLIZA ANULADA A $authIdDestino: $errorPush',
-          );
+          debugPrint('ERROR PUSH PÓLIZA ANULADA A $authIdDestino: $errorPush');
         }
       }
     } catch (error) {
@@ -503,14 +497,9 @@ await supabase.from('recibos').update({
                   Expanded(
                     child: Row(
                       children: [
-                        SizedBox(
-                          width: 390,
-                          child: _formularioBusqueda(),
-                        ),
+                        SizedBox(width: 390, child: _formularioBusqueda()),
                         const SizedBox(width: 20),
-                        Expanded(
-                          child: _resultado(extorno),
-                        ),
+                        Expanded(child: _resultado(extorno)),
                       ],
                     ),
                   ),
@@ -627,11 +616,7 @@ await supabase.from('recibos').update({
             ),
           ),
           const SizedBox(height: 24),
-          _input(
-            motivoCtrl,
-            'Motivo de anulación',
-            Icons.edit_note_rounded,
-          ),
+          _input(motivoCtrl, 'Motivo de anulación', Icons.edit_note_rounded),
           _input(
             observacionesCtrl,
             'Observaciones',
@@ -695,20 +680,32 @@ await supabase.from('recibos').update({
                 spacing: 14,
                 runSpacing: 14,
                 children: [
-                  _dataCard('Póliza', _text(venta?['numero_poliza']),
-                      Icons.confirmation_number_rounded),
-                  _dataCard('Estado', _text(venta?['estado_poliza']),
-                      Icons.info_rounded),
-                  _dataCard('Cliente',
-                      '${_text(cliente?['nombre'])} ${_text(cliente?['apellidos'])}',
-                      Icons.person_rounded),
-                  _dataCard('DNI', _text(cliente?['dni']),
-                      Icons.badge_rounded),
-                  _dataCard('Producto', _text(venta?['producto']),
-                      Icons.inventory_2_rounded),
-                  _dataCard('Fecha efecto',
-                      _text(venta?['fecha_efecto']).split('T').first,
-                      Icons.calendar_month_rounded),
+                  _dataCard(
+                    'Póliza',
+                    _text(venta?['numero_poliza']),
+                    Icons.confirmation_number_rounded,
+                  ),
+                  _dataCard(
+                    'Estado',
+                    _text(venta?['estado_poliza']),
+                    Icons.info_rounded,
+                  ),
+                  _dataCard(
+                    'Cliente',
+                    '${_text(cliente?['nombre'])} ${_text(cliente?['apellidos'])}',
+                    Icons.person_rounded,
+                  ),
+                  _dataCard('DNI', _text(cliente?['dni']), Icons.badge_rounded),
+                  _dataCard(
+                    'Producto',
+                    _text(venta?['producto']),
+                    Icons.inventory_2_rounded,
+                  ),
+                  _dataCard(
+                    'Fecha efecto',
+                    _text(venta?['fecha_efecto']).split('T').first,
+                    Icons.calendar_month_rounded,
+                  ),
                 ],
               ),
             ],
@@ -738,66 +735,66 @@ await supabase.from('recibos').update({
         ),
         const SizedBox(height: 18),
         _glassPanel(
-  child: Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      _moduleTitle(
-        Icons.receipt_long_rounded,
-        'Recibos asociados',
-        'Revisa y anula los recibos antes de anular la póliza.',
-      ),
-      const SizedBox(height: 18),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _moduleTitle(
+                Icons.receipt_long_rounded,
+                'Recibos asociados',
+                'Revisa y anula los recibos antes de anular la póliza.',
+              ),
+              const SizedBox(height: 18),
 
-      _resumenRecibos(),
+              _resumenRecibos(),
 
-      const SizedBox(height: 18),
+              const SizedBox(height: 18),
 
-      if (recibos.isEmpty)
-        const Text(
-          'No hay recibos asociados a esta póliza.',
-          style: TextStyle(
-            color: Color(0xFF64748B),
-            fontWeight: FontWeight.w700,
-          ),
-        )
-      else
-        _tablaRecibos(),
-
-      const SizedBox(height: 18),
-
-      SizedBox(
-        width: double.infinity,
-        height: 54,
-        child: ElevatedButton.icon(
-          onPressed: anulandoRecibos ? null : anularRecibos,
-          icon: anulandoRecibos
-              ? const SizedBox(
-                  width: 18,
-                  height: 18,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    color: Colors.white,
+              if (recibos.isEmpty)
+                const Text(
+                  'No hay recibos asociados a esta póliza.',
+                  style: TextStyle(
+                    color: Color(0xFF64748B),
+                    fontWeight: FontWeight.w700,
                   ),
                 )
-              : const Icon(Icons.done_all_rounded),
-          label: Text(
-            anulandoRecibos
-                ? 'Anulando recibos...'
-                : 'Anular todos los recibos',
-            style: const TextStyle(fontWeight: FontWeight.w900),
-          ),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: const Color(0xFFF97316),
-            foregroundColor: Colors.white,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(18),
-            ),
+              else
+                _tablaRecibos(),
+
+              const SizedBox(height: 18),
+
+              SizedBox(
+                width: double.infinity,
+                height: 54,
+                child: ElevatedButton.icon(
+                  onPressed: anulandoRecibos ? null : anularRecibos,
+                  icon: anulandoRecibos
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Icon(Icons.done_all_rounded),
+                  label: Text(
+                    anulandoRecibos
+                        ? 'Anulando recibos...'
+                        : 'Anular todos los recibos',
+                    style: const TextStyle(fontWeight: FontWeight.w900),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFF97316),
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(18),
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
-      ),
-    ],
-  ),
-),
         const SizedBox(height: 18),
         _glassPanel(
           child: Column(
@@ -862,8 +859,9 @@ await supabase.from('recibos').update({
                 width: double.infinity,
                 height: 58,
                 child: ElevatedButton.icon(
-                  onPressed:
-                      recibosAnulados && !anulandoPoliza ? anularPoliza : null,
+                  onPressed: recibosAnulados && !anulandoPoliza
+                      ? anularPoliza
+                      : null,
                   icon: anulandoPoliza
                       ? const SizedBox(
                           width: 18,
@@ -936,7 +934,9 @@ await supabase.from('recibos').update({
           Text(
             estado,
             style: TextStyle(
-              color: anulado ? const Color(0xFF16A34A) : const Color(0xFFF97316),
+              color: anulado
+                  ? const Color(0xFF16A34A)
+                  : const Color(0xFFF97316),
               fontWeight: FontWeight.w900,
             ),
           ),
@@ -946,137 +946,146 @@ await supabase.from('recibos').update({
   }
 
   Widget _resumenRecibos() {
-  final total = recibos.length;
-  final anulados = recibos.where((r) {
-    final estado = _text(r['estado_recibo'] ?? r['estado']).toUpperCase();
-    return estado == 'ANULADO' || estado == 'ANULADA';
-  }).length;
+    final total = recibos.length;
+    final anulados = recibos.where((r) {
+      final estado = _text(r['estado_recibo'] ?? r['estado']).toUpperCase();
+      return estado == 'ANULADO' || estado == 'ANULADA';
+    }).length;
 
-  return Container(
-    width: double.infinity,
-    padding: const EdgeInsets.all(18),
-    decoration: BoxDecoration(
-      color: recibosAnulados ? const Color(0xFFDCFCE7) : const Color(0xFFFFEDD5),
-      borderRadius: BorderRadius.circular(20),
-    ),
-    child: Row(
-      children: [
-        Icon(
-          recibosAnulados
-              ? Icons.check_circle_rounded
-              : Icons.warning_amber_rounded,
-          color: recibosAnulados
-              ? const Color(0xFF16A34A)
-              : const Color(0xFFF97316),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Text(
-            'Recibos anulados: $anulados / $total',
-            style: TextStyle(
-              color: recibosAnulados
-                  ? const Color(0xFF166534)
-                  : const Color(0xFF9A3412),
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-        ),
-      ],
-    ),
-  );
-}
-
-Widget _tablaRecibos() {
-  return ClipRRect(
-    borderRadius: BorderRadius.circular(20),
-    child: Container(
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+        color: recibosAnulados
+            ? const Color(0xFFDCFCE7)
+            : const Color(0xFFFFEDD5),
         borderRadius: BorderRadius.circular(20),
       ),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: DataTable(
-          headingRowColor: WidgetStateProperty.all(const Color(0xFFF8FAFC)),
-          columns: const [
-            DataColumn(label: Text('Recibo')),
-            DataColumn(label: Text('Vencimiento')),
-            DataColumn(label: Text('Importe')),
-            DataColumn(label: Text('Estado')),
-            DataColumn(label: Text('Acción')),
-          ],
-          rows: recibos.map((r) {
-            final estado = _text(r['estado_recibo'] ?? r['estado']);
-            final anulado = estado.toUpperCase() == 'ANULADO' ||
-                estado.toUpperCase() == 'ANULADA';
+      child: Row(
+        children: [
+          Icon(
+            recibosAnulados
+                ? Icons.check_circle_rounded
+                : Icons.warning_amber_rounded,
+            color: recibosAnulados
+                ? const Color(0xFF16A34A)
+                : const Color(0xFFF97316),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              'Recibos anulados: $anulados / $total',
+              style: TextStyle(
+                color: recibosAnulados
+                    ? const Color(0xFF166534)
+                    : const Color(0xFF9A3412),
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
-            return DataRow(
-              cells: [
-                DataCell(Text(_text(r['numero_recibo'] ?? r['id']))),
-                DataCell(Text(_text(
-                  r['fecha_vencimiento'] ??
-                      r['vencimiento'] ??
-                      r['fecha'] ??
-                      '-',
-                ).split('T').first)),
-                DataCell(Text(
-                  '${_money(r['importe'] ?? r['prima'] ?? r['total']).toStringAsFixed(2)} €',
-                )),
-                DataCell(
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 6,
+  Widget _tablaRecibos() {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(20),
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          border: Border.all(color: const Color(0xFFE2E8F0)),
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: DataTable(
+            headingRowColor: WidgetStateProperty.all(const Color(0xFFF8FAFC)),
+            columns: const [
+              DataColumn(label: Text('Recibo')),
+              DataColumn(label: Text('Vencimiento')),
+              DataColumn(label: Text('Importe')),
+              DataColumn(label: Text('Estado')),
+              DataColumn(label: Text('Acción')),
+            ],
+            rows: recibos.map((r) {
+              final estado = _text(r['estado_recibo'] ?? r['estado']);
+              final anulado =
+                  estado.toUpperCase() == 'ANULADO' ||
+                  estado.toUpperCase() == 'ANULADA';
+
+              return DataRow(
+                cells: [
+                  DataCell(Text(_text(r['numero_recibo'] ?? r['id']))),
+                  DataCell(
+                    Text(
+                      _text(
+                        r['fecha_vencimiento'] ??
+                            r['vencimiento'] ??
+                            r['fecha'] ??
+                            '-',
+                      ).split('T').first,
                     ),
-                    decoration: BoxDecoration(
-                      color: anulado
-                          ? const Color(0xFFDCFCE7)
-                          : const Color(0xFFFFEDD5),
-                      borderRadius: BorderRadius.circular(30),
+                  ),
+                  DataCell(
+                    Text(
+                      '${_money(r['importe'] ?? r['prima'] ?? r['total']).toStringAsFixed(2)} €',
                     ),
-                    child: Text(
-                      estado,
-                      style: TextStyle(
+                  ),
+                  DataCell(
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
                         color: anulado
-                            ? const Color(0xFF166534)
-                            : const Color(0xFF9A3412),
-                        fontWeight: FontWeight.w900,
-                        fontSize: 12,
+                            ? const Color(0xFFDCFCE7)
+                            : const Color(0xFFFFEDD5),
+                        borderRadius: BorderRadius.circular(30),
+                      ),
+                      child: Text(
+                        estado,
+                        style: TextStyle(
+                          color: anulado
+                              ? const Color(0xFF166534)
+                              : const Color(0xFF9A3412),
+                          fontWeight: FontWeight.w900,
+                          fontSize: 12,
+                        ),
                       ),
                     ),
                   ),
-                ),
-                DataCell(
-                  anulado
-                      ? const Icon(
-                          Icons.lock_rounded,
-                          color: Color(0xFF94A3B8),
-                        )
-                      : ElevatedButton.icon(
-                          onPressed: anulandoRecibos
-                              ? null
-                              : () => anularUnRecibo(r),
-                          icon: const Icon(Icons.block_rounded, size: 16),
-                          label: const Text('Anular'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFFDC2626),
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 10,
+                  DataCell(
+                    anulado
+                        ? const Icon(
+                            Icons.lock_rounded,
+                            color: Color(0xFF94A3B8),
+                          )
+                        : ElevatedButton.icon(
+                            onPressed: anulandoRecibos
+                                ? null
+                                : () => anularUnRecibo(r),
+                            icon: const Icon(Icons.block_rounded, size: 16),
+                            label: const Text('Anular'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFFDC2626),
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 10,
+                              ),
                             ),
                           ),
-                        ),
-                ),
-              ],
-            );
-          }).toList(),
+                  ),
+                ],
+              );
+            }).toList(),
+          ),
         ),
       ),
-    ),
-  );
-}
+    );
+  }
 
   Widget _input(
     TextEditingController controller,
@@ -1125,10 +1134,7 @@ Widget _tablaRecibos() {
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(20),
             gradient: const LinearGradient(
-              colors: [
-                Color(0xFFDC2626),
-                Color(0xFFFB7185),
-              ],
+              colors: [Color(0xFFDC2626), Color(0xFFFB7185)],
             ),
           ),
           child: Icon(icon, color: Colors.white, size: 29),

@@ -6,7 +6,7 @@ class SupportScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF08121C),
+      backgroundColor: const Color(0xFFF2FCFD),
 
       appBar: AppBar(
         backgroundColor: Colors.transparent,
@@ -16,26 +16,21 @@ class SupportScreen extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-
           /// HEADER
           Container(
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.08),
+              color: Colors.white,
               borderRadius: BorderRadius.circular(20),
             ),
             child: const Column(
               children: [
-                Icon(
-                  Icons.support_agent,
-                  color: Colors.cyanAccent,
-                  size: 60,
-                ),
+                Icon(Icons.support_agent, color: Colors.cyanAccent, size: 60),
                 SizedBox(height: 12),
                 Text(
                   "¿Necesitas ayuda?",
                   style: TextStyle(
-                    color: Colors.white,
+                    color: const Color(0xFF071A3A),
                     fontSize: 22,
                     fontWeight: FontWeight.bold,
                   ),
@@ -43,9 +38,7 @@ class SupportScreen extends StatelessWidget {
                 SizedBox(height: 6),
                 Text(
                   "Estamos aquí para ayudarte",
-                  style: TextStyle(
-                    color: Colors.white70,
-                  ),
+                  style: TextStyle(color: const Color(0xFF53627A)),
                 ),
               ],
             ),
@@ -131,7 +124,7 @@ class SupportScreen extends StatelessWidget {
       child: Text(
         title,
         style: const TextStyle(
-          color: Colors.white,
+          color: const Color(0xFF071A3A),
           fontSize: 18,
           fontWeight: FontWeight.bold,
         ),
@@ -148,29 +141,22 @@ class SupportScreen extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.08),
+        color: Colors.white,
         borderRadius: BorderRadius.circular(16),
       ),
       child: ListTile(
-        leading: Icon(
-          icon,
-          color: Colors.cyanAccent,
-        ),
+        leading: Icon(icon, color: Colors.cyanAccent),
         title: Text(
           title,
-          style: const TextStyle(
-            color: Colors.white,
-          ),
+          style: const TextStyle(color: const Color(0xFF071A3A)),
         ),
         subtitle: Text(
           subtitle,
-          style: const TextStyle(
-            color: Colors.white60,
-          ),
+          style: const TextStyle(color: const Color(0xFF64748B)),
         ),
         trailing: const Icon(
           Icons.arrow_forward_ios,
-          color: Colors.white38,
+          color: const Color(0xFF78909C),
           size: 16,
         ),
         onTap: onTap,

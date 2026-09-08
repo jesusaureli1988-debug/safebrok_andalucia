@@ -57,6 +57,9 @@ class _RatiosEquipoScreenState extends State<RatiosEquipoScreen> {
       final jefe = await supabase
           .from('usuarios')
           .select()
+          .or(
+            'estado.is.null,estado.not.in.(inactivo,Inactivo,INACTIVO,baja,Baja,BAJA,desactivado,Desactivado,DESACTIVADO,bloqueado,Bloqueado,BLOQUEADO,suspendido,Suspendido,SUSPENDIDO)',
+          )
           .eq('auth_id', user.id)
           .single();
 
@@ -65,6 +68,9 @@ class _RatiosEquipoScreenState extends State<RatiosEquipoScreen> {
       final agentes = await supabase
           .from('usuarios')
           .select()
+          .or(
+            'estado.is.null,estado.not.in.(inactivo,Inactivo,INACTIVO,baja,Baja,BAJA,desactivado,Desactivado,DESACTIVADO,bloqueado,Bloqueado,BLOQUEADO,suspendido,Suspendido,SUSPENDIDO)',
+          )
           .eq('parent_id', jefeId)
           .eq('rol_usuario', 'agente')
           .order('nombre', ascending: true);
@@ -141,8 +147,8 @@ class _RatiosEquipoScreenState extends State<RatiosEquipoScreen> {
   }
 
   Color colorRatio(double ratio) {
-    if (ratio >= 20) return const Color(0xFF86EFAC);
-    if (ratio >= 10) return const Color(0xFFFBBF24);
+    if (ratio >= 20) return const Color(0xFF20C7C2);
+    if (ratio >= 10) return const Color(0xFF0A7F91);
     return Colors.redAccent;
   }
 
@@ -167,7 +173,7 @@ class _RatiosEquipoScreenState extends State<RatiosEquipoScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF07111B),
+      backgroundColor: const Color(0xFFF2FCFD),
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -175,7 +181,7 @@ class _RatiosEquipoScreenState extends State<RatiosEquipoScreen> {
         title: const Text(
           "Ratios del equipo",
           style: TextStyle(
-            color: Colors.white,
+            color: const Color(0xFF071A3A),
             fontWeight: FontWeight.w900,
             letterSpacing: -0.4,
           ),
@@ -203,8 +209,8 @@ class _RatiosEquipoScreenState extends State<RatiosEquipoScreen> {
                     child: CircularProgressIndicator(color: Colors.white),
                   )
                 : RefreshIndicator(
-                    color: const Color(0xFF38BDF8),
-                    backgroundColor: const Color(0xFF0F172A),
+                    color: const Color(0xFF20C7C2),
+                    backgroundColor: const Color(0xFFEAF8F8),
                     onRefresh: () => cargarDatos(isRefresh: true),
                     child: ListView(
                       physics: const AlwaysScrollableScrollPhysics(),
@@ -241,24 +247,21 @@ class _RatiosEquipoScreenState extends State<RatiosEquipoScreen> {
                         if (agentesRatios.isEmpty)
                           const _EmptyState()
                         else
-                          ...List.generate(
-                            agentesRatios.length,
-                            (index) {
-                              final a = agentesRatios[index];
-                              final ratio = a['ratio'] as double;
+                          ...List.generate(agentesRatios.length, (index) {
+                            final a = agentesRatios[index];
+                            final ratio = a['ratio'] as double;
 
-                              return _AgentRatioCard(
-                                position: index + 1,
-                                medal: medalla(index),
-                                nombre: a['nombre'],
-                                contactos: a['contactos'],
-                                positivos: a['positivos'],
-                                ratio: ratio,
-                                color: colorRatio(ratio),
-                                estado: estadoRatio(ratio),
-                              );
-                            },
-                          ),
+                            return _AgentRatioCard(
+                              position: index + 1,
+                              medal: medalla(index),
+                              nombre: a['nombre'],
+                              contactos: a['contactos'],
+                              positivos: a['positivos'],
+                              ratio: ratio,
+                              color: colorRatio(ratio),
+                              estado: estadoRatio(ratio),
+                            );
+                          }),
                       ],
                     ),
                   ),
@@ -281,11 +284,7 @@ class _PremiumBackground extends StatelessWidget {
             gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
-              colors: [
-                Color(0xFF07111B),
-                Color(0xFF0B1F2E),
-                Color(0xFF12384E),
-              ],
+              colors: [Color(0xFFF2FCFD), Color(0xFFFFFFFF), Color(0xFFFFFFFF)],
             ),
           ),
         ),
@@ -294,7 +293,7 @@ class _PremiumBackground extends StatelessWidget {
           right: -80,
           child: _GlowCircle(
             size: 230,
-            color: const Color(0xFF38BDF8).withOpacity(0.24),
+            color: const Color(0xFF20C7C2).withOpacity(0.24),
           ),
         ),
         Positioned(
@@ -302,14 +301,12 @@ class _PremiumBackground extends StatelessWidget {
           left: -90,
           child: _GlowCircle(
             size: 260,
-            color: const Color(0xFF22C55E).withOpacity(0.16),
+            color: const Color(0xFF0AAEAE).withOpacity(0.16),
           ),
         ),
         BackdropFilter(
           filter: ImageFilter.blur(sigmaX: 34, sigmaY: 34),
-          child: Container(
-            color: Colors.black.withOpacity(0.08),
-          ),
+          child: Container(color: Colors.black.withOpacity(0.08)),
         ),
       ],
     );
@@ -320,20 +317,14 @@ class _GlowCircle extends StatelessWidget {
   final double size;
   final Color color;
 
-  const _GlowCircle({
-    required this.size,
-    required this.color,
-  });
+  const _GlowCircle({required this.size, required this.color});
 
   @override
   Widget build(BuildContext context) {
     return Container(
       width: size,
       height: size,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: color,
-      ),
+      decoration: BoxDecoration(shape: BoxShape.circle, color: color),
     );
   }
 }
@@ -363,10 +354,8 @@ class _HeaderPanel extends StatelessWidget {
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(30),
-        color: Colors.white.withOpacity(0.08),
-        border: Border.all(
-          color: Colors.white.withOpacity(0.10),
-        ),
+        color: Colors.white,
+        border: Border.all(color: Colors.white),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.28),
@@ -386,10 +375,7 @@ class _HeaderPanel extends StatelessWidget {
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(20),
                   gradient: const LinearGradient(
-                    colors: [
-                      Color(0xFF38BDF8),
-                      Color(0xFF2563EB),
-                    ],
+                    colors: [Color(0xFF20C7C2), Color(0xFF0A7F91)],
                   ),
                 ),
                 child: const Icon(
@@ -406,7 +392,7 @@ class _HeaderPanel extends StatelessWidget {
                     Text(
                       "Ratio medio equipo",
                       style: TextStyle(
-                        color: Colors.white,
+                        color: const Color(0xFF071A3A),
                         fontSize: 20,
                         fontWeight: FontWeight.w900,
                         letterSpacing: -0.5,
@@ -416,7 +402,7 @@ class _HeaderPanel extends StatelessWidget {
                     Text(
                       "Contactos positivos sobre contactos totales",
                       style: TextStyle(
-                        color: Colors.white60,
+                        color: const Color(0xFF64748B),
                         fontSize: 13,
                         fontWeight: FontWeight.w500,
                       ),
@@ -442,10 +428,7 @@ class _HeaderPanel extends StatelessWidget {
               const SizedBox(width: 10),
               Padding(
                 padding: const EdgeInsets.only(bottom: 8),
-                child: _StatusChip(
-                  text: estado,
-                  color: color,
-                ),
+                child: _StatusChip(text: estado, color: color),
               ),
             ],
           ),
@@ -455,7 +438,7 @@ class _HeaderPanel extends StatelessWidget {
             child: LinearProgressIndicator(
               minHeight: 9,
               value: progress,
-              backgroundColor: Colors.white.withOpacity(0.10),
+              backgroundColor: Colors.white,
               valueColor: AlwaysStoppedAnimation<Color>(color),
             ),
           ),
@@ -497,24 +480,16 @@ class _StatusChip extends StatelessWidget {
   final String text;
   final Color color;
 
-  const _StatusChip({
-    required this.text,
-    required this.color,
-  });
+  const _StatusChip({required this.text, required this.color});
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: 10,
-        vertical: 6,
-      ),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
         color: color.withOpacity(0.13),
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(
-          color: color.withOpacity(0.28),
-        ),
+        border: Border.all(color: color.withOpacity(0.28)),
       ),
       child: Text(
         text.toUpperCase(),
@@ -547,22 +522,16 @@ class _HeaderMiniMetric extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.black.withOpacity(0.18),
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: Colors.white.withOpacity(0.08),
-        ),
+        border: Border.all(color: Colors.white),
       ),
       child: Column(
         children: [
-          Icon(
-            icon,
-            color: const Color(0xFF7DD3FC),
-            size: 20,
-          ),
+          Icon(icon, color: const Color(0xFF20C7C2), size: 20),
           const SizedBox(height: 7),
           Text(
             value,
             style: const TextStyle(
-              color: Colors.white,
+              color: const Color(0xFF071A3A),
               fontSize: 16,
               fontWeight: FontWeight.w900,
             ),
@@ -570,7 +539,7 @@ class _HeaderMiniMetric extends StatelessWidget {
           Text(
             title,
             style: TextStyle(
-              color: Colors.white.withOpacity(0.48),
+              color: const Color(0xFF53627A),
               fontSize: 10.5,
               fontWeight: FontWeight.w700,
             ),
@@ -642,26 +611,20 @@ class _KpiCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.fromLTRB(10, 14, 10, 14),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.075),
+        color: Colors.white,
         borderRadius: BorderRadius.circular(22),
-        border: Border.all(
-          color: Colors.white.withOpacity(0.10),
-        ),
+        border: Border.all(color: Colors.white),
       ),
       child: Column(
         children: [
-          Icon(
-            icon,
-            color: const Color(0xFF7DD3FC),
-            size: 23,
-          ),
+          Icon(icon, color: const Color(0xFF20C7C2), size: 23),
           const SizedBox(height: 8),
           Text(
             value,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: const TextStyle(
-              color: Colors.white,
+              color: const Color(0xFF071A3A),
               fontSize: 16,
               fontWeight: FontWeight.w900,
             ),
@@ -671,7 +634,7 @@ class _KpiCard extends StatelessWidget {
             title,
             textAlign: TextAlign.center,
             style: TextStyle(
-              color: Colors.white.withOpacity(0.52),
+              color: const Color(0xFF53627A),
               fontSize: 10.5,
               fontWeight: FontWeight.w700,
             ),
@@ -686,10 +649,7 @@ class _SectionTitle extends StatelessWidget {
   final String title;
   final String subtitle;
 
-  const _SectionTitle({
-    required this.title,
-    required this.subtitle,
-  });
+  const _SectionTitle({required this.title, required this.subtitle});
 
   @override
   Widget build(BuildContext context) {
@@ -697,7 +657,7 @@ class _SectionTitle extends StatelessWidget {
       children: [
         const Icon(
           Icons.leaderboard_rounded,
-          color: Color(0xFF7DD3FC),
+          color: Color(0xFF20C7C2),
           size: 23,
         ),
         const SizedBox(width: 9),
@@ -708,7 +668,7 @@ class _SectionTitle extends StatelessWidget {
               Text(
                 title,
                 style: const TextStyle(
-                  color: Colors.white,
+                  color: const Color(0xFF071A3A),
                   fontSize: 19,
                   fontWeight: FontWeight.w900,
                   letterSpacing: -0.4,
@@ -718,7 +678,7 @@ class _SectionTitle extends StatelessWidget {
               Text(
                 subtitle,
                 style: TextStyle(
-                  color: Colors.white.withOpacity(0.55),
+                  color: const Color(0xFF53627A),
                   fontSize: 13,
                   fontWeight: FontWeight.w500,
                 ),
@@ -760,7 +720,7 @@ class _AgentRatioCard extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 14),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.075),
+        color: Colors.white,
         borderRadius: BorderRadius.circular(24),
         border: Border.all(
           color: color.withOpacity(position <= 3 ? 0.32 : 0.18),
@@ -770,10 +730,7 @@ class _AgentRatioCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              Text(
-                medal,
-                style: const TextStyle(fontSize: 30),
-              ),
+              Text(medal, style: const TextStyle(fontSize: 30)),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
@@ -784,7 +741,7 @@ class _AgentRatioCard extends StatelessWidget {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
-                        color: Colors.white,
+                        color: const Color(0xFF071A3A),
                         fontSize: 15.5,
                         fontWeight: FontWeight.w900,
                       ),
@@ -793,7 +750,7 @@ class _AgentRatioCard extends StatelessWidget {
                     Text(
                       "$positivos positivos · $contactos contactos",
                       style: TextStyle(
-                        color: Colors.white.withOpacity(0.58),
+                        color: const Color(0xFF53627A),
                         fontSize: 12.5,
                         fontWeight: FontWeight.w600,
                       ),
@@ -831,7 +788,7 @@ class _AgentRatioCard extends StatelessWidget {
             child: LinearProgressIndicator(
               minHeight: 7,
               value: progress,
-              backgroundColor: Colors.white.withOpacity(0.08),
+              backgroundColor: Colors.white,
               valueColor: AlwaysStoppedAnimation<Color>(color),
             ),
           ),
@@ -849,11 +806,9 @@ class _EmptyState extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(26),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.065),
+        color: Colors.white,
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(
-          color: Colors.white.withOpacity(0.08),
-        ),
+        border: Border.all(color: Colors.white),
       ),
       child: Column(
         children: [
@@ -866,7 +821,7 @@ class _EmptyState extends StatelessWidget {
           const Text(
             "Sin ratios disponibles",
             style: TextStyle(
-              color: Colors.white,
+              color: const Color(0xFF071A3A),
               fontSize: 17,
               fontWeight: FontWeight.w900,
             ),
@@ -876,7 +831,7 @@ class _EmptyState extends StatelessWidget {
             "Cuando los agentes registren contactos diarios aparecerá aquí el ranking de conversión.",
             textAlign: TextAlign.center,
             style: TextStyle(
-              color: Colors.white.withOpacity(0.55),
+              color: const Color(0xFF53627A),
               fontSize: 13,
               height: 1.4,
             ),
@@ -891,10 +846,7 @@ class _ErrorBox extends StatelessWidget {
   final String message;
   final VoidCallback onRetry;
 
-  const _ErrorBox({
-    required this.message,
-    required this.onRetry,
-  });
+  const _ErrorBox({required this.message, required this.onRetry});
 
   @override
   Widget build(BuildContext context) {
@@ -903,30 +855,22 @@ class _ErrorBox extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.redAccent.withOpacity(0.12),
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: Colors.redAccent.withOpacity(0.25),
-        ),
+        border: Border.all(color: Colors.redAccent.withOpacity(0.25)),
       ),
       child: Row(
         children: [
-          const Icon(
-            Icons.error_outline_rounded,
-            color: Colors.redAccent,
-          ),
+          const Icon(Icons.error_outline_rounded, color: Colors.redAccent),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
               message,
               style: const TextStyle(
-                color: Colors.white,
+                color: const Color(0xFF071A3A),
                 fontWeight: FontWeight.w700,
               ),
             ),
           ),
-          TextButton(
-            onPressed: onRetry,
-            child: const Text("Reintentar"),
-          ),
+          TextButton(onPressed: onRetry, child: const Text("Reintentar")),
         ],
       ),
     );

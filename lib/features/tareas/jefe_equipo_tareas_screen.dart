@@ -19,14 +19,14 @@ class _JefeEquipoTareasScreenState extends State<JefeEquipoTareasScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF07111B),
+      backgroundColor: const Color(0xFFF2FCFD),
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
         title: const Text(
           "Tareas jefe de equipo",
           style: TextStyle(
-            color: Colors.white,
+            color: const Color(0xFF071A3A),
             fontWeight: FontWeight.w900,
             letterSpacing: -0.4,
           ),
@@ -48,7 +48,8 @@ class _JefeEquipoTareasScreenState extends State<JefeEquipoTareasScreen> {
 
                   const _SectionTitle(
                     title: "Seguimiento del equipo",
-                    subtitle: "Control comercial, producción y rendimiento diario",
+                    subtitle:
+                        "Control comercial, producción y rendimiento diario",
                     icon: Icons.groups_rounded,
                   ),
 
@@ -176,11 +177,7 @@ class _PremiumBackground extends StatelessWidget {
             gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
-              colors: [
-                Color(0xFF07111B),
-                Color(0xFF0B1F2E),
-                Color(0xFF12384E),
-              ],
+              colors: [Color(0xFFF2FCFD), Color(0xFFFFFFFF), Color(0xFFFFFFFF)],
             ),
           ),
         ),
@@ -189,7 +186,7 @@ class _PremiumBackground extends StatelessWidget {
           right: -80,
           child: _GlowCircle(
             size: 230,
-            color: const Color(0xFF38BDF8).withOpacity(0.24),
+            color: const Color(0xFF20C7C2).withOpacity(0.24),
           ),
         ),
         Positioned(
@@ -197,14 +194,12 @@ class _PremiumBackground extends StatelessWidget {
           left: -90,
           child: _GlowCircle(
             size: 260,
-            color: const Color(0xFF22C55E).withOpacity(0.16),
+            color: const Color(0xFF0AAEAE).withOpacity(0.16),
           ),
         ),
         BackdropFilter(
           filter: ImageFilter.blur(sigmaX: 34, sigmaY: 34),
-          child: Container(
-            color: Colors.black.withOpacity(0.08),
-          ),
+          child: Container(color: Colors.black.withOpacity(0.08)),
         ),
       ],
     );
@@ -215,20 +210,14 @@ class _GlowCircle extends StatelessWidget {
   final double size;
   final Color color;
 
-  const _GlowCircle({
-    required this.size,
-    required this.color,
-  });
+  const _GlowCircle({required this.size, required this.color});
 
   @override
   Widget build(BuildContext context) {
     return Container(
       width: size,
       height: size,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: color,
-      ),
+      decoration: BoxDecoration(shape: BoxShape.circle, color: color),
     );
   }
 }
@@ -242,10 +231,8 @@ class _HeaderPanel extends StatelessWidget {
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(30),
-        color: Colors.white.withOpacity(0.08),
-        border: Border.all(
-          color: Colors.white.withOpacity(0.10),
-        ),
+        color: Colors.white,
+        border: Border.all(color: Colors.white),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.28),
@@ -262,10 +249,7 @@ class _HeaderPanel extends StatelessWidget {
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(22),
               gradient: const LinearGradient(
-                colors: [
-                  Color(0xFF38BDF8),
-                  Color(0xFF2563EB),
-                ],
+                colors: [Color(0xFF20C7C2), Color(0xFF0A7F91)],
               ),
             ),
             child: const Icon(
@@ -282,7 +266,7 @@ class _HeaderPanel extends StatelessWidget {
                 Text(
                   "Panel operativo",
                   style: TextStyle(
-                    color: Colors.white,
+                    color: const Color(0xFF071A3A),
                     fontSize: 21,
                     fontWeight: FontWeight.w900,
                     letterSpacing: -0.5,
@@ -292,7 +276,7 @@ class _HeaderPanel extends StatelessWidget {
                 Text(
                   "Control, seguimiento y crecimiento del equipo comercial",
                   style: TextStyle(
-                    color: Colors.white60,
+                    color: const Color(0xFF64748B),
                     fontSize: 13,
                     fontWeight: FontWeight.w500,
                     height: 1.3,
@@ -322,11 +306,7 @@ class _SectionTitle extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Icon(
-          icon,
-          color: const Color(0xFF7DD3FC),
-          size: 22,
-        ),
+        Icon(icon, color: const Color(0xFF20C7C2), size: 22),
         const SizedBox(width: 9),
         Expanded(
           child: Column(
@@ -335,7 +315,7 @@ class _SectionTitle extends StatelessWidget {
               Text(
                 title,
                 style: const TextStyle(
-                  color: Colors.white,
+                  color: const Color(0xFF071A3A),
                   fontSize: 19,
                   fontWeight: FontWeight.w900,
                   letterSpacing: -0.4,
@@ -345,7 +325,7 @@ class _SectionTitle extends StatelessWidget {
               Text(
                 subtitle,
                 style: TextStyle(
-                  color: Colors.white.withOpacity(0.55),
+                  color: const Color(0xFF53627A),
                   fontSize: 13,
                   fontWeight: FontWeight.w500,
                 ),
@@ -395,8 +375,8 @@ class _TaskCardState extends State<_TaskCard> {
               pressed = value;
             });
           },
-          splashColor: const Color(0xFF38BDF8).withOpacity(0.10),
-          highlightColor: const Color(0xFF38BDF8).withOpacity(0.05),
+          splashColor: const Color(0xFF20C7C2).withOpacity(0.10),
+          highlightColor: const Color(0xFF20C7C2).withOpacity(0.05),
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 120),
             margin: const EdgeInsets.only(bottom: 14),
@@ -423,24 +403,17 @@ class _TaskCardState extends State<_TaskCard> {
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(18),
                     gradient: const LinearGradient(
-                      colors: [
-                        Color(0xFF2563EB),
-                        Color(0xFF38BDF8),
-                      ],
+                      colors: [Color(0xFF0A7F91), Color(0xFF20C7C2)],
                     ),
                     boxShadow: [
                       BoxShadow(
-                        color: const Color(0xFF38BDF8).withOpacity(0.20),
+                        color: const Color(0xFF20C7C2).withOpacity(0.20),
                         blurRadius: 18,
                         offset: const Offset(0, 8),
                       ),
                     ],
                   ),
-                  child: Icon(
-                    widget.icon,
-                    color: Colors.white,
-                    size: 27,
-                  ),
+                  child: Icon(widget.icon, color: Colors.white, size: 27),
                 ),
                 const SizedBox(width: 15),
                 Expanded(
@@ -454,7 +427,7 @@ class _TaskCardState extends State<_TaskCard> {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
-                          color: Colors.white,
+                          color: const Color(0xFF071A3A),
                           fontSize: 15.5,
                           fontWeight: FontWeight.w900,
                           letterSpacing: -0.2,
@@ -466,7 +439,7 @@ class _TaskCardState extends State<_TaskCard> {
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                          color: Colors.white.withOpacity(0.55),
+                          color: const Color(0xFF53627A),
                           fontSize: 12.5,
                           fontWeight: FontWeight.w500,
                           height: 1.25,
@@ -483,12 +456,12 @@ class _TaskCardState extends State<_TaskCard> {
                     width: 34,
                     height: 34,
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.08),
+                      color: Colors.white,
                       shape: BoxShape.circle,
                     ),
                     child: const Icon(
                       Icons.chevron_right_rounded,
-                      color: Colors.white70,
+                      color: const Color(0xFF53627A),
                     ),
                   ),
                 ),
@@ -504,28 +477,21 @@ class _TaskCardState extends State<_TaskCard> {
 class _Badge extends StatelessWidget {
   final String text;
 
-  const _Badge({
-    required this.text,
-  });
+  const _Badge({required this.text});
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: 9,
-        vertical: 4,
-      ),
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
       decoration: BoxDecoration(
-        color: const Color(0xFF38BDF8).withOpacity(0.13),
+        color: const Color(0xFF20C7C2).withOpacity(0.13),
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(
-          color: const Color(0xFF38BDF8).withOpacity(0.25),
-        ),
+        border: Border.all(color: const Color(0xFF20C7C2).withOpacity(0.25)),
       ),
       child: Text(
         text.toUpperCase(),
         style: const TextStyle(
-          color: Color(0xFFBAE6FD),
+          color: Color(0xFFEAF8F8),
           fontSize: 10,
           fontWeight: FontWeight.w900,
           letterSpacing: 0.45,

@@ -89,10 +89,7 @@ class _ControlBajasScreenState extends State<ControlBajasScreen> {
         normalizado == 'comercial';
   }
 
-  bool _relacionPermitida({
-    required String rolPadre,
-    required String rolHijo,
-  }) {
+  bool _relacionPermitida({required String rolPadre, required String rolHijo}) {
     final padre = _normalizarRol(rolPadre);
     final hijo = _normalizarRol(rolHijo);
 
@@ -109,8 +106,7 @@ class _ControlBajasScreenState extends State<ControlBajasScreen> {
             _esRolAgente(hijo);
 
       case 'jefe_ventas':
-        return hijo == 'jefe_equipo' ||
-            _esRolAgente(hijo);
+        return hijo == 'jefe_equipo' || _esRolAgente(hijo);
 
       case 'jefe_equipo':
         return _esRolAgente(hijo);
@@ -156,8 +152,7 @@ class _ControlBajasScreenState extends State<ControlBajasScreen> {
       }).toList();
     }
 
-    final hijosPorParentId =
-        <String, List<Map<String, dynamic>>>{};
+    final hijosPorParentId = <String, List<Map<String, dynamic>>>{};
 
     for (final usuario in usuarios) {
       final parentId = _idTexto(usuario['parent_id']);
@@ -165,10 +160,7 @@ class _ControlBajasScreenState extends State<ControlBajasScreen> {
       if (parentId.isEmpty) continue;
 
       hijosPorParentId
-          .putIfAbsent(
-            parentId,
-            () => <Map<String, dynamic>>[],
-          )
+          .putIfAbsent(parentId, () => <Map<String, dynamic>>[])
           .add(usuario);
     }
 
@@ -185,20 +177,15 @@ class _ControlBajasScreenState extends State<ControlBajasScreen> {
       visitados.add(idActual);
       resultado.add(actual);
 
-      final rolActual =
-          _normalizarRol(actual['rol_usuario']);
+      final rolActual = _normalizarRol(actual['rol_usuario']);
 
-      final hijos = hijosPorParentId[idActual] ??
-          const <Map<String, dynamic>>[];
+      final hijos =
+          hijosPorParentId[idActual] ?? const <Map<String, dynamic>>[];
 
       for (final hijo in hijos) {
-        final rolHijo =
-            _normalizarRol(hijo['rol_usuario']);
+        final rolHijo = _normalizarRol(hijo['rol_usuario']);
 
-        if (!_relacionPermitida(
-          rolPadre: rolActual,
-          rolHijo: rolHijo,
-        )) {
+        if (!_relacionPermitida(rolPadre: rolActual, rolHijo: rolHijo)) {
           debugPrint(
             'CONTROL BAJAS: usuario bloqueado '
             '${_nombreCompleto(hijo)} '
@@ -254,13 +241,10 @@ class _ControlBajasScreenState extends State<ControlBajasScreen> {
           .maybeSingle();
 
       if (perfilData == null) {
-        throw Exception(
-          'No se encontró el perfil del usuario conectado.',
-        );
+        throw Exception('No se encontró el perfil del usuario conectado.');
       }
 
-      final perfil =
-          Map<String, dynamic>.from(perfilData);
+      final perfil = Map<String, dynamic>.from(perfilData);
 
       role = _normalizarRol(perfil['rol_usuario']);
       myId = _idTexto(perfil['id']);
@@ -276,16 +260,11 @@ class _ControlBajasScreenState extends State<ControlBajasScreen> {
           )
           .order('nombre', ascending: true);
 
-      usuarios =
-          List<Map<String, dynamic>>.from(
-        usuariosData,
-      );
+      usuarios = List<Map<String, dynamic>>.from(usuariosData);
 
       _crearIndicesUsuarios();
 
-      usuariosPermitidos = _construirEstructura(
-        perfil: perfil,
-      );
+      usuariosPermitidos = _construirEstructura(perfil: perfil);
 
       usuariosEnriquecidos = usuariosPermitidos
           .map(_enriquecerUsuario)
@@ -293,20 +272,14 @@ class _ControlBajasScreenState extends State<ControlBajasScreen> {
 
       _aplicarFiltros();
 
-      debugPrint(
-        '======= CONTROL BAJAS ESTRUCTURA REAL =======',
-      );
-      debugPrint(
-        'USUARIO: ${_nombreCompleto(perfil)}',
-      );
+      debugPrint('======= CONTROL BAJAS ESTRUCTURA REAL =======');
+      debugPrint('USUARIO: ${_nombreCompleto(perfil)}');
       debugPrint('ROL: $role');
       debugPrint(
         'PERSONAS EN ESTRUCTURA: '
         '${usuariosPermitidos.length}',
       );
-      debugPrint(
-        '============================================',
-      );
+      debugPrint('============================================');
 
       if (!mounted) return;
 
@@ -314,9 +287,7 @@ class _ControlBajasScreenState extends State<ControlBajasScreen> {
         loading = false;
       });
     } catch (e, stackTrace) {
-      debugPrint(
-        'ERROR CARGANDO CONTROL DE BAJAS: $e',
-      );
+      debugPrint('ERROR CARGANDO CONTROL DE BAJAS: $e');
       debugPrintStack(stackTrace: stackTrace);
 
       if (!mounted) return;
@@ -328,15 +299,11 @@ class _ControlBajasScreenState extends State<ControlBajasScreen> {
         usuariosFiltradosCache = [];
       });
 
-      _snack(
-        'Error cargando control de bajas: $e',
-      );
+      _snack('Error cargando control de bajas: $e');
     }
   }
 
-  Map<String, dynamic>? _usuarioPorId(
-    String? id,
-  ) {
+  Map<String, dynamic>? _usuarioPorId(String? id) {
     final valor = _idTexto(id);
 
     if (valor.isEmpty) return null;
@@ -344,9 +311,7 @@ class _ControlBajasScreenState extends State<ControlBajasScreen> {
     return usuariosPorId[valor];
   }
 
-  Map<String, dynamic>? _usuarioPorAuth(
-    String? authId,
-  ) {
+  Map<String, dynamic>? _usuarioPorAuth(String? authId) {
     final valor = _idTexto(authId);
 
     if (valor.isEmpty) return null;
@@ -354,9 +319,7 @@ class _ControlBajasScreenState extends State<ControlBajasScreen> {
     return usuariosPorAuth[valor];
   }
 
-  List<Map<String, dynamic>> _cadenaAntecesores(
-    Map<String, dynamic>? usuario,
-  ) {
+  List<Map<String, dynamic>> _cadenaAntecesores(Map<String, dynamic>? usuario) {
     if (usuario == null) return [];
 
     final resultado = <Map<String, dynamic>>[];
@@ -364,8 +327,7 @@ class _ControlBajasScreenState extends State<ControlBajasScreen> {
 
     var parentId = _idTexto(usuario['parent_id']);
 
-    while (parentId.isNotEmpty &&
-        !visitados.contains(parentId)) {
+    while (parentId.isNotEmpty && !visitados.contains(parentId)) {
       visitados.add(parentId);
 
       final padre = usuariosPorId[parentId];
@@ -385,17 +347,12 @@ class _ControlBajasScreenState extends State<ControlBajasScreen> {
   ) {
     final buscado = _normalizarRol(rolBuscado);
 
-    if (usuario != null &&
-        _normalizarRol(usuario['rol_usuario']) ==
-            buscado) {
+    if (usuario != null && _normalizarRol(usuario['rol_usuario']) == buscado) {
       return usuario;
     }
 
     for (final antecesor in _cadenaAntecesores(usuario)) {
-      if (_normalizarRol(
-            antecesor['rol_usuario'],
-          ) ==
-          buscado) {
+      if (_normalizarRol(antecesor['rol_usuario']) == buscado) {
         return antecesor;
       }
     }
@@ -403,99 +360,61 @@ class _ControlBajasScreenState extends State<ControlBajasScreen> {
     return null;
   }
 
-  Map<String, dynamic>? _responsableInmediato(
-    Map<String, dynamic>? usuario,
-  ) {
+  Map<String, dynamic>? _responsableInmediato(Map<String, dynamic>? usuario) {
     if (usuario == null) return null;
 
-    return _usuarioPorId(
-      _idTexto(usuario['parent_id']),
-    );
+    return _usuarioPorId(_idTexto(usuario['parent_id']));
   }
 
-  Map<String, dynamic> _enriquecerUsuario(
-    Map<String, dynamic> usuario,
-  ) {
-    final directorZona = _buscarAntecesorPorRol(
-      usuario,
-      'director_zona',
-    );
+  Map<String, dynamic> _enriquecerUsuario(Map<String, dynamic> usuario) {
+    final directorZona = _buscarAntecesorPorRol(usuario, 'director_zona');
 
-    final jefeVentas = _buscarAntecesorPorRol(
-      usuario,
-      'jefe_ventas',
-    );
+    final jefeVentas = _buscarAntecesorPorRol(usuario, 'jefe_ventas');
 
-    final jefeEquipo = _buscarAntecesorPorRol(
-      usuario,
-      'jefe_equipo',
-    );
+    final jefeEquipo = _buscarAntecesorPorRol(usuario, 'jefe_equipo');
 
-    final responsable =
-        _responsableInmediato(usuario);
+    final responsable = _responsableInmediato(usuario);
 
     return {
       ...usuario,
-      'nombre_completo':
-          _nombreCompleto(usuario),
-      'responsable_id':
-          _idTexto(responsable?['id']),
+      'nombre_completo': _nombreCompleto(usuario),
+      'responsable_id': _idTexto(responsable?['id']),
       'responsable_nombre': responsable == null
           ? ''
           : _nombreCompleto(responsable),
-      'responsable_rol':
-          _normalizarRol(
-        responsable?['rol_usuario'],
-      ),
-      'director_zona_id':
-          _idTexto(directorZona?['id']),
-      'director_zona_nombre':
-          directorZona == null
-              ? ''
-              : _nombreCompleto(directorZona),
-      'jefe_ventas_id':
-          _idTexto(jefeVentas?['id']),
-      'jefe_ventas_nombre':
-          jefeVentas == null
-              ? ''
-              : _nombreCompleto(jefeVentas),
-      'jefe_equipo_id':
-          _idTexto(jefeEquipo?['id']),
-      'jefe_equipo_nombre':
-          jefeEquipo == null
-              ? ''
-              : _nombreCompleto(jefeEquipo),
+      'responsable_rol': _normalizarRol(responsable?['rol_usuario']),
+      'director_zona_id': _idTexto(directorZona?['id']),
+      'director_zona_nombre': directorZona == null
+          ? ''
+          : _nombreCompleto(directorZona),
+      'jefe_ventas_id': _idTexto(jefeVentas?['id']),
+      'jefe_ventas_nombre': jefeVentas == null
+          ? ''
+          : _nombreCompleto(jefeVentas),
+      'jefe_equipo_id': _idTexto(jefeEquipo?['id']),
+      'jefe_equipo_nombre': jefeEquipo == null
+          ? ''
+          : _nombreCompleto(jefeEquipo),
     };
   }
 
-  String _nombreCompleto(
-    Map<String, dynamic> usuario,
-  ) {
-    final nombre =
-        usuario['nombre']?.toString() ?? '';
+  String _nombreCompleto(Map<String, dynamic> usuario) {
+    final nombre = usuario['nombre']?.toString() ?? '';
 
-    final apellidos =
-        usuario['apellidos']?.toString() ?? '';
+    final apellidos = usuario['apellidos']?.toString() ?? '';
 
-    final completo =
-        '$nombre $apellidos'.trim();
+    final completo = '$nombre $apellidos'.trim();
 
     return completo.isEmpty
-        ? (usuario['email']?.toString() ??
-            'Sin nombre')
+        ? (usuario['email']?.toString() ?? 'Sin nombre')
         : completo;
   }
 
   bool _esAgente(Map<String, dynamic> usuario) {
-    return _esRolAgente(
-      usuario['rol_usuario']?.toString() ?? '',
-    );
+    return _esRolAgente(usuario['rol_usuario']?.toString() ?? '');
   }
 
-  bool _esDescendienteDe(
-    Map<String, dynamic> usuario,
-    String ancestroId,
-  ) {
+  bool _esDescendienteDe(Map<String, dynamic> usuario, String ancestroId) {
     final objetivo = _idTexto(ancestroId);
 
     if (objetivo.isEmpty) return false;
@@ -505,11 +424,9 @@ class _ControlBajasScreenState extends State<ControlBajasScreen> {
     }
 
     final visitados = <String>{};
-    var parentId =
-        _idTexto(usuario['parent_id']);
+    var parentId = _idTexto(usuario['parent_id']);
 
-    while (parentId.isNotEmpty &&
-        !visitados.contains(parentId)) {
+    while (parentId.isNotEmpty && !visitados.contains(parentId)) {
       if (parentId == objetivo) {
         return true;
       }
@@ -520,8 +437,7 @@ class _ControlBajasScreenState extends State<ControlBajasScreen> {
 
       if (padre == null) break;
 
-      parentId =
-          _idTexto(padre['parent_id']);
+      parentId = _idTexto(padre['parent_id']);
     }
 
     return false;
@@ -556,17 +472,11 @@ class _ControlBajasScreenState extends State<ControlBajasScreen> {
     return '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
   }
 
-  List<Map<String, dynamic>> _usuariosPorRol(
-    String rol,
-  ) {
-    final normalizado =
-        _normalizarRol(rol);
+  List<Map<String, dynamic>> _usuariosPorRol(String rol) {
+    final normalizado = _normalizarRol(rol);
 
     return usuariosPermitidos.where((usuario) {
-      return _normalizarRol(
-            usuario['rol_usuario'],
-          ) ==
-          normalizado;
+      return _normalizarRol(usuario['rol_usuario']) == normalizado;
     }).toList();
   }
 
@@ -577,8 +487,7 @@ class _ControlBajasScreenState extends State<ControlBajasScreen> {
   }
 
   List<Map<String, dynamic>> get jefesVentas {
-    var lista =
-        _usuariosPorRol('jefe_ventas');
+    var lista = _usuariosPorRol('jefe_ventas');
 
     if (role == 'jefe_ventas') {
       return const <Map<String, dynamic>>[];
@@ -586,10 +495,7 @@ class _ControlBajasScreenState extends State<ControlBajasScreen> {
 
     if (filtroDirectorZonaId != null) {
       lista = lista.where((usuario) {
-        return _esDescendienteDe(
-          usuario,
-          filtroDirectorZonaId!,
-        );
+        return _esDescendienteDe(usuario, filtroDirectorZonaId!);
       }).toList();
     }
 
@@ -597,19 +503,13 @@ class _ControlBajasScreenState extends State<ControlBajasScreen> {
   }
 
   List<Map<String, dynamic>> get jefesEquipo {
-    var lista =
-        _usuariosPorRol('jefe_equipo');
+    var lista = _usuariosPorRol('jefe_equipo');
 
-    final responsableSeleccionado =
-        filtroJefeVentasId ??
-        filtroDirectorZonaId;
+    final responsableSeleccionado = filtroJefeVentasId ?? filtroDirectorZonaId;
 
     if (responsableSeleccionado != null) {
       lista = lista.where((usuario) {
-        return _esDescendienteDe(
-          usuario,
-          responsableSeleccionado,
-        );
+        return _esDescendienteDe(usuario, responsableSeleccionado);
       }).toList();
     }
 
@@ -622,19 +522,29 @@ class _ControlBajasScreenState extends State<ControlBajasScreen> {
     var lista = [...usuariosEnriquecidos];
 
     if (filtroDirectorZonaId != null) {
-      lista = lista.where((u) => u['director_zona_id']?.toString() == filtroDirectorZonaId).toList();
+      lista = lista
+          .where(
+            (u) => u['director_zona_id']?.toString() == filtroDirectorZonaId,
+          )
+          .toList();
     }
 
     if (filtroJefeVentasId != null) {
-      lista = lista.where((u) => u['jefe_ventas_id']?.toString() == filtroJefeVentasId).toList();
+      lista = lista
+          .where((u) => u['jefe_ventas_id']?.toString() == filtroJefeVentasId)
+          .toList();
     }
 
     if (filtroJefeEquipoId != null) {
-      lista = lista.where((u) => u['jefe_equipo_id']?.toString() == filtroJefeEquipoId).toList();
+      lista = lista
+          .where((u) => u['jefe_equipo_id']?.toString() == filtroJefeEquipoId)
+          .toList();
     }
 
     if (filtroRol != 'Todos') {
-      lista = lista.where((u) => u['rol_usuario']?.toString() == filtroRol).toList();
+      lista = lista
+          .where((u) => u['rol_usuario']?.toString() == filtroRol)
+          .toList();
     }
 
     if (filtroEstado == 'Activos') {
@@ -646,11 +556,17 @@ class _ControlBajasScreenState extends State<ControlBajasScreen> {
     }
 
     if (filtroMotivoBaja != 'Todos') {
-      lista = lista.where((u) => u['motivo_baja']?.toString() == filtroMotivoBaja).toList();
+      lista = lista
+          .where((u) => u['motivo_baja']?.toString() == filtroMotivoBaja)
+          .toList();
     }
 
     if (fechaDesde != null) {
-      final desde = DateTime(fechaDesde!.year, fechaDesde!.month, fechaDesde!.day);
+      final desde = DateTime(
+        fechaDesde!.year,
+        fechaDesde!.month,
+        fechaDesde!.day,
+      );
       lista = lista.where((u) {
         final f = _parseDate(u['fecha_baja']);
         if (f == null) return false;
@@ -659,7 +575,11 @@ class _ControlBajasScreenState extends State<ControlBajasScreen> {
     }
 
     if (fechaHasta != null) {
-      final hasta = DateTime(fechaHasta!.year, fechaHasta!.month, fechaHasta!.day);
+      final hasta = DateTime(
+        fechaHasta!.year,
+        fechaHasta!.month,
+        fechaHasta!.day,
+      );
       lista = lista.where((u) {
         final f = _parseDate(u['fecha_baja']);
         if (f == null) return false;
@@ -689,22 +609,24 @@ class _ControlBajasScreenState extends State<ControlBajasScreen> {
   }
 
   List<String> get rolesDisponibles {
-    final set = usuariosEnriquecidos
-        .map((u) => u['rol_usuario']?.toString() ?? '')
-        .where((e) => e.isNotEmpty)
-        .toSet()
-        .toList()
-      ..sort();
+    final set =
+        usuariosEnriquecidos
+            .map((u) => u['rol_usuario']?.toString() ?? '')
+            .where((e) => e.isNotEmpty)
+            .toSet()
+            .toList()
+          ..sort();
     return ['Todos', ...set];
   }
 
   List<String> get motivosDisponibles {
-    final set = usuariosEnriquecidos
-        .map((u) => u['motivo_baja']?.toString().trim() ?? '')
-        .where((e) => e.isNotEmpty)
-        .toSet()
-        .toList()
-      ..sort();
+    final set =
+        usuariosEnriquecidos
+            .map((u) => u['motivo_baja']?.toString().trim() ?? '')
+            .where((e) => e.isNotEmpty)
+            .toSet()
+            .toList()
+          ..sort();
     return ['Todos', ...set];
   }
 
@@ -712,7 +634,8 @@ class _ControlBajasScreenState extends State<ControlBajasScreen> {
   int get totalBajas => usuariosFiltrados.where(_estaInactivo).length;
   int get totalActivos => totalUsuarios - totalBajas;
 
-  double get porcentajeBajas => totalUsuarios == 0 ? 0 : (totalBajas / totalUsuarios) * 100;
+  double get porcentajeBajas =>
+      totalUsuarios == 0 ? 0 : (totalBajas / totalUsuarios) * 100;
 
   List<Map<String, dynamic>> get resumenAgrupado {
     final map = <String, Map<String, dynamic>>{};
@@ -753,7 +676,9 @@ class _ControlBajasScreenState extends State<ControlBajasScreen> {
     if (agrupacion == 'Director zona') {
       return {
         'key': u['director_zona_id']?.toString() ?? 'sin_director_zona',
-        'nombre': (u['director_zona_nombre']?.toString().isNotEmpty ?? false) ? u['director_zona_nombre'].toString() : 'Sin director zona',
+        'nombre': (u['director_zona_nombre']?.toString().isNotEmpty ?? false)
+            ? u['director_zona_nombre'].toString()
+            : 'Sin director zona',
         'subtitulo': 'Director zona',
       };
     }
@@ -761,7 +686,9 @@ class _ControlBajasScreenState extends State<ControlBajasScreen> {
     if (agrupacion == 'Jefe ventas') {
       return {
         'key': u['jefe_ventas_id']?.toString() ?? 'sin_jefe_ventas',
-        'nombre': (u['jefe_ventas_nombre']?.toString().isNotEmpty ?? false) ? u['jefe_ventas_nombre'].toString() : 'Sin jefe ventas',
+        'nombre': (u['jefe_ventas_nombre']?.toString().isNotEmpty ?? false)
+            ? u['jefe_ventas_nombre'].toString()
+            : 'Sin jefe ventas',
         'subtitulo': u['director_zona_nombre']?.toString() ?? '',
       };
     }
@@ -769,15 +696,20 @@ class _ControlBajasScreenState extends State<ControlBajasScreen> {
     if (agrupacion == 'Rol') {
       return {
         'key': u['rol_usuario']?.toString() ?? 'sin_rol',
-        'nombre': (u['rol_usuario']?.toString().isNotEmpty ?? false) ? u['rol_usuario'].toString().replaceAll('_', ' ').toUpperCase() : 'Sin rol',
+        'nombre': (u['rol_usuario']?.toString().isNotEmpty ?? false)
+            ? u['rol_usuario'].toString().replaceAll('_', ' ').toUpperCase()
+            : 'Sin rol',
         'subtitulo': 'Rol usuario',
       };
     }
 
     return {
       'key': u['jefe_equipo_id']?.toString() ?? 'sin_jefe_equipo',
-      'nombre': (u['jefe_equipo_nombre']?.toString().isNotEmpty ?? false) ? u['jefe_equipo_nombre'].toString() : 'Sin jefe equipo',
-      'subtitulo': '${u['jefe_ventas_nombre'] ?? ''} · ${u['director_zona_nombre'] ?? ''}',
+      'nombre': (u['jefe_equipo_nombre']?.toString().isNotEmpty ?? false)
+          ? u['jefe_equipo_nombre'].toString()
+          : 'Sin jefe equipo',
+      'subtitulo':
+          '${u['jefe_ventas_nombre'] ?? ''} · ${u['director_zona_nombre'] ?? ''}',
     };
   }
 
@@ -786,7 +718,9 @@ class _ControlBajasScreenState extends State<ControlBajasScreen> {
     final bajas = usuariosFiltrados.where(_estaInactivo).toList();
 
     for (final u in bajas) {
-      final motivo = (u['motivo_baja']?.toString().trim().isNotEmpty ?? false) ? u['motivo_baja'].toString().trim() : 'Sin motivo';
+      final motivo = (u['motivo_baja']?.toString().trim().isNotEmpty ?? false)
+          ? u['motivo_baja'].toString().trim()
+          : 'Sin motivo';
       map.putIfAbsent(motivo, () => {'motivo': motivo, 'total': 0});
       map[motivo]!['total'] = (map[motivo]!['total'] as int) + 1;
     }
@@ -802,8 +736,12 @@ class _ControlBajasScreenState extends State<ControlBajasScreen> {
 
     for (final u in bajas) {
       final f = _parseDate(u['fecha_baja']);
-      final key = f == null ? 'Sin fecha' : '${f.year}-${f.month.toString().padLeft(2, '0')}';
-      final label = f == null ? 'Sin fecha' : '${f.month.toString().padLeft(2, '0')}/${f.year}';
+      final key = f == null
+          ? 'Sin fecha'
+          : '${f.year}-${f.month.toString().padLeft(2, '0')}';
+      final label = f == null
+          ? 'Sin fecha'
+          : '${f.month.toString().padLeft(2, '0')}/${f.year}';
       map.putIfAbsent(key, () => {'key': key, 'label': label, 'total': 0});
       map[key]!['total'] = (map[key]!['total'] as int) + 1;
     }
@@ -859,7 +797,6 @@ class _ControlBajasScreenState extends State<ControlBajasScreen> {
     });
   }
 
-
   String _rolVisible(dynamic rol) {
     switch (_normalizarRol(rol)) {
       case 'director_nacional':
@@ -882,9 +819,7 @@ class _ControlBajasScreenState extends State<ControlBajasScreen> {
         return 'Administración';
       default:
         final texto = (rol ?? '').toString().trim();
-        return texto.isEmpty
-            ? 'Sin rol'
-            : texto.replaceAll('_', ' ');
+        return texto.isEmpty ? 'Sin rol' : texto.replaceAll('_', ' ');
     }
   }
 
@@ -893,8 +828,7 @@ class _ControlBajasScreenState extends State<ControlBajasScreen> {
     required Map<String, dynamic> nuevoResponsable,
   }) {
     final usuarioId = _idTexto(usuario['id']);
-    final responsableId =
-        _idTexto(nuevoResponsable['id']);
+    final responsableId = _idTexto(nuevoResponsable['id']);
 
     if (usuarioId.isEmpty || responsableId.isEmpty) {
       return true;
@@ -904,17 +838,13 @@ class _ControlBajasScreenState extends State<ControlBajasScreen> {
       return true;
     }
 
-    return _esDescendienteDe(
-      nuevoResponsable,
-      usuarioId,
-    );
+    return _esDescendienteDe(nuevoResponsable, usuarioId);
   }
 
   List<Map<String, dynamic>> _responsablesPermitidosPara(
     Map<String, dynamic> usuario,
   ) {
-    final rolUsuario =
-        _normalizarRol(usuario['rol_usuario']);
+    final rolUsuario = _normalizarRol(usuario['rol_usuario']);
 
     final lista = usuariosPermitidos.where((posible) {
       final idPosible = _idTexto(posible['id']);
@@ -924,47 +854,36 @@ class _ControlBajasScreenState extends State<ControlBajasScreen> {
         return false;
       }
 
-      if (_creariaCiclo(
-        usuario: usuario,
-        nuevoResponsable: posible,
-      )) {
+      if (_creariaCiclo(usuario: usuario, nuevoResponsable: posible)) {
         return false;
       }
 
       return _relacionPermitida(
-        rolPadre:
-            _normalizarRol(posible['rol_usuario']),
+        rolPadre: _normalizarRol(posible['rol_usuario']),
         rolHijo: rolUsuario,
       );
     }).toList();
 
     lista.sort((a, b) {
-      final rolA =
-          _rolVisible(a['rol_usuario']).toLowerCase();
+      final rolA = _rolVisible(a['rol_usuario']).toLowerCase();
 
-      final rolB =
-          _rolVisible(b['rol_usuario']).toLowerCase();
+      final rolB = _rolVisible(b['rol_usuario']).toLowerCase();
 
-      final comparacionRol =
-          rolA.compareTo(rolB);
+      final comparacionRol = rolA.compareTo(rolB);
 
       if (comparacionRol != 0) {
         return comparacionRol;
       }
 
-      return _nombreCompleto(a)
-          .toLowerCase()
-          .compareTo(
-            _nombreCompleto(b).toLowerCase(),
-          );
+      return _nombreCompleto(
+        a,
+      ).toLowerCase().compareTo(_nombreCompleto(b).toLowerCase());
     });
 
     return lista;
   }
 
-  Future<bool> _usuarioSiguePermitido(
-    String usuarioId,
-  ) async {
+  Future<bool> _usuarioSiguePermitido(String usuarioId) async {
     final authUser = supabase.auth.currentUser;
 
     if (authUser == null) return false;
@@ -995,17 +914,12 @@ class _ControlBajasScreenState extends State<ControlBajasScreen> {
 
     final anteriores = usuarios;
 
-    usuarios =
-        List<Map<String, dynamic>>.from(
-      usuariosData,
-    );
+    usuarios = List<Map<String, dynamic>>.from(usuariosData);
 
     _crearIndicesUsuarios();
 
     final estructura = _construirEstructura(
-      perfil: Map<String, dynamic>.from(
-        perfilData,
-      ),
+      perfil: Map<String, dynamic>.from(perfilData),
     );
 
     final permitido = estructura.any((usuario) {
@@ -1018,38 +932,24 @@ class _ControlBajasScreenState extends State<ControlBajasScreen> {
     return permitido;
   }
 
-  Future<void> _gestionarBaja(
-    Map<String, dynamic> usuario,
-  ) async {
-    String estado = _estaInactivo(usuario)
-        ? 'Inactivo'
-        : 'Activo';
+  Future<void> _gestionarBaja(Map<String, dynamic> usuario) async {
+    String estado = _estaInactivo(usuario) ? 'Inactivo' : 'Activo';
 
-    String motivo =
-        (usuario['motivo_baja']
-                    ?.toString()
-                    .isNotEmpty ??
-                false)
-            ? usuario['motivo_baja'].toString()
-            : motivosBaja.first;
+    String motivo = (usuario['motivo_baja']?.toString().isNotEmpty ?? false)
+        ? usuario['motivo_baja'].toString()
+        : motivosBaja.first;
 
-    String comentario =
-        usuario['comentario_baja']?.toString() ?? '';
+    String comentario = usuario['comentario_baja']?.toString() ?? '';
 
-    DateTime fechaBaja =
-        _parseDate(usuario['fecha_baja']) ??
-            DateTime.now();
+    DateTime fechaBaja = _parseDate(usuario['fecha_baja']) ?? DateTime.now();
 
-    String? nuevoParentId =
-        _idTexto(usuario['parent_id']).isEmpty
-            ? null
-            : _idTexto(usuario['parent_id']);
+    String? nuevoParentId = _idTexto(usuario['parent_id']).isEmpty
+        ? null
+        : _idTexto(usuario['parent_id']);
 
-    final teniaResponsable =
-        nuevoParentId != null;
+    final teniaResponsable = nuevoParentId != null;
 
-    final responsables =
-        _responsablesPermitidosPara(usuario);
+    final responsables = _responsablesPermitidosPara(usuario);
 
     await showModalBottomSheet(
       context: context,
@@ -1058,14 +958,11 @@ class _ControlBajasScreenState extends State<ControlBajasScreen> {
       builder: (_) {
         return StatefulBuilder(
           builder: (context, setModalState) {
-            final responsableActual =
-                _usuarioPorId(nuevoParentId);
+            final responsableActual = _usuarioPorId(nuevoParentId);
 
             return _modalShell(
               title: 'Gestionar usuario',
-              subtitle:
-                  usuario['nombre_completo']?.toString() ??
-                      'Usuario',
+              subtitle: usuario['nombre_completo']?.toString() ?? 'Usuario',
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -1074,15 +971,11 @@ class _ControlBajasScreenState extends State<ControlBajasScreen> {
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
                       color: const Color(0xFFEFF6FF),
-                      borderRadius:
-                          BorderRadius.circular(20),
-                      border: Border.all(
-                        color: const Color(0xFFBFDBFE),
-                      ),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: const Color(0xFFBFDBFE)),
                     ),
                     child: Column(
-                      crossAxisAlignment:
-                          CrossAxisAlignment.start,
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Row(
                           children: [
@@ -1090,10 +983,10 @@ class _ControlBajasScreenState extends State<ControlBajasScreen> {
                               width: 42,
                               height: 42,
                               decoration: BoxDecoration(
-                                color: const Color(0xFF2563EB)
-                                    .withOpacity(0.11),
-                                borderRadius:
-                                    BorderRadius.circular(14),
+                                color: const Color(
+                                  0xFF2563EB,
+                                ).withOpacity(0.11),
+                                borderRadius: BorderRadius.circular(14),
                               ),
                               child: Icon(
                                 teniaResponsable
@@ -1105,8 +998,7 @@ class _ControlBajasScreenState extends State<ControlBajasScreen> {
                             const SizedBox(width: 12),
                             Expanded(
                               child: Column(
-                                crossAxisAlignment:
-                                    CrossAxisAlignment.start,
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
                                     teniaResponsable
@@ -1115,8 +1007,7 @@ class _ControlBajasScreenState extends State<ControlBajasScreen> {
                                     style: const TextStyle(
                                       color: Color(0xFF0F172A),
                                       fontSize: 16,
-                                      fontWeight:
-                                          FontWeight.w900,
+                                      fontWeight: FontWeight.w900,
                                     ),
                                   ),
                                   const SizedBox(height: 3),
@@ -1127,8 +1018,7 @@ class _ControlBajasScreenState extends State<ControlBajasScreen> {
                                     style: const TextStyle(
                                       color: Color(0xFF64748B),
                                       fontSize: 12,
-                                      fontWeight:
-                                          FontWeight.w700,
+                                      fontWeight: FontWeight.w700,
                                     ),
                                   ),
                                 ],
@@ -1138,11 +1028,12 @@ class _ControlBajasScreenState extends State<ControlBajasScreen> {
                         ),
                         const SizedBox(height: 14),
                         DropdownButtonFormField<String>(
-                          value: responsables.any(
-                            (responsable) =>
-                                _idTexto(responsable['id']) ==
-                                nuevoParentId,
-                          )
+                          value:
+                              responsables.any(
+                                (responsable) =>
+                                    _idTexto(responsable['id']) ==
+                                    nuevoParentId,
+                              )
                               ? nuevoParentId
                               : null,
                           isExpanded: true,
@@ -1153,13 +1044,11 @@ class _ControlBajasScreenState extends State<ControlBajasScreen> {
                           ),
                           items: responsables.map((responsable) {
                             return DropdownMenuItem<String>(
-                              value:
-                                  _idTexto(responsable['id']),
+                              value: _idTexto(responsable['id']),
                               child: Text(
                                 '${_nombreCompleto(responsable)} · ${_rolVisible(responsable['rol_usuario'])}',
                                 maxLines: 1,
-                                overflow:
-                                    TextOverflow.ellipsis,
+                                overflow: TextOverflow.ellipsis,
                               ),
                             );
                           }).toList(),
@@ -1176,15 +1065,10 @@ class _ControlBajasScreenState extends State<ControlBajasScreen> {
                   DropdownButtonFormField<String>(
                     value: estado,
                     isExpanded: true,
-                    decoration:
-                        _inputDecoration('Estado'),
-                    items: const [
-                      'Activo',
-                      'Inactivo',
-                    ]
+                    decoration: _inputDecoration('Estado'),
+                    items: const ['Activo', 'Inactivo']
                         .map(
-                          (valor) =>
-                              DropdownMenuItem<String>(
+                          (valor) => DropdownMenuItem<String>(
                             value: valor,
                             child: Text(valor),
                           ),
@@ -1201,16 +1085,12 @@ class _ControlBajasScreenState extends State<ControlBajasScreen> {
                   const SizedBox(height: 12),
                   if (estado == 'Inactivo') ...[
                     DropdownButtonFormField<String>(
-                      value: motivosBaja.contains(motivo)
-                          ? motivo
-                          : 'Otro',
+                      value: motivosBaja.contains(motivo) ? motivo : 'Otro',
                       isExpanded: true,
-                      decoration:
-                          _inputDecoration('Motivo baja'),
+                      decoration: _inputDecoration('Motivo baja'),
                       items: motivosBaja
                           .map(
-                            (valor) =>
-                                DropdownMenuItem<String>(
+                            (valor) => DropdownMenuItem<String>(
                               value: valor,
                               child: Text(valor),
                             ),
@@ -1226,11 +1106,9 @@ class _ControlBajasScreenState extends State<ControlBajasScreen> {
                     ),
                     const SizedBox(height: 12),
                     InkWell(
-                      borderRadius:
-                          BorderRadius.circular(18),
+                      borderRadius: BorderRadius.circular(18),
                       onTap: () async {
-                        final fecha =
-                            await showDatePicker(
+                        final fecha = await showDatePicker(
                           context: context,
                           initialDate: fechaBaja,
                           firstDate: DateTime(2020),
@@ -1244,9 +1122,7 @@ class _ControlBajasScreenState extends State<ControlBajasScreen> {
                         }
                       },
                       child: InputDecorator(
-                        decoration: _inputDecoration(
-                          'Fecha baja',
-                        ),
+                        decoration: _inputDecoration('Fecha baja'),
                         child: Row(
                           children: [
                             const Icon(
@@ -1254,12 +1130,7 @@ class _ControlBajasScreenState extends State<ControlBajasScreen> {
                               color: Color(0xFF0284C7),
                             ),
                             const SizedBox(width: 8),
-                            Text(
-                              _formatDate(
-                                fechaBaja
-                                    .toIso8601String(),
-                              ),
-                            ),
+                            Text(_formatDate(fechaBaja.toIso8601String())),
                           ],
                         ),
                       ),
@@ -1268,9 +1139,7 @@ class _ControlBajasScreenState extends State<ControlBajasScreen> {
                     TextFormField(
                       initialValue: comentario,
                       maxLines: 4,
-                      decoration: _inputDecoration(
-                        'Comentario baja',
-                      ),
+                      decoration: _inputDecoration('Comentario baja'),
                       onChanged: (value) {
                         comentario = value;
                       },
@@ -1291,8 +1160,7 @@ class _ControlBajasScreenState extends State<ControlBajasScreen> {
                                 motivo,
                                 comentario,
                                 fechaBaja,
-                                nuevoParentId:
-                                    nuevoParentId,
+                                nuevoParentId: nuevoParentId,
                               );
                             },
                       icon: Icon(
@@ -1340,18 +1208,13 @@ class _ControlBajasScreenState extends State<ControlBajasScreen> {
       }
 
       if (parentId.isEmpty) {
-        throw Exception(
-          'Debes seleccionar un responsable.',
-        );
+        throw Exception('Debes seleccionar un responsable.');
       }
 
-      final siguePermitido =
-          await _usuarioSiguePermitido(id);
+      final siguePermitido = await _usuarioSiguePermitido(id);
 
       if (!siguePermitido) {
-        throw Exception(
-          'El usuario ya no pertenece a tu estructura.',
-        );
+        throw Exception('El usuario ya no pertenece a tu estructura.');
       }
 
       final usuarioActual = await supabase
@@ -1372,23 +1235,15 @@ class _ControlBajasScreenState extends State<ControlBajasScreen> {
           .eq('id', parentId)
           .maybeSingle();
 
-      if (usuarioActual == null ||
-          responsableActual == null) {
-        throw Exception(
-          'No se pudo validar la asignación.',
-        );
+      if (usuarioActual == null || responsableActual == null) {
+        throw Exception('No se pudo validar la asignación.');
       }
 
-      final usuarioMap =
-          Map<String, dynamic>.from(usuarioActual);
+      final usuarioMap = Map<String, dynamic>.from(usuarioActual);
 
-      final responsableMap =
-          Map<String, dynamic>.from(
-        responsableActual,
-      );
+      final responsableMap = Map<String, dynamic>.from(responsableActual);
 
-      final responsablePermitido =
-          usuariosPermitidos.any((permitido) {
+      final responsablePermitido = usuariosPermitidos.any((permitido) {
         return _idTexto(permitido['id']) == parentId;
       });
 
@@ -1400,12 +1255,8 @@ class _ControlBajasScreenState extends State<ControlBajasScreen> {
       }
 
       if (!_relacionPermitida(
-        rolPadre: _normalizarRol(
-          responsableMap['rol_usuario'],
-        ),
-        rolHijo: _normalizarRol(
-          usuarioMap['rol_usuario'],
-        ),
+        rolPadre: _normalizarRol(responsableMap['rol_usuario']),
+        rolHijo: _normalizarRol(usuarioMap['rol_usuario']),
       )) {
         throw Exception(
           'La dependencia seleccionada no es válida '
@@ -1426,23 +1277,13 @@ class _ControlBajasScreenState extends State<ControlBajasScreen> {
       final update = <String, dynamic>{
         'parent_id': parentId,
         'estado': estado,
-        'motivo_baja':
-            estado == 'Inactivo' ? motivo : null,
-        'comentario_baja':
-            estado == 'Inactivo' ? comentario : null,
-        'fecha_baja': estado == 'Inactivo'
-            ? fechaBaja.toIso8601String()
-            : null,
-        'baja_tramitada_por':
-            estado == 'Inactivo'
-                ? myAuthId
-                : null,
+        'motivo_baja': estado == 'Inactivo' ? motivo : null,
+        'comentario_baja': estado == 'Inactivo' ? comentario : null,
+        'fecha_baja': estado == 'Inactivo' ? fechaBaja.toIso8601String() : null,
+        'baja_tramitada_por': estado == 'Inactivo' ? myAuthId : null,
       };
 
-      await supabase
-          .from('usuarios')
-          .update(update)
-          .eq('id', id);
+      await supabase.from('usuarios').update(update).eq('id', id);
 
       _snack(
         'Usuario actualizado y asignado a '
@@ -1451,9 +1292,7 @@ class _ControlBajasScreenState extends State<ControlBajasScreen> {
 
       await cargarDatos();
     } catch (e) {
-      _snack(
-        'Error guardando usuario: $e',
-      );
+      _snack('Error guardando usuario: $e');
     } finally {
       if (mounted) {
         setState(() {
@@ -1483,13 +1322,34 @@ class _ControlBajasScreenState extends State<ControlBajasScreen> {
                   _detailChip('Email', u['email']?.toString() ?? ''),
                   _detailChip('Rol', u['rol_usuario']?.toString() ?? ''),
                   _detailChip('Estado', u['estado']?.toString() ?? ''),
-                  _detailChip('Responsable directo', u['responsable_nombre']?.toString() ?? ''),
-                  _detailChip('Rol responsable', _rolVisible(u['responsable_rol'])),
-                  _detailChip('Director zona', u['director_zona_nombre']?.toString() ?? ''),
-                  _detailChip('Jefe ventas', u['jefe_ventas_nombre']?.toString() ?? ''),
-                  _detailChip('Jefe equipo', u['jefe_equipo_nombre']?.toString() ?? ''),
-                  _detailChip('Motivo baja', u['motivo_baja']?.toString() ?? ''),
-                  _detailChip('Comentario baja', u['comentario_baja']?.toString() ?? ''),
+                  _detailChip(
+                    'Responsable directo',
+                    u['responsable_nombre']?.toString() ?? '',
+                  ),
+                  _detailChip(
+                    'Rol responsable',
+                    _rolVisible(u['responsable_rol']),
+                  ),
+                  _detailChip(
+                    'Director zona',
+                    u['director_zona_nombre']?.toString() ?? '',
+                  ),
+                  _detailChip(
+                    'Jefe ventas',
+                    u['jefe_ventas_nombre']?.toString() ?? '',
+                  ),
+                  _detailChip(
+                    'Jefe equipo',
+                    u['jefe_equipo_nombre']?.toString() ?? '',
+                  ),
+                  _detailChip(
+                    'Motivo baja',
+                    u['motivo_baja']?.toString() ?? '',
+                  ),
+                  _detailChip(
+                    'Comentario baja',
+                    u['comentario_baja']?.toString() ?? '',
+                  ),
                   _detailChip('Fecha baja', _formatDate(u['fecha_baja'])),
                 ],
               ),
@@ -1526,13 +1386,20 @@ class _ControlBajasScreenState extends State<ControlBajasScreen> {
           const _FondoControlBajas(),
           SafeArea(
             child: loading
-                ? const Center(child: CircularProgressIndicator(color: Color(0xFF0284C7)))
+                ? const Center(
+                    child: CircularProgressIndicator(color: Color(0xFF0284C7)),
+                  )
                 : LayoutBuilder(
                     builder: (context, constraints) {
                       final isMobile = constraints.maxWidth < 980;
 
                       final contenido = Padding(
-                        padding: EdgeInsets.fromLTRB(isMobile ? 12 : 18, 18, isMobile ? 12 : 22, 22),
+                        padding: EdgeInsets.fromLTRB(
+                          isMobile ? 12 : 18,
+                          18,
+                          isMobile ? 12 : 22,
+                          22,
+                        ),
                         child: Column(
                           children: [
                             _header(),
@@ -1545,8 +1412,8 @@ class _ControlBajasScreenState extends State<ControlBajasScreen> {
                               child: vista == 0
                                   ? _vistaEstructura()
                                   : vista == 1
-                                      ? _vistaMotivos()
-                                      : _vistaUsuarios(),
+                                  ? _vistaMotivos()
+                                  : _vistaUsuarios(),
                             ),
                           ],
                         ),
@@ -1555,7 +1422,10 @@ class _ControlBajasScreenState extends State<ControlBajasScreen> {
                       if (isMobile) {
                         return Column(
                           children: [
-                            SizedBox(height: 330, child: _panelFiltros(compacto: true)),
+                            SizedBox(
+                              height: 330,
+                              child: _panelFiltros(compacto: true),
+                            ),
                             Expanded(child: contenido),
                           ],
                         );
@@ -1573,7 +1443,9 @@ class _ControlBajasScreenState extends State<ControlBajasScreen> {
           if (guardando)
             Container(
               color: Colors.black.withOpacity(0.18),
-              child: const Center(child: CircularProgressIndicator(color: Color(0xFF0284C7))),
+              child: const Center(
+                child: CircularProgressIndicator(color: Color(0xFF0284C7)),
+              ),
             ),
         ],
       ),
@@ -1595,7 +1467,10 @@ class _ControlBajasScreenState extends State<ControlBajasScreen> {
               borderRadius: BorderRadius.circular(18),
               border: Border.all(color: const Color(0xFFE2E8F0)),
             ),
-            child: const Icon(Icons.arrow_back_rounded, color: Color(0xFF0F172A)),
+            child: const Icon(
+              Icons.arrow_back_rounded,
+              color: Color(0xFF0F172A),
+            ),
           ),
         );
 
@@ -1619,7 +1494,10 @@ class _ControlBajasScreenState extends State<ControlBajasScreen> {
               '$totalUsuarios usuarios visibles · $totalBajas bajas · ${porcentajeBajas.toStringAsFixed(1)} % bajas',
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(color: Color(0xFF64748B), fontWeight: FontWeight.w600),
+              style: const TextStyle(
+                color: Color(0xFF64748B),
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ],
         );
@@ -1628,7 +1506,13 @@ class _ControlBajasScreenState extends State<ControlBajasScreen> {
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(children: [volver, const SizedBox(width: 12), Expanded(child: titulo)]),
+              Row(
+                children: [
+                  volver,
+                  const SizedBox(width: 12),
+                  Expanded(child: titulo),
+                ],
+              ),
               const SizedBox(height: 10),
               _badgeRole(),
             ],
@@ -1658,7 +1542,11 @@ class _ControlBajasScreenState extends State<ControlBajasScreen> {
       ),
       child: Text(
         role.replaceAll('_', ' ').toUpperCase(),
-        style: const TextStyle(color: Color(0xFF075985), fontWeight: FontWeight.w900, fontSize: 12),
+        style: const TextStyle(
+          color: Color(0xFF075985),
+          fontWeight: FontWeight.w900,
+          fontSize: 12,
+        ),
       ),
     );
   }
@@ -1674,7 +1562,9 @@ class _ControlBajasScreenState extends State<ControlBajasScreen> {
       ),
       child: Row(
         children: [
-          Expanded(child: _tabButton('Estructura', 0, Icons.account_tree_rounded)),
+          Expanded(
+            child: _tabButton('Estructura', 0, Icons.account_tree_rounded),
+          ),
           Expanded(child: _tabButton('Motivos', 1, Icons.rule_rounded)),
           Expanded(child: _tabButton('Usuarios', 2, Icons.people_alt_rounded)),
         ],
@@ -1696,14 +1586,21 @@ class _ControlBajasScreenState extends State<ControlBajasScreen> {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, color: active ? Colors.white : const Color(0xFF64748B), size: 20),
+            Icon(
+              icon,
+              color: active ? Colors.white : const Color(0xFF64748B),
+              size: 20,
+            ),
             const SizedBox(width: 8),
             Flexible(
               child: Text(
                 text,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: TextStyle(color: active ? Colors.white : const Color(0xFF64748B), fontWeight: FontWeight.w900),
+                style: TextStyle(
+                  color: active ? Colors.white : const Color(0xFF64748B),
+                  fontWeight: FontWeight.w900,
+                ),
               ),
             ),
           ],
@@ -1728,7 +1625,12 @@ class _ControlBajasScreenState extends State<ControlBajasScreen> {
           _miniTotal('Usuarios', totalUsuarios),
           _miniTotal('Activos', totalActivos, color: const Color(0xFF16A34A)),
           _miniTotal('Bajas', totalBajas, color: const Color(0xFFDC2626)),
-          _miniTotal('% bajas', porcentajeBajas.toStringAsFixed(1), suffix: '%', color: const Color(0xFFF97316)),
+          _miniTotal(
+            '% bajas',
+            porcentajeBajas.toStringAsFixed(1),
+            suffix: '%',
+            color: const Color(0xFFF97316),
+          ),
         ],
       ),
     );
@@ -1743,15 +1645,32 @@ class _ControlBajasScreenState extends State<ControlBajasScreen> {
         color: Colors.white.withOpacity(0.94),
         borderRadius: BorderRadius.circular(32),
         border: Border.all(color: Colors.white),
-        boxShadow: [BoxShadow(color: Colors.blueGrey.withOpacity(0.10), blurRadius: 14, offset: const Offset(0, 8))],
+        boxShadow: [
+          BoxShadow(
+            color: Colors.blueGrey.withOpacity(0.10),
+            blurRadius: 14,
+            offset: const Offset(0, 8),
+          ),
+        ],
       ),
       child: ListView(
         children: [
-          const Text('Filtros de bajas', style: TextStyle(color: Color(0xFF0F172A), fontSize: 24, fontWeight: FontWeight.w900)),
+          const Text(
+            'Filtros de bajas',
+            style: TextStyle(
+              color: Color(0xFF0F172A),
+              fontSize: 24,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
           const SizedBox(height: 5),
           const Text(
             'Analiza bajas por estructura, rol, motivo y fechas.',
-            style: TextStyle(color: Color(0xFF64748B), fontWeight: FontWeight.w600, height: 1.3),
+            style: TextStyle(
+              color: Color(0xFF64748B),
+              fontWeight: FontWeight.w600,
+              height: 1.3,
+            ),
           ),
           const SizedBox(height: 18),
           TextField(
@@ -1759,7 +1678,9 @@ class _ControlBajasScreenState extends State<ControlBajasScreen> {
               busqueda = v;
               _aplicarFiltros();
             }),
-            decoration: _inputDecoration('Buscar usuario').copyWith(prefixIcon: const Icon(Icons.search_rounded)),
+            decoration: _inputDecoration(
+              'Buscar usuario',
+            ).copyWith(prefixIcon: const Icon(Icons.search_rounded)),
           ),
           const SizedBox(height: 14),
           if (directoresZona.isNotEmpty)
@@ -1828,8 +1749,16 @@ class _ControlBajasScreenState extends State<ControlBajasScreen> {
               _aplicarFiltros();
             }),
           ),
-          _dateButton(label: 'Fecha baja desde', value: fechaDesde, onTap: () => _pickFecha(true)),
-          _dateButton(label: 'Fecha baja hasta', value: fechaHasta, onTap: () => _pickFecha(false)),
+          _dateButton(
+            label: 'Fecha baja desde',
+            value: fechaDesde,
+            onTap: () => _pickFecha(true),
+          ),
+          _dateButton(
+            label: 'Fecha baja hasta',
+            value: fechaHasta,
+            onTap: () => _pickFecha(false),
+          ),
           _dropdownSimple(
             label: 'Agrupar estructura por',
             value: agrupacion,
@@ -1866,7 +1795,10 @@ class _ControlBajasScreenState extends State<ControlBajasScreen> {
               itemBuilder: (context, index) {
                 final r = rows[index];
                 return Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  margin: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 6,
+                  ),
                   padding: const EdgeInsets.all(14),
                   decoration: BoxDecoration(
                     color: Colors.white,
@@ -1880,7 +1812,11 @@ class _ControlBajasScreenState extends State<ControlBajasScreen> {
                         r['nombre'].toString(),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(color: Color(0xFF0F172A), fontSize: 16, fontWeight: FontWeight.w900),
+                        style: const TextStyle(
+                          color: Color(0xFF0F172A),
+                          fontSize: 16,
+                          fontWeight: FontWeight.w900,
+                        ),
                       ),
                       if (r['subtitulo']?.toString().isNotEmpty ?? false) ...[
                         const SizedBox(height: 3),
@@ -1888,7 +1824,10 @@ class _ControlBajasScreenState extends State<ControlBajasScreen> {
                           r['subtitulo'].toString(),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(color: Color(0xFF64748B), fontWeight: FontWeight.w700),
+                          style: const TextStyle(
+                            color: Color(0xFF64748B),
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
                       ],
                       const SizedBox(height: 12),
@@ -1897,9 +1836,22 @@ class _ControlBajasScreenState extends State<ControlBajasScreen> {
                         runSpacing: 10,
                         children: [
                           _miniTotal('Total', r['total']),
-                          _miniTotal('Activos', r['activos'], color: const Color(0xFF16A34A)),
-                          _miniTotal('Bajas', r['bajas'], color: const Color(0xFFDC2626)),
-                          _miniTotal('Ratio', _ratio(r).toStringAsFixed(1), suffix: '%', color: const Color(0xFF0284C7)),
+                          _miniTotal(
+                            'Activos',
+                            r['activos'],
+                            color: const Color(0xFF16A34A),
+                          ),
+                          _miniTotal(
+                            'Bajas',
+                            r['bajas'],
+                            color: const Color(0xFFDC2626),
+                          ),
+                          _miniTotal(
+                            'Ratio',
+                            _ratio(r).toStringAsFixed(1),
+                            suffix: '%',
+                            color: const Color(0xFF0284C7),
+                          ),
                         ],
                       ),
                     ],
@@ -1926,7 +1878,10 @@ class _ControlBajasScreenState extends State<ControlBajasScreen> {
                 final pct = total == 0 ? 0.0 : (n / total) * 100;
 
                 return Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  margin: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 6,
+                  ),
                   padding: const EdgeInsets.all(14),
                   decoration: BoxDecoration(
                     color: Colors.white,
@@ -1940,12 +1895,21 @@ class _ControlBajasScreenState extends State<ControlBajasScreen> {
                           r['motivo'].toString(),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(color: Color(0xFF0F172A), fontSize: 16, fontWeight: FontWeight.w900),
+                          style: const TextStyle(
+                            color: Color(0xFF0F172A),
+                            fontSize: 16,
+                            fontWeight: FontWeight.w900,
+                          ),
                         ),
                       ),
                       _miniTotal('Bajas', n, color: const Color(0xFFDC2626)),
                       const SizedBox(width: 10),
-                      _miniTotal('%', pct.toStringAsFixed(1), suffix: '%', color: const Color(0xFF0284C7)),
+                      _miniTotal(
+                        '%',
+                        pct.toStringAsFixed(1),
+                        suffix: '%',
+                        color: const Color(0xFF0284C7),
+                      ),
                     ],
                   ),
                 );
@@ -1969,9 +1933,21 @@ class _ControlBajasScreenState extends State<ControlBajasScreen> {
                   color: const Color(0xFFF1F5F9),
                   child: Row(
                     children: [
-                      Text('Mostrando ${rows.length} de ${usuariosFiltrados.length}', style: const TextStyle(color: Color(0xFF64748B), fontWeight: FontWeight.w900)),
+                      Text(
+                        'Mostrando ${rows.length} de ${usuariosFiltrados.length}',
+                        style: const TextStyle(
+                          color: Color(0xFF64748B),
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
                       const Spacer(),
-                      const Text('Acciones', style: TextStyle(color: Color(0xFF0284C7), fontWeight: FontWeight.w900)),
+                      const Text(
+                        'Acciones',
+                        style: TextStyle(
+                          color: Color(0xFF0284C7),
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -1983,7 +1959,10 @@ class _ControlBajasScreenState extends State<ControlBajasScreen> {
                       final baja = _estaInactivo(u);
 
                       return Container(
-                        margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        margin: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 6,
+                        ),
                         padding: const EdgeInsets.all(14),
                         decoration: BoxDecoration(
                           color: Colors.white,
@@ -1997,17 +1976,25 @@ class _ControlBajasScreenState extends State<ControlBajasScreen> {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    u['nombre_completo']?.toString() ?? 'Sin nombre',
+                                    u['nombre_completo']?.toString() ??
+                                        'Sin nombre',
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(color: Color(0xFF0F172A), fontSize: 16, fontWeight: FontWeight.w900),
+                                    style: const TextStyle(
+                                      color: Color(0xFF0F172A),
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w900,
+                                    ),
                                   ),
                                   const SizedBox(height: 4),
                                   Text(
                                     '${_rolVisible(u['rol_usuario'])} · Responsable: ${u['responsable_nombre']?.toString().isEmpty ?? true ? 'Sin asignar' : u['responsable_nombre']} · ${u['jefe_equipo_nombre'] ?? ''} · ${u['jefe_ventas_nombre'] ?? ''} · ${u['director_zona_nombre'] ?? ''}',
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(color: Color(0xFF64748B), fontWeight: FontWeight.w700),
+                                    style: const TextStyle(
+                                      color: Color(0xFF64748B),
+                                      fontWeight: FontWeight.w700,
+                                    ),
                                   ),
                                   if (baja) ...[
                                     const SizedBox(height: 8),
@@ -2015,15 +2002,33 @@ class _ControlBajasScreenState extends State<ControlBajasScreen> {
                                       spacing: 8,
                                       runSpacing: 8,
                                       children: [
-                                        _pill(u['motivo_baja']?.toString().isEmpty ?? true ? 'Sin motivo' : u['motivo_baja'].toString(), const Color(0xFFDC2626)),
-                                        _pill(_formatDate(u['fecha_baja']).isEmpty ? 'Sin fecha' : _formatDate(u['fecha_baja']), const Color(0xFFF97316)),
+                                        _pill(
+                                          u['motivo_baja']
+                                                      ?.toString()
+                                                      .isEmpty ??
+                                                  true
+                                              ? 'Sin motivo'
+                                              : u['motivo_baja'].toString(),
+                                          const Color(0xFFDC2626),
+                                        ),
+                                        _pill(
+                                          _formatDate(u['fecha_baja']).isEmpty
+                                              ? 'Sin fecha'
+                                              : _formatDate(u['fecha_baja']),
+                                          const Color(0xFFF97316),
+                                        ),
                                       ],
                                     ),
                                   ],
                                 ],
                               ),
                             ),
-                            _pill(baja ? 'Inactivo' : 'Activo', baja ? const Color(0xFFDC2626) : const Color(0xFF16A34A)),
+                            _pill(
+                              baja ? 'Inactivo' : 'Activo',
+                              baja
+                                  ? const Color(0xFFDC2626)
+                                  : const Color(0xFF16A34A),
+                            ),
                             PopupMenuButton<String>(
                               icon: const Icon(Icons.more_vert_rounded),
                               onSelected: (value) {
@@ -2066,18 +2071,27 @@ class _ControlBajasScreenState extends State<ControlBajasScreen> {
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(24),
-        child: child ??
+        child:
+            child ??
             Center(
               child: Text(
                 emptyText,
-                style: const TextStyle(color: Color(0xFF64748B), fontWeight: FontWeight.w800),
+                style: const TextStyle(
+                  color: Color(0xFF64748B),
+                  fontWeight: FontWeight.w800,
+                ),
               ),
             ),
       ),
     );
   }
 
-  Widget _miniTotal(String label, dynamic value, {String suffix = '', Color color = const Color(0xFF0F172A)}) {
+  Widget _miniTotal(
+    String label,
+    dynamic value, {
+    String suffix = '',
+    Color color = const Color(0xFF0F172A),
+  }) {
     return Container(
       width: 135,
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
@@ -2089,9 +2103,27 @@ class _ControlBajasScreenState extends State<ControlBajasScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xFF64748B), fontSize: 11, fontWeight: FontWeight.w900)),
+          Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: Color(0xFF64748B),
+              fontSize: 11,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
           const SizedBox(height: 3),
-          Text('$value$suffix', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: color, fontSize: 18, fontWeight: FontWeight.w900)),
+          Text(
+            '$value$suffix',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: color,
+              fontSize: 18,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
         ],
       ),
     );
@@ -2105,7 +2137,16 @@ class _ControlBajasScreenState extends State<ControlBajasScreen> {
         borderRadius: BorderRadius.circular(999),
         border: Border.all(color: color.withOpacity(0.24)),
       ),
-      child: Text(text, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: color, fontWeight: FontWeight.w900, fontSize: 12)),
+      child: Text(
+        text,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: TextStyle(
+          color: color,
+          fontWeight: FontWeight.w900,
+          fontSize: 12,
+        ),
+      ),
     );
   }
 
@@ -2121,24 +2162,55 @@ class _ControlBajasScreenState extends State<ControlBajasScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, style: const TextStyle(color: Color(0xFF64748B), fontSize: 12, fontWeight: FontWeight.w800)),
+          Text(
+            label,
+            style: const TextStyle(
+              color: Color(0xFF64748B),
+              fontSize: 12,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
           const SizedBox(height: 5),
-          Text(value.isEmpty ? '-' : value, maxLines: 4, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xFF0F172A), fontWeight: FontWeight.w900)),
+          Text(
+            value.isEmpty ? '-' : value,
+            maxLines: 4,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: Color(0xFF0F172A),
+              fontWeight: FontWeight.w900,
+            ),
+          ),
         ],
       ),
     );
   }
 
-  Widget _modalShell({required String title, required String subtitle, required Widget child}) {
+  Widget _modalShell({
+    required String title,
+    required String subtitle,
+    required Widget child,
+  }) {
     return Padding(
-      padding: EdgeInsets.only(left: 18, right: 18, bottom: MediaQuery.of(context).viewInsets.bottom + 18),
+      padding: EdgeInsets.only(
+        left: 18,
+        right: 18,
+        bottom: MediaQuery.of(context).viewInsets.bottom + 18,
+      ),
       child: Container(
-        constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.88),
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(context).size.height * 0.88,
+        ),
         padding: const EdgeInsets.all(22),
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(30),
-          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.18), blurRadius: 28, offset: const Offset(0, 14))],
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.18),
+              blurRadius: 28,
+              offset: const Offset(0, 14),
+            ),
+          ],
         ),
         child: SingleChildScrollView(
           child: Column(
@@ -2150,16 +2222,35 @@ class _ControlBajasScreenState extends State<ControlBajasScreen> {
                   Container(
                     height: 48,
                     width: 48,
-                    decoration: BoxDecoration(color: const Color(0xFFE0F2FE), borderRadius: BorderRadius.circular(16)),
-                    child: const Icon(Icons.person_remove_alt_1_rounded, color: Color(0xFF0284C7)),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFE0F2FE),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: const Icon(
+                      Icons.person_remove_alt_1_rounded,
+                      color: Color(0xFF0284C7),
+                    ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(title, style: const TextStyle(color: Color(0xFF0F172A), fontSize: 23, fontWeight: FontWeight.w900)),
-                        Text(subtitle, style: const TextStyle(color: Color(0xFF64748B), fontWeight: FontWeight.w700)),
+                        Text(
+                          title,
+                          style: const TextStyle(
+                            color: Color(0xFF0F172A),
+                            fontSize: 23,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                        Text(
+                          subtitle,
+                          style: const TextStyle(
+                            color: Color(0xFF64748B),
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
                       ],
                     ),
                   ),
@@ -2174,7 +2265,12 @@ class _ControlBajasScreenState extends State<ControlBajasScreen> {
     );
   }
 
-  Widget _dropdownUsuarios({required String label, required String? value, required List<Map<String, dynamic>> usuarios, required void Function(String?) onChanged}) {
+  Widget _dropdownUsuarios({
+    required String label,
+    required String? value,
+    required List<Map<String, dynamic>> usuarios,
+    required void Function(String?) onChanged,
+  }) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 13),
       child: DropdownButtonFormField<String>(
@@ -2183,14 +2279,24 @@ class _ControlBajasScreenState extends State<ControlBajasScreen> {
         decoration: _inputDecoration(label),
         items: [
           const DropdownMenuItem<String>(value: null, child: Text('Todos')),
-          ...usuarios.map((u) => DropdownMenuItem<String>(value: u['id']?.toString(), child: Text(_nombreCompleto(u)))),
+          ...usuarios.map(
+            (u) => DropdownMenuItem<String>(
+              value: u['id']?.toString(),
+              child: Text(_nombreCompleto(u)),
+            ),
+          ),
         ],
         onChanged: onChanged,
       ),
     );
   }
 
-  Widget _dropdownSimple({required String label, required String value, required List<String> items, required void Function(String?) onChanged}) {
+  Widget _dropdownSimple({
+    required String label,
+    required String value,
+    required List<String> items,
+    required void Function(String?) onChanged,
+  }) {
     final safeItems = items.toSet().toList();
     final safeValue = safeItems.contains(value) ? value : safeItems.first;
 
@@ -2200,14 +2306,22 @@ class _ControlBajasScreenState extends State<ControlBajasScreen> {
         value: safeValue,
         isExpanded: true,
         decoration: _inputDecoration(label),
-        items: safeItems.map((e) => DropdownMenuItem<String>(value: e, child: Text(e))).toList(),
+        items: safeItems
+            .map((e) => DropdownMenuItem<String>(value: e, child: Text(e)))
+            .toList(),
         onChanged: onChanged,
       ),
     );
   }
 
-  Widget _dateButton({required String label, required DateTime? value, required VoidCallback onTap}) {
-    final text = value == null ? 'Sin seleccionar' : '${value.day.toString().padLeft(2, '0')}/${value.month.toString().padLeft(2, '0')}/${value.year}';
+  Widget _dateButton({
+    required String label,
+    required DateTime? value,
+    required VoidCallback onTap,
+  }) {
+    final text = value == null
+        ? 'Sin seleccionar'
+        : '${value.day.toString().padLeft(2, '0')}/${value.month.toString().padLeft(2, '0')}/${value.year}';
     return Padding(
       padding: const EdgeInsets.only(bottom: 13),
       child: InkWell(
@@ -2232,9 +2346,18 @@ class _ControlBajasScreenState extends State<ControlBajasScreen> {
       labelText: label,
       filled: true,
       fillColor: const Color(0xFFF8FAFC),
-      border: OutlineInputBorder(borderRadius: BorderRadius.circular(18), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
-      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(18), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
-      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(18), borderSide: const BorderSide(color: Color(0xFF0284C7))),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(18),
+        borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(18),
+        borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(18),
+        borderSide: const BorderSide(color: Color(0xFF0284C7)),
+      ),
     );
   }
 
@@ -2250,7 +2373,9 @@ class _ControlBajasScreenState extends State<ControlBajasScreen> {
 
   void _snack(String text) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text), backgroundColor: const Color(0xFF0F172A)));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(text), backgroundColor: const Color(0xFF0F172A)),
+    );
   }
 }
 
@@ -2262,8 +2387,16 @@ class _FondoControlBajas extends StatelessWidget {
     return Stack(
       children: [
         Container(color: const Color(0xFFF4F7FB)),
-        Positioned(top: -130, right: -120, child: _orb(330, const Color(0xFF7DD3FC))),
-        Positioned(bottom: -150, left: -130, child: _orb(360, const Color(0xFFC4B5FD))),
+        Positioned(
+          top: -130,
+          right: -120,
+          child: _orb(330, const Color(0xFF7DD3FC)),
+        ),
+        Positioned(
+          bottom: -150,
+          left: -130,
+          child: _orb(360, const Color(0xFFC4B5FD)),
+        ),
       ],
     );
   }
@@ -2275,7 +2408,13 @@ class _FondoControlBajas extends StatelessWidget {
       decoration: BoxDecoration(
         color: color.withOpacity(0.42),
         shape: BoxShape.circle,
-        boxShadow: [BoxShadow(color: color.withOpacity(0.28), blurRadius: 70, spreadRadius: 20)],
+        boxShadow: [
+          BoxShadow(
+            color: color.withOpacity(0.28),
+            blurRadius: 70,
+            spreadRadius: 20,
+          ),
+        ],
       ),
     );
   }

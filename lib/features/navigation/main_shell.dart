@@ -1,11 +1,9 @@
 import 'package:flutter/material.dart';
 import '../home/home_screen.dart';
-import '../../core/permissions/role_permissions.dart';
-import '../team/team_screen.dart';
-import 'package:safebrok_andalucia/features/settings/settings_screen.dart';
-import 'package:safebrok_andalucia/features/business/business_screen.dart';
-import 'package:safebrok_andalucia/features/safecloud/safecloud_screen.dart';
-import 'package:safebrok_andalucia/features/chat/internal_chat_screen.dart';
+import '../settings/settings_screen.dart';
+import '../business/business_screen.dart';
+import '../safecloud/safecloud_screen.dart';
+import '../chat/internal_chat_screen.dart';
 import '../../core/auth/app_role.dart';
 
 class MainShell extends StatefulWidget {
@@ -22,11 +20,6 @@ class _MainShellState extends State<MainShell> {
 
   String get role => AppRole.normalize(widget.role);
 
-  bool get isDirector => role == AppRole.directorZona.value;
-  bool get isJefeVentas => role == AppRole.jefeVentas.value;
-  bool get isJefeEquipo => role == AppRole.jefeEquipo.value;
-  bool get isAgente => role == AppRole.agente.value;
-
   @override
   Widget build(BuildContext context) {
     final pages = [
@@ -38,30 +31,61 @@ class _MainShellState extends State<MainShell> {
     ];
 
     return Scaffold(
+      backgroundColor: const Color(0xFFF2FCFD),
+      extendBody: true,
       body: pages[index],
-
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: index,
-        onTap: (i) => setState(() => index = i),
-        type: BottomNavigationBarType.fixed,
-
-        backgroundColor: const Color(0xFF0B1C2A),
-        selectedItemColor: Colors.cyanAccent,
-        unselectedItemColor: Colors.white60,
-
-        items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.home), label: "Inicio"),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.chat_bubble_rounded),
-            label: "Chat",
+      bottomNavigationBar: SafeArea(
+        top: false,
+        child: Container(
+          margin: const EdgeInsets.fromLTRB(18, 0, 18, 12),
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.97),
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: const Color(0xFFBDEDEF)),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF071A3A).withOpacity(0.10),
+                blurRadius: 28,
+                offset: const Offset(0, 10),
+              ),
+            ],
           ),
-          BottomNavigationBarItem(icon: Icon(Icons.euro), label: "Negocio"),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.cloud_done_rounded),
-            label: "SafeCloud",
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(24),
+            child: BottomNavigationBar(
+              currentIndex: index,
+              onTap: (i) => setState(() => index = i),
+              type: BottomNavigationBarType.fixed,
+              elevation: 0,
+              backgroundColor: Colors.transparent,
+              selectedItemColor: const Color(0xFF0AAEAE),
+              unselectedItemColor: const Color(0xFF53627A),
+              selectedLabelStyle: const TextStyle(fontWeight: FontWeight.w800),
+              items: const [
+                BottomNavigationBarItem(
+                  icon: Icon(Icons.home),
+                  label: 'Inicio',
+                ),
+                BottomNavigationBarItem(
+                  icon: Icon(Icons.chat_bubble_rounded),
+                  label: 'Chat',
+                ),
+                BottomNavigationBarItem(
+                  icon: Icon(Icons.euro),
+                  label: 'Negocio',
+                ),
+                BottomNavigationBarItem(
+                  icon: Icon(Icons.cloud_done_rounded),
+                  label: 'SafeCloud',
+                ),
+                BottomNavigationBarItem(
+                  icon: Icon(Icons.settings),
+                  label: 'Ajustes',
+                ),
+              ],
+            ),
           ),
-          BottomNavigationBarItem(icon: Icon(Icons.settings), label: "Ajustes"),
-        ],
+        ),
       ),
     );
   }
