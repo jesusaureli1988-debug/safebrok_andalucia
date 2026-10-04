@@ -54,7 +54,9 @@ class PremiumWeighting {
     if (!isAuto(sale['producto'] ?? sale['ramo'] ?? sale['tipo_seguro']))
       return 1;
     final date = effectDate(sale);
-    return date != null && !date.isBefore(autoCutoff) ? 0.5 : 1;
+    // Desde el cargo de septiembre de 2026, Auto conserva su prima real
+    // para comisiones, pero no aporta producción computable.
+    return date != null && !date.isBefore(autoCutoff) ? 0 : 1;
   }
 
   static double amount(Map<String, dynamic> sale, dynamic rawAmount) =>

@@ -581,8 +581,10 @@ class _ReferenciasScreenState extends State<ReferenciasScreen> {
                                   "Decesos",
                                   "Hogar",
                                   "Auto",
+                                  "Patinete",
                                   "Vida",
                                   "Salud",
+                                  "Dental",
                                   "Transportes construcción",
                                   "Caución",
                                   "Camión",
@@ -654,12 +656,13 @@ class _ReferenciasScreenState extends State<ReferenciasScreen> {
                                 lastDate: DateTime(2035),
                                 builder: (context, child) {
                                   return Theme(
-                                    data: ThemeData.dark().copyWith(
-                                      colorScheme: const ColorScheme.dark(
-                                        primary: const Color(0xFF2563EB),
-                                        surface: Color(0xFFFFFFFF),
-                                      ),
-                                    ),
+                                    data: ThemeData.light(useMaterial3: true)
+                                        .copyWith(
+                                          colorScheme: const ColorScheme.light(
+                                            primary: Color(0xFF2454D3),
+                                            surface: Color(0xFFFFFFFF),
+                                          ),
+                                        ),
                                     child: child!,
                                   );
                                 },
@@ -1849,10 +1852,14 @@ class _ReferenciaDetailScreenState extends State<ReferenciaDetailScreen> {
         return Icons.home_rounded;
       case 'Auto':
         return Icons.directions_car_rounded;
+      case 'Patinete':
+        return Icons.electric_scooter_rounded;
       case 'Vida':
         return Icons.favorite_rounded;
       case 'Salud':
         return Icons.medical_services_rounded;
+      case 'Dental':
+        return Icons.medical_information_rounded;
       default:
         return Icons.sell_rounded;
     }
@@ -1866,10 +1873,14 @@ class _ReferenciaDetailScreenState extends State<ReferenciaDetailScreen> {
         return Colors.greenAccent;
       case 'Auto':
         return Colors.orangeAccent;
+      case 'Patinete':
+        return Colors.tealAccent;
       case 'Vida':
         return Colors.pinkAccent;
       case 'Salud':
         return Colors.blueAccent;
+      case 'Dental':
+        return Colors.cyanAccent;
       default:
         return const Color(0xFF2563EB);
     }
@@ -1892,11 +1903,11 @@ class _ReferenciaDetailScreenState extends State<ReferenciaDetailScreen> {
       lastDate: DateTime(2035),
       builder: (context, child) {
         return Theme(
-          data: ThemeData.dark().copyWith(
-            colorScheme: const ColorScheme.dark(
-              primary: const Color(0xFF2563EB),
+          data: ThemeData.light(useMaterial3: true).copyWith(
+            colorScheme: const ColorScheme.light(
+              primary: Color(0xFF2454D3),
               surface: Color(0xFFFFFFFF),
-              onSurface: Colors.white,
+              onSurface: const Color(0xFF071A3A),
             ),
             dialogBackgroundColor: const Color(0xFFFFFFFF),
           ),
@@ -1907,13 +1918,36 @@ class _ReferenciaDetailScreenState extends State<ReferenciaDetailScreen> {
   }
 
   Future<void> gestionarReferencia() async {
-    final notaController = TextEditingController();
-
     String estado = widget.referencia['estado']?.toString() ?? "En curso";
     if (estado == "Pendiente") estado = "En curso";
 
+    final notaGuardada =
+        widget.referencia['nota_seguimiento']?.toString() ?? '';
+    final resultadoEnNota = RegExp(
+      r'^Resultado: (Contratado|No contratado)',
+      caseSensitive: false,
+    ).firstMatch(notaGuardada)?.group(1);
     String resultado =
-        widget.referencia['resultado']?.toString() ?? "Contratado";
+        widget.referencia['resultado_local']?.toString().trim().isNotEmpty ==
+            true
+        ? widget.referencia['resultado_local'].toString()
+        : widget.referencia['resultados']?.toString().trim().isNotEmpty == true
+        ? widget.referencia['resultados'].toString()
+        : widget.referencia['resultado']?.toString().trim().isNotEmpty == true
+        ? widget.referencia['resultado'].toString()
+        : resultadoEnNota ?? "Contratado";
+    final notaController = TextEditingController(
+      text: notaGuardada
+          .replaceFirst(
+            RegExp(
+              r'^Resultado: (Contratado|No contratado)\s*',
+              caseSensitive: false,
+            ),
+            '',
+          )
+          .trim(),
+    );
+    bool guardando = false;
 
     fechaRellamada = _parseDate(widget.referencia['fecha_rellamada']);
 
@@ -2168,34 +2202,129 @@ class _ReferenciaDetailScreenState extends State<ReferenciaDetailScreen> {
                               const SizedBox(width: 12),
                               Expanded(
                                 child: ElevatedButton.icon(
-                                  onPressed: () async {
-                                    await supabase
-                                        .from('referencias_viables')
-                                        .update({
-                                          'estado': estado,
-                                          'resultado': estado == "Resuelto"
-                                              ? resultado
-                                              : null,
-                                          'nota_seguimiento': notaController
-                                              .text
-                                              .trim(),
-                                          'fecha_rellamada':
-                                              estado == "En curso"
-                                              ? fechaRellamada
-                                                    ?.toIso8601String()
-                                              : null,
-                                          'updated_at': DateTime.now()
-                                              .toIso8601String(),
-                                        })
-                                        .eq('id', widget.referencia['id']);
+                                  onPressed: guardando
+                                      ? null
+                                      : () async {
+                                          final dialogNavigator = Navigator.of(
+                                            context,
+                                          );
+                                          final pageNavigator = Navigator.of(
+                                            this.context,
+                                          );
+                                          final messenger =
+                                              ScaffoldMessenger.of(
+                                                this.context,
+                                              );
+                                          setDialogState(() {
+                                            guardando = true;
+                                          });
 
-                                    if (!mounted) return;
+                                          try {
+                                            final ahora = DateTime.now()
+                                                .toIso8601String();
+                                            final notaLimpia = notaController
+                                                .text
+                                                .replaceFirst(
+                                                  RegExp(
+                                                    r'^Resultado: (Contratado|No contratado)\s*',
+                                                    caseSensitive: false,
+                                                  ),
+                                                  '',
+                                                )
+                                                .trim();
+                                            final notaParaGuardar =
+                                                estado == "Resuelto"
+                                                ? 'Resultado: $resultado${notaLimpia.isEmpty ? '' : '\n$notaLimpia'}'
+                                                : notaLimpia;
+                                            final cambios = <String, dynamic>{
+                                              'estado': estado,
+                                              'nota_seguimiento':
+                                                  notaParaGuardar,
+                                              'fecha_seguimiento': ahora,
+                                              'fecha_rellamada':
+                                                  estado == "En curso"
+                                                  ? fechaRellamada
+                                                        ?.toIso8601String()
+                                                  : null,
+                                            };
 
-                                    Navigator.pop(context);
-                                    Navigator.pop(context, true);
-                                  },
-                                  icon: const Icon(Icons.save_rounded),
-                                  label: const Text("Guardar"),
+                                            final referenciaActualizada =
+                                                await supabase
+                                                    .from('referencias_viables')
+                                                    .update(cambios)
+                                                    .eq(
+                                                      'id',
+                                                      widget.referencia['id'],
+                                                    )
+                                                    .select(
+                                                      'id, estado, nota_seguimiento, fecha_seguimiento, fecha_rellamada',
+                                                    )
+                                                    .maybeSingle();
+
+                                            if (referenciaActualizada == null) {
+                                              throw Exception(
+                                                'No se actualizó la referencia. Comprueba tus permisos.',
+                                              );
+                                            }
+
+                                            widget.referencia.addAll(
+                                              Map<String, dynamic>.from(
+                                                referenciaActualizada,
+                                              ),
+                                            );
+                                            widget.referencia['resultado_local'] =
+                                                estado == "Resuelto"
+                                                ? resultado
+                                                : null;
+
+                                            if (!mounted) return;
+
+                                            messenger.showSnackBar(
+                                              const SnackBar(
+                                                content: Text(
+                                                  'Referencia guardada correctamente',
+                                                ),
+                                                behavior:
+                                                    SnackBarBehavior.floating,
+                                              ),
+                                            );
+
+                                            dialogNavigator.pop();
+                                            pageNavigator.pop(true);
+                                          } catch (error) {
+                                            if (!mounted) return;
+
+                                            setDialogState(() {
+                                              guardando = false;
+                                            });
+
+                                            messenger.showSnackBar(
+                                              SnackBar(
+                                                content: Text(
+                                                  'No se pudo guardar: $error',
+                                                ),
+                                                backgroundColor: const Color(
+                                                  0xFFB42318,
+                                                ),
+                                                behavior:
+                                                    SnackBarBehavior.floating,
+                                              ),
+                                            );
+                                          }
+                                        },
+                                  icon: guardando
+                                      ? const SizedBox(
+                                          width: 18,
+                                          height: 18,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2.2,
+                                            color: Colors.white,
+                                          ),
+                                        )
+                                      : const Icon(Icons.save_rounded),
+                                  label: Text(
+                                    guardando ? "Guardando..." : "Guardar",
+                                  ),
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor: const Color(0xFF2563EB),
                                     foregroundColor: const Color(0xFFFFFFFF),
@@ -2236,7 +2365,16 @@ class _ReferenciaDetailScreenState extends State<ReferenciaDetailScreen> {
     final estado = r['estado']?.toString() ?? "Pendiente";
     final notas = r['notas']?.toString() ?? "";
     final notaSeguimiento = r['nota_seguimiento']?.toString() ?? "";
-    final resultado = r['resultado']?.toString() ?? "";
+    final resultadoEnNota = RegExp(
+      r'^Resultado: (Contratado|No contratado)',
+      caseSensitive: false,
+    ).firstMatch(notaSeguimiento)?.group(1);
+    final resultado =
+        r['resultado_local']?.toString() ??
+        r['resultados']?.toString() ??
+        r['resultado']?.toString() ??
+        resultadoEnNota ??
+        "";
 
     final productos = _productos(r['productos_actuales']);
     final score = _scoreReferencia(r);

@@ -285,7 +285,7 @@ class _AgendaScreenState extends State<AgendaScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF2FCFD),
+      backgroundColor: const Color(0xFFF4F6FB),
 
       appBar: AppBar(
         backgroundColor: Colors.transparent,
@@ -297,7 +297,7 @@ class _AgendaScreenState extends State<AgendaScreen> {
       ),
 
       floatingActionButton: FloatingActionButton(
-        backgroundColor: Colors.cyanAccent,
+        backgroundColor: const Color(0xFF2454D3),
         onPressed: () async {
           final res = await Navigator.push(
             context,
@@ -308,7 +308,7 @@ class _AgendaScreenState extends State<AgendaScreen> {
             cargarEventos();
           }
         },
-        child: const Icon(Icons.add, color: Colors.black),
+        child: const Icon(Icons.add, color: Colors.white),
       ),
 
       body: loading
@@ -337,11 +337,11 @@ class _AgendaScreenState extends State<AgendaScreen> {
                       titleCentered: true,
                       leftChevronIcon: Icon(
                         Icons.chevron_left,
-                        color: Colors.white,
+                        color: Color(0xFF2454D3),
                       ),
                       rightChevronIcon: Icon(
                         Icons.chevron_right,
-                        color: Colors.white,
+                        color: Color(0xFF2454D3),
                       ),
                       titleTextStyle: TextStyle(
                         color: const Color(0xFF071A3A),
@@ -351,12 +351,12 @@ class _AgendaScreenState extends State<AgendaScreen> {
                     ),
                     calendarStyle: const CalendarStyle(
                       todayDecoration: BoxDecoration(
-                        color: Colors.cyanAccent,
+                        color: Color(0xFF2454D3),
                         shape: BoxShape.circle,
                       ),
 
                       selectedDecoration: BoxDecoration(
-                        color: Colors.orange,
+                        color: Color(0xFF13244D),
                         shape: BoxShape.circle,
                       ),
 
@@ -375,12 +375,12 @@ class _AgendaScreenState extends State<AgendaScreen> {
                       ),
 
                       todayTextStyle: TextStyle(
-                        color: Colors.black,
+                        color: Colors.white,
                         fontWeight: FontWeight.bold,
                       ),
 
                       selectedTextStyle: TextStyle(
-                        color: Colors.black,
+                        color: Colors.white,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
@@ -517,7 +517,7 @@ class _AgendaScreenState extends State<AgendaScreen> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         decoration: BoxDecoration(
-          color: vista == index ? const Color(0xFF0AAEAE) : Colors.white,
+          color: vista == index ? const Color(0xFF2454D3) : Colors.white,
           borderRadius: BorderRadius.circular(12),
         ),
         child: Text(

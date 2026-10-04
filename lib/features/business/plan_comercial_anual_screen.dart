@@ -19,6 +19,7 @@ class _PlanComercialAnualScreenState extends State<PlanComercialAnualScreen>
   late final TabController _tabs;
 
   static const _allowedRoles = {
+    'agente',
     'jefe_equipo',
     'jefe_ventas',
     'director_zona',
@@ -28,86 +29,61 @@ class _PlanComercialAnualScreenState extends State<PlanComercialAnualScreen>
   static const _definitions = <_MetricDefinition>[
     _MetricDefinition(
       keyName: 'incremento_prima_sin_vehiculos',
-      title: 'Incremento de prima',
-      subtitle: 'Crecimiento interanual excluyendo vehículos',
+      title: 'Incremento de primas',
+      subtitle: 'Crecimiento frente al mismo periodo del año anterior',
       unit: _MetricUnit.currency,
       icon: Icons.trending_up_rounded,
-      color: Color(0xFF0A7F91),
+      color: Color(0xFF2457D6),
     ),
     _MetricDefinition(
-      keyName: 'incremento_asegurados',
-      title: 'Incremento de asegurados',
-      subtitle: 'Variación anual del número de asegurados',
-      unit: _MetricUnit.number,
-      icon: Icons.groups_rounded,
-      color: Color(0xFF0A7F91),
-    ),
-    _MetricDefinition(
-      keyName: 'incremento_ventas_netas',
-      title: 'Incremento de ventas netas',
-      subtitle: 'Diferencia frente a las ventas netas del año anterior',
-      unit: _MetricUnit.number,
-      icon: Icons.stacked_line_chart_rounded,
-      color: Color(0xFF0891B2),
+      keyName: 'primas_decesos_vida',
+      title: 'Primas Decesos + Vida',
+      subtitle: 'Producción de Decesos + Vida frente al mix objetivo',
+      unit: _MetricUnit.currency,
+      icon: Icons.health_and_safety_rounded,
+      color: Color(0xFF6846C7),
     ),
     _MetricDefinition(
       keyName: 'porcentaje_pendiente',
-      title: 'Pendiente de recibos',
+      title: 'Pendiente',
       subtitle: 'Porcentaje máximo de recibos pendientes',
       unit: _MetricUnit.percentage,
       inverse: true,
       icon: Icons.pending_actions_rounded,
-      color: Color(0xFF0A7F91),
+      color: Color(0xFFD97706),
     ),
     _MetricDefinition(
-      keyName: 'anulaciones_decesos',
-      title: 'Anulaciones decesos',
-      subtitle: 'Límite anual de pólizas de decesos anuladas',
+      keyName: 'anulaciones',
+      title: 'Anulaciones',
+      subtitle: 'Límite de pólizas anuladas',
       unit: _MetricUnit.number,
       inverse: true,
       icon: Icons.policy_outlined,
-      color: Color(0xFFDC2626),
-    ),
-    _MetricDefinition(
-      keyName: 'anulaciones_resto',
-      title: 'Anulaciones resto',
-      subtitle: 'Límite anual para el resto de productos',
-      unit: _MetricUnit.number,
-      inverse: true,
-      icon: Icons.remove_circle_outline_rounded,
-      color: Color(0xFFE74646),
-    ),
-    _MetricDefinition(
-      keyName: 'ventas_netas',
-      title: 'Ventas netas',
-      subtitle: 'Altas menos anulaciones del año',
-      unit: _MetricUnit.number,
-      icon: Icons.shopping_bag_outlined,
-      color: Color(0xFF0AAEAE),
-    ),
-    _MetricDefinition(
-      keyName: 'facturacion',
-      title: 'Facturación',
-      subtitle: 'Prima anual neta generada',
-      unit: _MetricUnit.currency,
-      icon: Icons.euro_rounded,
-      color: Color(0xFF0F766E),
+      color: Color(0xFFDC3545),
     ),
     _MetricDefinition(
       keyName: 'captacion',
       title: 'Captación',
-      subtitle: 'Candidatos incorporados al proceso',
+      subtitle: 'Nuevas incorporaciones al proceso',
       unit: _MetricUnit.number,
       icon: Icons.person_add_alt_1_rounded,
-      color: Color(0xFF9333EA),
+      color: Color(0xFF7C3AED),
     ),
     _MetricDefinition(
-      keyName: 'liquido_decesos',
-      title: 'Líquido decesos',
-      subtitle: 'Prima neta de decesos menos prima extornada',
+      keyName: 'facturacion',
+      title: 'Facturación',
+      subtitle: 'Prima anual neta ponderada generada',
       unit: _MetricUnit.currency,
-      icon: Icons.waterfall_chart_rounded,
-      color: Color(0xFF0369A1),
+      icon: Icons.euro_rounded,
+      color: Color(0xFF087F8C),
+    ),
+    _MetricDefinition(
+      keyName: 'bi',
+      title: 'BI',
+      subtitle: 'Contribución generada después de lo cobrado',
+      unit: _MetricUnit.currency,
+      icon: Icons.insights_rounded,
+      color: Color(0xFF132A56),
     ),
   ];
 
@@ -123,6 +99,8 @@ class _PlanComercialAnualScreenState extends State<PlanComercialAnualScreen>
   Map<String, double> _actuals = {};
   Map<String, double> _monthlyActuals = {};
   Map<String, double> _cumulativeActuals = {};
+  double _biCumulativeGenerated = 0;
+  double _biCumulativePaid = 0;
 
   final _currency = NumberFormat.currency(locale: 'es_ES', symbol: '€');
   final _number = NumberFormat.decimalPattern('es_ES');
@@ -137,40 +115,7 @@ class _PlanComercialAnualScreenState extends State<PlanComercialAnualScreen>
         role == 'jefe_ventas';
   }
 
-  List<_MetricDefinition> get _visibleDefinitions {
-    final viewerRole = _text(_profile?['rol_usuario']);
-    final figure = _selectedFigure ?? _profile;
-    final figureRole = _text(figure?['rol_usuario']);
-    final isOwnPlan = _text(figure?['auth_id']) == _text(_profile?['auth_id']);
-
-    if (viewerRole == 'director_nacional') return _definitions;
-
-    // El director de zona conserva una visión completa de las figuras
-    // subordinadas, aunque esas figuras no vean todos esos indicadores.
-    if (viewerRole == 'director_zona' && !isOwnPlan) return _definitions;
-
-    final hiddenKeys = switch (figureRole) {
-      'director_zona' => {'facturacion', 'anulaciones_resto'},
-      'jefe_ventas' => {
-        'facturacion',
-        'anulaciones_resto',
-        'ventas_netas',
-        'incremento_ventas_netas',
-      },
-      'jefe_equipo' => {
-        'facturacion',
-        'anulaciones_resto',
-        'ventas_netas',
-        'incremento_ventas_netas',
-        'liquido_decesos',
-      },
-      _ => <String>{},
-    };
-
-    return _definitions
-        .where((definition) => !hiddenKeys.contains(definition.keyName))
-        .toList();
-  }
+  List<_MetricDefinition> get _visibleDefinitions => _definitions;
 
   @override
   void initState() {
@@ -345,6 +290,11 @@ class _PlanComercialAnualScreenState extends State<PlanComercialAnualScreen>
             .inFilter('asignado_auth_id', authIds)
             .gte('fecha_asignacion', from.toIso8601String())
             .lt('fecha_asignacion', to.toIso8601String()),
+        _supabase
+            .from('nominas_mensuales')
+            .select('auth_id, mes, anio, total_cobrar')
+            .inFilter('auth_id', authIds)
+            .eq('anio', _year),
       ]);
       final sales = List<Map<String, dynamic>>.from(results[0] as List);
       final allCancellations = List<Map<String, dynamic>>.from(
@@ -352,6 +302,8 @@ class _PlanComercialAnualScreenState extends State<PlanComercialAnualScreen>
       );
       final receipts = List<Map<String, dynamic>>.from(results[2] as List);
       final candidates = List<Map<String, dynamic>>.from(results[3] as List);
+      final payrolls = List<Map<String, dynamic>>.from(results[4] as List);
+
       final salesById = {for (final sale in sales) _text(sale['id']): sale};
       final currentSales = sales.where((sale) {
         final date = _date(sale['fecha_efecto']);
@@ -404,14 +356,21 @@ class _PlanComercialAnualScreenState extends State<PlanComercialAnualScreen>
       bool deaths(Map<String, dynamic> sale) =>
           _text(sale['producto']).toLowerCase().contains('deces');
 
+      bool deathsOrLife(Map<String, dynamic> sale) {
+        final product = _text(sale['producto']).toLowerCase();
+        return product.contains('deces') || product.contains('vida');
+      }
+
       double premium(
         Iterable<Map<String, dynamic>> rows, {
         bool withoutVehicles = false,
         bool onlyDeaths = false,
+        bool onlyDeathsOrLife = false,
       }) => rows
           .where((sale) {
             if (withoutVehicles && vehicle(sale)) return false;
             if (onlyDeaths && !deaths(sale)) return false;
+            if (onlyDeathsOrLife && !deathsOrLife(sale)) return false;
             return true;
           })
           .fold(0, (sum, sale) => sum + PremiumWeighting.net(sale));
@@ -548,72 +507,67 @@ class _PlanComercialAnualScreenState extends State<PlanComercialAnualScreen>
             ),
       );
 
+      double paidUntil(int month) => payrolls
+          .where((row) => _value(row['mes']).toInt() <= month)
+          .fold(0.0, (sum, row) => sum + _value(row['total_cobrar']));
+      double paidInMonth(int month) => payrolls
+          .where((row) => _value(row['mes']).toInt() == month)
+          .fold(0.0, (sum, row) => sum + _value(row['total_cobrar']));
+
+      final annualGenerated = premium(currentSales);
+      final monthlyGenerated = premium(currentMonthSales);
+      final cumulativeGenerated = premium(cumulativeSales);
+      final annualPaid = paidUntil(12);
+      final monthlyPaid = paidInMonth(_month);
+      final cumulativePaid = paidUntil(_month);
+
       final actuals = <String, double>{
         'incremento_prima_sin_vehiculos':
-            premium(currentSales, withoutVehicles: true) -
-            premium(previousSales, withoutVehicles: true),
-        'incremento_asegurados': insured(currentSales) - insured(previousSales),
-        'incremento_ventas_netas': (currentNet - previousNet).toDouble(),
+            annualGenerated - premium(previousSales),
+        'primas_decesos_vida': premium(currentSales, onlyDeathsOrLife: true),
         'porcentaje_pendiente': receipts.isEmpty
             ? 0
             : pendingReceipts / receipts.length * 100,
-        'anulaciones_decesos': deathsCancellations.length.toDouble(),
-        'anulaciones_resto':
-            (validCancellations.length - deathsCancellations.length).toDouble(),
-        'ventas_netas': currentNet.toDouble(),
-        'facturacion': premium(currentSales),
+        'anulaciones': validCancellations.length.toDouble(),
         'captacion': candidates.length.toDouble(),
-        'liquido_decesos':
-            premium(currentSales, onlyDeaths: true) - deathReversals,
+        'facturacion': annualGenerated,
+        'bi': annualGenerated - annualPaid,
       };
       final monthlyActuals = <String, double>{
         'incremento_prima_sin_vehiculos':
-            premium(currentMonthSales, withoutVehicles: true) -
-            premium(previousMonthSales, withoutVehicles: true),
-        'incremento_asegurados':
-            insured(currentMonthSales) - insured(previousMonthSales),
-        'incremento_ventas_netas': (monthNet - previousMonthNet).toDouble(),
+            monthlyGenerated - premium(previousMonthSales),
+        'primas_decesos_vida': premium(
+          currentMonthSales,
+          onlyDeathsOrLife: true,
+        ),
         'porcentaje_pendiente': monthReceipts.isEmpty
             ? 0
             : monthPendingReceipts / monthReceipts.length * 100,
-        'anulaciones_decesos': monthDeathsCancellations.length.toDouble(),
-        'anulaciones_resto':
-            (monthCancellations.length - monthDeathsCancellations.length)
-                .toDouble(),
-        'ventas_netas': monthNet.toDouble(),
-        'facturacion': premium(currentMonthSales),
+        'anulaciones': monthCancellations.length.toDouble(),
         'captacion': monthCandidates.length.toDouble(),
-        'liquido_decesos':
-            premium(currentMonthSales, onlyDeaths: true) - monthDeathReversals,
+        'facturacion': monthlyGenerated,
+        'bi': monthlyGenerated - monthlyPaid,
       };
       final cumulativeActuals = <String, double>{
         'incremento_prima_sin_vehiculos':
-            premium(cumulativeSales, withoutVehicles: true) -
-            premium(previousCumulativeSales, withoutVehicles: true),
-        'incremento_asegurados':
-            insured(cumulativeSales) - insured(previousCumulativeSales),
-        'incremento_ventas_netas': (cumulativeNet - previousCumulativeNet)
-            .toDouble(),
+            cumulativeGenerated - premium(previousCumulativeSales),
+        'primas_decesos_vida': premium(cumulativeSales, onlyDeathsOrLife: true),
         'porcentaje_pendiente': cumulativeReceipts.isEmpty
             ? 0
             : cumulativePendingReceipts / cumulativeReceipts.length * 100,
-        'anulaciones_decesos': cumulativeDeathsCancellations.length.toDouble(),
-        'anulaciones_resto':
-            (cumulativeCancellations.length -
-                    cumulativeDeathsCancellations.length)
-                .toDouble(),
-        'ventas_netas': cumulativeNet.toDouble(),
-        'facturacion': premium(cumulativeSales),
+        'anulaciones': cumulativeCancellations.length.toDouble(),
         'captacion': cumulativeCandidates.length.toDouble(),
-        'liquido_decesos':
-            premium(cumulativeSales, onlyDeaths: true) -
-            cumulativeDeathReversals,
+        'facturacion': cumulativeGenerated,
+        'bi': cumulativeGenerated - cumulativePaid,
       };
       if (!mounted) return;
       setState(() {
         _actuals = actuals;
         _monthlyActuals = monthlyActuals;
         _cumulativeActuals = cumulativeActuals;
+        _biCumulativeGenerated = cumulativeGenerated;
+        _biCumulativePaid = cumulativePaid;
+
         _loading = false;
       });
     } catch (error) {
@@ -662,9 +616,17 @@ class _PlanComercialAnualScreenState extends State<PlanComercialAnualScreen>
     final controllers = {
       for (final definition in _definitions)
         definition.keyName: TextEditingController(
-          text: _value(
-            existing?[definition.keyName],
-          ).toStringAsFixed(definition.unit == _MetricUnit.currency ? 2 : 0),
+          text:
+              (definition.keyName == 'primas_decesos_vida'
+                      ? _mixPercentage(existing)
+                      : _value(existing?[definition.keyName]))
+                  .toStringAsFixed(
+                    definition.keyName == 'primas_decesos_vida'
+                        ? 2
+                        : definition.unit == _MetricUnit.currency
+                        ? 2
+                        : 0,
+                  ),
         ),
     };
     final save = await showDialog<bool>(
@@ -687,10 +649,14 @@ class _PlanComercialAnualScreenState extends State<PlanComercialAnualScreen>
                     ),
                     decoration: InputDecoration(
                       labelText: definition.title,
-                      helperText: definition.inverse
+                      helperText: definition.keyName == 'primas_decesos_vida'
+                          ? 'Porcentaje del objetivo de Incremento de primas'
+                          : definition.inverse
                           ? 'Objetivo máximo permitido'
                           : 'Objetivo mínimo a alcanzar',
-                      suffixText: definition.unit == _MetricUnit.currency
+                      suffixText: definition.keyName == 'primas_decesos_vida'
+                          ? '%'
+                          : definition.unit == _MetricUnit.currency
                           ? '€'
                           : definition.unit == _MetricUnit.percentage
                           ? '%'
@@ -747,6 +713,8 @@ class _PlanComercialAnualScreenState extends State<PlanComercialAnualScreen>
 
   String _roleLabel(String role) {
     switch (role) {
+      case 'agente':
+        return 'Agente';
       case 'jefe_equipo':
         return 'Jefe de equipo';
       case 'jefe_ventas':
@@ -861,15 +829,19 @@ class _PlanComercialAnualScreenState extends State<PlanComercialAnualScreen>
                         _cumulativeActuals[definition.keyName] ?? 0,
                         _cumulativeTarget(
                           definition,
-                          _value(goal[definition.keyName]),
+                          _annualTargetFor(definition, goal),
                         ),
                         _monthlyActuals[definition.keyName] ?? 0,
                         _monthlyTarget(
                           definition,
-                          _value(goal[definition.keyName]),
+                          _annualTargetFor(definition, goal),
                         ),
                         _actuals[definition.keyName] ?? 0,
-                        _value(goal[definition.keyName]),
+                        _annualTargetFor(definition, goal),
+                        mixObjective:
+                            definition.keyName == 'primas_decesos_vida'
+                            ? _mixPercentage(goal)
+                            : null,
                       ),
                     );
                   }).toList(),
@@ -1069,7 +1041,7 @@ class _PlanComercialAnualScreenState extends State<PlanComercialAnualScreen>
         : visibleDefinitions.where((definition) {
             final target = _monthlyTarget(
               definition,
-              _value(goal[definition.keyName]),
+              _annualTargetFor(definition, goal),
             );
             final actual = _monthlyActuals[definition.keyName] ?? 0;
             if (target <= 0) return false;
@@ -1080,7 +1052,7 @@ class _PlanComercialAnualScreenState extends State<PlanComercialAnualScreen>
         : visibleDefinitions.where((definition) {
             final target = _cumulativeTarget(
               definition,
-              _value(goal[definition.keyName]),
+              _annualTargetFor(definition, goal),
             );
             final actual = _cumulativeActuals[definition.keyName] ?? 0;
             if (target <= 0) return false;
@@ -1190,16 +1162,21 @@ class _PlanComercialAnualScreenState extends State<PlanComercialAnualScreen>
     double monthlyActual,
     double monthlyTarget,
     double annualActual,
-    double annualTarget,
-  ) {
-    final rawProgress = cumulativeTarget <= 0
-        ? 0.0
-        : definition.inverse
-        ? (cumulativeActual <= cumulativeTarget
-              ? 1.0
-              : cumulativeTarget / cumulativeActual)
-        : cumulativeActual / cumulativeTarget;
+    double annualTarget, {
+    double? mixObjective,
+  }) {
+    double calculateProgress(double actual, double target) {
+      if (target <= 0) return 0;
+      return definition.inverse
+          ? (actual <= target ? 1 : target / actual)
+          : actual / target;
+    }
+
+    final monthLabel = _monthName(_month);
+    final rawProgress = calculateProgress(cumulativeActual, cumulativeTarget);
     final progress = rawProgress.clamp(0.0, 1.0);
+    final annualRawProgress = calculateProgress(annualActual, annualTarget);
+    final annualProgress = annualRawProgress.clamp(0.0, 1.0);
     final deviation = definition.inverse
         ? cumulativeTarget - cumulativeActual
         : cumulativeActual - cumulativeTarget;
@@ -1211,6 +1188,7 @@ class _PlanComercialAnualScreenState extends State<PlanComercialAnualScreen>
         (definition.inverse
             ? cumulativeActual <= cumulativeTarget
             : cumulativeActual >= cumulativeTarget);
+
     return Card(
       elevation: 0,
       clipBehavior: Clip.antiAlias,
@@ -1248,51 +1226,121 @@ class _PlanComercialAnualScreenState extends State<PlanComercialAnualScreen>
                     ],
                   ),
                 ),
-                SizedBox(
-                  width: 72,
-                  height: 72,
-                  child: CustomPaint(
-                    painter: _ProgressRingPainter(
-                      progress: progress,
-                      color: achieved
-                          ? const Color(0xFF0AAEAE)
-                          : definition.color,
-                    ),
-                    child: Center(
-                      child: Text(
-                        '${(rawProgress * 100).clamp(0, 999).toStringAsFixed(0)}%',
-                        style: const TextStyle(fontWeight: FontWeight.w900),
-                      ),
-                    ),
-                  ),
-                ),
               ],
             ),
             const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(
-                  child: _smallValue(
-                    'Acumulado a ${_monthName(_month)}',
-                    _formatValue(cumulativeActual, definition.unit),
-                  ),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: definition.color.withValues(alpha: .055),
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(
+                  color: definition.color.withValues(alpha: .18),
                 ),
-                Expanded(
-                  child: _smallValue(
-                    'Objetivo acumulado',
-                    _formatValue(cumulativeTarget, definition.unit),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    mixObjective == null
+                        ? 'OBJETIVO A ${monthLabel.toUpperCase()}'
+                        : 'OBJETIVO A ${monthLabel.toUpperCase()} · ${mixObjective.toStringAsFixed(1)} % MIX ANUAL',
+                    style: TextStyle(
+                      color: definition.color,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: .7,
+                    ),
                   ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _smallValue(
+                          'Lleva hasta $monthLabel',
+                          _formatValue(cumulativeActual, definition.unit),
+                        ),
+                      ),
+                      Expanded(
+                        child: _smallValue(
+                          'Debería llevar',
+                          _formatValue(cumulativeTarget, definition.unit),
+                        ),
+                      ),
+                      SizedBox(
+                        width: 72,
+                        height: 72,
+                        child: CustomPaint(
+                          painter: _ProgressRingPainter(
+                            progress: progress,
+                            color: achieved
+                                ? const Color(0xFF0AAEAE)
+                                : definition.color,
+                          ),
+                          child: Center(
+                            child: Text(
+                              '${(rawProgress * 100).clamp(0, 999).toStringAsFixed(0)}%',
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  LinearProgressIndicator(
+                    value: progress,
+                    minHeight: 7,
+                    borderRadius: BorderRadius.circular(20),
+                    color: achieved
+                        ? const Color(0xFF0AAEAE)
+                        : definition.color,
+                    backgroundColor: definition.color.withValues(alpha: .10),
+                  ),
+                ],
+              ),
+            ),
+            if (definition.keyName == 'bi') ...[
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFFEEF4FF), Color(0xFFF4F0FF)],
+                  ),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: const Color(0xFFD8E3F4)),
                 ),
-              ],
-            ),
-            const SizedBox(height: 10),
-            LinearProgressIndicator(
-              value: progress,
-              minHeight: 7,
-              borderRadius: BorderRadius.circular(20),
-              color: achieved ? const Color(0xFF0AAEAE) : definition.color,
-              backgroundColor: definition.color.withValues(alpha: .10),
-            ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: _biValue(
+                        'Generado',
+                        _biCumulativeGenerated,
+                        Icons.auto_graph_rounded,
+                      ),
+                    ),
+                    Container(
+                      width: 1,
+                      height: 38,
+                      color: const Color(0xFFD8E3F4),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _biValue(
+                        'Cobrado',
+                        _biCumulativePaid,
+                        Icons.account_balance_wallet_rounded,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
             const SizedBox(height: 11),
             Row(
               children: [
@@ -1302,7 +1350,7 @@ class _PlanComercialAnualScreenState extends State<PlanComercialAnualScreen>
                         ? definition.inverse
                               ? 'Dentro del límite · margen: '
                                     '${_formatValue(remaining, definition.unit)}'
-                              : 'Objetivo acumulado alcanzado'
+                              : 'Objetivo a $monthLabel alcanzado'
                         : definition.inverse
                         ? 'Exceso: '
                               '${_formatValue(cumulativeActual - cumulativeTarget, definition.unit)}'
@@ -1328,53 +1376,146 @@ class _PlanComercialAnualScreenState extends State<PlanComercialAnualScreen>
                 ),
               ],
             ),
-            const Divider(height: 24),
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    '${_monthName(_month)}: '
-                    '${_formatValue(monthlyActual, definition.unit)}',
-                    style: const TextStyle(color: Colors.black54, fontSize: 12),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-                Expanded(
-                  child: Text(
-                    'Objetivo mensual: '
-                    '${_formatValue(monthlyTarget, definition.unit)}',
-                    textAlign: TextAlign.right,
-                    style: const TextStyle(color: Colors.black54, fontSize: 12),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-              ],
+            const SizedBox(height: 8),
+            Text(
+              '$monthLabel: ${_formatValue(monthlyActual, definition.unit)} · '
+              'objetivo del mes: ${_formatValue(monthlyTarget, definition.unit)}',
+              style: const TextStyle(color: Colors.black54, fontSize: 12),
             ),
-            const SizedBox(height: 7),
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    'Registrado en $_year: '
-                    '${_formatValue(annualActual, definition.unit)}',
-                    style: const TextStyle(color: Colors.black45, fontSize: 11),
-                    overflow: TextOverflow.ellipsis,
+            const Divider(height: 24),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF7F9FC),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: const Color(0xFFE4E9F1)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'OBJETIVO ANUAL',
+                    style: TextStyle(
+                      color: Color(0xFF64748B),
+                      fontSize: 10,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: .7,
+                    ),
                   ),
-                ),
-                Expanded(
-                  child: Text(
-                    'Meta anual: ${_formatValue(annualTarget, definition.unit)}',
-                    textAlign: TextAlign.right,
-                    style: const TextStyle(color: Colors.black45, fontSize: 11),
-                    overflow: TextOverflow.ellipsis,
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _annualValue(
+                          'Lleva en $_year',
+                          _formatValue(annualActual, definition.unit),
+                        ),
+                      ),
+                      Expanded(
+                        child: _annualValue(
+                          mixObjective == null
+                              ? 'Objetivo del año'
+                              : 'Objetivo del año (${mixObjective.toStringAsFixed(1)} %)',
+                          _formatValue(annualTarget, definition.unit),
+                        ),
+                      ),
+                      Expanded(
+                        child: _annualValue(
+                          'Cumplimiento',
+                          '${(annualRawProgress * 100).clamp(0, 999).toStringAsFixed(0)}%',
+                          alignRight: true,
+                        ),
+                      ),
+                    ],
                   ),
-                ),
-              ],
+                  const SizedBox(height: 8),
+                  LinearProgressIndicator(
+                    value: annualProgress,
+                    minHeight: 4,
+                    borderRadius: BorderRadius.circular(20),
+                    color: const Color(0xFF64748B),
+                    backgroundColor: const Color(0xFFE2E8F0),
+                  ),
+                ],
+              ),
             ),
           ],
         ),
       ),
     );
+  }
+
+  Widget _annualValue(String label, String value, {bool alignRight = false}) =>
+      Column(
+        crossAxisAlignment: alignRight
+            ? CrossAxisAlignment.end
+            : CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: const TextStyle(color: Color(0xFF64748B), fontSize: 10),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            value,
+            textAlign: alignRight ? TextAlign.right : TextAlign.left,
+            style: const TextStyle(
+              color: Color(0xFF172033),
+              fontSize: 12,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ],
+      );
+  Widget _biValue(String label, double value, IconData icon) => Row(
+    children: [
+      Icon(icon, size: 20, color: const Color(0xFF2457D6)),
+      const SizedBox(width: 8),
+      Expanded(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              label,
+              style: const TextStyle(
+                color: Color(0xFF667085),
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            Text(
+              _currency.format(value),
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: Color(0xFF101828),
+                fontSize: 15,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ],
+        ),
+      ),
+    ],
+  );
+
+  double _mixPercentage(Map<String, dynamic>? goal) {
+    if (goal == null) return 0;
+    final stored = _value(goal['primas_decesos_vida']);
+    final premiumGoal = _value(goal['incremento_prima_sin_vehiculos']);
+    if (stored <= 100 || premiumGoal <= 0) return stored;
+    return stored / premiumGoal * 100;
+  }
+
+  double _annualTargetFor(
+    _MetricDefinition definition,
+    Map<String, dynamic> goal,
+  ) {
+    if (definition.keyName != 'primas_decesos_vida') {
+      return _value(goal[definition.keyName]);
+    }
+    final premiumGoal = _value(goal['incremento_prima_sin_vehiculos']);
+    return premiumGoal * _mixPercentage(goal) / 100;
   }
 
   double _monthlyTarget(_MetricDefinition definition, double annualTarget) {
@@ -1499,15 +1640,17 @@ class _PlanComercialAnualScreenState extends State<PlanComercialAnualScreen>
     childrenPadding: const EdgeInsets.fromLTRB(18, 0, 18, 18),
     children: const [
       Text(
-        'Incrementos: comparan el ejercicio seleccionado con el ejercicio '
-        'anterior. Ventas netas: ventas menos anulaciones. Facturación: '
-        'suma de prima anual neta. Líquido decesos: prima neta de decesos '
-        'menos prima extornada. Pendiente: recibos pendientes sobre el '
-        'total acumulado. El objetivo anual se divide entre 12 meses y se '
-        'acumula hasta el mes seleccionado; los objetivos porcentuales '
-        'mantienen su porcentaje. También se muestra por separado el '
-        'resultado exclusivo del mes. Las métricas de una figura incluyen '
-        'sus subordinados.',
+        'El porcentaje principal compara el resultado acumulado con el '
+        'objetivo anual ponderado hasta el mes seleccionado. El avance '
+        'sobre el objetivo anual completo se conserva como referencia '
+        'secundaria. Incremento de primas compara la producción ponderada '
+        'con el mismo periodo del ejercicio anterior. Decesos + Vida suma '
+        'las primas de ambos ramos. Pendiente refleja los recibos pendientes '
+        'sobre el total y Anulaciones reúne todas las anulaciones válidas. '
+        'Facturación muestra la producción ponderada generada y BI compara '
+        'lo generado con lo cobrado. Las pólizas de Auto con efecto desde '
+        'el 27/08/2026 no computan como primas. En responsables, todos los datos '
+        'incluyen su estructura completa.',
       ),
     ],
   );

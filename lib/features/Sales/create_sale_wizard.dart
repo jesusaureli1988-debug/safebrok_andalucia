@@ -63,12 +63,14 @@ class _CreateSaleWizardState extends State<CreateSaleWizard> {
     'Comercio',
     'Comunidad',
     'Salud',
+    'Dental',
     'Baja laboral',
     'Accidentes',
     'Ahorro',
     'Embarcaciones',
     'Legal familiar',
     'Moto',
+    'Patinete',
     'Vehiculos agricolas',
 
     // NUEVOS RAMOS
@@ -1091,47 +1093,6 @@ class _CreateSaleWizardState extends State<CreateSaleWizard> {
     );
   }
 
-  Future<void> _notificarNuevaVenta({
-    required String ventaId,
-    required String agenteAuthId,
-    required double primaAnual,
-  }) async {
-    try {
-      final response = await supabase.functions.invoke(
-        'enviar-push',
-        body: {
-          'auth_id_destino': agenteAuthId,
-          'incluir_superiores': true,
-          'titulo': 'Nueva venta registrada',
-          'mensaje':
-              '${selectedProduct!} · ${selectedCompany!} · '
-              '${primaAnual.toStringAsFixed(2)} €',
-          'data': {
-            'tipo': 'nueva_venta',
-            'venta_id': ventaId,
-            'agente_auth_id': agenteAuthId,
-            'numero_poliza': numeroPoliza.text.trim(),
-            'producto': selectedProduct!,
-            'compania': selectedCompany!,
-            'forma_pago': selectedPayment!,
-            'prima_anual': primaAnual,
-          },
-        },
-      );
-
-      if (response.status < 200 || response.status >= 300) {
-        debugPrint(
-          'PUSH NUEVA VENTA NO ENVIADO: '
-          'HTTP ${response.status} - ${response.data}',
-        );
-      }
-    } catch (error, stackTrace) {
-      // El push es secundario: nunca debe hacer fallar el guardado.
-      debugPrint('ERROR PUSH NUEVA VENTA: $error');
-      debugPrintStack(stackTrace: stackTrace);
-    }
-  }
-
   Future<void> _save() async {
     if (saving) return;
 
@@ -1218,7 +1179,7 @@ class _CreateSaleWizardState extends State<CreateSaleWizard> {
         porcentajeComision: porcentajeComision,
       );
 
-      final ventaResponse = await supabase
+      await supabase
           .from('ventas')
           .insert({
             'cliente_id': finalClientId,
@@ -1248,16 +1209,6 @@ class _CreateSaleWizardState extends State<CreateSaleWizard> {
           })
           .select('id')
           .single();
-
-      final ventaId = ventaResponse['id'].toString();
-
-      unawaited(
-        _notificarNuevaVenta(
-          ventaId: ventaId,
-          agenteAuthId: user.id,
-          primaAnual: primaAnual,
-        ),
-      );
 
       final seguimientos = [
         {

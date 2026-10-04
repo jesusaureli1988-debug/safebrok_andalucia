@@ -14,7 +14,7 @@ class PrevisionesScreen extends StatefulWidget {
 class _PrevisionesScreenState extends State<PrevisionesScreen>
     with SingleTickerProviderStateMixin {
   final db = Supabase.instance.client;
-  late final TabController tabs;
+  late TabController tabs;
   late String role;
   DateTime period = DateTime(DateTime.now().year, DateTime.now().month);
   bool loading = true, saving = false;
@@ -22,6 +22,7 @@ class _PrevisionesScreenState extends State<PrevisionesScreen>
   final forecasts = <String, _Forecast>{};
   final actuals = <String, _Actual>{};
   List<_MemberProgress> members = const [];
+  _Actual loadedTeamActual = const _Actual();
   String? currentUserId;
   bool get isAgent => role == AppRole.agente.value;
 
@@ -65,7 +66,13 @@ class _PrevisionesScreenState extends State<PrevisionesScreen>
               'estado.is.null,estado.not.in.(inactivo,Inactivo,INACTIVO,baja,Baja,BAJA,desactivado,Desactivado,DESACTIVADO,bloqueado,Bloqueado,BLOQUEADO,suspendido,Suspendido,SUSPENDIDO)',
             ),
       );
-      role = AppRole.normalize(me['rol_usuario']);
+      final resolvedRole = AppRole.normalize(me['rol_usuario']);
+      final resolvedTabLength = resolvedRole == AppRole.agente.value ? 1 : 2;
+      if (tabs.length != resolvedTabLength) {
+        tabs.dispose();
+        tabs = TabController(length: resolvedTabLength, vsync: this);
+      }
+      role = resolvedRole;
       final rows = List<Map<String, dynamic>>.from(
         await db
             .from('previsiones_mensuales')
@@ -78,13 +85,14 @@ class _PrevisionesScreenState extends State<PrevisionesScreen>
         ))
           row['ambito'].toString(): _Forecast.fromRow(row),
       };
-      final nextActuals = <String, _Actual>{
-        'propias': await calculate({auth.id}),
-        if (!isAgent) 'equipo': await calculate(teamIds(me, users)),
-      };
+      final ownActual = await calculate({auth.id});
       final nextMembers = isAgent
           ? const <_MemberProgress>[]
           : await buildMembers(me, users, rows);
+      final nextActuals = <String, _Actual>{
+        'propias': ownActual,
+        if (!isAgent) 'equipo': loadedTeamActual,
+      };
       if (!mounted) return;
       setState(() {
         forecasts
@@ -155,7 +163,10 @@ class _PrevisionesScreenState extends State<PrevisionesScreen>
       ids,
       'created_at',
       end,
-    )).where(productiveSale);
+      selectColumns:
+          'agente_auth_id,producto,precio,prima_anual,prima_anual_neta,'
+          'fecha_efecto,estado_poliza',
+    )).where(productiveSale).toList();
     final hires = await paged(
       'incorporaciones',
       'solicitante_auth_id',
@@ -163,17 +174,23 @@ class _PrevisionesScreenState extends State<PrevisionesScreen>
       'completado_at',
       end,
       completed: true,
+      selectColumns: 'solicitante_auth_id',
     );
 
     final ownActual = <String, _Actual>{};
+    var teamPremiums = 0.0;
+    var teamMix = 0.0;
     for (final sale in sales) {
       final auth = sale['agente_auth_id']?.toString();
       if (auth == null) continue;
       final old = ownActual[auth] ?? const _Actual();
       final amount = PremiumWeighting.net(sale);
+      final lifeMixAmount = isLifeMix(sale) ? amount : 0.0;
+      teamPremiums += amount;
+      teamMix += lifeMixAmount;
       ownActual[auth] = _Actual(
         old.premiums + amount,
-        old.mix + (isLifeMix(sale) ? amount : 0),
+        old.mix + lifeMixAmount,
         old.hires,
       );
     }
@@ -183,6 +200,7 @@ class _PrevisionesScreenState extends State<PrevisionesScreen>
       final old = ownActual[auth] ?? const _Actual();
       ownActual[auth] = _Actual(old.premiums, old.mix, old.hires + 1);
     }
+    loadedTeamActual = _Actual(teamPremiums, teamMix, hires.length);
 
     final goals = <String, _Forecast>{};
     for (final row in rows) {
@@ -271,6 +289,9 @@ class _PrevisionesScreenState extends State<PrevisionesScreen>
       ids,
       'created_at',
       end,
+      selectColumns:
+          'agente_auth_id,producto,precio,prima_anual,prima_anual_neta,'
+          'fecha_efecto,estado_poliza',
     );
     final productive = sales.where(productiveSale).toList();
     final premiums = productive.fold<double>(
@@ -287,6 +308,7 @@ class _PrevisionesScreenState extends State<PrevisionesScreen>
       'completado_at',
       end,
       completed: true,
+      selectColumns: 'solicitante_auth_id',
     );
     return _Actual(premiums, mix, hires.length);
   }
@@ -298,6 +320,7 @@ class _PrevisionesScreenState extends State<PrevisionesScreen>
     String dateColumn,
     DateTime end, {
     bool completed = false,
+    String selectColumns = '*',
   }) async {
     final result = <Map<String, dynamic>>[], all = ids.toList();
     for (var i = 0; i < all.length; i += 80) {
@@ -306,7 +329,7 @@ class _PrevisionesScreenState extends State<PrevisionesScreen>
       while (true) {
         var query = db
             .from(table)
-            .select()
+            .select(selectColumns)
             .inFilter(column, block)
             .gte(dateColumn, period.toUtc().toIso8601String())
             .lt(dateColumn, end.toUtc().toIso8601String());

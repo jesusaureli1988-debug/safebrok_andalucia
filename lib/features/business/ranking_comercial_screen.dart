@@ -34,18 +34,19 @@ class _RankingComercialScreenState extends State<RankingComercialScreen> {
     });
 
     try {
-      final ventasRaw = await supabase
-          .from('ventas')
-          .select('agente_auth_id, producto, prima_anual_neta');
+      final ventas = <Map<String, dynamic>>[];
+      for (var desde = 0; ; desde += 1000) {
+        final pagina = await supabase
+            .from('ventas')
+            .select('agente_auth_id, producto, prima_anual_neta, fecha_efecto')
+            .order('id')
+            .range(desde, desde + 999);
+        ventas.addAll(List<Map<String, dynamic>>.from(pagina));
+        if (pagina.length < 1000) break;
+      }
 
-      final usuariosRaw = await supabase
-          .from('usuarios')
-          .select('id, auth_id, nombre, apellidos, rol_usuario, parent_id')
-          .or(
-            'estado.is.null,estado.not.in.(inactivo,Inactivo,INACTIVO,baja,Baja,BAJA,desactivado,Desactivado,DESACTIVADO,bloqueado,Bloqueado,BLOQUEADO,suspendido,Suspendido,SUSPENDIDO)',
-          );
+      final usuariosRaw = await supabase.rpc('app_ranking_usuarios_activos');
 
-      final ventas = List<Map<String, dynamic>>.from(ventasRaw);
       final usuarios = List<Map<String, dynamic>>.from(usuariosRaw);
 
       final List<Map<String, dynamic>> resultado = [];
@@ -85,7 +86,9 @@ class _RankingComercialScreenState extends State<RankingComercialScreen> {
           'Hogar': 0,
           'Vida': 0,
           'Salud': 0,
+          'Dental': 0,
           'Auto': 0,
+          'Patinete': 0,
           'Otros': 0,
         };
 
@@ -94,7 +97,9 @@ class _RankingComercialScreenState extends State<RankingComercialScreen> {
           'Hogar': 0,
           'Vida': 0,
           'Salud': 0,
+          'Dental': 0,
           'Auto': 0,
+          'Patinete': 0,
           'Otros': 0,
         };
 
@@ -145,62 +150,34 @@ class _RankingComercialScreenState extends State<RankingComercialScreen> {
     List<Map<String, dynamic>> usuarios,
     String rol,
   ) {
-    final List<String> ids = [];
+    final ids = <String>{};
+    final visitados = <String>{};
+    final hijosPorPadre = <String, List<Map<String, dynamic>>>{};
 
-    final userId = usuario['id']?.toString();
-    final authId = usuario['auth_id']?.toString();
+    for (final persona in usuarios) {
+      final parentId = persona['parent_id']?.toString();
+      if (parentId != null && parentId.isNotEmpty) {
+        hijosPorPadre.putIfAbsent(parentId, () => []).add(persona);
+      }
+    }
 
-    if (rol == "agente") {
-      if (authId != null && authId.isNotEmpty) {
+    void recorrer(Map<String, dynamic> persona) {
+      final id = persona['id']?.toString();
+      if (id == null || id.isEmpty || !visitados.add(id)) return;
+      final authId = persona['auth_id']?.toString();
+      if (authId != null && authId.isNotEmpty && authId != 'null') {
         ids.add(authId);
       }
-      return ids;
-    }
-
-    if (userId == null) return ids;
-
-    if (rol == "jefe_equipo") {
-      final agentes = usuarios.where((u) {
-        final parentId = u['parent_id']?.toString();
-        final rolUsuario = _normalizarRol(u['rol_usuario']);
-        return parentId == userId && rolUsuario == "agente";
-      });
-
-      for (final a in agentes) {
-        final auth = a['auth_id']?.toString();
-        if (auth != null && auth.isNotEmpty) ids.add(auth);
+      for (final hijo in hijosPorPadre[id] ?? const <Map<String, dynamic>>[]) {
+        recorrer(hijo);
       }
-
-      return ids;
     }
 
-    if (rol == "jefe_ventas") {
-      final jefesEquipo = usuarios.where((u) {
-        final parentId = u['parent_id']?.toString();
-        final rolUsuario = _normalizarRol(u['rol_usuario']);
-        return parentId == userId && rolUsuario == "jefe_equipo";
-      }).toList();
-
-      final jefeIds = jefesEquipo
-          .map((j) => j['id']?.toString())
-          .where((id) => id != null && id.isNotEmpty)
-          .toList();
-
-      final agentes = usuarios.where((u) {
-        final parentId = u['parent_id']?.toString();
-        final rolUsuario = _normalizarRol(u['rol_usuario']);
-        return jefeIds.contains(parentId) && rolUsuario == "agente";
-      });
-
-      for (final a in agentes) {
-        final auth = a['auth_id']?.toString();
-        if (auth != null && auth.isNotEmpty) ids.add(auth);
-      }
-
-      return ids;
-    }
-
-    return ids;
+    // Cada clasificación compara a todos los miembros activos de esa figura
+    // en la compañía. Para responsables, se suma toda su descendencia real,
+    // sin imponer un rol concreto a cada nivel de dependencia.
+    recorrer(usuario);
+    return ids.toList();
   }
 
   String _normalizarRol(dynamic rol) {
@@ -229,7 +206,9 @@ class _RankingComercialScreenState extends State<RankingComercialScreen> {
     if (p.contains('deceso')) return 'Decesos';
     if (p.contains('hogar')) return 'Hogar';
     if (p.contains('vida')) return 'Vida';
+    if (p.contains('dental')) return 'Dental';
     if (p.contains('salud')) return 'Salud';
+    if (p.contains('patinete')) return 'Patinete';
     if (p.contains('auto') || p.contains('coche')) return 'Auto';
 
     return 'Otros';
@@ -385,7 +364,7 @@ class _RankingComercialScreenState extends State<RankingComercialScreen> {
           ),
           const SizedBox(height: 6),
           Text(
-            "Ranking por estructura, producción y ventas acumuladas",
+            "Ranking de toda la compañía por figura, producción y ventas",
             style: const TextStyle(color: Color(0xFFD8E2F2), fontSize: 13),
           ),
           const SizedBox(height: 18),
@@ -472,7 +451,9 @@ class _RankingComercialScreenState extends State<RankingComercialScreen> {
                 _chipProducto("Hogar"),
                 _chipProducto("Vida"),
                 _chipProducto("Salud"),
+                _chipProducto("Dental"),
                 _chipProducto("Auto"),
+                _chipProducto("Patinete"),
                 _chipProducto("Transportes construcción"),
                 _chipProducto("Caución"),
                 _chipProducto("Camión"),

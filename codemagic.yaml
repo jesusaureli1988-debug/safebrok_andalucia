@@ -1,6 +1,6 @@
 workflows:
   ios-release:
-    name: iOS Release Safebrok
+    name: iOS Release SafeBrok
     instance_type: mac_mini_m2
     max_build_duration: 60
 
@@ -41,8 +41,6 @@ workflows:
         script: |
           flutter build ipa --release \
             -t lib/main.dart \
-            --build-name=1.1.1 \
-            --build-number=10 \
             --export-options-plist=/Users/builder/export_options.plist
           echo "BUSCANDO IPA..."
           find build -name "*.ipa" -print

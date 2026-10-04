@@ -1200,11 +1200,11 @@ class _MeetingCreateDialogState extends State<MeetingCreateDialog> {
       lastDate: DateTime(2035),
       builder: (context, child) {
         return Theme(
-          data: ThemeData.dark().copyWith(
-            colorScheme: const ColorScheme.dark(
-              primary: const Color(0xFF2563EB),
+          data: ThemeData.light(useMaterial3: true).copyWith(
+            colorScheme: const ColorScheme.light(
+              primary: Color(0xFF2454D3),
               surface: Color(0xFFFFFFFF),
-              onSurface: Colors.white,
+              onSurface: const Color(0xFF071A3A),
             ),
             dialogBackgroundColor: const Color(0xFFFFFFFF),
           ),
@@ -1220,11 +1220,11 @@ class _MeetingCreateDialogState extends State<MeetingCreateDialog> {
       initialTime: initial,
       builder: (context, child) {
         return Theme(
-          data: ThemeData.dark().copyWith(
-            colorScheme: const ColorScheme.dark(
-              primary: const Color(0xFF2563EB),
+          data: ThemeData.light(useMaterial3: true).copyWith(
+            colorScheme: const ColorScheme.light(
+              primary: Color(0xFF2454D3),
               surface: Color(0xFFFFFFFF),
-              onSurface: Colors.white,
+              onSurface: const Color(0xFF071A3A),
             ),
             dialogBackgroundColor: const Color(0xFFFFFFFF),
           ),

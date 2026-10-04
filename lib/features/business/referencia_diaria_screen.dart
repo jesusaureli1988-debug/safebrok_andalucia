@@ -33,7 +33,9 @@ class _ReferenciaDiariaScreenState extends State<ReferenciaDiariaScreen> {
     "Hogar",
     "Vida",
     "Salud",
+    "Dental",
     "Auto",
+    "Patinete",
     "Comercio",
     "Comunidad",
     "RC",
@@ -153,10 +155,10 @@ class _ReferenciaDiariaScreenState extends State<ReferenciaDiariaScreen> {
 
   Widget _dateTheme(BuildContext context, Widget? child) {
     return Theme(
-      data: ThemeData.dark().copyWith(
-        colorScheme: const ColorScheme.dark(
-          primary: Color(0xFF20C7C2),
-          surface: Color(0xFFEAF8F8),
+      data: ThemeData.light(useMaterial3: true).copyWith(
+        colorScheme: const ColorScheme.light(
+          primary: Color(0xFF2454D3),
+          surface: Colors.white,
         ),
       ),
       child: child!,

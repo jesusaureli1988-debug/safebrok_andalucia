@@ -422,9 +422,9 @@ class _ObjetivoScreenState extends State<ObjetivoScreen> {
   double get objetivoPrimas {
     final role = widget.role.toLowerCase().trim();
 
-    if (role == 'jefe_equipo') return 10000;
-    if (role == 'jefe_ventas') return 11500;
-    if (role == 'director_zona') return 15000;
+    if (role == 'jefe_equipo') return 4000;
+    if (role == 'jefe_ventas') return 6500;
+    if (role == 'director_zona') return 15500;
     if (role == 'director_nacional') return 25000;
 
     return 12000;

@@ -186,12 +186,44 @@ class _PlanificacionSemanalEquipoScreenState
       lastDate: DateTime(2030),
       initialDate: DateTime.now(),
       builder: (context, child) {
+        final base = ThemeData.light(useMaterial3: true);
         return Theme(
-          data: ThemeData.dark().copyWith(
-            colorScheme: const ColorScheme.dark(
-              primary: Color(0xFF20C7C2),
-              surface: Color(0xFFFFFFFF),
-              onSurface: Colors.white,
+          data: base.copyWith(
+            colorScheme: const ColorScheme.light(
+              primary: Color(0xFF2454D3),
+              onPrimary: Colors.white,
+              surface: Colors.white,
+              onSurface: Color(0xFF071A3A),
+              outline: Color(0xFFDCE5F2),
+            ),
+            datePickerTheme: const DatePickerThemeData(
+              backgroundColor: Colors.white,
+              surfaceTintColor: Colors.white,
+              headerBackgroundColor: Color(0xFF13244D),
+              headerForegroundColor: Colors.white,
+              weekdayStyle: TextStyle(
+                color: Color(0xFF53627A),
+                fontWeight: FontWeight.w800,
+              ),
+              dayStyle: TextStyle(
+                color: Color(0xFF071A3A),
+                fontWeight: FontWeight.w700,
+              ),
+              todayForegroundColor: WidgetStatePropertyAll(Color(0xFF2454D3)),
+              todayBorder: BorderSide(color: Color(0xFF2454D3)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.all(Radius.circular(28)),
+              ),
+            ),
+            dialogTheme: const DialogThemeData(
+              backgroundColor: Colors.white,
+              surfaceTintColor: Colors.white,
+            ),
+            textButtonTheme: TextButtonThemeData(
+              style: TextButton.styleFrom(
+                foregroundColor: const Color(0xFF2454D3),
+                textStyle: const TextStyle(fontWeight: FontWeight.w900),
+              ),
             ),
           ),
           child: child!,
@@ -240,7 +272,7 @@ class _PlanificacionSemanalEquipoScreenState
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF2FCFD),
+      backgroundColor: const Color(0xFFF4F6FB),
       bottomNavigationBar: loading
           ? null
           : SafeArea(
@@ -261,7 +293,7 @@ class _PlanificacionSemanalEquipoScreenState
                     ),
                     boxShadow: [
                       BoxShadow(
-                        color: const Color(0xFF20C7C2).withOpacity(0.35),
+                        color: const Color(0xFF2454D3).withOpacity(0.35),
                         blurRadius: 24,
                         offset: const Offset(0, 10),
                       ),
@@ -302,11 +334,11 @@ class _PlanificacionSemanalEquipoScreenState
             ),
       body: loading
           ? const Center(
-              child: CircularProgressIndicator(color: Color(0xFF20C7C2)),
+              child: CircularProgressIndicator(color: Color(0xFF2454D3)),
             )
           : RefreshIndicator(
               onRefresh: cargarAgentes,
-              color: const Color(0xFF20C7C2),
+              color: const Color(0xFF2454D3),
               backgroundColor: const Color(0xFFFFFFFF),
               child: CustomScrollView(
                 physics: const AlwaysScrollableScrollPhysics(),
@@ -362,35 +394,35 @@ class _PlanificacionSemanalEquipoScreenState
                             subtitulo: "Inicio de semana",
                             icono: Icons.looks_one_rounded,
                             controller: lunesController,
-                            color: const Color(0xFF20C7C2),
+                            color: const Color(0xFF2454D3),
                           ),
                           _diaCard(
                             dia: "Martes",
                             subtitulo: "Prospección y llamadas",
                             icono: Icons.looks_two_rounded,
                             controller: martesController,
-                            color: const Color(0xFF0A7F91),
+                            color: const Color(0xFF2454D3),
                           ),
                           _diaCard(
                             dia: "Miércoles",
                             subtitulo: "Seguimiento comercial",
                             icono: Icons.looks_3_rounded,
                             controller: miercolesController,
-                            color: const Color(0xFF0A7F91),
+                            color: const Color(0xFF2454D3),
                           ),
                           _diaCard(
                             dia: "Jueves",
                             subtitulo: "Visitas y cierres",
                             icono: Icons.looks_4_rounded,
                             controller: juevesController,
-                            color: const Color(0xFF0A7F91),
+                            color: const Color(0xFF2454D3),
                           ),
                           _diaCard(
                             dia: "Viernes",
                             subtitulo: "Revisión y objetivos",
                             icono: Icons.looks_5_rounded,
                             controller: viernesController,
-                            color: const Color(0xFF0AAEAE),
+                            color: const Color(0xFF198754),
                           ),
                         ],
                       ),
@@ -403,143 +435,134 @@ class _PlanificacionSemanalEquipoScreenState
   }
 
   Widget _header() {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(20, 54, 20, 26),
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          colors: [Color(0xFFF2FCFD), Color(0xFFFFFFFF), Color(0xFFF2FCFD)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-      ),
-      child: Stack(
-        children: [
-          Positioned(
-            right: -24,
-            top: 20,
-            child: Container(
-              width: 160,
-              height: 160,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: RadialGradient(
-                  colors: [
-                    const Color(0xFF20C7C2).withOpacity(0.28),
-                    Colors.transparent,
-                  ],
-                ),
-              ),
-            ),
-          ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  IconButton(
-                    onPressed: () => Navigator.pop(context),
-                    icon: const Icon(
-                      Icons.arrow_back_rounded,
-                      color: Colors.white,
-                    ),
-                    style: IconButton.styleFrom(
-                      backgroundColor: Colors.white,
-                      fixedSize: const Size(48, 48),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(18),
-                      ),
+    return SafeArea(
+      bottom: false,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 14, 20, 22),
+        child: Column(
+          children: [
+            Row(
+              children: [
+                IconButton(
+                  onPressed: () => Navigator.pop(context),
+                  icon: const Icon(
+                    Icons.arrow_back_ios_new_rounded,
+                    color: Color(0xFF13244D),
+                    size: 19,
+                  ),
+                  style: IconButton.styleFrom(
+                    backgroundColor: Colors.white,
+                    fixedSize: const Size(48, 48),
+                    side: const BorderSide(color: Color(0xFFDCE5F2)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
                     ),
                   ),
-                  const Spacer(),
-                  IconButton(
-                    onPressed: cargarAgentes,
-                    icon: const Icon(
-                      Icons.refresh_rounded,
-                      color: Colors.white,
-                    ),
-                    style: IconButton.styleFrom(
-                      backgroundColor: Colors.white,
-                      fixedSize: const Size(48, 48),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(18),
+                ),
+                const SizedBox(width: 14),
+                const Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Nueva planificación',
+                        style: TextStyle(
+                          color: Color(0xFF071A3A),
+                          fontSize: 25,
+                          fontWeight: FontWeight.w900,
+                        ),
                       ),
+                      SizedBox(height: 3),
+                      Text(
+                        'Define la semana de cada agente',
+                        style: TextStyle(
+                          color: Color(0xFF64748B),
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  onPressed: cargarAgentes,
+                  icon: const Icon(Icons.refresh_rounded, color: Colors.white),
+                  style: IconButton.styleFrom(
+                    backgroundColor: const Color(0xFF2454D3),
+                    fixedSize: const Size(48, 48),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
                     ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(22),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(28),
+                gradient: const LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [Color(0xFF13244D), Color(0xFF2454D3)],
+                ),
+                boxShadow: const [
+                  BoxShadow(
+                    color: Color(0x332454D3),
+                    blurRadius: 24,
+                    offset: Offset(0, 12),
                   ),
                 ],
               ),
-              const SizedBox(height: 26),
-              Row(
+              child: const Row(
                 children: [
-                  Container(
-                    width: 64,
-                    height: 64,
+                  DecoratedBox(
                     decoration: BoxDecoration(
+                      color: Color(0x24FFFFFF),
                       shape: BoxShape.circle,
-                      gradient: const LinearGradient(
-                        colors: [
-                          Color(0xFF20C7C2),
-                          Color(0xFF0A7F91),
-                          Color(0xFF0A7F91),
-                        ],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
+                    ),
+                    child: Padding(
+                      padding: EdgeInsets.all(15),
+                      child: Icon(
+                        Icons.calendar_month_rounded,
+                        color: Colors.white,
+                        size: 31,
                       ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: const Color(0xFF20C7C2).withOpacity(0.35),
-                          blurRadius: 24,
-                          offset: const Offset(0, 10),
+                    ),
+                  ),
+                  SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Plan semanal',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 22,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                        SizedBox(height: 5),
+                        Text(
+                          'Selecciona un agente, elige la semana y organiza sus cinco días de actividad.',
+                          style: TextStyle(
+                            color: Color(0xFFE1E9FC),
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            height: 1.35,
+                          ),
                         ),
                       ],
                     ),
-                    child: const Icon(
-                      Icons.calendar_month_rounded,
-                      color: Colors.white,
-                      size: 32,
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: RichText(
-                      text: const TextSpan(
-                        children: [
-                          TextSpan(
-                            text: "Crear\n",
-                            style: TextStyle(
-                              color: const Color(0xFF071A3A),
-                              fontSize: 36,
-                              fontWeight: FontWeight.w900,
-                              height: 1,
-                            ),
-                          ),
-                          TextSpan(
-                            text: "plan semanal",
-                            style: TextStyle(
-                              color: Color(0xFF20C7C2),
-                              fontSize: 34,
-                              fontWeight: FontWeight.w900,
-                              height: 1,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
                   ),
                 ],
               ),
-              const SizedBox(height: 18),
-              const Text(
-                "Define la planificación semanal de trabajo para cada agente del equipo.",
-                style: TextStyle(
-                  color: Color(0xFF64748B),
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  height: 1.35,
-                ),
-              ),
-            ],
-          ),
-        ],
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -556,7 +579,7 @@ class _PlanificacionSemanalEquipoScreenState
             icono: Icons.person_rounded,
             valor: agenteSeleccionado == null ? "—" : "OK",
             titulo: nombreAgenteSeleccionado(),
-            color: const Color(0xFF0A7F91),
+            color: const Color(0xFF2454D3),
           ),
         ),
         const SizedBox(width: 12),
@@ -565,7 +588,7 @@ class _PlanificacionSemanalEquipoScreenState
             icono: Icons.date_range_rounded,
             valor: "${diasPlanificados}/5",
             titulo: semanaTexto,
-            color: const Color(0xFF0AAEAE),
+            color: const Color(0xFF198754),
           ),
         ),
       ],
@@ -593,7 +616,7 @@ class _PlanificacionSemanalEquipoScreenState
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icono, color: Colors.white, size: 28),
+          Icon(icono, color: const Color(0xFF2454D3), size: 28),
           const Spacer(),
           Text(
             valor,
@@ -611,7 +634,7 @@ class _PlanificacionSemanalEquipoScreenState
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
             style: const TextStyle(
-              color: Color(0xFFC7ECEC),
+              color: Color(0xFF53627A),
               fontSize: 12,
               fontWeight: FontWeight.w700,
               height: 1.2,
@@ -625,11 +648,11 @@ class _PlanificacionSemanalEquipoScreenState
   Widget _selectorAgente() {
     return Container(
       padding: const EdgeInsets.all(16),
-      decoration: _cardDecoration(const Color(0xFF20C7C2)),
+      decoration: _cardDecoration(const Color(0xFF2454D3)),
       child: DropdownButtonFormField<String>(
         value: agenteSeleccionado,
         dropdownColor: const Color(0xFFFFFFFF),
-        iconEnabledColor: const Color(0xFF20C7C2),
+        iconEnabledColor: const Color(0xFF2454D3),
         decoration: _inputDecoration(
           label: "Agente",
           icono: Icons.person_search_rounded,
@@ -667,17 +690,17 @@ class _PlanificacionSemanalEquipoScreenState
         onTap: seleccionarSemana,
         child: Ink(
           padding: const EdgeInsets.all(16),
-          decoration: _cardDecoration(const Color(0xFF0A7F91)),
+          decoration: _cardDecoration(const Color(0xFF2454D3)),
           child: Row(
             children: [
               Container(
                 width: 48,
                 height: 48,
                 decoration: BoxDecoration(
-                  color: const Color(0xFF0A7F91).withOpacity(0.16),
+                  color: const Color(0xFF2454D3).withOpacity(0.16),
                   borderRadius: BorderRadius.circular(16),
                   border: Border.all(
-                    color: const Color(0xFF0A7F91).withOpacity(0.42),
+                    color: const Color(0xFF2454D3).withOpacity(0.42),
                   ),
                 ),
                 child: const Icon(
@@ -698,7 +721,7 @@ class _PlanificacionSemanalEquipoScreenState
               ),
               const Icon(
                 Icons.chevron_right_rounded,
-                color: Colors.white,
+                color: Color(0xFF2454D3),
                 size: 30,
               ),
             ],
@@ -757,7 +780,7 @@ class _PlanificacionSemanalEquipoScreenState
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   gradient: LinearGradient(
-                    colors: [color.withOpacity(0.95), const Color(0xFF0A7F91)],
+                    colors: [color.withOpacity(0.95), const Color(0xFF2454D3)],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ),
@@ -822,7 +845,7 @@ class _PlanificacionSemanalEquipoScreenState
   }) {
     return InputDecoration(
       labelText: label,
-      prefixIcon: Icon(icono, color: const Color(0xFF20C7C2)),
+      prefixIcon: Icon(icono, color: const Color(0xFF2454D3)),
       labelStyle: const TextStyle(
         color: Color(0xFF64748B),
         fontWeight: FontWeight.w800,
@@ -830,7 +853,7 @@ class _PlanificacionSemanalEquipoScreenState
       filled: true,
       fillColor: Colors.white,
       enabledBorder: OutlineInputBorder(
-        borderSide: BorderSide(color: Colors.white),
+        borderSide: const BorderSide(color: Color(0xFFDCE5F2)),
         borderRadius: BorderRadius.circular(18),
       ),
       focusedBorder: OutlineInputBorder(

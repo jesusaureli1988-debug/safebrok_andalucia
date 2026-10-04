@@ -38,10 +38,10 @@ const umbrales = [50, 75, 90, 100] as const;
 
 function primaComputable(venta: Venta): number {
   const producto = String(venta.producto ?? '').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-  const esAuto = producto.includes('auto') || producto.includes('coche') || producto.includes('vehicul') || producto.includes('turismo') || producto.includes('moto');
+  const esAuto = producto.includes('auto') || producto.includes('coche') || producto.includes('vehicul') || producto.includes('turismo') || producto.includes('moto') || producto.includes('camion');
   const fechaEfecto = String(venta.fecha_efecto ?? '').slice(0, 10);
   const importe = numero(venta.prima_anual_neta ?? venta.prima_neta);
-  return importe * (esAuto && fechaEfecto >= '2026-08-27' ? 0.5 : 1);
+  return importe * (esAuto && fechaEfecto >= '2026-08-27' ? 0 : 1);
 }
 
 function json(

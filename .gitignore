@@ -71,3 +71,13 @@ firebase-secrets.env
 
 # Archivos con secretos
 firebase-secrets.env
+# Archivos locales y temporales de desarrollo
+/.codex_backups/
+/.codex_flutter_temp/
+/.firebase/
+/output/
+/tmp/
+/nominas_screen.backup.txt
+/nulecho
+/tmp_usuarios_schema.sql
+/titularidad raquel.pdf

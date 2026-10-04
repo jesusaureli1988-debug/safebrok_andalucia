@@ -1,5 +1,6 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:safebrok_andalucia/core/production/premium_weighting.dart';
+import 'package:safebrok_andalucia/core/payroll/role_compensation.dart';
 import 'package:safebrok_andalucia/core/production/production_period_service.dart';
 
 class PayrollService {
@@ -84,6 +85,7 @@ class PayrollService {
     double comisiones = 0;
 
     for (final v in ventasFiltradas) {
+      if (v['agente_auth_id']?.toString() != authId) continue;
       comisiones += ((v['comision'] ?? 0) as num).toDouble();
     }
 
@@ -102,15 +104,16 @@ class PayrollService {
     print("========== ENTRANDO RAPPEL ==========");
     print("PRIMA NETA QUE ENTRA AL RAPPEL: $primaNetaTotal");
     // 6️⃣ RAPPEL
-    double rappel = _calcularRappel(
-      primaNeta: primaNetaTotal,
-      porcentajeDV: porcentajeDecesosVida,
-      rol: rol,
+    final compensation = RoleCompensationRules.calculate(
+      role: rol?.toString() ?? '',
+      premiums: primaNetaTotal,
+      deathAndLifePremiums: primasDecesosVida,
     );
+    final rappel = compensation.total;
 
     print("RAPPEL RESULTADO: $rappel");
     // 7️⃣ SUELDO FIJO
-    double sueldoFijo = _getSueldoFijo(rol);
+    const double sueldoFijo = 0;
 
     // 8️⃣ TOTAL
     double totalCobrar = sueldoFijo + comisiones + rappel;
@@ -128,6 +131,8 @@ class PayrollService {
       'porcentaje_decesos_vida': porcentajeDecesosVida,
       'comisiones': comisiones,
       'rappel': rappel,
+      'rappel_base': compensation.rappel,
+      'diferencial_variable': compensation.variable,
       'sueldo_fijo': sueldoFijo,
       'total_cobrar': totalCobrar,
       'created_at': DateTime.now().toIso8601String(),
@@ -152,7 +157,16 @@ class PayrollService {
         'importe': primaNetaTotal,
       },
       {'nomina_id': nominaId, 'concepto': 'Comisiones', 'importe': comisiones},
-      {'nomina_id': nominaId, 'concepto': 'Rappel', 'importe': rappel},
+      {
+        'nomina_id': nominaId,
+        'concepto': 'Rappel',
+        'importe': compensation.rappel,
+      },
+      {
+        'nomina_id': nominaId,
+        'concepto': 'Diferencial variable',
+        'importe': compensation.variable,
+      },
       {'nomina_id': nominaId, 'concepto': 'Sueldo fijo', 'importe': sueldoFijo},
     ]);
   }
@@ -175,101 +189,43 @@ class PayrollService {
     }
   }
 
-  /// 🔥 RAPPEL (EJEMPLO ESCALABLE)
-  double _calcularRappel({
-    required double primaNeta,
-    required double porcentajeDV,
-    required String rol,
-  }) {
-    // Obligatorio 30% Decesos + Vida
-    if (porcentajeDV < 30) {
-      return 0;
-    }
-
-    // ==========================
-    // AGENTE
-    // ==========================
-    if (rol == 'agente') {
-      if (primaNeta >= 12000) return 1500;
-      if (primaNeta >= 9000) return 1200;
-      if (primaNeta >= 6000) return 800;
-      if (primaNeta >= 4000) return 600;
-      if (primaNeta >= 2500) return 400;
-      if (primaNeta >= 1500) return 200;
-
-      return 0;
-    }
-
-    // ==========================
-    // JEFE EQUIPO
-    // ==========================
-    if (rol == 'jefe_equipo') {
-      if (primaNeta >= 10000) {
-        return 2000 + (((primaNeta - 10000) ~/ 1000) * 100);
-      }
-
-      if (primaNeta >= 9000) return 1800;
-      if (primaNeta >= 8000) return 1600;
-      if (primaNeta >= 7000) return 1400;
-      if (primaNeta >= 6000) return 1200;
-      if (primaNeta >= 5000) return 1000;
-      if (primaNeta >= 4000) return 800;
-
-      return 0;
-    }
-
-    // ==========================
-    // JEFE VENTAS
-    // ==========================
-    if (rol == 'jefe_ventas') {
-      if (primaNeta >= 11500) {
-        return 2500 + (((primaNeta - 11500) ~/ 1000) * 100);
-      }
-
-      if (primaNeta >= 10500) return 2300;
-      if (primaNeta >= 9500) return 2100;
-      if (primaNeta >= 8500) return 1900;
-      if (primaNeta >= 7500) return 1700;
-      if (primaNeta >= 6500) return 1500;
-
-      return 0;
-    }
-
-    return 0;
-  }
-
-  /// 🔥 SUELDOS FIJOS
-  double _getSueldoFijo(String rol) {
-    switch (rol) {
-      case 'director':
-        return 2500;
-
-      case 'jefe_ventas':
-        return 1500;
-
-      case 'jefe_equipo':
-        return 1000;
-
-      case 'agente':
-      default:
-        return 0;
-    }
-  }
-
-  /// 🔥 JERARQUÍA (parent_id RECURSIVO)
+  /// Devuelve los auth_id del usuario y de toda su estructura.
+  /// parent_id referencia usuarios.id (ID interno), no auth_id.
   Future<List<String>> _getEstructura(String authId) async {
-    List<String> resultado = [authId];
+    final raiz = await supabase
+        .from('usuarios')
+        .select('id, auth_id')
+        .eq('auth_id', authId)
+        .maybeSingle();
+
+    if (raiz == null) return [authId];
+
+    final resultado = <String>{authId};
+    await _agregarDescendientes(raiz['id'].toString(), resultado, <String>{});
+    return resultado.toList();
+  }
+
+  Future<void> _agregarDescendientes(
+    String usuarioId,
+    Set<String> authIds,
+    Set<String> visitados,
+  ) async {
+    if (!visitados.add(usuarioId)) return;
 
     final directos = await supabase
         .from('usuarios')
-        .select('auth_id')
-        .eq('parent_id', authId);
+        .select('id, auth_id')
+        .eq('parent_id', usuarioId);
 
     for (final u in directos) {
-      resultado.add(u['auth_id']);
-      resultado.addAll(await _getEstructura(u['auth_id']));
+      final hijoId = u['id']?.toString();
+      final hijoAuthId = u['auth_id']?.toString();
+      if (hijoAuthId != null && hijoAuthId.isNotEmpty) {
+        authIds.add(hijoAuthId);
+      }
+      if (hijoId != null && hijoId.isNotEmpty) {
+        await _agregarDescendientes(hijoId, authIds, visitados);
+      }
     }
-
-    return resultado;
   }
 }

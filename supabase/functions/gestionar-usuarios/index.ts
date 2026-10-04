@@ -111,7 +111,25 @@ Deno.serve(async(req)=>{
       const disabled=action==="deactivate";const auth=await admin.auth.admin.updateUserById(target.auth_id,{ban_duration:disabled?"876000h":"none"});if(auth.error)throw auth.error;
       const changed=await admin.from("usuarios").update({estado:disabled?"bloqueado":"activo"}).eq("id",target.id).select().single();if(changed.error)throw changed.error;target=changed.data;
     }else if(action==="resend_access"){
-      if(!target)throw new Error("Usuario no encontrado");const reset=await admin.auth.resetPasswordForEmail(target.email,{redirectTo:passwordRedirect});if(reset.error)throw reset.error;
+      if(!target)throw new Error("Usuario no encontrado");
+      const authResult=await admin.auth.admin.getUserById(target.auth_id);
+      if(authResult.error||!authResult.data.user)throw authResult.error??new Error("La cuenta de acceso no existe en Auth");
+      const authEmail=norm(authResult.data.user.email);
+      if(!authEmail.includes("@"))throw new Error("La cuenta de acceso no tiene un email válido");
+      const reset=await admin.auth.resetPasswordForEmail(authEmail,{redirectTo:passwordRedirect});
+      if(reset.error)throw reset.error;
+      if(norm(target.email)!==authEmail){
+        const synced=await admin.from("usuarios").update({email:authEmail}).eq("id",target.id);
+        if(synced.error)console.error("Enlace enviado, pero no se pudo sincronizar el email",synced.error);
+        target={...target,email:authEmail};
+      }
+    }else if(action==="set_password"){
+      if(!target)throw new Error("Usuario no encontrado");
+      if(norm(actor.rol_usuario)!=="administracion")throw new Error("Solo Administración puede establecer contraseñas");
+      const password=String(body.password??"");
+      if(password.length<12)throw new Error("La contraseña debe tener al menos 12 caracteres");
+      const changed=await admin.auth.admin.updateUserById(target.auth_id,{password,user_metadata:{requires_password_setup:false}});
+      if(changed.error)throw changed.error;
     }else throw new Error("Acción no reconocida");
     const log=await admin.from("usuarios_accesos_auditoria").insert({actor_usuario_id:actor.id,objetivo_usuario_id:target?.id,objetivo_email:target?.email,accion:action,detalle:{rol_usuario:target?.rol_usuario,parent_id:target?.parent_id}});
     if(log.error&&log.error.code!=="PGRST205"){

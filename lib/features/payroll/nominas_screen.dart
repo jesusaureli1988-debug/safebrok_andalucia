@@ -1,5 +1,6 @@
 import 'dart:ui';
 import 'package:safebrok_andalucia/core/production/premium_weighting.dart';
+import 'package:safebrok_andalucia/core/payroll/role_compensation.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:safebrok_andalucia/core/production/production_period_service.dart';
@@ -145,70 +146,44 @@ class _NominasScreenState extends State<NominasScreen> {
     return resultado;
   }
 
-  double calcularRappelAgente(double primas, double primasDV) {
-    if (primas <= 0) return 0;
-    final porcentaje = primasDV / primas * 100;
-    if (primas >= 12000 && porcentaje >= 30) return 1500;
-    if (primas >= 9000 && porcentaje >= 30) return 1200;
-    if (primas >= 6000 && porcentaje >= 30) return 800;
-    if (primas >= 4000 && porcentaje >= 30) return 600;
-    if (primas >= 2500 && porcentaje >= 99.999) return 400;
-    if (primas >= 1500 && porcentaje >= 99.999) return 200;
-    return 0;
-  }
+  double calcularRappelAgente(double primas, double primasDV) =>
+      RoleCompensationRules.calculate(
+        role: 'agente',
+        premiums: primas,
+        deathAndLifePremiums: primasDV,
+      ).total;
 
-  double calcularRappelJefe(double primas) {
-    if (primas >= 10000) return 2000 + ((primas - 10000) ~/ 1000) * 100;
-    if (primas >= 9000) return 1800;
-    if (primas >= 8000) return 1600;
-    if (primas >= 7000) return 1400;
-    if (primas >= 6000) return 1200;
-    if (primas >= 5000) return 1000;
-    if (primas >= 4000) return 800;
-    return 0;
-  }
+  double calcularRappelJefe(double primas, double primasDV) =>
+      RoleCompensationRules.calculate(
+        role: 'jefe_equipo',
+        premiums: primas,
+        deathAndLifePremiums: primasDV,
+      ).total;
 
-  double calcularRappelJefeVentas(double primas) {
-    if (primas >= 11500) return 2500 + ((primas - 11500) ~/ 1000) * 100;
-    if (primas >= 10500) return 2300;
-    if (primas >= 9500) return 2100;
-    if (primas >= 8500) return 1900;
-    if (primas >= 7500) return 1700;
-    if (primas >= 6500) return 1500;
-    return 0;
-  }
+  double calcularRappelJefeVentas(double primas, double primasDV) =>
+      RoleCompensationRules.calculate(
+        role: 'jefe_ventas',
+        premiums: primas,
+        deathAndLifePremiums: primasDV,
+      ).total;
 
   void _recalcularNomina(Map<String, dynamic> n, String rolActual) {
     final primas = _money(n['prima_neta_total']).clamp(0, double.infinity);
     final primasDV = _money(n['primas_dv']).clamp(0, double.infinity);
     final comisiones = _money(n['comisiones']);
-    double concepto = 0;
-    String conceptoNombre = 'Rappel';
-
-    switch (rolActual) {
-      case 'agente':
-        concepto = calcularRappelAgente(primas.toDouble(), primasDV.toDouble());
-        break;
-      case 'jefe_equipo':
-        concepto = calcularRappelJefe(primas.toDouble());
-        break;
-      case 'jefe_ventas':
-        concepto = calcularRappelJefeVentas(primas.toDouble());
-        break;
-      case 'director_zona':
-        concepto = primas * 0.10;
-        conceptoNombre = '10% estructura';
-        break;
-      case 'director_nacional':
-        concepto = primas * 0.05;
-        conceptoNombre = '5% estructura';
-        break;
-    }
-
-    n['rappel'] = concepto;
-    n['concepto_variable'] = conceptoNombre;
+    final compensation = RoleCompensationRules.calculate(
+      role: rolActual,
+      premiums: primas.toDouble(),
+      deathAndLifePremiums: primasDV.toDouble(),
+    );
+    n['rappel'] = compensation.total;
+    n['rappel_base'] = compensation.rappel;
+    n['diferencial_variable'] = compensation.variable;
+    n['concepto_variable'] = compensation.variable > 0
+        ? 'Rappel + diferencial'
+        : 'Rappel';
     n['sueldo_fijo'] = 0.0;
-    n['total_cobrar'] = comisiones + concepto;
+    n['total_cobrar'] = comisiones + compensation.total;
   }
 
   Future<void> loadNominas() async {
@@ -808,7 +783,8 @@ class _NominasScreenState extends State<NominasScreen> {
                             ),
                             const SizedBox(width: 8),
                             _pill(
-                              '${n['concepto_variable'] ?? 'Rappel'} ${_money(n['rappel']).toStringAsFixed(0)} €',
+                              'Rappel ${_money(n['rappel_base'] ?? n['rappel']).toStringAsFixed(0)} €'
+                              ' · Variable ${_money(n['diferencial_variable']).toStringAsFixed(0)} €',
                               const Color(0xFFD97706),
                             ),
                           ],
@@ -987,43 +963,26 @@ class _NominaDetailScreenState extends State<NominaDetailScreen> {
     return total;
   }
 
-  double _calcularRappelAgente(double primas, double primasDV) {
-    if (primas <= 0) return 0;
-    final porcentaje = primasDV / primas * 100;
-    if (primas >= 12000 && porcentaje >= 30) return 1500;
-    if (primas >= 9000 && porcentaje >= 30) return 1200;
-    if (primas >= 6000 && porcentaje >= 30) return 800;
-    if (primas >= 4000 && porcentaje >= 30) return 600;
-    if (primas >= 2500 && porcentaje >= 99.999) return 400;
-    if (primas >= 1500 && porcentaje >= 99.999) return 200;
-    return 0;
-  }
+  double _calcularRappelAgente(double primas, double primasDV) =>
+      RoleCompensationRules.calculate(
+        role: 'agente',
+        premiums: primas,
+        deathAndLifePremiums: primasDV,
+      ).total;
 
-  double _calcularRappelJefe(double primasTotales) {
-    if (primasTotales < 4000) return 0;
-    if (primasTotales >= 10000) {
-      return 2000 + ((primasTotales - 10000) ~/ 1000) * 100;
-    }
-    if (primasTotales >= 9000) return 1800;
-    if (primasTotales >= 8000) return 1600;
-    if (primasTotales >= 7000) return 1400;
-    if (primasTotales >= 6000) return 1200;
-    if (primasTotales >= 5000) return 1000;
-    if (primasTotales >= 4000) return 800;
-    return 0;
-  }
+  double _calcularRappelJefe(double primas, double primasDV) =>
+      RoleCompensationRules.calculate(
+        role: 'jefe_equipo',
+        premiums: primas,
+        deathAndLifePremiums: primasDV,
+      ).total;
 
-  double _calcularRappelJefeVentas(double primasTotales) {
-    if (primasTotales >= 11500) {
-      return 2500 + ((primasTotales - 11500) ~/ 1000) * 100;
-    }
-    if (primasTotales >= 10500) return 2300;
-    if (primasTotales >= 9500) return 2100;
-    if (primasTotales >= 8500) return 1900;
-    if (primasTotales >= 7500) return 1700;
-    if (primasTotales >= 6500) return 1500;
-    return 0;
-  }
+  double _calcularRappelJefeVentas(double primas, double primasDV) =>
+      RoleCompensationRules.calculate(
+        role: 'jefe_ventas',
+        premiums: primas,
+        deathAndLifePremiums: primasDV,
+      ).total;
 
   double _primasBrutasNode(_FacturaNode node) {
     double total = 0;
@@ -1053,32 +1012,20 @@ class _NominaDetailScreenState extends State<NominaDetailScreen> {
     return total;
   }
 
-  double _rappelNode(_FacturaNode node) {
-    final primas = _primasNode(node);
-
-    if (node.rol == 'agente') {
-      return _calcularRappelAgente(primas, _primasDVNode(node));
-    }
-
-    if (node.rol == 'jefe_equipo') {
-      return _calcularRappelJefe(primas);
-    }
-
-    if (node.rol == 'jefe_ventas') {
-      return _calcularRappelJefeVentas(primas);
-    }
-
-    if (node.rol == 'director_zona') {
-      return primas * 0.10;
-    }
-
-    if (node.rol == 'director_nacional') {
-      return primas * 0.05;
-    }
-
-    return 0;
+  RoleCompensation _compensationNode(_FacturaNode node) {
+    return RoleCompensationRules.calculate(
+      role: node.rol,
+      premiums: _primasNode(node),
+      deathAndLifePremiums: _primasDVNode(node),
+    );
   }
 
+  double _rappelNode(_FacturaNode node) => _compensationNode(node).total;
+
+  double _rappelBaseNode(_FacturaNode node) => _compensationNode(node).rappel;
+
+  double _diferencialNode(_FacturaNode node) =>
+      _compensationNode(node).variable;
   double _fijoNode(_FacturaNode node) {
     return 0;
   }
@@ -1875,49 +1822,106 @@ class _NominaDetailScreenState extends State<NominaDetailScreen> {
 
     final existente = await supabase
         .from('nominas_facturas')
-        .select('id')
+        .select()
         .eq('usuario_auth_id', usuarioAuthId)
         .eq('mes', mes)
         .eq('anio', anio)
         .maybeSingle();
 
-    if (existente != null) {
+    // Una factura ya tramitada es un documento cerrado y nunca se modifica.
+    if (existente != null &&
+        existente['estado']?.toString() != 'pendiente_tramitar') {
       return;
     }
 
-    final comisionesPropias = _comisionesPropiasNode(node);
-    final rappel = _rappelNode(node);
+    double ajusteComisiones = 0;
+    double ajusteRappel = 0;
+    final idsLineasAutomaticas = <dynamic>[];
+
+    if (existente != null) {
+      final lineasExistentes = await supabase
+          .from('nominas_facturas_lineas')
+          .select('id, tipo_movimiento, comision')
+          .eq('factura_id', existente['id']);
+
+      const tiposManuales = <String>{
+        'AJUSTE_COMISION_POSITIVO',
+        'AJUSTE_COMISION_NEGATIVO',
+        'AJUSTE_RAPPEL_POSITIVO',
+        'AJUSTE_RAPPEL_NEGATIVO',
+        'EXTORNO_MANUAL',
+        'REVERSO_EXTORNO_MANUAL',
+      };
+
+      for (final linea in lineasExistentes) {
+        final tipo = linea['tipo_movimiento']?.toString().toUpperCase() ?? '';
+        final importe = _money(linea['comision']);
+        if (tipo.startsWith('AJUSTE_RAPPEL')) {
+          ajusteRappel += importe;
+        } else if (tiposManuales.contains(tipo)) {
+          ajusteComisiones += importe;
+        } else {
+          idsLineasAutomaticas.add(linea['id']);
+        }
+      }
+    }
+
+    final comisionesPropias = _comisionesPropiasNode(node) + ajusteComisiones;
+    final rappel = _rappelNode(node) + ajusteRappel;
     final fijo = _fijoNode(node);
 
     final base = comisionesPropias + rappel + fijo;
-    final irpf = 15.0;
+    final irpf = existente == null
+        ? 15.0
+        : _money(existente['irpf_porcentaje']).clamp(0, 100).toDouble();
     final importeIrpf = base * irpf / 100;
     final total = base - importeIrpf;
 
-    final facturaCreada = await supabase
-        .from('nominas_facturas')
-        .insert({
-          'usuario_auth_id': usuarioAuthId,
-          'usuario_nombre': usuarioNombre,
-          'usuario_email': usuarioEmail,
-          'usuario_rol': usuarioRol,
-          'mes': mes,
-          'anio': anio,
-          'comisiones': comisionesPropias,
-          'rappel': rappel,
-          'fijo': fijo,
-          'base_imponible': base,
-          'irpf_porcentaje': irpf,
-          'importe_irpf': importeIrpf,
-          'total_factura': total,
-          'estado': 'pendiente_tramitar',
-          'aprobada_por': user.id,
-          'fecha_aprobacion': DateTime.now().toIso8601String(),
-        })
-        .select()
-        .single();
+    final datosFactura = <String, dynamic>{
+      'usuario_auth_id': usuarioAuthId,
+      'usuario_nombre': usuarioNombre,
+      'usuario_email': usuarioEmail,
+      'usuario_rol': usuarioRol,
+      'mes': mes,
+      'anio': anio,
+      'comisiones': comisionesPropias,
+      'rappel': rappel,
+      'rappel_base': _rappelBaseNode(node),
+      'diferencial_variable': _diferencialNode(node),
+      'fijo': fijo,
+      'base_imponible': base,
+      'irpf_porcentaje': irpf,
+      'importe_irpf': importeIrpf,
+      'total_factura': total,
+      'estado': 'pendiente_tramitar',
+      'aprobada_por': user.id,
+      'fecha_aprobacion': DateTime.now().toIso8601String(),
+    };
 
-    final facturaId = facturaCreada['id'];
+    dynamic facturaId;
+    if (existente == null) {
+      final facturaCreada = await supabase
+          .from('nominas_facturas')
+          .insert(datosFactura)
+          .select()
+          .single();
+      facturaId = facturaCreada['id'];
+    } else {
+      facturaId = existente['id'];
+      await supabase
+          .from('nominas_facturas')
+          .update(datosFactura)
+          .eq('id', facturaId);
+
+      // Sustituimos solamente pólizas y extornos automáticos. Los ajustes
+      // introducidos por Administración se conservan íntegramente.
+      for (final lineaId in idsLineasAutomaticas) {
+        await supabase
+            .from('nominas_facturas_lineas')
+            .delete()
+            .eq('id', lineaId);
+      }
+    }
 
     // Solo enviamos a la factura los movimientos incluidos en el cálculo.
     // Cada baja viaja como una línea EXTORNO independiente, vinculada a la
@@ -2392,7 +2396,6 @@ class _NominaDetailScreenState extends State<NominaDetailScreen> {
   Widget _resumenNode(_FacturaNode node, String estado, Color color) {
     final primasBrutas = _primasBrutasNode(node);
     final primasNetas = _primasNode(node);
-    final rappel = _rappelNode(node);
     final porcentajeMix = _porcentajeMixNode(node);
     final comisionesPropias = _comisionesPropiasNode(node);
     final comisiones = _comisionesNode(node);
@@ -2418,7 +2421,16 @@ class _NominaDetailScreenState extends State<NominaDetailScreen> {
                 ? const Color(0xFF059669)
                 : const Color(0xFFEA580C),
           ),
-          _lineaResumen('Rappel', rappel, const Color(0xFFD97706)),
+          _lineaResumen(
+            'Rappel',
+            _rappelBaseNode(node),
+            const Color(0xFFD97706),
+          ),
+          _lineaResumen(
+            'Diferencial variable',
+            _diferencialNode(node),
+            const Color(0xFF7C3AED),
+          ),
           _lineaResumen(
             'Comisiones propias',
             comisionesPropias,

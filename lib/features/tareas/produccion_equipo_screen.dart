@@ -1,6 +1,6 @@
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import '../../core/production/premium_weighting.dart';
+import '../../core/production/production_period_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class ProduccionEquipoScreen extends StatefulWidget {
@@ -15,6 +15,9 @@ class _ProduccionEquipoScreenState extends State<ProduccionEquipoScreen> {
 
   double produccionEquipo = 0;
   int ventasHoy = 0;
+  int agentesEquipo = 0;
+  double mixEquipo = 0;
+  ProductionPeriod? periodo;
 
   List<Map<String, dynamic>> ranking = [];
 
@@ -30,140 +33,175 @@ class _ProduccionEquipoScreenState extends State<ProduccionEquipoScreen> {
 
   Future<void> cargarDatos({bool isRefresh = false}) async {
     if (!mounted) return;
-
     setState(() {
-      if (isRefresh) {
-        refreshing = true;
-      } else {
-        loading = true;
-      }
+      refreshing = isRefresh;
+      if (!isRefresh) loading = true;
       errorMessage = null;
     });
 
     try {
-      final user = supabase.auth.currentUser;
+      final currentUser = supabase.auth.currentUser;
+      if (currentUser == null) throw Exception('Usuario no autenticado');
 
-      if (user == null) {
-        if (!mounted) return;
-        setState(() {
-          loading = false;
-          refreshing = false;
-          errorMessage = "Usuario no autenticado";
-        });
-        return;
-      }
-
+      final currentPeriod = await ProductionPeriodService.instance.current(
+        forceRefresh: isRefresh,
+      );
       final jefe = await supabase
           .from('usuarios')
           .select('id')
-          .or(
-            'estado.is.null,estado.not.in.(inactivo,Inactivo,INACTIVO,baja,Baja,BAJA,desactivado,Desactivado,DESACTIVADO,bloqueado,Bloqueado,BLOQUEADO,suspendido,Suspendido,SUSPENDIDO)',
-          )
-          .eq('auth_id', user.id)
+          .eq('auth_id', currentUser.id)
           .maybeSingle();
+      if (jefe == null) throw Exception('No se encontró el jefe de equipo');
 
-      if (jefe == null) {
-        if (!mounted) return;
-        setState(() {
-          loading = false;
-          refreshing = false;
-          errorMessage = "No se encontró el jefe de equipo";
-        });
-        return;
-      }
-
-      final jefeId = jefe['id'];
-
-      final agentes = await supabase
+      final rawUsers = await supabase
           .from('usuarios')
-          .select('auth_id,nombre')
+          .select('id, auth_id, parent_id, nombre, apellidos, rol_usuario')
           .or(
             'estado.is.null,estado.not.in.(inactivo,Inactivo,INACTIVO,baja,Baja,BAJA,desactivado,Desactivado,DESACTIVADO,bloqueado,Bloqueado,BLOQUEADO,suspendido,Suspendido,SUSPENDIDO)',
-          )
-          .eq('parent_id', jefeId)
-          .order('nombre', ascending: true);
-
-      if (agentes.isEmpty) {
-        if (!mounted) return;
-        setState(() {
-          produccionEquipo = 0;
-          ventasHoy = 0;
-          ranking = [];
-          loading = false;
-          refreshing = false;
-        });
-        return;
-      }
-
-      final agentesIds = agentes.map((a) => a['auth_id']).toList();
-
-      final ventas = await supabase
-          .from('ventas')
-          .select('agente_auth_id, prima_anual_neta, producto, fecha_efecto')
-          .inFilter('agente_auth_id', agentesIds);
-
-      double total = 0;
-      int hoy = 0;
-
-      final mapaProduccion = <String, double>{};
-      final ahora = DateTime.now();
-
-      for (final venta in ventas) {
-        final prima = PremiumWeighting.net(Map<String, dynamic>.from(venta));
-
-        total += prima;
-
-        final authId = venta['agente_auth_id'];
-
-        mapaProduccion[authId] = (mapaProduccion[authId] ?? 0) + prima;
-
-        final fechaRaw = venta['fecha_efecto'];
-
-        if (fechaRaw != null) {
-          final fecha = DateTime.tryParse(fechaRaw.toString());
-
-          if (fecha != null &&
-              fecha.year == ahora.year &&
-              fecha.month == ahora.month &&
-              fecha.day == ahora.day) {
-            hoy++;
-          }
+          );
+      final users = List<Map<String, dynamic>>.from(rawUsers);
+      final byParent = <String, List<Map<String, dynamic>>>{};
+      for (final item in users) {
+        final parentId = (item['parent_id'] ?? '').toString().trim();
+        if (parentId.isNotEmpty && parentId != 'null') {
+          byParent.putIfAbsent(parentId, () => []).add(item);
         }
       }
 
-      final rankingTemp = <Map<String, dynamic>>[];
-
-      for (final agente in agentes) {
-        final authId = agente['auth_id'];
-
-        rankingTemp.add({
-          "nombre": agente['nombre'] ?? "Sin nombre",
-          "produccion": mapaProduccion[authId] ?? 0,
-        });
+      final descendants = <Map<String, dynamic>>[];
+      final visited = <String>{};
+      void walk(String parentId) {
+        for (final child in byParent[parentId] ?? const []) {
+          final childId = (child['id'] ?? '').toString().trim();
+          if (childId.isEmpty || !visited.add(childId)) continue;
+          descendants.add(child);
+          walk(childId);
+        }
       }
 
-      rankingTemp.sort((a, b) => b['produccion'].compareTo(a['produccion']));
+      walk(jefe['id'].toString());
+      final agentes = descendants.where((item) {
+        final role = (item['rol_usuario'] ?? '')
+            .toString()
+            .trim()
+            .toLowerCase()
+            .replaceAll('-', '_')
+            .replaceAll(' ', '_');
+        final authId = (item['auth_id'] ?? '').toString().trim();
+        return role == 'agente' && authId.isNotEmpty && authId != 'null';
+      }).toList();
+
+      final ventas = <Map<String, dynamic>>[];
+      final authIds = agentes
+          .map((item) => item['auth_id'].toString())
+          .toList();
+      final from = _databaseDate(currentPeriod.start);
+      final to = _databaseDate(currentPeriod.endExclusive);
+
+      for (var offset = 0; offset < authIds.length; offset += 100) {
+        final chunk = authIds.skip(offset).take(100).toList();
+        for (var page = 0; ; page += 1000) {
+          final rows = await supabase
+              .from('ventas')
+              .select(
+                'id, agente_auth_id, prima_anual_neta, producto, fecha_efecto',
+              )
+              .inFilter('agente_auth_id', chunk)
+              .gte('fecha_efecto', from)
+              .lt('fecha_efecto', to)
+              .order('id')
+              .range(page, page + 999);
+          ventas.addAll(List<Map<String, dynamic>>.from(rows));
+          if (rows.length < 1000) break;
+        }
+      }
+
+      final ventasPorAgente = <String, List<Map<String, dynamic>>>{};
+      for (final venta in ventas) {
+        final authId = (venta['agente_auth_id'] ?? '').toString();
+        ventasPorAgente.putIfAbsent(authId, () => []).add(venta);
+      }
+
+      var total = 0.0;
+      var totalMix = 0.0;
+      final detalle = <Map<String, dynamic>>[];
+      for (final agente in agentes) {
+        final authId = agente['auth_id'].toString();
+        final ventasAgente = ventasPorAgente[authId] ?? const [];
+        var primas = 0.0;
+        var primasMix = 0.0;
+        for (final venta in ventasAgente) {
+          final prima = PremiumWeighting.net(venta);
+          primas += prima;
+          if (_esMix(venta['producto'])) primasMix += prima;
+        }
+        total += primas;
+        totalMix += primasMix;
+        final nombre = '${agente['nombre'] ?? ''} ${agente['apellidos'] ?? ''}'
+            .trim();
+        detalle.add({
+          'nombre': nombre.isEmpty ? 'Agente sin nombre' : nombre,
+          'produccion': primas,
+          'mix_primas': primasMix,
+          'mix_porcentaje': primas <= 0 ? 0.0 : primasMix / primas * 100,
+          'polizas': ventasAgente.length,
+        });
+      }
+      detalle.sort(
+        (a, b) =>
+            (b['produccion'] as double).compareTo(a['produccion'] as double),
+      );
 
       if (!mounted) return;
-
       setState(() {
         produccionEquipo = total;
-        ventasHoy = hoy;
-        ranking = rankingTemp;
+        mixEquipo = totalMix;
+        ventasHoy = ventas.length;
+        ranking = detalle;
+        agentesEquipo = agentes.length;
+        periodo = currentPeriod;
         loading = false;
         refreshing = false;
       });
-    } catch (e) {
-      debugPrint("ERROR PRODUCCION EQUIPO: $e");
-
+    } catch (error) {
+      debugPrint('ERROR PRODUCCION EQUIPO: $error');
       if (!mounted) return;
-
       setState(() {
         loading = false;
         refreshing = false;
-        errorMessage = "No se pudo cargar la producción del equipo";
+        errorMessage = 'No se pudo cargar la producción del equipo';
       });
     }
+  }
+
+  bool _esMix(dynamic value) {
+    final producto = (value ?? '')
+        .toString()
+        .trim()
+        .toLowerCase()
+        .replaceAll('á', 'a')
+        .replaceAll('é', 'e')
+        .replaceAll('í', 'i')
+        .replaceAll('ó', 'o')
+        .replaceAll('ú', 'u');
+    return producto.contains('deces') || producto.contains('vida');
+  }
+
+  String _databaseDate(DateTime value) =>
+      '${value.year}-${value.month.toString().padLeft(2, '0')}-'
+      '${value.day.toString().padLeft(2, '0')}';
+
+  double get mixPorcentaje =>
+      produccionEquipo <= 0 ? 0 : mixEquipo / produccionEquipo * 100;
+
+  String get etiquetaPeriodo {
+    final value = periodo;
+    if (value == null) return 'Cargo actual';
+    return 'Cargo ${value.month.toString().padLeft(2, '0')}/${value.year} · '
+        '${value.from.day.toString().padLeft(2, '0')}/'
+        '${value.from.month.toString().padLeft(2, '0')}–'
+        '${value.to.day.toString().padLeft(2, '0')}/'
+        '${value.to.month.toString().padLeft(2, '0')}';
   }
 
   double get mejorProduccion {
@@ -173,16 +211,22 @@ class _ProduccionEquipoScreenState extends State<ProduccionEquipoScreen> {
 
   double get mediaProduccion {
     if (ranking.isEmpty) return 0;
-    return produccionEquipo / ranking.length;
+    return agentesEquipo == 0 ? 0 : produccionEquipo / agentesEquipo;
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF2FCFD),
+      backgroundColor: const Color(0xFFF4F6FB),
       appBar: AppBar(
-        backgroundColor: Colors.transparent,
+        backgroundColor: const Color(0xFFF4F6FB),
+        surfaceTintColor: Colors.transparent,
         elevation: 0,
+        leading: IconButton(
+          onPressed: () => Navigator.pop(context),
+          icon: const Icon(Icons.arrow_back_ios_new_rounded),
+          color: const Color(0xFF13244D),
+        ),
         title: const Text(
           "Producción equipo",
           style: TextStyle(
@@ -194,6 +238,7 @@ class _ProduccionEquipoScreenState extends State<ProduccionEquipoScreen> {
         actions: [
           IconButton(
             tooltip: "Actualizar",
+            color: const Color(0xFF13244D),
             onPressed: refreshing ? null : () => cargarDatos(isRefresh: true),
             icon: refreshing
                 ? const SizedBox(
@@ -211,11 +256,11 @@ class _ProduccionEquipoScreenState extends State<ProduccionEquipoScreen> {
           SafeArea(
             child: loading
                 ? const Center(
-                    child: CircularProgressIndicator(color: Colors.white),
+                    child: CircularProgressIndicator(color: Color(0xFF2454D3)),
                   )
                 : RefreshIndicator(
-                    color: const Color(0xFF20C7C2),
-                    backgroundColor: const Color(0xFFEAF8F8),
+                    color: const Color(0xFF2454D3),
+                    backgroundColor: Colors.white,
                     onRefresh: () => cargarDatos(isRefresh: true),
                     child: ListView(
                       physics: const AlwaysScrollableScrollPhysics(),
@@ -224,6 +269,8 @@ class _ProduccionEquipoScreenState extends State<ProduccionEquipoScreen> {
                         _HeaderCard(
                           produccionEquipo: produccionEquipo,
                           ventasHoy: ventasHoy,
+                          mixPorcentaje: mixPorcentaje,
+                          periodo: etiquetaPeriodo,
                         ),
                         if (errorMessage != null) ...[
                           const SizedBox(height: 16),
@@ -234,15 +281,16 @@ class _ProduccionEquipoScreenState extends State<ProduccionEquipoScreen> {
                         ],
                         const SizedBox(height: 18),
                         _KpiGrid(
-                          agentes: ranking.length,
+                          agentes: agentesEquipo,
                           ventasHoy: ventasHoy,
                           mediaProduccion: mediaProduccion,
-                          mejorProduccion: mejorProduccion,
+                          mejorProduccion: mixEquipo,
                         ),
                         const SizedBox(height: 24),
                         const _SectionTitle(
-                          title: "Ranking equipo",
-                          subtitle: "Producción acumulada por agente",
+                          title: "Producción por agente",
+                          subtitle:
+                              "Detalle individual del equipo en el cargo actual",
                         ),
                         const SizedBox(height: 12),
                         if (ranking.isEmpty)
@@ -253,7 +301,10 @@ class _ProduccionEquipoScreenState extends State<ProduccionEquipoScreen> {
                               position: entry.key + 1,
                               nombre: entry.value['nombre'],
                               produccion: entry.value['produccion'],
-                              maxProduccion: mejorProduccion,
+                              maxProduccion: produccionEquipo,
+                              mixPrimas: entry.value['mix_primas'],
+                              mixPorcentaje: entry.value['mix_porcentaje'],
+                              polizas: entry.value['polizas'],
                             ),
                           ),
                       ],
@@ -271,54 +322,14 @@ class _PremiumBackground extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Stack(
-      children: [
-        Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [Color(0xFFF2FCFD), Color(0xFFFFFFFF), Color(0xFFFFFFFF)],
-            ),
-          ),
+    return const DecoratedBox(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Color(0xFFF4F6FB), Color(0xFFEAF1FF)],
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
         ),
-        Positioned(
-          top: -90,
-          right: -80,
-          child: _GlowCircle(
-            size: 230,
-            color: const Color(0xFF20C7C2).withOpacity(0.24),
-          ),
-        ),
-        Positioned(
-          bottom: -120,
-          left: -90,
-          child: _GlowCircle(
-            size: 260,
-            color: const Color(0xFF0AAEAE).withOpacity(0.16),
-          ),
-        ),
-        BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 34, sigmaY: 34),
-          child: Container(color: Colors.black.withOpacity(0.08)),
-        ),
-      ],
-    );
-  }
-}
-
-class _GlowCircle extends StatelessWidget {
-  final double size;
-  final Color color;
-
-  const _GlowCircle({required this.size, required this.color});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(shape: BoxShape.circle, color: color),
+      ),
     );
   }
 }
@@ -326,85 +337,109 @@ class _GlowCircle extends StatelessWidget {
 class _HeaderCard extends StatelessWidget {
   final double produccionEquipo;
   final int ventasHoy;
+  final double mixPorcentaje;
+  final String periodo;
 
-  const _HeaderCard({required this.produccionEquipo, required this.ventasHoy});
+  const _HeaderCard({
+    required this.produccionEquipo,
+    required this.ventasHoy,
+    required this.mixPorcentaje,
+    required this.periodo,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(22),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(30),
-        color: Colors.white,
-        border: Border.all(color: Colors.white),
+        borderRadius: BorderRadius.circular(28),
+        gradient: const LinearGradient(
+          colors: [Color(0xFF172B58), Color(0xFF2454D3)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.28),
-            blurRadius: 30,
-            offset: const Offset(0, 18),
+            color: const Color(0xFF13244D).withValues(alpha: 0.15),
+            blurRadius: 28,
+            offset: const Offset(0, 14),
           ),
         ],
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Stack(
         children: [
-          Row(
+          Positioned(
+            right: -18,
+            bottom: -32,
+            child: Icon(
+              Icons.query_stats_rounded,
+              size: 145,
+              color: Colors.white.withValues(alpha: 0.08),
+            ),
+          ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(
-                width: 58,
-                height: 58,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(20),
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFF20C7C2), Color(0xFF0A7F91)],
+              Row(
+                children: [
+                  const Icon(
+                    Icons.groups_rounded,
+                    color: Color(0xFFCBD9FA),
+                    size: 21,
                   ),
-                ),
-                child: const Icon(
-                  Icons.bar_chart_rounded,
-                  color: Colors.white,
-                  size: 31,
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      periodo,
+                      style: const TextStyle(
+                        color: Color(0xFFCBD9FA),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 19),
+              const Text(
+                'PRODUCCIÓN TOTAL DEL EQUIPO',
+                style: TextStyle(
+                  color: Color(0xFFE1E9FC),
+                  fontSize: 12,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 0.8,
                 ),
               ),
-              const SizedBox(width: 15),
-              const Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      "Producción total",
-                      style: TextStyle(
-                        color: const Color(0xFF64748B),
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    SizedBox(height: 4),
-                    Text(
-                      "Equipo comercial",
-                      style: TextStyle(
-                        color: const Color(0xFF071A3A),
-                        fontSize: 20,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: -0.5,
-                      ),
-                    ),
-                  ],
+              const SizedBox(height: 6),
+              Text(
+                produccionEquipo.toStringAsFixed(0) + ' €',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 39,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: -1.2,
                 ),
+              ),
+              const SizedBox(height: 17),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  _MiniChip(
+                    icon: Icons.shield_rounded,
+                    text:
+                        'Mix Decesos + Vida · ' +
+                        mixPorcentaje.toStringAsFixed(1) +
+                        '%',
+                  ),
+                  _MiniChip(
+                    icon: Icons.description_rounded,
+                    text: ventasHoy.toString() + ' pólizas',
+                  ),
+                ],
               ),
             ],
           ),
-          const SizedBox(height: 22),
-          Text(
-            "${produccionEquipo.toStringAsFixed(0)} €",
-            style: const TextStyle(
-              color: const Color(0xFF071A3A),
-              fontSize: 38,
-              fontWeight: FontWeight.w900,
-              letterSpacing: -1,
-            ),
-          ),
-          const SizedBox(height: 10),
-          _MiniChip(icon: Icons.today_rounded, text: "$ventasHoy ventas hoy"),
         ],
       ),
     );
@@ -414,28 +449,27 @@ class _HeaderCard extends StatelessWidget {
 class _MiniChip extends StatelessWidget {
   final IconData icon;
   final String text;
-
   const _MiniChip({required this.icon, required this.text});
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
+      padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 8),
       decoration: BoxDecoration(
-        color: const Color(0xFF0AAEAE).withOpacity(0.14),
+        color: Colors.white.withValues(alpha: 0.14),
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: const Color(0xFF0AAEAE).withOpacity(0.25)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.20)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, color: const Color(0xFF20C7C2), size: 15),
+          Icon(icon, color: Colors.white, size: 15),
           const SizedBox(width: 6),
           Text(
             text,
             style: const TextStyle(
-              color: Color(0xFFEAF8F8),
-              fontSize: 12,
+              color: Colors.white,
+              fontSize: 11.5,
               fontWeight: FontWeight.w900,
             ),
           ),
@@ -460,42 +494,52 @@ class _KpiGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(
-          child: _KpiCard(
-            title: "Agentes",
-            value: agentes.toString(),
-            icon: Icons.groups_rounded,
-          ),
-        ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: _KpiCard(
-            title: "Hoy",
-            value: ventasHoy.toString(),
-            icon: Icons.flash_on_rounded,
-          ),
-        ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: _KpiCard(
-            title: "Media",
-            value: "${mediaProduccion.toStringAsFixed(0)}€",
-            icon: Icons.analytics_rounded,
-          ),
-        ),
-      ],
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final width = (constraints.maxWidth - 10) / 2;
+        return Wrap(
+          spacing: 10,
+          runSpacing: 10,
+          children: [
+            _KpiCard(
+              width: width,
+              title: 'Agentes activos',
+              value: agentes.toString(),
+              icon: Icons.people_alt_rounded,
+            ),
+            _KpiCard(
+              width: width,
+              title: 'Pólizas del cargo',
+              value: ventasHoy.toString(),
+              icon: Icons.description_rounded,
+            ),
+            _KpiCard(
+              width: width,
+              title: 'Media por agente',
+              value: mediaProduccion.toStringAsFixed(0) + ' €',
+              icon: Icons.analytics_rounded,
+            ),
+            _KpiCard(
+              width: width,
+              title: 'Primas de mix',
+              value: mejorProduccion.toStringAsFixed(0) + ' €',
+              icon: Icons.shield_rounded,
+            ),
+          ],
+        );
+      },
     );
   }
 }
 
 class _KpiCard extends StatelessWidget {
+  final double width;
   final String title;
   final String value;
   final IconData icon;
 
   const _KpiCard({
+    required this.width,
     required this.title,
     required this.value,
     required this.icon,
@@ -504,32 +548,34 @@ class _KpiCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.fromLTRB(10, 14, 10, 14),
+      width: width,
+      padding: const EdgeInsets.all(15),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: Colors.white),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFFDCE5F2)),
       ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, color: const Color(0xFF20C7C2), size: 23),
-          const SizedBox(height: 8),
+          Icon(icon, color: const Color(0xFF2454D3), size: 23),
+          const SizedBox(height: 11),
           Text(
             value,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: const TextStyle(
-              color: const Color(0xFF071A3A),
-              fontSize: 17,
+              color: Color(0xFF0F172A),
+              fontSize: 18,
               fontWeight: FontWeight.w900,
             ),
           ),
           const SizedBox(height: 3),
           Text(
             title,
-            style: TextStyle(
-              color: const Color(0xFF53627A),
-              fontSize: 11,
+            style: const TextStyle(
+              color: Color(0xFF64748B),
+              fontSize: 11.5,
               fontWeight: FontWeight.w700,
             ),
           ),
@@ -550,8 +596,8 @@ class _SectionTitle extends StatelessWidget {
     return Row(
       children: [
         const Icon(
-          Icons.emoji_events_rounded,
-          color: Color(0xFF20C7C2),
+          Icons.account_tree_rounded,
+          color: Color(0xFF2454D3),
           size: 23,
         ),
         const SizedBox(width: 9),
@@ -590,108 +636,130 @@ class _RankingCard extends StatelessWidget {
   final String nombre;
   final double produccion;
   final double maxProduccion;
+  final double mixPrimas;
+  final double mixPorcentaje;
+  final int polizas;
 
   const _RankingCard({
     required this.position,
     required this.nombre,
     required this.produccion,
     required this.maxProduccion,
+    required this.mixPrimas,
+    required this.mixPorcentaje,
+    required this.polizas,
   });
 
   @override
   Widget build(BuildContext context) {
-    final percent = maxProduccion <= 0 ? 0.0 : produccion / maxProduccion;
+    final share = maxProduccion <= 0 ? 0.0 : produccion / maxProduccion;
+    final initial = nombre.isEmpty ? '?' : nombre[0].toUpperCase();
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 13),
-      padding: const EdgeInsets.all(15),
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(
-          color: position == 1
-              ? const Color(0xFF20C7C2).withOpacity(0.28)
-              : Colors.white,
-        ),
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: const Color(0xFFDCE5F2)),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF13244D).withValues(alpha: 0.05),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
+          ),
+        ],
       ),
       child: Column(
         children: [
           Row(
             children: [
-              _PositionBadge(position: position),
-              const SizedBox(width: 12),
-              Expanded(
+              CircleAvatar(
+                radius: 25,
+                backgroundColor: const Color(0xFFEAF0FF),
                 child: Text(
-                  nombre,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+                  initial,
                   style: const TextStyle(
-                    color: const Color(0xFF071A3A),
-                    fontSize: 15.5,
+                    color: Color(0xFF2454D3),
+                    fontSize: 20,
                     fontWeight: FontWeight.w900,
                   ),
                 ),
               ),
-              const SizedBox(width: 10),
+              const SizedBox(width: 13),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      nombre,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Color(0xFF0F172A),
+                        fontSize: 15.5,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(height: 5),
+                    Text(
+                      polizas.toString() +
+                          ' pólizas · Mix ' +
+                          mixPorcentaje.toStringAsFixed(1) +
+                          '%',
+                      style: const TextStyle(
+                        color: Color(0xFF64748B),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
               Text(
-                "${produccion.toStringAsFixed(0)} €",
+                produccion.toStringAsFixed(0) + ' €',
                 style: const TextStyle(
-                  color: Color(0xFFEAF8F8),
-                  fontSize: 15,
+                  color: Color(0xFF13244D),
+                  fontSize: 16,
                   fontWeight: FontWeight.w900,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 13),
+          const SizedBox(height: 14),
           ClipRRect(
             borderRadius: BorderRadius.circular(999),
             child: LinearProgressIndicator(
+              value: share.clamp(0.0, 1.0),
               minHeight: 7,
-              value: percent.clamp(0.0, 1.0),
-              backgroundColor: Colors.white,
-              valueColor: const AlwaysStoppedAnimation<Color>(
-                Color(0xFF20C7C2),
-              ),
+              backgroundColor: const Color(0xFFE5EBF5),
+              valueColor: const AlwaysStoppedAnimation(Color(0xFF2454D3)),
             ),
           ),
-        ],
-      ),
-    );
-  }
-}
-
-class _PositionBadge extends StatelessWidget {
-  final int position;
-
-  const _PositionBadge({required this.position});
-
-  @override
-  Widget build(BuildContext context) {
-    final bool isFirst = position == 1;
-
-    return Container(
-      width: 42,
-      height: 42,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        gradient: isFirst
-            ? const LinearGradient(
-                colors: [Color(0xFF20C7C2), Color(0xFF0A7F91)],
-              )
-            : null,
-        color: isFirst ? null : Colors.white,
-        border: Border.all(color: Colors.white),
-      ),
-      child: Center(
-        child: Text(
-          "$position",
-          style: const TextStyle(
-            color: const Color(0xFF071A3A),
-            fontSize: 15,
-            fontWeight: FontWeight.w900,
+          const SizedBox(height: 8),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Mix: ' + mixPrimas.toStringAsFixed(0) + ' €',
+                style: const TextStyle(
+                  color: Color(0xFF64748B),
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              Text(
+                (share * 100).toStringAsFixed(1) + '% del equipo',
+                style: const TextStyle(
+                  color: Color(0xFF2454D3),
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ],
           ),
-        ),
+        ],
       ),
     );
   }
@@ -707,14 +775,14 @@ class _EmptyState extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: Colors.white),
+        border: Border.all(color: const Color(0xFFDCE5F2)),
       ),
       child: Column(
         children: [
           Icon(
             Icons.groups_2_outlined,
             size: 48,
-            color: Colors.white.withOpacity(0.35),
+            color: const Color(0xFF2454D3),
           ),
           const SizedBox(height: 14),
           const Text(
@@ -727,7 +795,7 @@ class _EmptyState extends StatelessWidget {
           ),
           const SizedBox(height: 7),
           Text(
-            "Cuando tu equipo tenga agentes y ventas registradas aparecerá aquí el ranking de producción.",
+            "Cuando tu equipo tenga agentes y ventas registradas aparecerán aquí sus primas, pólizas y mix.",
             textAlign: TextAlign.center,
             style: TextStyle(
               color: const Color(0xFF53627A),

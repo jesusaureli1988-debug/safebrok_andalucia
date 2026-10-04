@@ -512,23 +512,7 @@ class _CargarGestionesScreenState extends State<CargarGestionesScreen> {
         'archivo_tipo': archivoInfo['tipo'],
       };
 
-      final creada = await supabase
-          .from('gestiones_asignadas')
-          .insert(insert)
-          .select()
-          .single();
-
-      await supabase.from('notificaciones').insert({
-        'auth_id': destinoAuthId,
-        'titulo': 'Nueva gestión asignada',
-        'mensaje': titulo,
-        'tipo': 'gestion',
-        'leida': false,
-        'referencia_id': creada['id'],
-        'pantalla_destino': 'mis_gestiones',
-        'archivo_url': archivoInfo['url'],
-        'archivo_nombre': archivoInfo['nombre'],
-      });
+      await supabase.from('gestiones_asignadas').insert(insert);
 
       tituloCtrl.clear();
       descripcionCtrl.clear();
@@ -665,8 +649,6 @@ class _CargarGestionesScreenState extends State<CargarGestionesScreen> {
       final id = g['id']?.toString();
       if (id == null || id.isEmpty) return;
 
-      final destinoAnterior = g['asignado_a_auth_id']?.toString();
-
       await supabase
           .from('gestiones_asignadas')
           .update({
@@ -677,20 +659,6 @@ class _CargarGestionesScreenState extends State<CargarGestionesScreen> {
             'updated_at': DateTime.now().toIso8601String(),
           })
           .eq('id', id);
-
-      if (nuevoDestino != null && nuevoDestino != destinoAnterior) {
-        await supabase.from('notificaciones').insert({
-          'auth_id': nuevoDestino,
-          'titulo': 'Gestión reasignada',
-          'mensaje': g['titulo']?.toString() ?? 'Tienes una nueva gestión',
-          'tipo': 'gestion',
-          'leida': false,
-          'referencia_id': id,
-          'pantalla_destino': 'mis_gestiones',
-          'archivo_url': g['archivo_url'],
-          'archivo_nombre': g['archivo_nombre'],
-        });
-      }
 
       await cargarGestiones();
       if (!mounted) return;

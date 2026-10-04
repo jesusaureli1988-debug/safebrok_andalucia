@@ -230,6 +230,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
       dataRows = lines
           .skip(1)
           .map((line) => _parsearLineaCsv(line, separator))
+          .where(_filaReciboConDatos)
           .toList();
     } else {
       final archivoExcel = excel.Excel.decodeBytes(bytes);
@@ -240,9 +241,11 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
       headers = rows.first
           .map((cell) => cell?.value.toString().trim().toUpperCase() ?? '')
           .toList();
-      dataRows = rows.skip(1).map((row) {
-        return row.map((cell) => cell?.value ?? '').toList();
-      }).toList();
+      dataRows = rows
+          .skip(1)
+          .map((row) => row.map((cell) => cell?.value ?? '').toList())
+          .where(_filaReciboConDatos)
+          .toList();
     }
 
     autoDetectMapping();
@@ -382,15 +385,67 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
     await OpenFilex.open(file.path);
   }
 
+  bool _filaReciboConDatos(List<dynamic> row) => row.any((cell) {
+    final value = cleanExcelValue(cell);
+    return value != null && value.toString().trim().isNotEmpty;
+  });
+
+  String? _normalizarEstadoImportado(String? value) {
+    final estado = (value ?? '')
+        .toLowerCase()
+        .replaceAll('á', 'a')
+        .replaceAll('é', 'e')
+        .replaceAll('í', 'i')
+        .replaceAll('ó', 'o')
+        .replaceAll('ú', 'u')
+        .trim()
+        .replaceAll(RegExp(r'[_\s]+'), ' ');
+    if (const {'cobrado', 'pagado', 'abonado'}.contains(estado)) {
+      return 'COBRADO';
+    }
+    if (const {'devuelto', 'impagado', 'impago'}.contains(estado)) {
+      return 'DEVUELTO';
+    }
+    if (const {'pendiente', 'pendiente de cobro'}.contains(estado)) {
+      return 'PENDIENTE';
+    }
+    if (const {'en gestion', 'gestion'}.contains(estado)) {
+      return 'En gestión';
+    }
+    if (const {'para baja', 'baja'}.contains(estado)) return 'PARA BAJA';
+    return null;
+  }
+
   Future<void> importarMasivoASupabase() async {
     if (dataRows.isEmpty) {
       _mostrarMensajeRecibos("Selecciona primero un archivo Excel o CSV.");
       return;
     }
 
-    if (!columnMapping.containsValue('numero_recibo')) {
+    const camposObligatorios = <String>{
+      'numero_recibo',
+      'poliza',
+      'importe',
+      'estado',
+      'fecha',
+    };
+    final camposFaltantes = camposObligatorios
+        .where((campo) => !columnMapping.containsValue(campo))
+        .toList();
+    if (camposFaltantes.isNotEmpty) {
       _mostrarMensajeRecibos(
-        "Debes asignar una columna del archivo al campo numero_recibo.",
+        'Falta mapear: ${camposFaltantes.join(', ')}. '
+        'No se iniciará la carga hasta completar los campos obligatorios.',
+      );
+      return;
+    }
+
+    final cabecerasNormalizadas = headers
+        .map(_normalizarCabeceraRecibo)
+        .toList();
+    if (cabecerasNormalizadas.toSet().length != cabecerasNormalizadas.length) {
+      _mostrarMensajeRecibos(
+        'El archivo contiene columnas repetidas. Renómbralas antes de importar.',
       );
       return;
     }
@@ -584,9 +639,36 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
 
     final numero = item['numero_recibo']?.toString().trim().toUpperCase() ?? '';
     if (numero.isEmpty) {
-      throw const FormatException("numero_recibo está vacío");
+      throw const FormatException('numero_recibo está vacío');
     }
     item['numero_recibo'] = numero;
+
+    final poliza = item['poliza']?.toString().trim().toUpperCase() ?? '';
+    if (poliza.isEmpty) throw const FormatException('poliza está vacía');
+    item['poliza'] = poliza;
+
+    if (item['importe'] == null) {
+      throw const FormatException('importe está vacío');
+    }
+    if (item['fecha'] == null) {
+      throw const FormatException('fecha está vacía');
+    }
+
+    final estadoOriginal = (item['estado'] ?? item['estado_recibo'])
+        ?.toString()
+        .trim();
+    final estado = _normalizarEstadoImportado(estadoOriginal);
+    if (estado == null) {
+      throw FormatException(
+        'estado no reconocido: ${estadoOriginal ?? 'vacío'}',
+      );
+    }
+    item['estado'] = estado;
+    item['estado_recibo'] = 'ACTIVO';
+
+    if (item['agente'] != null) {
+      item['agente'] = item['agente'].toString().trim();
+    }
 
     return item;
   }
@@ -1007,6 +1089,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
       polizasRows = lines
           .skip(1)
           .map((line) => _parsearLineaCsv(line, separator))
+          .where(_filaReciboConDatos)
           .toList();
     } else {
       final archivoExcel = excel.Excel.decodeBytes(bytes);
@@ -1019,9 +1102,11 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
           .map((e) => e?.value.toString().trim().toUpperCase() ?? '')
           .toList();
 
-      polizasRows = rows.skip(1).map((row) {
-        return row.map((e) => e?.value ?? '').toList();
-      }).toList();
+      polizasRows = rows
+          .skip(1)
+          .map((row) => row.map((e) => e?.value ?? '').toList())
+          .where(_filaReciboConDatos)
+          .toList();
     }
 
     autoMapearPolizas();
@@ -1289,38 +1374,48 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
   String? toFechaSupabase(dynamic value) {
     if (value == null) return null;
 
+    DateTime? validar(int year, int month, int day) {
+      if (year < 1900 || year > 2200 || month < 1 || month > 12 || day < 1) {
+        return null;
+      }
+      final fecha = DateTime(year, month, day);
+      return fecha.year == year && fecha.month == month && fecha.day == day
+          ? fecha
+          : null;
+    }
+
     if (value is DateTime) {
-      return DateTime(value.year, value.month, value.day).toIso8601String();
+      return validar(value.year, value.month, value.day)?.toIso8601String();
+    }
+
+    // Excel puede entregar la fecha como número de serie.
+    if (value is num) {
+      final fecha = DateTime(1899, 12, 30).add(Duration(days: value.floor()));
+      return validar(fecha.year, fecha.month, fecha.day)?.toIso8601String();
     }
 
     final text = value.toString().trim();
-
     if (text.isEmpty) return null;
 
-    try {
-      if (text.contains('/') || text.contains('-')) {
-        final separador = text.contains('/') ? '/' : '-';
-        final parts = text.split(separador);
+    final match = RegExp(
+      r'^(\d{1,4})[\/\-.](\d{1,2})[\/\-.](\d{1,4})$',
+    ).firstMatch(text);
+    if (match != null) {
+      final primero = int.tryParse(match.group(1)!);
+      final segundo = int.tryParse(match.group(2)!);
+      final tercero = int.tryParse(match.group(3)!);
+      if (primero == null || segundo == null || tercero == null) return null;
 
-        if (parts.length == 3) {
-          final primero = int.parse(parts[0]);
-          final segundo = int.parse(parts[1]);
-          final tercero = int.parse(parts[2]);
-
-          final year = parts[0].length == 4 ? primero : tercero;
-          final month = segundo;
-          final day = parts[0].length == 4 ? tercero : primero;
-
-          return DateTime(year, month, day).toIso8601String();
-        }
-      }
-
-      final parsed = DateTime.tryParse(text);
-
-      return parsed?.toIso8601String() ?? text;
-    } catch (_) {
-      return text;
+      final year = match.group(1)!.length == 4 ? primero : tercero;
+      final month = segundo;
+      final day = match.group(1)!.length == 4 ? tercero : primero;
+      return validar(year, month, day)?.toIso8601String();
     }
+
+    final parsed = DateTime.tryParse(text);
+    return parsed == null
+        ? null
+        : validar(parsed.year, parsed.month, parsed.day)?.toIso8601String();
   }
 
   double calcularPrimaAnualMasiva({
@@ -1361,13 +1456,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
   }
 
   Future<String?> resolverAgenteAuthId(dynamic value) async {
-    final supabase = Supabase.instance.client;
-
-    if (value == null || value.toString().trim().isEmpty) {
-      return null;
-    }
-
-    final raw = value.toString().trim();
+    if (value == null || value.toString().trim().isEmpty) return null;
 
     String normalizarTexto(String texto) {
       return texto
@@ -1379,104 +1468,72 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
           .replaceAll('ú', 'u')
           .replaceAll('ü', 'u')
           .replaceAll('ñ', 'n')
-          .replaceAll(',', ' ')
-          .replaceAll('.', ' ')
-          .replaceAll('-', ' ')
+          .replaceAll(RegExp(r'[^a-z0-9]+'), ' ')
           .replaceAll(RegExp(r'\s+'), ' ')
           .trim();
     }
 
-    final colaboradorNormalizado = normalizarTexto(raw);
+    bool estadoActivo(dynamic estado) {
+      final normalizado = normalizarTexto(estado?.toString() ?? 'activo');
+      return !{
+        'baja',
+        'inactivo',
+        'inactiva',
+        'bloqueado',
+        'bloqueada',
+        'desactivado',
+        'desactivada',
+        'suspendido',
+        'suspendida',
+      }.contains(normalizado);
+    }
 
+    final referencia = value.toString().trim();
+    final referenciaNormalizada = normalizarTexto(referencia);
     final usuariosResponse = await supabase
         .from('usuarios')
-        .select('id, auth_id, nombre, apellidos, email, rol_usuario');
+        .select('id, auth_id, nombre, apellidos, email, estado');
+    final usuarios = List<Map<String, dynamic>>.from(usuariosResponse)
+        .where(
+          (u) =>
+              (u['auth_id']?.toString().trim().isNotEmpty ?? false) &&
+              estadoActivo(u['estado']),
+        )
+        .toList();
 
-    final usuarios = List<Map<String, dynamic>>.from(usuariosResponse);
+    final directos = usuarios.where((u) {
+      return u['auth_id']?.toString() == referencia ||
+          u['id']?.toString() == referencia ||
+          (u['email']?.toString().trim().toLowerCase() ?? '') ==
+              referencia.toLowerCase();
+    }).toList();
 
-    /*
-   * 1. Coincidencia exacta:
-   * nombre + apellidos
-   */
-    for (final usuario in usuarios) {
-      final authId = usuario['auth_id']?.toString().trim() ?? '';
+    if (directos.length == 1) return directos.single['auth_id'].toString();
+    if (directos.length > 1) return null;
 
-      if (authId.isEmpty) {
-        continue;
-      }
+    final exactos = usuarios.where((u) {
+      final nombre = normalizarTexto(u['nombre']?.toString() ?? '');
+      final apellidos = normalizarTexto(u['apellidos']?.toString() ?? '');
+      return normalizarTexto('$nombre $apellidos') == referenciaNormalizada ||
+          normalizarTexto('$apellidos $nombre') == referenciaNormalizada;
+    }).toList();
 
-      final nombre = normalizarTexto(usuario['nombre']?.toString() ?? '');
+    // Nunca se elige arbitrariamente entre personas con el mismo nombre.
+    if (exactos.length == 1) return exactos.single['auth_id'].toString();
+    if (exactos.length > 1) return null;
 
-      final apellidos = normalizarTexto(usuario['apellidos']?.toString() ?? '');
+    final contenidos = usuarios.where((u) {
+      final nombre = normalizarTexto(u['nombre']?.toString() ?? '');
+      final apellidos = normalizarTexto(u['apellidos']?.toString() ?? '');
+      return nombre.isNotEmpty &&
+          apellidos.isNotEmpty &&
+          referenciaNormalizada.contains(nombre) &&
+          referenciaNormalizada.contains(apellidos);
+    }).toList();
 
-      final nombreCompleto = normalizarTexto('$nombre $apellidos');
-
-      if (nombreCompleto == colaboradorNormalizado) {
-        return authId;
-      }
-    }
-
-    /*
-   * 2. Coincidencia exacta con orden invertido:
-   * apellidos + nombre
-   */
-    for (final usuario in usuarios) {
-      final authId = usuario['auth_id']?.toString().trim() ?? '';
-
-      if (authId.isEmpty) {
-        continue;
-      }
-
-      final nombre = normalizarTexto(usuario['nombre']?.toString() ?? '');
-
-      final apellidos = normalizarTexto(usuario['apellidos']?.toString() ?? '');
-
-      final nombreInvertido = normalizarTexto('$apellidos $nombre');
-
-      if (nombreInvertido == colaboradorNormalizado) {
-        return authId;
-      }
-    }
-
-    /*
-   * 3. Coincidencia por contenido.
-   *
-   * Sirve para casos como:
-   * Excel: "MORENO GARCIA, JESUS AURELIO"
-   * Usuario:
-   * nombre = "Jesús Aurelio"
-   * apellidos = "Moreno García"
-   */
-    for (final usuario in usuarios) {
-      final authId = usuario['auth_id']?.toString().trim() ?? '';
-
-      if (authId.isEmpty) {
-        continue;
-      }
-
-      final nombre = normalizarTexto(usuario['nombre']?.toString() ?? '');
-
-      final apellidos = normalizarTexto(usuario['apellidos']?.toString() ?? '');
-
-      if (nombre.isEmpty || apellidos.isEmpty) {
-        continue;
-      }
-
-      final contieneNombre = colaboradorNormalizado.contains(nombre);
-
-      final contieneApellidos = colaboradorNormalizado.contains(apellidos);
-
-      if (contieneNombre && contieneApellidos) {
-        return authId;
-      }
-    }
-
-    /*
-   * Muy importante:
-   * si no encontramos al agente, NO devolvemos el auth_id
-   * de la persona que está importando.
-   */
-    return null;
+    return contenidos.length == 1
+        ? contenidos.single['auth_id'].toString()
+        : null;
   }
 
   Map<String, String> separarNombreApellidos(String nombreCompleto) {
@@ -1531,7 +1588,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
     if (authIdDirecto != null && authIdDirecto.isNotEmpty) {
       final usuario = await supabase
           .from('usuarios')
-          .select('auth_id')
+          .select('auth_id, estado')
           .eq('auth_id', authIdDirecto)
           .maybeSingle();
 
@@ -1541,6 +1598,25 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
         );
       }
 
+      final estado = (usuario['estado'] ?? 'activo')
+          .toString()
+          .trim()
+          .toLowerCase();
+      if ({
+        'baja',
+        'inactivo',
+        'inactiva',
+        'bloqueado',
+        'bloqueada',
+        'desactivado',
+        'desactivada',
+        'suspendido',
+        'suspendida',
+      }.contains(estado)) {
+        throw Exception(
+          'El usuario asignado está inactivo o de baja: $authIdDirecto',
+        );
+      }
       return authIdDirecto;
     }
 
@@ -1578,6 +1654,9 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
     for (final requerido in [
       'cliente.nombre',
       'venta.numero_poliza',
+      'venta.producto',
+      'venta.compania',
+      'venta.fecha_efecto',
       'venta.prima_anual_neta',
       'venta.comision',
     ]) {
@@ -1587,6 +1666,21 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
     if (!destinos.contains('venta.agente_auth_id') &&
         !destinos.contains('aux.colaborador_nombre')) {
       faltantes.add('aux.colaborador_nombre o venta.agente_auth_id');
+    }
+    final cabecerasNormalizadas = polizasHeaders
+        .map((h) => h.trim().toUpperCase())
+        .where((h) => h.isNotEmpty)
+        .toList();
+    if (cabecerasNormalizadas.toSet().length != cabecerasNormalizadas.length) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'El archivo contiene columnas repetidas. Renómbralas antes de importar.',
+          ),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
     }
 
     if (faltantes.isNotEmpty) {
@@ -1621,7 +1715,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
         final numeroPoliza = valorPolizaMapeado(
           row,
           'venta.numero_poliza',
-        )?.toString().trim();
+        )?.toString().trim().toUpperCase();
 
         if (numeroPoliza == null || numeroPoliza.isEmpty) {
           throw Exception('Falta el número de póliza.');
@@ -1630,7 +1724,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
         final ventaExistente = await supabase
             .from('ventas')
             .select('id')
-            .eq('numero_poliza', numeroPoliza)
+            .ilike('numero_poliza', numeroPoliza)
             .limit(1);
 
         if ((ventaExistente as List).isNotEmpty) {
@@ -1697,12 +1791,35 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
         final fechaEfecto = toFechaSupabase(
           valorPolizaMapeado(row, 'venta.fecha_efecto'),
         );
+        if (producto == null || producto.isEmpty) {
+          throw Exception('Falta el producto o ramo de la póliza.');
+        }
+        if (fechaEfecto == null) {
+          throw Exception(
+            'Falta la fecha de efecto o su formato no es válido.',
+          );
+        }
+        if (primaNeta < 0) {
+          throw Exception('La prima anual neta no puede ser negativa.');
+        }
+        if (primaBrutaExcel != null && primaBrutaExcel < 0) {
+          throw Exception('La prima anual bruta no puede ser negativa.');
+        }
+        if (primaAnual != null && primaAnual < 0) {
+          throw Exception('La prima anual no puede ser negativa.');
+        }
+        if (comision < 0) {
+          throw Exception('La comisión no puede ser negativa.');
+        }
 
-        final dni = valorPolizaMapeado(row, 'cliente.dni')?.toString().trim();
+        final dni = valorPolizaMapeado(
+          row,
+          'cliente.dni',
+        )?.toString().trim().toUpperCase();
         final email = valorPolizaMapeado(
           row,
           'cliente.email',
-        )?.toString().trim();
+        )?.toString().trim().toLowerCase();
 
         Map<String, dynamic>? clienteExistente;
 
@@ -1771,7 +1888,8 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
           'categoria_producto':
               valorPolizaMapeado(row, 'venta.categoria_producto') ?? producto,
           'numero_poliza': numeroPoliza,
-          'estado_poliza': valorPolizaMapeado(row, 'venta.estado_poliza'),
+          'estado_poliza':
+              valorPolizaMapeado(row, 'venta.estado_poliza') ?? 'ACTIVA',
         });
 
         await supabase.from('ventas').insert(ventaData);
@@ -1989,7 +2107,8 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                 valorPolizaMapeado(row, 'venta.categoria_producto') ?? producto,
 
             'numero_poliza': valorPolizaMapeado(row, 'venta.numero_poliza'),
-            'estado_poliza': valorPolizaMapeado(row, 'venta.estado_poliza'),
+            'estado_poliza':
+                valorPolizaMapeado(row, 'venta.estado_poliza') ?? 'ACTIVA',
           });
 
           await supabase.from('ventas').insert(ventaData);
@@ -7031,7 +7150,8 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
 
           const SizedBox(height: 20),
 
-          if (modoCarga == "Importar Excel") buildImportadorExcel(),
+          if (modoCarga == "Importar Excel" || modoCarga == "Carga Masiva")
+            buildImportadorExcel(),
 
           if (modoCarga == "Carga Manual")
             Container(
@@ -7238,11 +7358,16 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                           .skip(1)
                           .map(
                             (row) => DataRow(
-                              cells: row
-                                  .map(
-                                    (cell) => DataCell(Text(cell.toString())),
-                                  )
-                                  .toList(),
+                              cells: List.generate(
+                                excelPreview.first.length,
+                                (index) => DataCell(
+                                  Text(
+                                    index < row.length
+                                        ? row[index].toString()
+                                        : '',
+                                  ),
+                                ),
+                              ),
                             ),
                           )
                           .toList(),
@@ -7269,11 +7394,6 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
   }
 
   Widget buildColumnMapper() {
-    ElevatedButton(
-      onPressed: autoDetectMapping,
-      child: const Text("AUTO-MAPEAR COLUMNAS"),
-    );
-
     return Container(
       margin: const EdgeInsets.only(top: 20),
       padding: const EdgeInsets.all(20),
@@ -7285,11 +7405,28 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            "MAPEO DE COLUMNAS",
-            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+          Row(
+            children: [
+              const Expanded(
+                child: Text(
+                  'MAPEO DE COLUMNAS',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                ),
+              ),
+              OutlinedButton.icon(
+                onPressed: autoDetectMapping,
+                icon: const Icon(Icons.auto_fix_high_rounded),
+                label: const Text('AUTO-MAPEAR'),
+              ),
+            ],
           ),
-
+          const SizedBox(height: 8),
+          const Text(
+            'Obligatorios: número de recibo, póliza, importe, estado y fecha. '
+            'El agente puede indicarse por nombre, email o identificador; si '
+            'falta, se obtiene automáticamente desde la póliza.',
+            style: TextStyle(color: Colors.black54),
+          ),
           const SizedBox(height: 15),
 
           ...headers.map((header) {
@@ -7377,26 +7514,40 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
       "numero recibo": "numero_recibo",
       "n recibo": "numero_recibo",
       "num recibo": "numero_recibo",
+      "numero de recibo": "numero_recibo",
+      "nro recibo": "numero_recibo",
+      "referencia recibo": "numero_recibo",
       "id recibo": "numero_recibo",
       "recibo": "numero_recibo",
       "poliza": "poliza",
       "n poliza": "poliza",
       "numero poliza": "poliza",
+      "numero de poliza": "poliza",
+      "referencia poliza": "poliza",
       "cliente": "cliente",
       "tomador": "cliente",
       "asegurado": "cliente",
       "importe": "importe",
       "importe recibo": "importe",
+      "importe total": "importe",
+      "prima recibo": "importe",
+      "prima": "importe",
       "total": "importe",
       "compania": "compania",
       "aseguradora": "compania",
       "estado": "estado",
       "fecha": "fecha",
       "fecha recibo": "fecha",
+      "fecha emision": "fecha",
+      "fecha de emision": "fecha",
+      "fecha vencimiento": "fecha",
       "agente": "agente",
       "comercial": "agente",
       "mediador": "agente",
       "colaborador": "agente",
+      "responsable": "agente",
+      "agente email": "agente",
+      "email agente": "agente",
       "motivo": "motivo",
       "estado recibo": "estado_recibo",
       "situacion recibo": "estado_recibo",
@@ -11791,7 +11942,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
         : await Supabase.instance.client
               .from('recibos')
               .select()
-              .eq('numero_poliza', numeroPoliza);
+              .ilike('numero_poliza', numeroPoliza);
 
     final cobrados = recibos.where((r) => r['estado'] == 'COBRADO').length;
     final devueltos = recibos.where((r) => r['estado'] == 'DEVUELTO').length;

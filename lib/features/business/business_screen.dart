@@ -1,5 +1,6 @@
 import 'dart:ui';
 import 'package:safebrok_andalucia/core/production/premium_weighting.dart';
+import 'package:safebrok_andalucia/core/payroll/role_compensation.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:safebrok_andalucia/core/production/production_period_service.dart';
@@ -12,7 +13,29 @@ import 'package:safebrok_andalucia/features/referrals/referral_screen.dart';
 import 'referencias_screen.dart';
 import 'package:safebrok_andalucia/features/business/mejora_produccion_screen.dart';
 import 'package:safebrok_andalucia/features/business/ranking_comercial_screen.dart';
+import 'package:safebrok_andalucia/features/business/advanced_statistics_screen.dart';
+import 'package:safebrok_andalucia/features/business/team_hierarchy_screen.dart';
+import 'package:safebrok_andalucia/features/business/complete_history_screen.dart';
+import 'package:safebrok_andalucia/features/business/extornos_screen.dart';
+import 'package:safebrok_andalucia/features/business/commission_simulator_screen.dart';
+import 'package:safebrok_andalucia/features/business/business_settings_screen.dart';
 import 'package:safebrok_andalucia/features/team/team_dashboard_screen.dart';
+
+List<BoxShadow> _bankCardShadows({bool strong = false}) {
+  return [
+    BoxShadow(
+      color: const Color(0xFF0F172A).withValues(alpha: strong ? .13 : .075),
+      blurRadius: strong ? 30 : 20,
+      spreadRadius: strong ? 1 : 0,
+      offset: Offset(0, strong ? 14 : 8),
+    ),
+    BoxShadow(
+      color: Colors.white.withValues(alpha: .92),
+      blurRadius: 6,
+      offset: const Offset(-2, -2),
+    ),
+  ];
+}
 
 class BusinessScreen extends StatefulWidget {
   final String role;
@@ -514,17 +537,21 @@ class _BusinessScreenState extends State<BusinessScreen> {
         break;
 
       case 'jefe_equipo':
-        incentivo = calcularRappelJefe(primasTotales);
+        incentivo = calcularRappelJefe(primasTotales, primasDV);
         sueldo = comisionPropia + incentivo;
         break;
 
       case 'jefe_ventas':
-        incentivo = calcularRappelJefeVentas(primasTotales);
+        incentivo = calcularRappelJefeVentas(primasTotales, primasDV);
         sueldo = comisionPropia + incentivo;
         break;
 
       case 'director_zona':
-        incentivo = primasTotales * 0.10;
+        incentivo = RoleCompensationRules.calculate(
+          role: 'director_zona',
+          premiums: primasTotales,
+          deathAndLifePremiums: primasDV,
+        ).total;
         sueldo = comisionPropia + incentivo;
         break;
 
@@ -556,11 +583,11 @@ class _BusinessScreenState extends State<BusinessScreen> {
   double _objetivoPrimasPorRol(dynamic rol) {
     switch (_normalizarRol(rol)) {
       case 'jefe_equipo':
-        return 10000;
+        return 4000;
       case 'jefe_ventas':
-        return 11500;
+        return 6500;
       case 'director_zona':
-        return 15000;
+        return 15500;
       case 'director_nacional':
         return 25000;
       case 'agente':
@@ -616,35 +643,20 @@ class _BusinessScreenState extends State<BusinessScreen> {
     return 0;
   }
 
-  double calcularRappelJefe(double primasTotales) {
-    if (primasTotales < 4000) return 0;
-
-    if (primasTotales >= 10000) {
-      return 2000 + ((primasTotales - 10000) ~/ 1000) * 100;
-    }
-
-    if (primasTotales >= 9000) return 1800;
-    if (primasTotales >= 8000) return 1600;
-    if (primasTotales >= 7000) return 1400;
-    if (primasTotales >= 6000) return 1200;
-    if (primasTotales >= 5000) return 1000;
-    if (primasTotales >= 4000) return 800;
-
-    return 0;
+  double calcularRappelJefe(double primasTotales, double primasDV) {
+    return RoleCompensationRules.calculate(
+      role: 'jefe_equipo',
+      premiums: primasTotales,
+      deathAndLifePremiums: primasDV,
+    ).total;
   }
 
-  double calcularRappelJefeVentas(double primasTotales) {
-    if (primasTotales >= 11500) {
-      return 2500 + ((primasTotales - 11500) ~/ 1000) * 100;
-    }
-
-    if (primasTotales >= 10500) return 2300;
-    if (primasTotales >= 9500) return 2100;
-    if (primasTotales >= 8500) return 1900;
-    if (primasTotales >= 7500) return 1700;
-    if (primasTotales >= 6500) return 1500;
-
-    return 0;
+  double calcularRappelJefeVentas(double primasTotales, double primasDV) {
+    return RoleCompensationRules.calculate(
+      role: 'jefe_ventas',
+      premiums: primasTotales,
+      deathAndLifePremiums: primasDV,
+    ).total;
   }
 
   Future<Map<String, double>> getExtornosPeriodo({
@@ -747,7 +759,7 @@ class _BusinessScreenState extends State<BusinessScreen> {
     final progresoObjetivo = (objetivo / 100).clamp(0.0, 1.0);
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF2FCFD),
+      backgroundColor: const Color(0xFFF2F4F7),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
       floatingActionButton: FloatingActionButton(
         backgroundColor: Colors.transparent,
@@ -894,6 +906,19 @@ class _BusinessScreenState extends State<BusinessScreen> {
                         child: Column(
                           children: [
                             _discoverRow(
+                              icon: Icons.trending_down_rounded,
+                              title: "Extornos",
+                              color: const Color(0xFFE5484D),
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => const ExtornosScreen(),
+                                  ),
+                                );
+                              },
+                            ),
+                            _discoverRow(
                               icon: Icons.card_giftcard_rounded,
                               title: "Trae a un amigo",
                               color: const Color(0xFF0AAEAE),
@@ -901,7 +926,8 @@ class _BusinessScreenState extends State<BusinessScreen> {
                                 Navigator.push(
                                   context,
                                   MaterialPageRoute(
-                                    builder: (_) => const ReferralScreen(),
+                                    builder: (_) =>
+                                        ReferralScreen(role: widget.role),
                                   ),
                                 );
                               },
@@ -1010,7 +1036,8 @@ class _BusinessScreenState extends State<BusinessScreen> {
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: const Color(0xFFC7ECEC)),
+            border: Border.all(color: const Color(0xFFE1E5EA)),
+            boxShadow: _bankCardShadows(),
           ),
           child: Icon(
             _objetivoCumplido
@@ -1203,7 +1230,8 @@ class _BusinessScreenState extends State<BusinessScreen> {
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(26),
         color: Colors.white,
-        border: Border.all(color: const Color(0xFFC7ECEC)),
+        border: Border.all(color: const Color(0xFFE1E5EA)),
+        boxShadow: _bankCardShadows(),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1282,14 +1310,8 @@ class _BusinessScreenState extends State<BusinessScreen> {
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(34),
         color: Colors.white,
-        border: Border.all(color: const Color(0xFFC7ECEC)),
-        boxShadow: [
-          BoxShadow(
-            color: colorBase.withOpacity(0.18),
-            blurRadius: 32,
-            offset: const Offset(0, 18),
-          ),
-        ],
+        border: Border.all(color: const Color(0xFFE1E5EA)),
+        boxShadow: _bankCardShadows(strong: true),
       ),
       child: Stack(
         clipBehavior: Clip.none,
@@ -1525,7 +1547,7 @@ class _BusinessScreenState extends State<BusinessScreen> {
                 context: context,
                 backgroundColor: Colors.transparent,
                 isScrollControlled: true,
-                builder: (_) => const MoreMenuSheet(),
+                builder: (_) => MoreMenuSheet(role: widget.role),
               );
             },
           ),
@@ -1552,7 +1574,8 @@ class _BusinessScreenState extends State<BusinessScreen> {
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(24),
             color: Colors.white,
-            border: Border.all(color: const Color(0xFFC7ECEC)),
+            border: Border.all(color: const Color(0xFFE1E5EA)),
+            boxShadow: _bankCardShadows(),
           ),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -1586,7 +1609,8 @@ class _BusinessScreenState extends State<BusinessScreen> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(28),
-        border: Border.all(color: const Color(0xFFC7ECEC)),
+        border: Border.all(color: const Color(0xFFE1E5EA)),
+        boxShadow: _bankCardShadows(),
       ),
       child: Column(
         children: [
@@ -1621,7 +1645,8 @@ class _BusinessScreenState extends State<BusinessScreen> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xFFC7ECEC)),
+        border: Border.all(color: const Color(0xFFE1E5EA)),
+        boxShadow: _bankCardShadows(),
       ),
       child: Text(
         "Sin ventas registradas todavía",
@@ -1653,7 +1678,8 @@ class _BusinessScreenState extends State<BusinessScreen> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xFFC7ECEC)),
+        border: Border.all(color: const Color(0xFFE1E5EA)),
+        boxShadow: _bankCardShadows(),
       ),
       child: Row(
         children: [
@@ -1720,7 +1746,8 @@ class _BusinessScreenState extends State<BusinessScreen> {
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: const Color(0xFFC7ECEC)),
+            border: Border.all(color: const Color(0xFFE1E5EA)),
+            boxShadow: _bankCardShadows(),
           ),
           child: Row(
             children: [
@@ -1738,7 +1765,7 @@ class _BusinessScreenState extends State<BusinessScreen> {
               ),
               Icon(
                 Icons.arrow_forward_ios_rounded,
-                color: Colors.white.withOpacity(0.35),
+                color: const Color(0xFF64748B),
                 size: 14,
               ),
             ],
@@ -1787,28 +1814,28 @@ class _PremiumBackground extends StatelessWidget {
             gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
-              colors: [Color(0xFFF2FCFD), Color(0xFFFFFFFF), Color(0xFFF2FCFD)],
+              colors: [Color(0xFFF0F2F5), Color(0xFFF7F8FA), Color(0xFFEEF1F4)],
             ),
           ),
         ),
         Positioned(
           top: -150,
           right: -100,
-          child: _glow(const Color(0xFF0AAEAE), 330, 0.16),
+          child: _glow(const Color(0xFF2454D3), 330, 0.055),
         ),
         Positioned(
           bottom: -170,
           left: -110,
-          child: _glow(const Color(0xFF0A7F91), 370, 0.15),
+          child: _glow(const Color(0xFF13244D), 370, 0.045),
         ),
         Positioned(
           top: 330,
           left: -120,
-          child: _glow(const Color(0xFF0AAEAE), 240, 0.08),
+          child: _glow(const Color(0xFF2454D3), 240, 0.035),
         ),
         BackdropFilter(
           filter: ImageFilter.blur(sigmaX: 60, sigmaY: 60),
-          child: Container(color: Colors.black.withOpacity(0.05)),
+          child: Container(color: Colors.white.withValues(alpha: .08)),
         ),
       ],
     );
@@ -1827,7 +1854,9 @@ class _PremiumBackground extends StatelessWidget {
 }
 
 class MoreMenuSheet extends StatelessWidget {
-  const MoreMenuSheet({super.key});
+  final String role;
+
+  const MoreMenuSheet({super.key, required this.role});
 
   @override
   Widget build(BuildContext context) {
@@ -1858,24 +1887,96 @@ class MoreMenuSheet extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 18),
-          _item(Icons.bar_chart_rounded, "Estadísticas avanzadas"),
-          _item(Icons.people_alt_rounded, "Equipo y jerarquía"),
-          _item(Icons.history_rounded, "Histórico completo"),
-          _item(Icons.calculate_outlined, "Simulador de comisiones"),
-          _item(Icons.settings_rounded, "Configuración"),
+          _item(
+            Icons.trending_down_rounded,
+            "Extornos",
+            onTap: () {
+              final navigator = Navigator.of(context);
+              navigator.pop();
+              navigator.push(
+                MaterialPageRoute(builder: (_) => const ExtornosScreen()),
+              );
+            },
+          ),
+          _item(
+            Icons.bar_chart_rounded,
+            "Estadísticas avanzadas",
+            onTap: () {
+              final navigator = Navigator.of(context);
+              navigator.pop();
+              navigator.push(
+                MaterialPageRoute(
+                  builder: (_) => AdvancedStatisticsScreen(role: role),
+                ),
+              );
+            },
+          ),
+          _item(
+            Icons.people_alt_rounded,
+            "Equipo y jerarquía",
+            onTap: () {
+              final navigator = Navigator.of(context);
+              navigator.pop();
+              navigator.push(
+                MaterialPageRoute(
+                  builder: (_) => TeamHierarchyScreen(role: role),
+                ),
+              );
+            },
+          ),
+          _item(
+            Icons.history_rounded,
+            "Histórico completo",
+            onTap: () {
+              final navigator = Navigator.of(context);
+              navigator.pop();
+              navigator.push(
+                MaterialPageRoute(
+                  builder: (_) => CompleteHistoryScreen(role: role),
+                ),
+              );
+            },
+          ),
+          _item(
+            Icons.calculate_outlined,
+            "Simulador de comisiones",
+            onTap: () {
+              final navigator = Navigator.of(context);
+              navigator.pop();
+              navigator.push(
+                MaterialPageRoute(
+                  builder: (_) => CommissionSimulatorScreen(role: role),
+                ),
+              );
+            },
+          ),
+          _item(
+            Icons.settings_rounded,
+            "Configuración",
+            onTap: () {
+              final navigator = Navigator.of(context);
+              navigator.pop();
+              navigator.push(
+                MaterialPageRoute(
+                  builder: (_) => BusinessSettingsScreen(role: role),
+                ),
+              );
+            },
+          ),
           const SizedBox(height: 10),
         ],
       ),
     );
   }
 
-  Widget _item(IconData icon, String title) {
+  Widget _item(IconData icon, String title, {VoidCallback? onTap}) {
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0xFFC7ECEC)),
+        border: Border.all(color: const Color(0xFFE1E5EA)),
+        boxShadow: _bankCardShadows(),
       ),
       child: ListTile(
         leading: Icon(icon, color: const Color(0xFF0AAEAE)),
@@ -1891,7 +1992,7 @@ class MoreMenuSheet extends StatelessWidget {
           size: 14,
           color: const Color(0xFF78909C),
         ),
-        onTap: () {},
+        onTap: onTap,
       ),
     );
   }

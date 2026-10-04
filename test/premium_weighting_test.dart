@@ -11,15 +11,15 @@ void main() {
     expect(PremiumWeighting.net(venta), 1000);
   });
 
-  test('Auto desde el 27/08/2026 computa al 50 %', () {
+  test('Auto desde el 27/08/2026 no computa como prima', () {
     final venta = <String, dynamic>{
       'producto': 'Seguro de Auto',
       'fecha_efecto': '2026-08-27',
       'prima_anual_neta': 1000,
       'prima_anual_bruta': 1200,
     };
-    expect(PremiumWeighting.net(venta), 500);
-    expect(PremiumWeighting.gross(venta), 600);
+    expect(PremiumWeighting.net(venta), 0);
+    expect(PremiumWeighting.gross(venta), 0);
   });
 
   test('Otros ramos conservan el 100 % despues de la fecha de corte', () {
@@ -31,12 +31,22 @@ void main() {
     expect(PremiumWeighting.net(venta), 1000);
   });
 
+  test('Camión también queda excluido desde el 27/08/2026', () {
+    final venta = <String, dynamic>{
+      'producto': 'Camión',
+      'fecha_efecto': '2026-09-02',
+      'prima_anual_neta': 2500,
+      'comision': 375,
+    };
+    expect(PremiumWeighting.net(venta), 0);
+    expect(venta['comision'], 375);
+  });
   test('Un extorno de Auto usa la fecha de efecto original', () {
     final venta = <String, dynamic>{
       'producto': 'Vehiculos',
       'fecha_efecto_poliza': '2026-08-27',
       'fecha_efecto': '2026-10-01',
     };
-    expect(PremiumWeighting.amount(venta, 300), 150);
+    expect(PremiumWeighting.amount(venta, 300), 0);
   });
 }

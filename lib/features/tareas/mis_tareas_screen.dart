@@ -1,4 +1,3 @@
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:safebrok_andalucia/utils/referencias_filter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -7,6 +6,7 @@ import 'package:safebrok_andalucia/features/business/referencia_diaria_screen.da
 import 'package:safebrok_andalucia/features/business/referencias_screen.dart';
 import 'package:safebrok_andalucia/features/business/seguimiento_clientes_screen.dart';
 import 'package:safebrok_andalucia/features/business/visitas_hoy_screen.dart';
+import 'package:safebrok_andalucia/features/recibos/recibos_agente_screen.dart';
 import '../business/contactos_diarios_screen.dart';
 
 class MisTareasScreen extends StatefulWidget {
@@ -25,6 +25,7 @@ class _MisTareasScreenState extends State<MisTareasScreen> {
   int seguimientosTotales = 0;
   int visitasHoy = 0;
   int contactosHoy = 0;
+  int recibosPendientes = 0;
 
   final List<Map<String, dynamic>> tareas = [
     {
@@ -74,11 +75,11 @@ class _MisTareasScreenState extends State<MisTareasScreen> {
     },
     {
       "titulo": "Recibos pendientes",
-      "detalle": "3 recibos por gestionar",
+      "detalle": "Cargando recibos...",
       "completada": false,
       "icono": Icons.receipt_long,
       "color": Colors.amberAccent,
-      "actual": 3,
+      "actual": 0,
       "objetivo": 0,
     },
   ];
@@ -96,6 +97,7 @@ class _MisTareasScreenState extends State<MisTareasScreen> {
     cargarDatosSeguimiento();
     cargarDatosVisitas();
     cargarContactosDiarios();
+    cargarRecibosPendientes();
   }
 
   void _actualizarTarea(
@@ -324,6 +326,57 @@ class _MisTareasScreenState extends State<MisTareasScreen> {
     );
   }
 
+  bool _esReciboSinGestionar(dynamic value) {
+    final estado = (value ?? '').toString().trim().toLowerCase();
+
+    return estado.isEmpty ||
+        estado == 'pendiente' ||
+        estado == 'devuelto' ||
+        estado == 'impagado';
+  }
+
+  Future<void> cargarRecibosPendientes() async {
+    final user = supabase.auth.currentUser;
+    if (user == null) return;
+
+    try {
+      final data = await supabase
+          .from('recibos')
+          .select('id, estado')
+          .eq('agente', user.id);
+
+      final pendientes = List<Map<String, dynamic>>.from(
+        data,
+      ).where((recibo) => _esReciboSinGestionar(recibo['estado'])).length;
+
+      if (!mounted) return;
+
+      recibosPendientes = pendientes;
+      _actualizarTarea(
+        "Recibos pendientes",
+        detalle: pendientes == 0
+            ? "Sin recibos por gestionar"
+            : pendientes == 1
+            ? "1 recibo por gestionar"
+            : "$pendientes recibos por gestionar",
+        completada: pendientes == 0,
+        actual: pendientes,
+        objetivo: 0,
+      );
+    } catch (error) {
+      debugPrint('ERROR CARGANDO RECIBOS PENDIENTES: $error');
+      if (!mounted) return;
+
+      _actualizarTarea(
+        "Recibos pendientes",
+        detalle: "No se pudieron cargar los recibos",
+        completada: false,
+        actual: 0,
+        objetivo: 0,
+      );
+    }
+  }
+
   Future<void> _refreshAll() async {
     await Future.wait([
       cargarReferenciasHoy(),
@@ -331,6 +384,7 @@ class _MisTareasScreenState extends State<MisTareasScreen> {
       cargarDatosSeguimiento(),
       cargarDatosVisitas(),
       cargarContactosDiarios(),
+      cargarRecibosPendientes(),
     ]);
   }
 
@@ -379,6 +433,14 @@ class _MisTareasScreenState extends State<MisTareasScreen> {
       ).then((_) => cargarDatosVisitas());
       return;
     }
+
+    if (titulo == "Recibos pendientes") {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const RecibosAgenteScreen()),
+      ).then((_) => cargarRecibosPendientes());
+      return;
+    }
   }
 
   @override
@@ -422,57 +484,33 @@ class _MisTareasScreenState extends State<MisTareasScreen> {
       padding: const EdgeInsets.fromLTRB(18, 12, 18, 14),
       child: Row(
         children: [
-          Container(
-            height: 46,
-            width: 46,
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.08),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: Colors.white.withOpacity(0.10)),
+          IconButton.filledTonal(
+            onPressed: () => Navigator.pop(context),
+            icon: const Icon(Icons.arrow_back_ios_new_rounded),
+            style: IconButton.styleFrom(
+              foregroundColor: const Color(0xFF13244D),
+              backgroundColor: Colors.white,
             ),
-            child: const Icon(Icons.menu_rounded, color: Colors.white),
           ),
-          const SizedBox(width: 14),
+          const SizedBox(width: 12),
           const Expanded(
             child: Text(
               "Mis tareas",
               style: TextStyle(
-                color: const Color(0xFF071A3A),
-                fontSize: 34,
+                color: Color(0xFF13244D),
+                fontSize: 30,
                 fontWeight: FontWeight.w900,
-                letterSpacing: -1,
               ),
             ),
           ),
-          Stack(
-            children: [
-              Container(
-                height: 46,
-                width: 46,
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.08),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: Colors.white.withOpacity(0.10)),
-                ),
-                child: const Icon(
-                  Icons.notifications_none_rounded,
-                  color: Colors.white,
-                  size: 28,
-                ),
-              ),
-              Positioned(
-                top: 8,
-                right: 9,
-                child: Container(
-                  width: 9,
-                  height: 9,
-                  decoration: const BoxDecoration(
-                    color: Colors.cyanAccent,
-                    shape: BoxShape.circle,
-                  ),
-                ),
-              ),
-            ],
+          IconButton.filledTonal(
+            onPressed: _refreshAll,
+            icon: const Icon(Icons.refresh_rounded),
+            tooltip: 'Actualizar tareas',
+            style: IconButton.styleFrom(
+              foregroundColor: const Color(0xFF13244D),
+              backgroundColor: Colors.white,
+            ),
           ),
         ],
       ),
@@ -481,286 +519,173 @@ class _MisTareasScreenState extends State<MisTareasScreen> {
 
   Widget _heroCard() {
     final percent = (progreso * 100).round();
-
     return Container(
       margin: const EdgeInsets.fromLTRB(18, 6, 18, 0),
       padding: const EdgeInsets.all(22),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(28),
-        gradient: LinearGradient(
-          colors: [
-            Colors.cyanAccent.withOpacity(0.16),
-            const Color(0xFF081A2A).withOpacity(0.92),
-            const Color(0xFFFFFFFF).withOpacity(0.95),
-          ],
+        gradient: const LinearGradient(
+          colors: [Color(0xFF172B58), Color(0xFF2454D3)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
-        border: Border.all(color: Colors.cyanAccent.withOpacity(0.32)),
         boxShadow: [
           BoxShadow(
-            color: Colors.cyanAccent.withOpacity(0.12),
-            blurRadius: 30,
-            offset: const Offset(0, 14),
+            color: const Color(0xFF13244D).withOpacity(0.12),
+            blurRadius: 24,
+            offset: const Offset(0, 12),
           ),
         ],
       ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(28),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
-          child: Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      "TAREAS DEL DÍA",
-                      style: TextStyle(
-                        color: Colors.cyanAccent,
-                        fontSize: 15,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: 2,
-                      ),
-                    ),
-                    const SizedBox(height: 18),
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        Text(
-                          "$completadas",
-                          style: const TextStyle(
-                            color: Colors.cyanAccent,
-                            fontSize: 62,
-                            fontWeight: FontWeight.w900,
-                            height: 0.9,
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Text(
-                          "/ ${tareas.length}",
-                          style: const TextStyle(
-                            color: const Color(0xFF071A3A),
-                            fontSize: 46,
-                            fontWeight: FontWeight.w800,
-                            height: 1,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 10),
-                    const Text(
-                      "completadas",
-                      style: TextStyle(
-                        color: const Color(0xFF53627A),
-                        fontSize: 24,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 14,
-                        vertical: 10,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.cyanAccent.withOpacity(0.10),
-                        borderRadius: BorderRadius.circular(30),
-                        border: Border.all(
-                          color: Colors.cyanAccent.withOpacity(0.25),
-                        ),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: const [
-                          Icon(
-                            Icons.star_rounded,
-                            color: Colors.cyanAccent,
-                            size: 20,
-                          ),
-                          SizedBox(width: 8),
-                          Text(
-                            "Sigue así. Vas por buen camino",
-                            style: TextStyle(
-                              color: Colors.cyanAccent,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  "TAREAS DEL DÍA",
+                  style: TextStyle(
+                    color: Color(0xFFCBD9FA),
+                    fontSize: 13,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 1.2,
+                  ),
                 ),
-              ),
-              const SizedBox(width: 18),
-              SizedBox(
-                height: 130,
-                width: 130,
-                child: Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    SizedBox(
-                      height: 120,
-                      width: 120,
-                      child: CircularProgressIndicator(
-                        value: progreso,
-                        strokeWidth: 11,
-                        backgroundColor: Colors.white.withOpacity(0.10),
-                        valueColor: const AlwaysStoppedAnimation<Color>(
-                          Colors.cyanAccent,
-                        ),
-                      ),
-                    ),
-                    Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          "$percent%",
-                          style: const TextStyle(
-                            color: Colors.cyanAccent,
-                            fontSize: 31,
-                            fontWeight: FontWeight.w900,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        const Text(
-                          "PROGRESO",
-                          style: TextStyle(
-                            color: Colors.cyanAccent,
-                            fontSize: 11,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: 1.5,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
+                const SizedBox(height: 14),
+                Text(
+                  "$completadas / ${tareas.length}",
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 36,
+                    fontWeight: FontWeight.w900,
+                  ),
                 ),
-              ),
-            ],
+                const SizedBox(height: 3),
+                const Text(
+                  "completadas",
+                  style: TextStyle(color: Color(0xFFE1E9FC), fontSize: 16),
+                ),
+              ],
+            ),
           ),
-        ),
+          const SizedBox(width: 12),
+          SizedBox(
+            height: 92,
+            width: 92,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                SizedBox(
+                  height: 82,
+                  width: 82,
+                  child: CircularProgressIndicator(
+                    value: progreso,
+                    strokeWidth: 8,
+                    backgroundColor: Colors.white24,
+                    valueColor: const AlwaysStoppedAnimation<Color>(
+                      Colors.white,
+                    ),
+                  ),
+                ),
+                Text(
+                  "$percent%",
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 22,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
 
   Widget _taskCard(Map<String, dynamic> tarea) {
     final bool completada = tarea["completada"] == true;
-    final Color color = tarea["color"] as Color;
+    const Color color = Color(0xFF2454D3);
     final int actual = tarea["actual"] ?? 0;
     final int objetivo = tarea["objetivo"] ?? 0;
-
     final bool hasProgress = objetivo > 0;
     final double value = hasProgress ? (actual / objetivo).clamp(0.0, 1.0) : 0;
 
-    return InkWell(
+    return Material(
+      color: Colors.white,
       borderRadius: BorderRadius.circular(24),
-      onTap: () => _abrirTarea(tarea),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 260),
-        padding: const EdgeInsets.all(18),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(24),
-          gradient: LinearGradient(
-            colors: [
-              color.withOpacity(0.12),
-              Colors.white.withOpacity(0.055),
-              Colors.white.withOpacity(0.035),
-            ],
-            begin: Alignment.centerLeft,
-            end: Alignment.centerRight,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(24),
+        onTap: () => _abrirTarea(tarea),
+        child: Container(
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: const Color(0xFFDCE5F2)),
           ),
-          border: Border.all(
-            color: completada
-                ? Colors.greenAccent.withOpacity(0.38)
-                : color.withOpacity(0.26),
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: color.withOpacity(0.09),
-              blurRadius: 22,
-              offset: const Offset(0, 10),
-            ),
-          ],
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 68,
-              height: 68,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: RadialGradient(
-                  colors: [
-                    color.withOpacity(0.34),
-                    color.withOpacity(0.10),
-                    Colors.black.withOpacity(0.15),
-                  ],
+          child: Row(
+            children: [
+              Container(
+                width: 52,
+                height: 52,
+                decoration: const BoxDecoration(
+                  color: Color(0xFFEAF0FF),
+                  shape: BoxShape.circle,
                 ),
-                border: Border.all(color: color.withOpacity(0.55)),
+                child: Icon(tarea["icono"], color: color, size: 26),
               ),
-              child: Icon(tarea["icono"], color: color, size: 34),
-            ),
-            const SizedBox(width: 16),
-            Container(
-              width: 1,
-              height: 58,
-              color: Colors.white.withOpacity(0.10),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    tarea["titulo"],
-                    style: const TextStyle(
-                      color: const Color(0xFF071A3A),
-                      fontSize: 17,
-                      fontWeight: FontWeight.w900,
-                      height: 1.2,
-                    ),
-                  ),
-                  const SizedBox(height: 7),
-                  Text(
-                    tarea["detalle"],
-                    style: TextStyle(
-                      color: color,
-                      fontSize: 15,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                  if (hasProgress) ...[
-                    const SizedBox(height: 12),
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(50),
-                      child: LinearProgressIndicator(
-                        value: value,
-                        minHeight: 7,
-                        backgroundColor: Colors.white.withOpacity(0.10),
-                        valueColor: AlwaysStoppedAnimation<Color>(color),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      tarea["titulo"],
+                      style: const TextStyle(
+                        color: Color(0xFF13244D),
+                        fontSize: 16,
+                        fontWeight: FontWeight.w900,
                       ),
                     ),
+                    const SizedBox(height: 5),
+                    Text(
+                      tarea["detalle"],
+                      style: const TextStyle(
+                        color: Color(0xFF53627A),
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    if (hasProgress) ...[
+                      const SizedBox(height: 11),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(50),
+                        child: LinearProgressIndicator(
+                          value: value,
+                          minHeight: 6,
+                          backgroundColor: const Color(0xFFE5EBF5),
+                          valueColor: const AlwaysStoppedAnimation<Color>(
+                            color,
+                          ),
+                        ),
+                      ),
+                    ],
                   ],
-                ],
+                ),
               ),
-            ),
-            const SizedBox(width: 14),
-            _rightBadge(
-              completada: completada,
-              color: color,
-              actual: actual,
-              objetivo: objetivo,
-              hasProgress: hasProgress,
-            ),
-            const SizedBox(width: 10),
-            Icon(
-              Icons.arrow_forward_ios_rounded,
-              color: Colors.white.withOpacity(0.52),
-              size: 18,
-            ),
-          ],
+              const SizedBox(width: 10),
+              _rightBadge(
+                completada: completada,
+                color: color,
+                actual: actual,
+                objetivo: objetivo,
+                hasProgress: hasProgress,
+              ),
+              const SizedBox(width: 8),
+              const Icon(Icons.chevron_right_rounded, color: Color(0xFF64748B)),
+            ],
+          ),
         ),
       ),
     );
@@ -779,12 +704,12 @@ class _MisTareasScreenState extends State<MisTareasScreen> {
         width: 54,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
-          color: Colors.greenAccent.withOpacity(0.12),
-          border: Border.all(color: Colors.greenAccent.withOpacity(0.5)),
+          color: const Color(0xFFE7F7EF),
+          border: Border.all(color: const Color(0xFF88D5AC)),
         ),
         child: const Icon(
           Icons.check_rounded,
-          color: Colors.greenAccent,
+          color: const Color(0xFF198754),
           size: 32,
         ),
       );
@@ -802,7 +727,7 @@ class _MisTareasScreenState extends State<MisTareasScreen> {
             CircularProgressIndicator(
               value: actual / objetivo,
               strokeWidth: 5,
-              backgroundColor: Colors.white.withOpacity(0.10),
+              backgroundColor: const Color(0xFFE5EBF5),
               valueColor: AlwaysStoppedAnimation<Color>(color),
             ),
             Text(
@@ -841,48 +766,14 @@ class _MisTareasScreenState extends State<MisTareasScreen> {
 
 class _PremiumBackground extends StatelessWidget {
   const _PremiumBackground();
-
   @override
-  Widget build(BuildContext context) {
-    return Stack(
-      children: [
-        Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              colors: [Color(0xFF02060A), Color(0xFFFFFFFF), Color(0xFF071827)],
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-            ),
-          ),
-        ),
-        Positioned(
-          top: -90,
-          right: -80,
-          child: _blurCircle(220, Colors.cyanAccent.withOpacity(0.18)),
-        ),
-        Positioned(
-          top: 260,
-          left: -130,
-          child: _blurCircle(240, Colors.blueAccent.withOpacity(0.10)),
-        ),
-        Positioned(
-          bottom: -100,
-          right: -100,
-          child: _blurCircle(260, Colors.cyanAccent.withOpacity(0.10)),
-        ),
-      ],
-    );
-  }
-
-  static Widget _blurCircle(double size, Color color) {
-    return Container(
-      height: size,
-      width: size,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: color,
-        boxShadow: [BoxShadow(color: color, blurRadius: 80, spreadRadius: 45)],
+  Widget build(BuildContext context) => const DecoratedBox(
+    decoration: BoxDecoration(
+      gradient: LinearGradient(
+        colors: [Color(0xFFF5F7FC), Color(0xFFEAF1FF)],
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
       ),
-    );
-  }
+    ),
+  );
 }

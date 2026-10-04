@@ -13,9 +13,9 @@ const AUTO_COMPUTE_FROM = '2026-08-27';
 const normalizeProduct = (v: unknown) => String(v ?? '').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 const autoWeighted = (sale: Record<string, unknown>, raw: unknown) => {
   const product = normalizeProduct(sale.producto ?? sale.ramo ?? sale.tipo_seguro);
-  const isAuto = product.includes('auto') || product.includes('coche') || product.includes('vehicul') || product.includes('turismo') || product.includes('moto');
+  const isAuto = product.includes('auto') || product.includes('coche') || product.includes('vehicul') || product.includes('turismo') || product.includes('moto') || product.includes('camion');
   const effect = String(sale.fecha_efecto ?? sale.FECHA_EFECTO ?? '').slice(0, 10);
-  return num(raw) * (isAuto && effect >= AUTO_COMPUTE_FROM ? 0.5 : 1);
+  return num(raw) * (isAuto && effect >= AUTO_COMPUTE_FROM ? 0 : 1);
 };
 const json = (v: unknown, status = 200) => new Response(JSON.stringify(v), {
   status,

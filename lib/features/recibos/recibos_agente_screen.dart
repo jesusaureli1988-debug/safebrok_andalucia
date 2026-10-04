@@ -15,6 +15,9 @@ class _RecibosAgenteScreenState extends State<RecibosAgenteScreen> {
   bool loading = true;
   String filtro = 'Todos';
   String searchText = '';
+  final TextEditingController buscadorController = TextEditingController();
+  String orden = 'Prioridad';
+  int limiteVisible = 25;
 
   List<Map<String, dynamic>> recibos = [];
 
@@ -31,6 +34,12 @@ class _RecibosAgenteScreenState extends State<RecibosAgenteScreen> {
   void initState() {
     super.initState();
     cargarRecibos();
+  }
+
+  @override
+  void dispose() {
+    buscadorController.dispose();
+    super.dispose();
   }
 
   String _normalizarTexto(dynamic value) {
@@ -402,13 +411,15 @@ class _RecibosAgenteScreenState extends State<RecibosAgenteScreen> {
       final cliente = _normalizarTexto(r['cliente']);
       final compania = _normalizarTexto(r['compania']);
       final motivo = _normalizarTexto(r['motivo']);
+      final numeroRecibo = _normalizarTexto(r['numero_recibo']);
 
       final matchSearch =
           search.isEmpty ||
           poliza.contains(search) ||
           cliente.contains(search) ||
           compania.contains(search) ||
-          motivo.contains(search);
+          motivo.contains(search) ||
+          numeroRecibo.contains(search);
 
       bool matchFiltro;
 
@@ -424,6 +435,12 @@ class _RecibosAgenteScreenState extends State<RecibosAgenteScreen> {
         case 'Cobrados':
           matchFiltro = estado == 'pagado' || estado == 'cobrado';
           break;
+        case 'Devueltos':
+          matchFiltro = estado == 'devuelto' || estado == 'impagado';
+          break;
+        case 'En gestión':
+          matchFiltro = estado == 'en gestión' || estado == 'en gestion';
+          break;
         case 'Para baja':
           matchFiltro =
               estado == 'para baja' ||
@@ -436,6 +453,63 @@ class _RecibosAgenteScreenState extends State<RecibosAgenteScreen> {
 
       return matchSearch && matchFiltro;
     }).toList();
+  }
+
+  List<Map<String, dynamic>> get recibosOrdenados {
+    final lista = List<Map<String, dynamic>>.from(recibosFiltrados);
+
+    int prioridad(Map<String, dynamic> recibo) {
+      final estado = _normalizarTexto(recibo['estado']);
+      if (estado == 'devuelto' || estado == 'impagado') return 0;
+      if (estado == 'pendiente') return 1;
+      if (estado == 'en gestión' || estado == 'en gestion') return 2;
+      if (_esParaBaja(recibo)) return 3;
+      return 4;
+    }
+
+    switch (orden) {
+      case 'Importe mayor':
+        lista.sort(
+          (a, b) => _money(b['importe']).compareTo(_money(a['importe'])),
+        );
+        break;
+      case 'Importe menor':
+        lista.sort(
+          (a, b) => _money(a['importe']).compareTo(_money(b['importe'])),
+        );
+        break;
+      case 'Más antiguos':
+        lista.sort(
+          (a, b) => (_parseFechaRecibo(a['fecha']) ?? DateTime(2200)).compareTo(
+            _parseFechaRecibo(b['fecha']) ?? DateTime(2200),
+          ),
+        );
+        break;
+      case 'Más recientes':
+        lista.sort(
+          (a, b) => (_parseFechaRecibo(b['fecha']) ?? DateTime(1900)).compareTo(
+            _parseFechaRecibo(a['fecha']) ?? DateTime(1900),
+          ),
+        );
+        break;
+      case 'Cliente A-Z':
+        lista.sort(
+          (a, b) => _normalizarTexto(
+            a['cliente'],
+          ).compareTo(_normalizarTexto(b['cliente'])),
+        );
+        break;
+      default:
+        lista.sort((a, b) {
+          final porEstado = prioridad(a).compareTo(prioridad(b));
+          if (porEstado != 0) return porEstado;
+          return (_parseFechaRecibo(a['fecha']) ?? DateTime(2200)).compareTo(
+            _parseFechaRecibo(b['fecha']) ?? DateTime(2200),
+          );
+        });
+    }
+
+    return lista;
   }
 
   DateTime? _parseFechaRecibo(dynamic value) {
@@ -486,6 +560,33 @@ class _RecibosAgenteScreenState extends State<RecibosAgenteScreen> {
   int get cobrados => recibosConFiltrosAvanzados.where(_esCobrado).length;
 
   int get paraBaja => recibosConFiltrosAvanzados.where(_esParaBaja).length;
+  int get devueltos => recibosConFiltrosAvanzados.where((r) {
+    final estado = _normalizarTexto(r['estado']);
+    return estado == 'devuelto' || estado == 'impagado';
+  }).length;
+
+  int get enGestion => recibosConFiltrosAvanzados.where((r) {
+    final estado = _normalizarTexto(r['estado']);
+    return estado == 'en gestión' || estado == 'en gestion';
+  }).length;
+
+  double get importeTotal => recibosConFiltrosAvanzados.fold(
+    0.0,
+    (sum, r) => sum + _money(r['importe']),
+  );
+
+  double get importeCobrado => recibosConFiltrosAvanzados
+      .where(_esCobrado)
+      .fold(0.0, (sum, r) => sum + _money(r['importe']));
+
+  double get importeDevuelto => recibosConFiltrosAvanzados
+      .where((r) {
+        final estado = _normalizarTexto(r['estado']);
+        return estado == 'devuelto' || estado == 'impagado';
+      })
+      .fold(0.0, (sum, r) => sum + _money(r['importe']));
+
+  double get tasaCobro => importeTotal <= 0 ? 0 : importeCobrado / importeTotal;
 
   String _formatFecha(dynamic fecha) {
     if (fecha == null) return 'Sin fecha';
@@ -504,19 +605,19 @@ class _RecibosAgenteScreenState extends State<RecibosAgenteScreen> {
     final e = _normalizarTexto(estado);
 
     if (e == 'pagado' || e == 'cobrado') {
-      return const Color(0xFF2563EB);
+      return const Color(0xFF15803D);
     }
     if (e == 'pendiente') {
-      return const Color(0xFF1D4ED8);
+      return const Color(0xFFD97706);
     }
     if (e == 'devuelto' || e == 'impagado') {
-      return const Color(0xFFE74646);
+      return const Color(0xFFDC2626);
     }
     if (e == 'en gestión' || e == 'en gestion') {
-      return const Color(0xFF2563EB);
+      return const Color(0xFF2454D3);
     }
     if (e == 'para baja' || e == 'para_baja' || e == 'baja') {
-      return const Color(0xFF2563EB);
+      return const Color(0xFF475569);
     }
     if (e == 'anulado') return const Color(0xFF78909C);
 
@@ -639,29 +740,7 @@ class _RecibosAgenteScreenState extends State<RecibosAgenteScreen> {
                         const SizedBox(height: 12),
                         _filtros(),
                         const SizedBox(height: 18),
-                        Row(
-                          children: [
-                            const Expanded(
-                              child: Text(
-                                'RECIBOS',
-                                style: TextStyle(
-                                  color: const Color(0xFF64748B),
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w900,
-                                  letterSpacing: 1.1,
-                                ),
-                              ),
-                            ),
-                            Text(
-                              '${recibosFiltrados.length} resultados',
-                              style: const TextStyle(
-                                color: const Color(0xFF78909C),
-                                fontSize: 11,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          ],
-                        ),
+                        _cabeceraListado(),
                         const SizedBox(height: 10),
                       ]),
                     ),
@@ -675,10 +754,38 @@ class _RecibosAgenteScreenState extends State<RecibosAgenteScreen> {
                     SliverPadding(
                       padding: const EdgeInsets.fromLTRB(16, 0, 16, 110),
                       sliver: SliverList.separated(
-                        itemCount: recibosFiltrados.length,
+                        itemCount: recibosOrdenados.length > limiteVisible
+                            ? limiteVisible + 1
+                            : recibosOrdenados.length,
                         separatorBuilder: (_, __) => const SizedBox(height: 12),
                         itemBuilder: (_, index) {
-                          return _reciboCard(recibosFiltrados[index]);
+                          if (index == limiteVisible) {
+                            return SizedBox(
+                              height: 52,
+                              child: OutlinedButton.icon(
+                                onPressed: () =>
+                                    setState(() => limiteVisible += 25),
+                                icon: const Icon(Icons.expand_more_rounded),
+                                label: Text(
+                                  'CARGAR MÁS · ${recibosOrdenados.length - limiteVisible} RESTANTES',
+                                  style: const TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w900,
+                                  ),
+                                ),
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: const Color(0xFF2454D3),
+                                  side: const BorderSide(
+                                    color: Color(0xFFCBD5E1),
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(16),
+                                  ),
+                                ),
+                              ),
+                            );
+                          }
+                          return _reciboCard(recibosOrdenados[index]);
                         },
                       ),
                     ),
@@ -688,145 +795,408 @@ class _RecibosAgenteScreenState extends State<RecibosAgenteScreen> {
     );
   }
 
-  Widget _resumenPrincipal() {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(28),
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Color(0xFF111827), Color(0xFF1D4ED8)],
-        ),
-        border: Border.all(color: Colors.white.withOpacity(0.22)),
-      ),
-      child: Row(
-        children: [
-          Container(
-            height: 54,
-            width: 54,
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.14),
-              borderRadius: BorderRadius.circular(18),
-            ),
-            child: const Icon(
-              Icons.account_balance_wallet_rounded,
-              color: Color(0xFF2563EB),
-              size: 28,
-            ),
+  Widget _cabeceraListado() {
+    const opciones = <String>[
+      'Prioridad',
+      'Más recientes',
+      'Más antiguos',
+      'Importe mayor',
+      'Importe menor',
+      'Cliente A-Z',
+    ];
+
+    return Row(
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'BANDEJA DE RECIBOS',
+                style: TextStyle(
+                  color: Color(0xFF0F172A),
+                  fontSize: 12,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 0.8,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                '${recibosOrdenados.length} resultados · mostrando ${recibosOrdenados.length.clamp(0, limiteVisible)}',
+                style: const TextStyle(
+                  color: Color(0xFF64748B),
+                  fontSize: 10,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
           ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+        ),
+        PopupMenuButton<String>(
+          tooltip: 'Ordenar recibos',
+          initialValue: orden,
+          onSelected: (value) => setState(() {
+            orden = value;
+            limiteVisible = 25;
+          }),
+          itemBuilder: (_) => opciones
+              .map(
+                (opcion) => PopupMenuItem<String>(
+                  value: opcion,
+                  child: Row(
+                    children: [
+                      Icon(
+                        opcion == orden
+                            ? Icons.check_circle_rounded
+                            : Icons.radio_button_unchecked_rounded,
+                        size: 18,
+                        color: const Color(0xFF2454D3),
+                      ),
+                      const SizedBox(width: 9),
+                      Text(opcion),
+                    ],
+                  ),
+                ),
+              )
+              .toList(),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 9),
+            decoration: BoxDecoration(
+              color: const Color(0xFFE2E8F0),
+              borderRadius: BorderRadius.circular(13),
+              border: Border.all(color: const Color(0xFFCBD5E1)),
+            ),
+            child: const Row(
               children: [
-                const Text(
-                  'Importe por gestionar',
-                  style: TextStyle(
-                    color: Colors.white70,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                  ),
+                Icon(
+                  Icons.swap_vert_rounded,
+                  size: 18,
+                  color: Color(0xFF2454D3),
                 ),
-                const SizedBox(height: 4),
-                FittedBox(
-                  fit: BoxFit.scaleDown,
-                  alignment: Alignment.centerLeft,
-                  child: Text(
-                    '${totalPendiente.toStringAsFixed(2)} €',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 31,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: -1,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 3),
+                SizedBox(width: 5),
                 Text(
-                  '$pendientes recibos necesitan seguimiento',
-                  style: const TextStyle(
-                    color: Color(0xFF2563EB),
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
+                  'ORDENAR',
+                  style: TextStyle(
+                    color: Color(0xFF334155),
+                    fontSize: 10,
+                    fontWeight: FontWeight.w900,
                   ),
                 ),
               ],
             ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _kpis() {
-    return Row(
-      children: [
-        Expanded(
-          child: _kpiCompacto(
-            titulo: 'Pendientes',
-            valor: pendientes.toString(),
-            icono: Icons.schedule_rounded,
-            color: const Color(0xFF1D4ED8),
-          ),
-        ),
-        const SizedBox(width: 9),
-        Expanded(
-          child: _kpiCompacto(
-            titulo: 'Cobrados',
-            valor: cobrados.toString(),
-            icono: Icons.check_circle_rounded,
-            color: const Color(0xFF2563EB),
-          ),
-        ),
-        const SizedBox(width: 9),
-        Expanded(
-          child: _kpiCompacto(
-            titulo: 'Para baja',
-            valor: paraBaja.toString(),
-            icono: Icons.person_remove_rounded,
-            color: const Color(0xFF2563EB),
           ),
         ),
       ],
     );
   }
 
-  Widget _kpiCompacto({
-    required String titulo,
-    required String valor,
-    required IconData icono,
-    required Color color,
-  }) {
+  Widget _resumenPrincipal() {
+    final porcentaje = (tasaCobro * 100).clamp(0, 100).toDouble();
+
     return Container(
-      height: 94,
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(22),
       decoration: BoxDecoration(
-        color: const Color(0xFFFFFFFF),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: color.withOpacity(0.18)),
+        borderRadius: BorderRadius.circular(28),
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF13244D), Color(0xFF2454D3)],
+        ),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x242454D3),
+            blurRadius: 26,
+            offset: Offset(0, 12),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icono, color: color, size: 20),
-          const Spacer(),
+          Row(
+            children: [
+              Container(
+                height: 48,
+                width: 48,
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.14),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.18),
+                  ),
+                ),
+                child: const Icon(
+                  Icons.receipt_long_rounded,
+                  color: const Color(0xFFE2E8F0),
+                  size: 25,
+                ),
+              ),
+              const SizedBox(width: 13),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'CENTRO DE GESTIÓN',
+                      style: TextStyle(
+                        color: Color(0xFFBFD0FF),
+                        fontSize: 10,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 1.1,
+                      ),
+                    ),
+                    SizedBox(height: 3),
+                    Text(
+                      'Cartera de recibos',
+                      style: TextStyle(
+                        color: const Color(0xFFE2E8F0),
+                        fontSize: 20,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 7,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  '${recibosConFiltrosAvanzados.length} recibos',
+                  style: const TextStyle(
+                    color: const Color(0xFFE2E8F0),
+                    fontSize: 10,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 24),
+          const Text(
+            'IMPORTE PENDIENTE DE GESTIÓN',
+            style: TextStyle(
+              color: Color(0xFFC8D5F5),
+              fontSize: 10,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 0.8,
+            ),
+          ),
+          const SizedBox(height: 5),
           Text(
-            valor,
+            '${totalPendiente.toStringAsFixed(2)} €',
             style: const TextStyle(
-              color: const Color(0xFF111827),
-              fontSize: 21,
+              color: const Color(0xFFE2E8F0),
+              fontSize: 36,
+              fontWeight: FontWeight.w900,
+              letterSpacing: -1.2,
+            ),
+          ),
+          const SizedBox(height: 22),
+          Row(
+            children: [
+              const Text(
+                'Tasa de cobro',
+                style: TextStyle(
+                  color: Color(0xFFD9E2FA),
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const Spacer(),
+              Text(
+                '${porcentaje.toStringAsFixed(1)}%',
+                style: const TextStyle(
+                  color: const Color(0xFFE2E8F0),
+                  fontSize: 12,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(20),
+            child: LinearProgressIndicator(
+              value: tasaCobro.clamp(0, 1),
+              minHeight: 8,
+              backgroundColor: Colors.white.withValues(alpha: 0.15),
+              valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
+            ),
+          ),
+          const SizedBox(height: 18),
+          Row(
+            children: [
+              Expanded(
+                child: _datoHero(
+                  'Cobrado',
+                  '${importeCobrado.toStringAsFixed(2)} €',
+                ),
+              ),
+              Container(
+                width: 1,
+                height: 36,
+                color: Colors.white.withValues(alpha: 0.16),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: _datoHero(
+                  'Devuelto',
+                  '${importeDevuelto.toStringAsFixed(2)} €',
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _datoHero(String titulo, String valor) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          titulo,
+          style: const TextStyle(
+            color: Color(0xFFBFD0E8),
+            fontSize: 10,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const SizedBox(height: 3),
+        Text(
+          valor,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(
+            color: const Color(0xFFE2E8F0),
+            fontSize: 16,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _kpis() {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final width = (constraints.maxWidth - 10) / 2;
+        return Wrap(
+          spacing: 10,
+          runSpacing: 10,
+          children: [
+            _kpiCompacto(
+              width: width,
+              titulo: 'Pendientes',
+              valor: pendientes.toString(),
+              subtitulo: 'Requieren seguimiento',
+              icono: Icons.schedule_rounded,
+              color: const Color(0xFFD97706),
+            ),
+            _kpiCompacto(
+              width: width,
+              titulo: 'Devueltos',
+              valor: devueltos.toString(),
+              subtitulo: 'Prioridad inmediata',
+              icono: Icons.warning_amber_rounded,
+              color: const Color(0xFFDC2626),
+            ),
+            _kpiCompacto(
+              width: width,
+              titulo: 'En gestión',
+              valor: enGestion.toString(),
+              subtitulo: 'Con seguimiento abierto',
+              icono: Icons.support_agent_rounded,
+              color: const Color(0xFF2454D3),
+            ),
+            _kpiCompacto(
+              width: width,
+              titulo: 'Cobrados',
+              valor: cobrados.toString(),
+              subtitulo: 'Gestiones resueltas',
+              icono: Icons.task_alt_rounded,
+              color: const Color(0xFF15803D),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _kpiCompacto({
+    required double width,
+    required String titulo,
+    required String valor,
+    required String subtitulo,
+    required IconData icono,
+    required Color color,
+  }) {
+    return Container(
+      width: width,
+      constraints: const BoxConstraints(minHeight: 126),
+      padding: const EdgeInsets.all(15),
+      decoration: BoxDecoration(
+        color: const Color(0xFFE2E8F0),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x0D0F172A),
+            blurRadius: 14,
+            offset: Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                height: 34,
+                width: 34,
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.10),
+                  borderRadius: BorderRadius.circular(11),
+                ),
+                child: Icon(icono, color: color, size: 19),
+              ),
+              const Spacer(),
+              Text(
+                valor,
+                style: const TextStyle(
+                  color: Color(0xFF0F172A),
+                  fontSize: 24,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text(
+            titulo,
+            style: const TextStyle(
+              color: Color(0xFF0F172A),
+              fontSize: 13,
               fontWeight: FontWeight.w900,
             ),
           ),
+          const SizedBox(height: 3),
           Text(
-            titulo,
+            subtitulo,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: const TextStyle(
-              color: const Color(0xFF64748B),
+              color: Color(0xFF64748B),
               fontSize: 10,
-              fontWeight: FontWeight.w700,
+              fontWeight: FontWeight.w600,
             ),
           ),
         ],
@@ -835,31 +1205,72 @@ class _RecibosAgenteScreenState extends State<RecibosAgenteScreen> {
   }
 
   Widget _buscador() {
-    return TextField(
-      style: const TextStyle(
-        color: const Color(0xFF111827),
-        fontWeight: FontWeight.w700,
-      ),
-      onChanged: (v) => setState(() => searchText = v),
-      decoration: InputDecoration(
-        hintText: 'Buscar cliente, póliza o compañía',
-        hintStyle: const TextStyle(
-          color: const Color(0xFF78909C),
-          fontSize: 13,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Padding(
+          padding: EdgeInsets.only(left: 3, bottom: 8),
+          child: Text(
+            'BUSCAR RECIBO',
+            style: TextStyle(
+              color: Color(0xFF0F172A),
+              fontSize: 11,
+              fontWeight: FontWeight.w900,
+              letterSpacing: 0.8,
+            ),
+          ),
         ),
-        prefixIcon: const Icon(Icons.search_rounded, color: Color(0xFF2563EB)),
-        filled: true,
-        fillColor: const Color(0xFFFFFFFF),
-        contentPadding: const EdgeInsets.symmetric(vertical: 15),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(19),
-          borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+        TextField(
+          controller: buscadorController,
+          textInputAction: TextInputAction.search,
+          style: const TextStyle(
+            color: Color(0xFF111827),
+            fontWeight: FontWeight.w700,
+          ),
+          onChanged: (v) => setState(() {
+            searchText = v;
+            limiteVisible = 25;
+          }),
+          decoration: InputDecoration(
+            hintText: 'Cliente, nº de recibo, póliza, compañía o motivo',
+            hintStyle: const TextStyle(color: Color(0xFF78909C), fontSize: 13),
+            prefixIcon: const Icon(
+              Icons.search_rounded,
+              color: Color(0xFF2454D3),
+            ),
+            suffixIcon: searchText.isEmpty
+                ? null
+                : IconButton(
+                    tooltip: 'Limpiar búsqueda',
+                    onPressed: () {
+                      buscadorController.clear();
+                      setState(() {
+                        searchText = '';
+                        limiteVisible = 25;
+                      });
+                    },
+                    icon: const Icon(
+                      Icons.close_rounded,
+                      color: Color(0xFF475569),
+                    ),
+                  ),
+            filled: true,
+            fillColor: const Color(0xFFFFFFFF),
+            contentPadding: const EdgeInsets.symmetric(vertical: 17),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(19),
+              borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(19),
+              borderSide: const BorderSide(
+                color: Color(0xFF2454D3),
+                width: 1.6,
+              ),
+            ),
+          ),
         ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(19),
-          borderSide: const BorderSide(color: Color(0xFF2563EB)),
-        ),
-      ),
+      ],
     );
   }
 
@@ -877,7 +1288,7 @@ class _RecibosAgenteScreenState extends State<RecibosAgenteScreen> {
         border: Border.all(
           color: filtrosActivos > 0
               ? const Color(0xFF2563EB).withOpacity(0.28)
-              : Colors.white,
+              : const Color(0xFFE2E8F0),
         ),
       ),
       child: Column(
@@ -946,7 +1357,7 @@ class _RecibosAgenteScreenState extends State<RecibosAgenteScreen> {
                       child: Text(
                         '$filtrosActivos',
                         style: const TextStyle(
-                          color: Colors.black,
+                          color: Colors.white,
                           fontSize: 10,
                           fontWeight: FontWeight.w900,
                         ),
@@ -1125,7 +1536,7 @@ class _RecibosAgenteScreenState extends State<RecibosAgenteScreen> {
       ),
       prefixIcon: Icon(icono, color: const Color(0xFF2563EB), size: 20),
       filled: true,
-      fillColor: Colors.black.withOpacity(0.16),
+      fillColor: const Color(0xFFF8FAFC),
       contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 13),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(15),
@@ -1150,12 +1561,12 @@ class _RecibosAgenteScreenState extends State<RecibosAgenteScreen> {
         height: 56,
         padding: const EdgeInsets.symmetric(horizontal: 12),
         decoration: BoxDecoration(
-          color: Colors.black.withOpacity(0.16),
+          color: const Color(0xFFF8FAFC),
           borderRadius: BorderRadius.circular(15),
           border: Border.all(
             color: fecha != null
                 ? const Color(0xFF2563EB).withOpacity(0.35)
-                : Colors.white,
+                : const Color(0xFFE2E8F0),
           ),
         ),
         child: Row(
@@ -1185,7 +1596,7 @@ class _RecibosAgenteScreenState extends State<RecibosAgenteScreen> {
                     style: TextStyle(
                       color: fecha == null
                           ? const Color(0xFF64748B)
-                          : Colors.white,
+                          : const Color(0xFF0F172A),
                       fontSize: 11,
                       fontWeight: FontWeight.w800,
                     ),
@@ -1232,11 +1643,11 @@ class _RecibosAgenteScreenState extends State<RecibosAgenteScreen> {
       builder: (context, child) {
         return Theme(
           data: Theme.of(context).copyWith(
-            colorScheme: const ColorScheme.dark(
+            colorScheme: const ColorScheme.light(
               primary: Color(0xFF2563EB),
-              onPrimary: Colors.black,
+              onPrimary: Colors.white,
               surface: Color(0xFFFFFFFF),
-              onSurface: Colors.white,
+              onSurface: const Color(0xFFE2E8F0),
             ),
             dialogBackgroundColor: const Color(0xFFFFFFFF),
           ),
@@ -1288,7 +1699,14 @@ class _RecibosAgenteScreenState extends State<RecibosAgenteScreen> {
   }
 
   Widget _filtros() {
-    const filtros = ['Todos', 'Pendientes', 'Cobrados', 'Para baja'];
+    const filtros = [
+      'Todos',
+      'Pendientes',
+      'Devueltos',
+      'En gestión',
+      'Cobrados',
+      'Para baja',
+    ];
 
     return SizedBox(
       height: 41,
@@ -1302,7 +1720,10 @@ class _RecibosAgenteScreenState extends State<RecibosAgenteScreen> {
 
           return InkWell(
             borderRadius: BorderRadius.circular(30),
-            onTap: () => setState(() => filtro = item),
+            onTap: () => setState(() {
+              filtro = item;
+              limiteVisible = 25;
+            }),
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 180),
               padding: const EdgeInsets.symmetric(horizontal: 15),
@@ -1313,13 +1734,15 @@ class _RecibosAgenteScreenState extends State<RecibosAgenteScreen> {
                     : const Color(0xFFFFFFFF),
                 borderRadius: BorderRadius.circular(30),
                 border: Border.all(
-                  color: selected ? const Color(0xFF2563EB) : Colors.white,
+                  color: selected
+                      ? const Color(0xFF2563EB)
+                      : const Color(0xFFE2E8F0),
                 ),
               ),
               child: Text(
                 item,
                 style: TextStyle(
-                  color: selected ? Colors.black : const Color(0xFF475569),
+                  color: selected ? Colors.white : const Color(0xFF475569),
                   fontWeight: FontWeight.w900,
                   fontSize: 11,
                 ),
@@ -1340,6 +1763,7 @@ class _RecibosAgenteScreenState extends State<RecibosAgenteScreen> {
     final compania = (r['compania'] ?? 'Sin compañía').toString();
     final motivo = (r['motivo'] ?? '').toString();
     final fecha = _formatFecha(r['fecha']);
+    final numeroRecibo = (r['numero_recibo'] ?? '').toString().trim();
 
     return Material(
       color: Colors.transparent,
@@ -1394,7 +1818,9 @@ class _RecibosAgenteScreenState extends State<RecibosAgenteScreen> {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          '$compania · $poliza',
+                          numeroRecibo.isEmpty
+                              ? '$compania · Póliza $poliza'
+                              : '$compania · Póliza $poliza · Recibo $numeroRecibo',
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
@@ -1517,7 +1943,7 @@ class _RecibosAgenteScreenState extends State<RecibosAgenteScreen> {
               height: 80,
               width: 80,
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: const Color(0xFFE2E8F0),
                 shape: BoxShape.circle,
               ),
               child: Icon(
@@ -1620,17 +2046,17 @@ class _ReciboDetalleScreenState extends State<ReciboDetalleScreen> {
     final e = _normalizar(estado);
 
     if (e == 'pagado' || e == 'cobrado') {
-      return const Color(0xFF2563EB);
+      return const Color(0xFF15803D);
     }
-    if (e == 'pendiente') return const Color(0xFF1D4ED8);
+    if (e == 'pendiente') return const Color(0xFFD97706);
     if (e == 'devuelto' || e == 'impagado') {
-      return const Color(0xFFE74646);
+      return const Color(0xFFDC2626);
     }
     if (e == 'en gestión' || e == 'en gestion') {
-      return const Color(0xFF2563EB);
+      return const Color(0xFF2454D3);
     }
     if (e == 'para baja' || e == 'para_baja' || e == 'baja') {
-      return const Color(0xFF2563EB);
+      return const Color(0xFF475569);
     }
 
     return const Color(0xFF64748B);
@@ -1693,6 +2119,30 @@ class _ReciboDetalleScreenState extends State<ReciboDetalleScreen> {
     }
   }
 
+  Future<void> _actualizarSoloEsteRecibo(Map<String, dynamic> cambios) async {
+    final id = reciboActual['id'];
+    final numero = reciboActual['numero_recibo']?.toString().trim() ?? '';
+
+    if (id != null) {
+      await supabase.from('recibos').update(cambios).eq('id', id);
+      return;
+    }
+    if (numero.isNotEmpty) {
+      await supabase
+          .from('recibos')
+          .update(cambios)
+          .eq('numero_recibo', numero);
+      return;
+    }
+
+    throw Exception('El recibo no tiene un identificador válido.');
+  }
+
+  String get _prefijoRecibo {
+    final numero = reciboActual['numero_recibo']?.toString().trim() ?? '';
+    return numero.isEmpty ? '' : '[Recibo $numero] ';
+  }
+
   Future<void> guardarGestion() async {
     final comentario = comentarioController.text.trim();
 
@@ -1722,14 +2172,11 @@ class _ReciboDetalleScreenState extends State<ReciboDetalleScreen> {
     try {
       await supabase.from('recibos_comentarios').insert({
         'poliza': poliza,
-        'comentario': '[$nuevoEstado] $comentario',
+        'comentario': '$_prefijoRecibo[$nuevoEstado] $comentario',
         'usuario': usuario,
       });
 
-      await supabase
-          .from('recibos')
-          .update({'estado': nuevoEstado})
-          .eq('poliza', poliza);
+      await _actualizarSoloEsteRecibo({'estado': nuevoEstado});
 
       if (!mounted) return;
 
@@ -1853,7 +2300,7 @@ class _ReciboDetalleScreenState extends State<ReciboDetalleScreen> {
                     ),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF2563EB),
-                      foregroundColor: Colors.black,
+                      foregroundColor: Colors.white,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(17),
                       ),
@@ -1907,17 +2354,15 @@ class _ReciboDetalleScreenState extends State<ReciboDetalleScreen> {
 
       await supabase.from('recibos_comentarios').insert({
         'poliza': poliza,
-        'comentario': '[En gestión] Enlace TPV enviado a $emailDestino',
+        'comentario':
+            '${_prefijoRecibo}[En gestión] Enlace TPV enviado a $emailDestino',
         'usuario':
             supabase.auth.currentUser?.email ??
             supabase.auth.currentUser?.id ??
             'Usuario',
       });
 
-      await supabase
-          .from('recibos')
-          .update({'estado': 'En gestión'})
-          .eq('poliza', poliza);
+      await _actualizarSoloEsteRecibo({'estado': 'En gestión'});
 
       if (!mounted) return;
 
@@ -2063,9 +2508,9 @@ class _ReciboDetalleScreenState extends State<ReciboDetalleScreen> {
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [color.withOpacity(0.18), const Color(0xFFFFFFFF)],
+          colors: [const Color(0xFF13244D), const Color(0xFF2454D3)],
         ),
-        border: Border.all(color: color.withOpacity(0.24)),
+        border: Border.all(color: const Color(0xFF4F7BEE)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -2077,7 +2522,7 @@ class _ReciboDetalleScreenState extends State<ReciboDetalleScreen> {
                 child: Text(
                   cliente,
                   style: const TextStyle(
-                    color: const Color(0xFF111827),
+                    color: Colors.white,
                     fontSize: 21,
                     fontWeight: FontWeight.w900,
                     letterSpacing: -0.4,
@@ -2092,7 +2537,7 @@ class _ReciboDetalleScreenState extends State<ReciboDetalleScreen> {
           Text(
             '$compania · Póliza $poliza',
             style: const TextStyle(
-              color: const Color(0xFF64748B),
+              color: const Color(0xFFDCE7FF),
               fontSize: 12,
               fontWeight: FontWeight.w700,
             ),
@@ -2101,7 +2546,7 @@ class _ReciboDetalleScreenState extends State<ReciboDetalleScreen> {
           Text(
             '${importe.toStringAsFixed(2)} €',
             style: const TextStyle(
-              color: const Color(0xFF111827),
+              color: Colors.white,
               fontSize: 38,
               fontWeight: FontWeight.w900,
               letterSpacing: -1.4,
@@ -2113,18 +2558,16 @@ class _ReciboDetalleScreenState extends State<ReciboDetalleScreen> {
               width: double.infinity,
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: const Color(0xFFE74646).withOpacity(0.08),
+                color: Colors.white.withOpacity(0.12),
                 borderRadius: BorderRadius.circular(15),
-                border: Border.all(
-                  color: const Color(0xFFE74646).withOpacity(0.18),
-                ),
+                border: Border.all(color: Colors.white.withOpacity(0.22)),
               ),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Icon(
                     Icons.info_outline_rounded,
-                    color: Color(0xFFE74646),
+                    color: Colors.white,
                     size: 18,
                   ),
                   const SizedBox(width: 8),
@@ -2132,7 +2575,7 @@ class _ReciboDetalleScreenState extends State<ReciboDetalleScreen> {
                     child: Text(
                       motivo,
                       style: const TextStyle(
-                        color: const Color(0xFF475569),
+                        color: Colors.white,
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
                       ),
@@ -2251,7 +2694,7 @@ class _ReciboDetalleScreenState extends State<ReciboDetalleScreen> {
                       height: 19,
                       child: CircularProgressIndicator(
                         strokeWidth: 2.2,
-                        color: Colors.black,
+                        color: Colors.white,
                       ),
                     )
                   : const Icon(Icons.save_rounded),
@@ -2261,7 +2704,7 @@ class _ReciboDetalleScreenState extends State<ReciboDetalleScreen> {
               ),
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF2563EB),
-                foregroundColor: Colors.black,
+                foregroundColor: Colors.white,
                 disabledBackgroundColor: const Color(
                   0xFF20C7C2,
                 ).withOpacity(0.45),
@@ -2292,19 +2735,17 @@ class _ReciboDetalleScreenState extends State<ReciboDetalleScreen> {
         height: 76,
         padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 9),
         decoration: BoxDecoration(
-          color: selected
-              ? color.withOpacity(0.18)
-              : Colors.white.withOpacity(0.035),
+          color: selected ? color : const Color(0xFFF8FAFC),
           borderRadius: BorderRadius.circular(17),
           border: Border.all(
-            color: selected ? color : Colors.white,
+            color: selected ? color : const Color(0xFFE2E8F0),
             width: selected ? 1.4 : 1,
           ),
         ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icono, color: color, size: 22),
+            Icon(icono, color: selected ? Colors.white : color, size: 22),
             const SizedBox(height: 5),
             Text(
               titulo,
@@ -2566,7 +3007,7 @@ class _ReciboDetalleScreenState extends State<ReciboDetalleScreen> {
       margin: const EdgeInsets.only(bottom: 9),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.black.withOpacity(0.16),
+        color: const Color(0xFFF8FAFC),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: const Color(0xFFE2E8F0)),
       ),
@@ -2618,7 +3059,7 @@ class _ReciboDetalleScreenState extends State<ReciboDetalleScreen> {
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: const Color(0xFFE2E8F0),
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: const Color(0xFFE2E8F0)),
       ),
@@ -2651,7 +3092,7 @@ class _ReciboDetalleScreenState extends State<ReciboDetalleScreen> {
       hintText: label,
       hintStyle: const TextStyle(color: const Color(0xFF78909C), fontSize: 12),
       filled: true,
-      fillColor: Colors.white,
+      fillColor: const Color(0xFFE2E8F0),
       contentPadding: const EdgeInsets.all(14),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(16),

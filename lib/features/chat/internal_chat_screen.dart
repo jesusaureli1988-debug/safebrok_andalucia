@@ -63,14 +63,9 @@ class _InternalChatScreenState extends State<InternalChatScreen> {
         setState(() => loading = true);
       }
 
-      final usersRes = await supabase
-          .from('usuarios')
-          .select('id, nombre, apellidos, auth_id, rol_usuario')
-          .or(
-            'estado.is.null,estado.not.in.(inactivo,Inactivo,INACTIVO,baja,Baja,BAJA,desactivado,Desactivado,DESACTIVADO,bloqueado,Bloqueado,BLOQUEADO,suspendido,Suspendido,SUSPENDIDO)',
-          )
-          .neq('auth_id', user.id)
-          .order('nombre', ascending: true);
+      // El directorio del chat es global: devuelve solamente los datos
+      // públicos mínimos de todos los usuarios activos, sin aplicar jerarquía.
+      final usersRes = await supabase.rpc('chat_directorio_usuarios');
 
       final messagesRes = await supabase
           .from('chat_mensajes')
@@ -161,6 +156,12 @@ class _InternalChatScreenState extends State<InternalChatScreen> {
 
   String _rolText(String? rol) {
     switch (rol) {
+      case 'administracion':
+        return 'Administración';
+      case 'director_nacional':
+        return 'Director nacional';
+      case 'director_regional':
+        return 'Director regional';
       case 'director_zona':
         return 'Director de zona';
       case 'jefe_ventas':
@@ -307,7 +308,7 @@ class _InternalChatScreenState extends State<InternalChatScreen> {
                 ),
                 SizedBox(height: 3),
                 Text(
-                  'Comunicación directa con todo el equipo',
+                  'Todos los usuarios conectados, sin límites de jerarquía',
                   style: TextStyle(
                     color: const Color(0xFF64748B),
                     fontSize: 13,
@@ -341,7 +342,7 @@ class _InternalChatScreenState extends State<InternalChatScreen> {
         controller: searchCtrl,
         style: const TextStyle(color: const Color(0xFF071A3A)),
         decoration: InputDecoration(
-          hintText: 'Buscar usuario, rol o equipo...',
+          hintText: 'Buscar cualquier usuario o rol...',
           hintStyle: const TextStyle(color: const Color(0xFF78909C)),
           prefixIcon: const Icon(
             Icons.search_rounded,
@@ -763,6 +764,12 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
 
   String _roleText(String? rol) {
     switch (rol) {
+      case 'administracion':
+        return 'Administración';
+      case 'director_nacional':
+        return 'Director nacional';
+      case 'director_regional':
+        return 'Director regional';
       case 'director_zona':
         return 'Director de zona';
       case 'jefe_ventas':

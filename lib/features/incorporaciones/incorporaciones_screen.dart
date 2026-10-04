@@ -42,9 +42,11 @@ class IncorporacionesScreen extends StatefulWidget {
 
 class _IncorporacionesScreenState extends State<IncorporacionesScreen> {
   final repo = IncorporacionRepository();
+  final searchController = TextEditingController();
   bool loading = true;
   bool admin = false;
   String filter = 'TRABAJO';
+  String searchQuery = '';
   List<Map<String, dynamic>> rows = [];
 
   static const states = <String>[
@@ -63,6 +65,12 @@ class _IncorporacionesScreenState extends State<IncorporacionesScreen> {
   void initState() {
     super.initState();
     load();
+  }
+
+  @override
+  void dispose() {
+    searchController.dispose();
+    super.dispose();
   }
 
   Future<void> load() async {
@@ -115,10 +123,48 @@ class _IncorporacionesScreenState extends State<IncorporacionesScreen> {
     return false;
   }
 
+  String _normalizeSearch(dynamic value) => value
+      .toString()
+      .toLowerCase()
+      .replaceAll(RegExp(r'[áàäâ]'), 'a')
+      .replaceAll(RegExp(r'[éèëê]'), 'e')
+      .replaceAll(RegExp(r'[íìïî]'), 'i')
+      .replaceAll(RegExp(r'[óòöô]'), 'o')
+      .replaceAll(RegExp(r'[úùüû]'), 'u')
+      .replaceAll('ñ', 'n')
+      .trim();
+
+  bool _matchesSearch(Map<String, dynamic> expediente) {
+    final query = _normalizeSearch(searchQuery);
+    if (query.isEmpty) return true;
+    final responsable = Map<String, dynamic>.from(
+      expediente['responsable'] ?? {},
+    );
+    final searchable = _normalizeSearch(
+      [
+        expediente['nombre'],
+        expediente['apellidos'],
+        expediente['dni_nie'],
+        expediente['email'],
+        expediente['telefono'],
+        expediente['figura'],
+        _label(expediente['figura']),
+        expediente['estado'],
+        _visibleState(expediente),
+        responsable['nombre'],
+        responsable['apellidos'],
+      ].whereType<Object>().join(' '),
+    );
+    return query.split(RegExp(r'\s+')).every(searchable.contains);
+  }
+
   List<Map<String, dynamic>> get filteredRows {
-    if (filter == 'TODOS') return rows;
-    if (filter == 'TRABAJO') return rows.where(_needsWork).toList();
-    return rows.where((e) => e['estado'] == filter).toList();
+    final byStatus = filter == 'TODOS'
+        ? rows
+        : filter == 'TRABAJO'
+        ? rows.where(_needsWork).toList()
+        : rows.where((e) => e['estado'] == filter).toList();
+    return byStatus.where(_matchesSearch).toList();
   }
 
   int _count(String value) {
@@ -127,6 +173,42 @@ class _IncorporacionesScreenState extends State<IncorporacionesScreen> {
     return rows.where((e) => e['estado'] == value).length;
   }
 
+  Widget _searchBox() => Padding(
+    padding: const EdgeInsets.fromLTRB(16, 12, 16, 2),
+    child: TextField(
+      controller: searchController,
+      onChanged: (value) => setState(() => searchQuery = value),
+      textInputAction: TextInputAction.search,
+      decoration: InputDecoration(
+        hintText: 'Buscar por nombre, DNI, email, teléfono, figura o estado',
+        prefixIcon: const Icon(Icons.search_rounded),
+        suffixIcon: searchQuery.isEmpty
+            ? null
+            : IconButton(
+                tooltip: 'Limpiar búsqueda',
+                onPressed: () {
+                  searchController.clear();
+                  setState(() => searchQuery = '');
+                },
+                icon: const Icon(Icons.close_rounded),
+              ),
+        filled: true,
+        fillColor: Colors.white,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: BorderSide.none,
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: const BorderSide(color: Color(0xFFE1E7F0)),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: const BorderSide(color: Color(0xFF2457D6), width: 1.5),
+        ),
+      ),
+    ),
+  );
   Widget _filters() {
     final values = <String>['TRABAJO', 'TODOS', ...states];
     return SizedBox(
@@ -179,12 +261,15 @@ class _IncorporacionesScreenState extends State<IncorporacionesScreen> {
         ? const Center(child: CircularProgressIndicator())
         : Column(
             children: [
+              _searchBox(),
               _filters(),
               Expanded(
                 child: filteredRows.isEmpty
                     ? Center(
                         child: Text(
-                          filter == 'TRABAJO'
+                          searchQuery.trim().isNotEmpty
+                              ? 'No hay incorporaciones que coincidan con la búsqueda'
+                              : filter == 'TRABAJO'
                               ? 'No tienes expedientes pendientes'
                               : 'No hay expedientes en este estado',
                         ),

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:safebrok_andalucia/features/profile/profile_screen.dart';
+import 'package:safebrok_andalucia/features/invoices/my_invoices_screen.dart';
 import 'package:safebrok_andalucia/features/incidencias/incidencias_screen.dart';
 import 'package:safebrok_andalucia/features/settings/security/security_screen.dart';
 import 'package:safebrok_andalucia/features/support/support_screen.dart';
@@ -91,6 +92,20 @@ class SettingsScreen extends StatelessWidget {
                           context,
                           MaterialPageRoute(
                             builder: (_) => const ProfileScreen(),
+                          ),
+                        );
+                      },
+                    ),
+                    _item(
+                      icon: Icons.receipt_long_rounded,
+                      title: 'Facturas',
+                      subtitle: 'Consulta y descarga tus facturas mensuales',
+                      color: const Color(0xFF2454D3),
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const MyInvoicesScreen(),
                           ),
                         );
                       },

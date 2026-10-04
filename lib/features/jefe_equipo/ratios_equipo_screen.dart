@@ -1,4 +1,3 @@
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -22,6 +21,7 @@ class _RatiosEquipoScreenState extends State<RatiosEquipoScreen> {
 
   int contactosEquipo = 0;
   int positivosEquipo = 0;
+  int agentesEquipo = 0;
 
   @override
   void initState() {
@@ -56,25 +56,57 @@ class _RatiosEquipoScreenState extends State<RatiosEquipoScreen> {
 
       final jefe = await supabase
           .from('usuarios')
-          .select()
+          .select('id')
           .or(
             'estado.is.null,estado.not.in.(inactivo,Inactivo,INACTIVO,baja,Baja,BAJA,desactivado,Desactivado,DESACTIVADO,bloqueado,Bloqueado,BLOQUEADO,suspendido,Suspendido,SUSPENDIDO)',
           )
           .eq('auth_id', user.id)
           .single();
-
-      final jefeId = jefe['id'];
-
-      final agentes = await supabase
+      final equipo = await supabase
           .from('usuarios')
-          .select()
+          .select('auth_id')
           .or(
             'estado.is.null,estado.not.in.(inactivo,Inactivo,INACTIVO,baja,Baja,BAJA,desactivado,Desactivado,DESACTIVADO,bloqueado,Bloqueado,BLOQUEADO,suspendido,Suspendido,SUSPENDIDO)',
           )
-          .eq('parent_id', jefeId)
-          .eq('rol_usuario', 'agente')
-          .order('nombre', ascending: true);
-
+          .eq('parent_id', jefe['id'])
+          .eq('rol_usuario', 'agente');
+      final idsEquipo = equipo
+          .map((u) => u['auth_id']?.toString() ?? '')
+          .where((id) => id.isNotEmpty)
+          .toSet();
+      final usuariosCompania = List<Map<String, dynamic>>.from(
+        await supabase.rpc('app_ranking_usuarios_activos'),
+      );
+      final agentes = usuariosCompania
+          .where(
+            (u) =>
+                u['rol_usuario']?.toString().toLowerCase().trim() == 'agente',
+          )
+          .toList();
+      final idsAgentes = agentes
+          .map((u) => u['auth_id']?.toString() ?? '')
+          .where((id) => id.isNotEmpty)
+          .toSet();
+      final contactosPorAuth = <String, List<Map<String, dynamic>>>{};
+      if (idsAgentes.isNotEmpty) {
+        for (var desde = 0; ; desde += 1000) {
+          final pagina = await supabase
+              .from('contactos_diarios')
+              .select(
+                'id, auth_id, contactos_frios, contactos_telefonicos, contactos_positivos',
+              )
+              .inFilter('auth_id', idsAgentes.toList())
+              .order('id')
+              .range(desde, desde + 999);
+          for (final contacto in pagina) {
+            final authId = contacto['auth_id']?.toString() ?? '';
+            contactosPorAuth
+                .putIfAbsent(authId, () => [])
+                .add(Map<String, dynamic>.from(contacto));
+          }
+          if (pagina.length < 1000) break;
+        }
+      }
       final List<Map<String, dynamic>> resultado = [];
 
       int totalContactosEquipo = 0;
@@ -83,10 +115,9 @@ class _RatiosEquipoScreenState extends State<RatiosEquipoScreen> {
       for (final agente in agentes) {
         final authId = agente['auth_id'];
 
-        final contactos = await supabase
-            .from('contactos_diarios')
-            .select()
-            .eq('auth_id', authId);
+        final contactos =
+            contactosPorAuth[authId?.toString() ?? ''] ??
+            const <Map<String, dynamic>>[];
 
         int frios = 0;
         int telefonicos = 0;
@@ -104,8 +135,10 @@ class _RatiosEquipoScreenState extends State<RatiosEquipoScreen> {
             ? 0.0
             : (positivos / totalContactos) * 100;
 
-        totalContactosEquipo += totalContactos;
-        totalPositivosEquipo += positivos;
+        if (idsEquipo.contains(authId?.toString())) {
+          totalContactosEquipo += totalContactos;
+          totalPositivosEquipo += positivos;
+        }
 
         resultado.add({
           'nombre': "${agente['nombre']} ${agente['apellidos'] ?? ''}".trim(),
@@ -130,6 +163,7 @@ class _RatiosEquipoScreenState extends State<RatiosEquipoScreen> {
         contactosEquipo = totalContactosEquipo;
         positivosEquipo = totalPositivosEquipo;
         ratioEquipo = ratioMedioEquipo;
+        agentesEquipo = idsEquipo.length;
         loading = false;
         refreshing = false;
       });
@@ -147,8 +181,8 @@ class _RatiosEquipoScreenState extends State<RatiosEquipoScreen> {
   }
 
   Color colorRatio(double ratio) {
-    if (ratio >= 20) return const Color(0xFF20C7C2);
-    if (ratio >= 10) return const Color(0xFF0A7F91);
+    if (ratio >= 20) return const Color(0xFF2454D3);
+    if (ratio >= 10) return const Color(0xFF3B6AE8);
     return Colors.redAccent;
   }
 
@@ -173,11 +207,12 @@ class _RatiosEquipoScreenState extends State<RatiosEquipoScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF2FCFD),
+      backgroundColor: const Color(0xFFF4F6FB),
       appBar: AppBar(
-        backgroundColor: Colors.transparent,
+        backgroundColor: const Color(0xFFF4F6FB),
+        surfaceTintColor: Colors.transparent,
         elevation: 0,
-        iconTheme: const IconThemeData(color: Colors.white),
+        iconTheme: const IconThemeData(color: Color(0xFF13244D)),
         title: const Text(
           "Ratios del equipo",
           style: TextStyle(
@@ -189,6 +224,7 @@ class _RatiosEquipoScreenState extends State<RatiosEquipoScreen> {
         actions: [
           IconButton(
             tooltip: "Actualizar",
+            color: const Color(0xFF13244D),
             onPressed: refreshing ? null : () => cargarDatos(isRefresh: true),
             icon: refreshing
                 ? const SizedBox(
@@ -206,11 +242,11 @@ class _RatiosEquipoScreenState extends State<RatiosEquipoScreen> {
           SafeArea(
             child: loading
                 ? const Center(
-                    child: CircularProgressIndicator(color: Colors.white),
+                    child: CircularProgressIndicator(color: Color(0xFF2454D3)),
                   )
                 : RefreshIndicator(
-                    color: const Color(0xFF20C7C2),
-                    backgroundColor: const Color(0xFFEAF8F8),
+                    color: const Color(0xFF2454D3),
+                    backgroundColor: Colors.white,
                     onRefresh: () => cargarDatos(isRefresh: true),
                     child: ListView(
                       physics: const AlwaysScrollableScrollPhysics(),
@@ -220,7 +256,7 @@ class _RatiosEquipoScreenState extends State<RatiosEquipoScreen> {
                           ratioEquipo: ratioEquipo,
                           contactosEquipo: contactosEquipo,
                           positivosEquipo: positivosEquipo,
-                          agentes: agentesRatios.length,
+                          agentes: agentesEquipo,
                           color: colorRatio(ratioEquipo),
                           estado: estadoRatio(ratioEquipo),
                         ),
@@ -235,13 +271,14 @@ class _RatiosEquipoScreenState extends State<RatiosEquipoScreen> {
                         _KpiGrid(
                           contactosEquipo: contactosEquipo,
                           positivosEquipo: positivosEquipo,
-                          agentes: agentesRatios.length,
+                          agentes: agentesEquipo,
                           mejorRatio: mejorRatio,
                         ),
                         const SizedBox(height: 24),
                         const _SectionTitle(
-                          title: "Ranking de agentes",
-                          subtitle: "Conversión de contactos en positivos",
+                          title: "Ranking de la compañía",
+                          subtitle:
+                              "Todos los agentes activos · conversión de contactos",
                         ),
                         const SizedBox(height: 12),
                         if (agentesRatios.isEmpty)
@@ -277,54 +314,14 @@ class _PremiumBackground extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Stack(
-      children: [
-        Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [Color(0xFFF2FCFD), Color(0xFFFFFFFF), Color(0xFFFFFFFF)],
-            ),
-          ),
+    return const DecoratedBox(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Color(0xFFF4F6FB), Color(0xFFEAF1FF)],
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
         ),
-        Positioned(
-          top: -90,
-          right: -80,
-          child: _GlowCircle(
-            size: 230,
-            color: const Color(0xFF20C7C2).withOpacity(0.24),
-          ),
-        ),
-        Positioned(
-          bottom: -120,
-          left: -90,
-          child: _GlowCircle(
-            size: 260,
-            color: const Color(0xFF0AAEAE).withOpacity(0.16),
-          ),
-        ),
-        BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 34, sigmaY: 34),
-          child: Container(color: Colors.black.withOpacity(0.08)),
-        ),
-      ],
-    );
-  }
-}
-
-class _GlowCircle extends StatelessWidget {
-  final double size;
-  final Color color;
-
-  const _GlowCircle({required this.size, required this.color});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(shape: BoxShape.circle, color: color),
+      ),
     );
   }
 }
@@ -354,11 +351,15 @@ class _HeaderPanel extends StatelessWidget {
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(30),
-        color: Colors.white,
-        border: Border.all(color: Colors.white),
+        gradient: const LinearGradient(
+          colors: [Color(0xFF172B58), Color(0xFF2454D3)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        border: Border.all(color: const Color(0xFF2454D3)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.28),
+            color: const Color(0xFF13244D).withValues(alpha: 0.15),
             blurRadius: 30,
             offset: const Offset(0, 18),
           ),
@@ -375,7 +376,7 @@ class _HeaderPanel extends StatelessWidget {
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(20),
                   gradient: const LinearGradient(
-                    colors: [Color(0xFF20C7C2), Color(0xFF0A7F91)],
+                    colors: [Color(0xFF2454D3), Color(0xFF3B6AE8)],
                   ),
                 ),
                 child: const Icon(
@@ -392,7 +393,7 @@ class _HeaderPanel extends StatelessWidget {
                     Text(
                       "Ratio medio equipo",
                       style: TextStyle(
-                        color: const Color(0xFF071A3A),
+                        color: Colors.white,
                         fontSize: 20,
                         fontWeight: FontWeight.w900,
                         letterSpacing: -0.5,
@@ -402,7 +403,7 @@ class _HeaderPanel extends StatelessWidget {
                     Text(
                       "Contactos positivos sobre contactos totales",
                       style: TextStyle(
-                        color: const Color(0xFF64748B),
+                        color: const Color(0xFFE1E9FC),
                         fontSize: 13,
                         fontWeight: FontWeight.w500,
                       ),
@@ -419,7 +420,7 @@ class _HeaderPanel extends StatelessWidget {
               Text(
                 "${ratioEquipo.toStringAsFixed(1)}%",
                 style: TextStyle(
-                  color: color,
+                  color: Colors.white,
                   fontSize: 44,
                   fontWeight: FontWeight.w900,
                   letterSpacing: -1.2,
@@ -438,8 +439,8 @@ class _HeaderPanel extends StatelessWidget {
             child: LinearProgressIndicator(
               minHeight: 9,
               value: progress,
-              backgroundColor: Colors.white,
-              valueColor: AlwaysStoppedAnimation<Color>(color),
+              backgroundColor: Colors.white24,
+              valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
             ),
           ),
           const SizedBox(height: 18),
@@ -487,14 +488,14 @@ class _StatusChip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.13),
+        color: Colors.white.withValues(alpha: 0.14),
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: color.withOpacity(0.28)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.22)),
       ),
       child: Text(
         text.toUpperCase(),
         style: TextStyle(
-          color: color,
+          color: Colors.white,
           fontSize: 10.5,
           fontWeight: FontWeight.w900,
           letterSpacing: 0.4,
@@ -520,18 +521,18 @@ class _HeaderMiniMetric extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(13),
       decoration: BoxDecoration(
-        color: Colors.black.withOpacity(0.18),
+        color: Colors.white.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: Colors.white),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
       ),
       child: Column(
         children: [
-          Icon(icon, color: const Color(0xFF20C7C2), size: 20),
+          Icon(icon, color: Colors.white, size: 20),
           const SizedBox(height: 7),
           Text(
             value,
             style: const TextStyle(
-              color: const Color(0xFF071A3A),
+              color: Colors.white,
               fontSize: 16,
               fontWeight: FontWeight.w900,
             ),
@@ -539,7 +540,7 @@ class _HeaderMiniMetric extends StatelessWidget {
           Text(
             title,
             style: TextStyle(
-              color: const Color(0xFF53627A),
+              color: const Color(0xFFE1E9FC),
               fontSize: 10.5,
               fontWeight: FontWeight.w700,
             ),
@@ -613,11 +614,11 @@ class _KpiCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: Colors.white),
+        border: Border.all(color: const Color(0xFFDCE5F2)),
       ),
       child: Column(
         children: [
-          Icon(icon, color: const Color(0xFF20C7C2), size: 23),
+          Icon(icon, color: const Color(0xFF2454D3), size: 23),
           const SizedBox(height: 8),
           Text(
             value,
@@ -657,7 +658,7 @@ class _SectionTitle extends StatelessWidget {
       children: [
         const Icon(
           Icons.leaderboard_rounded,
-          color: Color(0xFF20C7C2),
+          color: Color(0xFF2454D3),
           size: 23,
         ),
         const SizedBox(width: 9),
@@ -788,7 +789,7 @@ class _AgentRatioCard extends StatelessWidget {
             child: LinearProgressIndicator(
               minHeight: 7,
               value: progress,
-              backgroundColor: Colors.white,
+              backgroundColor: const Color(0xFFE5EBF5),
               valueColor: AlwaysStoppedAnimation<Color>(color),
             ),
           ),
@@ -808,14 +809,14 @@ class _EmptyState extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: Colors.white),
+        border: Border.all(color: const Color(0xFFDCE5F2)),
       ),
       child: Column(
         children: [
           Icon(
             Icons.analytics_outlined,
             size: 48,
-            color: Colors.white.withOpacity(0.35),
+            color: const Color(0xFF2454D3),
           ),
           const SizedBox(height: 14),
           const Text(

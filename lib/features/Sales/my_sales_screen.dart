@@ -765,10 +765,10 @@ class _MySalesScreenState extends State<MySalesScreen> {
           onPressed: () => Navigator.pop(context),
         ),
 
-        title: const Text(
-          'Mis Ventas',
-          style: TextStyle(
-            color: const Color(0xFF111827),
+        title: Text(
+          userRole == 'jefe_equipo' ? 'Ventas Equipo' : 'Mis Ventas',
+          style: const TextStyle(
+            color: Color(0xFF111827),
             fontSize: 24,
             fontWeight: FontWeight.w900,
             letterSpacing: 0.3,

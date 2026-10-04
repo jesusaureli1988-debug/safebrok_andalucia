@@ -17,9 +17,9 @@ const CAMPO_PRIMA_VENTAS = "prima_anual_neta";
 const AUTO_COMPUTE_FROM = "2026-08-27";
 function primaComputableVenta(fila: any, campo = CAMPO_PRIMA_VENTAS): number {
   const producto = String(fila?.producto ?? fila?.ramo ?? fila?.tipo_seguro ?? "").trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-  const esAuto = producto.includes("auto") || producto.includes("coche") || producto.includes("vehicul") || producto.includes("turismo") || producto.includes("moto");
+  const esAuto = producto.includes("auto") || producto.includes("coche") || producto.includes("vehicul") || producto.includes("turismo") || producto.includes("moto") || producto.includes("camion");
   const fecha = String(fila?.fecha_efecto ?? fila?.FECHA_EFECTO ?? "").slice(0, 10);
-  return convertirNumero(fila?.[campo]) * (esAuto && fecha >= AUTO_COMPUTE_FROM ? 0.5 : 1);
+  return convertirNumero(fila?.[campo]) * (esAuto && fecha >= AUTO_COMPUTE_FROM ? 0 : 1);
 }
 const CAMPOS_FECHA_VENTA = [
   "created_at",
@@ -46,9 +46,9 @@ const OBJETIVOS_SEMANALES_PRIMA: Record<string, number> = {
 
 const OBJETIVOS_MENSUALES_REFERENCIA: Record<string, number> = {
   agente: 12000,
-  jefe_equipo: 10000,
-  jefe_ventas: 12000,
-  director_zona: 15000,
+  jefe_equipo: 4000,
+  jefe_ventas: 6500,
+  director_zona: 15500,
   director_nacional: 25000,
 };
 

@@ -14,6 +14,7 @@ verify_enabled = true
 [auth.email]
 max_frequency = "1m"
 otp_length = 8
+otp_expiry = 86400
 
 [auth.email.template.invite]
 subject = "Tu acceso a SafeBrok está listo"
@@ -92,3 +93,25 @@ enabled = true
 # Endpoint exclusivo de cron, protegido por CRON_SECRET dentro de la función.
 verify_jwt = false
 entrypoint = "./functions/notificar-cierre-produccion/index.ts"
+[functions.notificar-recibo-nuevo]
+enabled = true
+# Endpoint interno invocado por el trigger de recibos y protegido por CRON_SECRET.
+verify_jwt = false
+entrypoint = "./functions/notificar-recibo-nuevo/index.ts"
+
+[functions.notificar-tarea-nueva]
+enabled = true
+# Endpoint interno invocado al crear o reasignar una tarea.
+verify_jwt = false
+entrypoint = "./functions/notificar-tarea-nueva/index.ts"
+
+[functions.notificar-cierre-7-dias]
+enabled = true
+# Aviso personalizado cuando quedan siete días para el cierre.
+verify_jwt = false
+entrypoint = "./functions/notificar-cierre-7-dias/index.ts"
+
+[functions.notificar-venta-nueva]
+enabled = true
+# Endpoint interno invocado al registrar una venta.
+entrypoint = "./functions/notificar-venta-nueva/index.ts"

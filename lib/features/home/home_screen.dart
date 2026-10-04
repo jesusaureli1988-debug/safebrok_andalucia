@@ -1243,16 +1243,20 @@ class _HomeScreenState extends State<HomeScreen> {
           .where(_tareaPendiente)
           .toList();
 
-      final usuariosRanking = await supabase
-          .from('usuarios')
-          .select('id, auth_id, nombre, apellidos, rol_usuario')
-          .or(
-            'estado.is.null,estado.not.in.(inactivo,Inactivo,INACTIVO,baja,Baja,BAJA,desactivado,Desactivado,DESACTIVADO,bloqueado,Bloqueado,BLOQUEADO,suspendido,Suspendido,SUSPENDIDO)',
-          );
+      final usuariosRanking = await supabase.rpc(
+        'app_ranking_usuarios_activos',
+      );
 
-      final todasLasVentas = await supabase
-          .from('ventas')
-          .select('agente_auth_id');
+      final todasLasVentas = <Map<String, dynamic>>[];
+      for (var desde = 0; ; desde += 1000) {
+        final pagina = await supabase
+            .from('ventas')
+            .select('id, agente_auth_id')
+            .order('id')
+            .range(desde, desde + 999);
+        todasLasVentas.addAll(List<Map<String, dynamic>>.from(pagina));
+        if (pagina.length < 1000) break;
+      }
 
       final Map<String, int> polizasPorAuthId = {};
 
@@ -1273,7 +1277,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
         if (authId == null ||
             authId.isEmpty ||
-            authId.toLowerCase() == 'null') {
+            !polizasPorAuthId.containsKey(authId)) {
           continue;
         }
 
@@ -1460,35 +1464,215 @@ class _HomeScreenState extends State<HomeScreen> {
         context: context,
         barrierDismissible: false,
         builder: (dialogContext) {
-          return AlertDialog(
-            title: const Text('Actualización disponible'),
-            content: const Text(
-              'Hay una nueva versión de SafeBrok. '
-              'Debes actualizar para continuar.',
-            ),
-            actions: [
-              TextButton(
-                onPressed: () async {
-                  try {
-                    await UpdateService.downloadAndInstall(url.trim());
-                  } catch (e) {
-                    debugPrint('ERROR INSTALANDO ACTUALIZACIÓN: $e');
+          var downloading = false;
+          var openingInstaller = false;
+          double? progress;
+          String? downloadError;
 
-                    if (!dialogContext.mounted) return;
+          return StatefulBuilder(
+            builder: (context, setDialogState) {
+              final progressPercent = progress == null
+                  ? null
+                  : (progress! * 100).clamp(0, 100).round();
 
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(
-                          'No se pudo instalar la actualización: $e',
-                        ),
-                        backgroundColor: Colors.redAccent,
+              return AlertDialog(
+                backgroundColor: Colors.white,
+                surfaceTintColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(26),
+                ),
+                title: const Row(
+                  children: [
+                    DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: Color(0xFFEAF0FF),
+                        shape: BoxShape.circle,
                       ),
-                    );
-                  }
-                },
-                child: const Text('Actualizar'),
-              ),
-            ],
+                      child: Padding(
+                        padding: EdgeInsets.all(10),
+                        child: Icon(
+                          Icons.system_update_rounded,
+                          color: Color(0xFF2454D3),
+                        ),
+                      ),
+                    ),
+                    SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        'Actualización disponible',
+                        style: TextStyle(
+                          color: Color(0xFF071A3A),
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                content: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      openingInstaller
+                          ? 'Descarga completada. Abriendo el instalador de Android…'
+                          : downloading
+                          ? progressPercent == null
+                                ? 'Preparando la descarga segura…'
+                                : 'Descargando SafeBrok… ' +
+                                      progressPercent.toString() +
+                                      '%'
+                          : 'Hay una nueva versión de SafeBrok. '
+                                'Pulsa actualizar para descargarla e instalarla.',
+                      style: const TextStyle(
+                        color: Color(0xFF53627A),
+                        fontSize: 14,
+                        height: 1.4,
+                      ),
+                    ),
+                    if (downloading || openingInstaller) ...[
+                      const SizedBox(height: 18),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(99),
+                        child: LinearProgressIndicator(
+                          value: openingInstaller ? 1 : progress,
+                          minHeight: 10,
+                          backgroundColor: const Color(0xFFE2E8F0),
+                          color: const Color(0xFF2454D3),
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      Text(
+                        openingInstaller
+                            ? 'APK verificada correctamente'
+                            : 'No cierres SafeBrok durante la descarga',
+                        style: const TextStyle(
+                          color: Color(0xFF64748B),
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                    if (downloadError != null) ...[
+                      const SizedBox(height: 16),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFFF1F2),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: const Color(0xFFFECACA)),
+                        ),
+                        child: Text(
+                          downloadError!,
+                          style: const TextStyle(
+                            color: Color(0xFFB91C1C),
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            height: 1.35,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+                actions: [
+                  if (downloadError != null)
+                    TextButton.icon(
+                      onPressed: () async {
+                        try {
+                          await UpdateService.openUpdateExternally(url.trim());
+                        } catch (e) {
+                          if (!dialogContext.mounted) return;
+                          setDialogState(() {
+                            downloadError = e.toString().replaceFirst(
+                              'Exception: ',
+                              '',
+                            );
+                          });
+                        }
+                      },
+                      icon: const Icon(Icons.open_in_browser_rounded),
+                      label: const Text('Abrir en navegador'),
+                    ),
+                  FilledButton.icon(
+                    onPressed: downloading || openingInstaller
+                        ? null
+                        : () async {
+                            setDialogState(() {
+                              downloading = true;
+                              openingInstaller = false;
+                              progress = null;
+                              downloadError = null;
+                            });
+
+                            try {
+                              await UpdateService.downloadAndInstall(
+                                url.trim(),
+                                onProgress: (received, total) {
+                                  if (!dialogContext.mounted || total <= 0) {
+                                    return;
+                                  }
+
+                                  setDialogState(() {
+                                    progress = (received / total).clamp(
+                                      0.0,
+                                      1.0,
+                                    );
+                                  });
+                                },
+                              );
+
+                              if (!dialogContext.mounted) return;
+
+                              setDialogState(() {
+                                downloading = false;
+                                openingInstaller = true;
+                                progress = 1;
+                              });
+                            } catch (e) {
+                              debugPrint('ERROR INSTALANDO ACTUALIZACIÓN: $e');
+
+                              if (!dialogContext.mounted) return;
+
+                              setDialogState(() {
+                                downloading = false;
+                                openingInstaller = false;
+                                downloadError = e.toString().replaceFirst(
+                                  'Exception: ',
+                                  '',
+                                );
+                              });
+                            }
+                          },
+                    icon: downloading
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2.2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : const Icon(Icons.download_rounded),
+                    label: Text(
+                      downloadError == null ? 'Actualizar ahora' : 'Reintentar',
+                    ),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: const Color(0xFF2454D3),
+                      foregroundColor: Colors.white,
+                      disabledBackgroundColor: const Color(0xFF94A3B8),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 18,
+                        vertical: 13,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
+                  ),
+                ],
+              );
+            },
           );
         },
       );
@@ -2401,7 +2585,7 @@ class _HomeScreenState extends State<HomeScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text(
-                  "Ranking de Ventas",
+                  "Ranking de toda la compañía",
                   style: TextStyle(
                     color: Color(0xFF071A3A),
                     fontSize: 18,
@@ -2820,6 +3004,18 @@ class _HomeScreenState extends State<HomeScreen> {
       case 'administracion':
         return [
           DashboardItem(
+            title: "Recibos",
+            subtitle: "Gestión profesional de cobros",
+            icon: Icons.receipt_long_rounded,
+            color: const Color(0xFF2454D3),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const RecibosAgenteScreen()),
+              );
+            },
+          ),
+          DashboardItem(
             title: "Ventas Totales",
             subtitle: "Control producción",
             icon: Icons.euro_rounded,
@@ -3122,6 +3318,18 @@ class _HomeScreenState extends State<HomeScreen> {
               Navigator.push(
                 context,
                 MaterialPageRoute(builder: (_) => const TeamDashboardScreen()),
+              );
+            },
+          ),
+          DashboardItem(
+            title: "Ventas Equipo",
+            subtitle: "Ventas de tu estructura",
+            icon: Icons.shopping_cart_rounded,
+            color: const Color(0xFF2454D3),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const MySalesScreen()),
               );
             },
           ),

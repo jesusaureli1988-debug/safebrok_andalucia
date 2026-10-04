@@ -21,7 +21,9 @@ class _MejoraProduccionScreenState extends State<MejoraProduccionScreen> {
     'Hogar',
     'Vida',
     'Salud',
+    'Dental',
     'Auto',
+    'Patinete',
     'Prima única',
     'Transportes construcción',
     'Caución',
@@ -193,11 +195,11 @@ class _MejoraProduccionScreenState extends State<MejoraProduccionScreen> {
       case 'director_nacional':
         return 25000;
       case 'director_zona':
-        return 15000;
+        return 15500;
       case 'jefe_ventas':
-        return 11500;
+        return 6500;
       case 'jefe_equipo':
-        return 10000;
+        return 4000;
       case 'agente':
         return 12000;
       case 'administracion':
@@ -238,7 +240,9 @@ class _MejoraProduccionScreenState extends State<MejoraProduccionScreen> {
     if (producto.contains('deceso')) return 'Decesos';
     if (producto.contains('hogar')) return 'Hogar';
     if (producto.contains('vida')) return 'Vida';
+    if (producto.contains('dental')) return 'Dental';
     if (producto.contains('salud')) return 'Salud';
+    if (producto.contains('patinete')) return 'Patinete';
 
     if (producto.contains('auto') ||
         producto.contains('coche') ||
@@ -690,8 +694,12 @@ class _MejoraProduccionScreenState extends State<MejoraProduccionScreen> {
         return Icons.favorite_rounded;
       case 'Salud':
         return Icons.medical_services_rounded;
+      case 'Dental':
+        return Icons.medical_information_rounded;
       case 'Auto':
         return Icons.directions_car_rounded;
+      case 'Patinete':
+        return Icons.electric_scooter_rounded;
       case 'Prima única':
         return Icons.savings_rounded;
       default:
@@ -709,8 +717,12 @@ class _MejoraProduccionScreenState extends State<MejoraProduccionScreen> {
         return Colors.pinkAccent;
       case 'Salud':
         return Colors.blueAccent;
+      case 'Dental':
+        return Colors.cyanAccent;
       case 'Auto':
         return Colors.orangeAccent;
+      case 'Patinete':
+        return Colors.tealAccent;
       case 'Prima única':
         return Colors.amberAccent;
       default:

@@ -166,20 +166,20 @@ class _PlanificacionEquipoListScreenState
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF2FCFD),
+      backgroundColor: const Color(0xFFF4F6FB),
       floatingActionButton: Container(
         width: 72,
         height: 72,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
           gradient: const LinearGradient(
-            colors: [Color(0xFF20C7C2), Color(0xFF0A7F91), Color(0xFF0A7F91)],
+            colors: [Color(0xFF2454D3), Color(0xFF3B6AE8)],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
           boxShadow: [
             BoxShadow(
-              color: const Color(0xFF20C7C2).withOpacity(0.45),
+              color: const Color(0xFF2454D3).withOpacity(0.35),
               blurRadius: 28,
               offset: const Offset(0, 12),
             ),
@@ -194,11 +194,11 @@ class _PlanificacionEquipoListScreenState
       ),
       body: loading
           ? const Center(
-              child: CircularProgressIndicator(color: Color(0xFF20C7C2)),
+              child: CircularProgressIndicator(color: Color(0xFF2454D3)),
             )
           : RefreshIndicator(
               onRefresh: cargar,
-              color: const Color(0xFF20C7C2),
+              color: const Color(0xFF2454D3),
               backgroundColor: const Color(0xFFFFFFFF),
               child: CustomScrollView(
                 physics: const AlwaysScrollableScrollPhysics(),
@@ -269,59 +269,66 @@ class _PlanificacionEquipoListScreenState
   }
 
   Widget _header() {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(20, 54, 20, 24),
-      decoration: const BoxDecoration(color: const Color(0xFFF2FCFD)),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(
-            child: RichText(
-              text: const TextSpan(
+    return SafeArea(
+      bottom: false,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 14, 20, 22),
+        child: Row(
+          children: [
+            IconButton(
+              onPressed: () => Navigator.pop(context),
+              icon: const Icon(
+                Icons.arrow_back_ios_new_rounded,
+                color: Color(0xFF13244D),
+                size: 19,
+              ),
+              style: IconButton.styleFrom(
+                backgroundColor: Colors.white,
+                fixedSize: const Size(48, 48),
+                side: const BorderSide(color: Color(0xFFDCE5F2)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+              ),
+            ),
+            const SizedBox(width: 14),
+            const Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  TextSpan(
-                    text: "Planificación del ",
+                  Text(
+                    'Planificación del equipo',
                     style: TextStyle(
-                      color: const Color(0xFF071A3A),
-                      fontSize: 34,
+                      color: Color(0xFF071A3A),
+                      fontSize: 25,
                       fontWeight: FontWeight.w900,
-                      height: 1.05,
                     ),
                   ),
-                  TextSpan(
-                    text: "equipo",
-                    style: TextStyle(
-                      color: Color(0xFF20C7C2),
-                      fontSize: 34,
-                      fontWeight: FontWeight.w900,
-                      height: 1.05,
-                    ),
-                  ),
-                  TextSpan(
-                    text: "\nOrganiza, planifica y alcanza objetivos",
+                  SizedBox(height: 3),
+                  Text(
+                    'Organiza y controla cada semana',
                     style: TextStyle(
                       color: Color(0xFF64748B),
-                      fontSize: 15,
+                      fontSize: 13,
                       fontWeight: FontWeight.w600,
-                      height: 1.7,
                     ),
                   ),
                 ],
               ),
             ),
-          ),
-          IconButton(
-            onPressed: cargar,
-            icon: const Icon(Icons.refresh_rounded, color: Colors.white),
-            style: IconButton.styleFrom(
-              backgroundColor: Colors.white,
-              fixedSize: const Size(48, 48),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(18),
+            IconButton(
+              onPressed: cargar,
+              icon: const Icon(Icons.refresh_rounded, color: Colors.white),
+              style: IconButton.styleFrom(
+                backgroundColor: const Color(0xFF2454D3),
+                fixedSize: const Size(48, 48),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -332,7 +339,7 @@ class _PlanificacionEquipoListScreenState
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(26),
-        border: Border.all(color: Colors.white),
+        border: Border.all(color: const Color(0xFFDCE5F2)),
       ),
       child: Row(
         children: [
@@ -341,7 +348,7 @@ class _PlanificacionEquipoListScreenState
               icono: Icons.calendar_month_rounded,
               valor: "$totalSemanas",
               titulo: "Semanas",
-              color: const Color(0xFF0A7F91),
+              color: const Color(0xFF2454D3),
             ),
           ),
           Expanded(
@@ -349,7 +356,7 @@ class _PlanificacionEquipoListScreenState
               icono: Icons.groups_rounded,
               valor: "$totalAgentesPlanificados",
               titulo: "Agentes",
-              color: const Color(0xFF20C7C2),
+              color: const Color(0xFF2454D3),
             ),
           ),
           Expanded(
@@ -357,7 +364,7 @@ class _PlanificacionEquipoListScreenState
               icono: Icons.verified_rounded,
               valor: "$semanasCompletadas",
               titulo: "Cerradas",
-              color: const Color(0xFF0AAEAE),
+              color: const Color(0xFF2454D3),
             ),
           ),
           Expanded(
@@ -365,7 +372,7 @@ class _PlanificacionEquipoListScreenState
               icono: Icons.flash_on_rounded,
               valor: "$semanasActivas",
               titulo: "Activas",
-              color: const Color(0xFF0A7F91),
+              color: const Color(0xFF2454D3),
             ),
           ),
         ],
@@ -423,10 +430,10 @@ class _PlanificacionEquipoListScreenState
     final completada = fin.isBefore(DateTime.now()) && !actual;
 
     final Color accent = actual
-        ? const Color(0xFF20C7C2)
+        ? const Color(0xFF2454D3)
         : completada
-        ? const Color(0xFF0AAEAE)
-        : const Color(0xFF0A7F91);
+        ? const Color(0xFF198754)
+        : const Color(0xFF2454D3);
 
     final estado = actual
         ? "ACTUAL"
@@ -451,14 +458,7 @@ class _PlanificacionEquipoListScreenState
         child: Ink(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [
-                const Color(0xFFFFFFFF),
-                actual ? const Color(0xFF24105A) : const Color(0xFF071226),
-              ],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
+            color: Colors.white,
             borderRadius: BorderRadius.circular(28),
             border: Border.all(color: accent.withOpacity(actual ? 0.75 : 0.35)),
             boxShadow: [
@@ -535,7 +535,7 @@ class _PlanificacionEquipoListScreenState
                         Text(
                           "${agentes.length} agentes",
                           style: const TextStyle(
-                            color: Color(0xFFC7ECEC),
+                            color: Color(0xFF53627A),
                             fontSize: 13,
                             fontWeight: FontWeight.w700,
                           ),
@@ -558,7 +558,7 @@ class _PlanificacionEquipoListScreenState
                 ),
                 child: const Icon(
                   Icons.chevron_right_rounded,
-                  color: Colors.white,
+                  color: Color(0xFF2454D3),
                   size: 30,
                 ),
               ),
@@ -580,7 +580,7 @@ class _PlanificacionEquipoListScreenState
           end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: Colors.white),
+        border: Border.all(color: const Color(0xFFDCE5F2)),
         boxShadow: [
           BoxShadow(
             color: accent.withOpacity(0.22),
@@ -595,7 +595,7 @@ class _PlanificacionEquipoListScreenState
           Text(
             mesCorto(fecha),
             style: const TextStyle(
-              color: const Color(0xFF071A3A),
+              color: Colors.white,
               fontSize: 13,
               fontWeight: FontWeight.w900,
             ),
@@ -603,7 +603,7 @@ class _PlanificacionEquipoListScreenState
           Text(
             fecha.day.toString().padLeft(2, '0'),
             style: const TextStyle(
-              color: const Color(0xFF071A3A),
+              color: Colors.white,
               fontSize: 33,
               fontWeight: FontWeight.w900,
               height: 1.05,
@@ -634,9 +634,9 @@ class _PlanificacionEquipoListScreenState
               height: 86,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: const Color(0xFF20C7C2).withOpacity(0.12),
+                color: const Color(0xFF2454D3).withOpacity(0.12),
                 border: Border.all(
-                  color: const Color(0xFF20C7C2).withOpacity(0.35),
+                  color: const Color(0xFF2454D3).withOpacity(0.35),
                 ),
               ),
               child: const Icon(
@@ -672,8 +672,8 @@ class _PlanificacionEquipoListScreenState
               icon: const Icon(Icons.add_rounded),
               label: const Text("Crear planificación"),
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF20C7C2),
-                foregroundColor: const Color(0xFFF2FCFD),
+                backgroundColor: const Color(0xFF2454D3),
+                foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(
                   horizontal: 18,
                   vertical: 14,

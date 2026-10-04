@@ -23,6 +23,7 @@ class _MyClientsScreenState extends State<MyClientsScreen> {
   String selectedYear = 'Todos';
   String selectedMonth = 'Todos';
   String searchText = '';
+  final searchController = TextEditingController();
 
   List<String> years = ['Todos'];
   List<String> months = ['Todos'];
@@ -31,6 +32,12 @@ class _MyClientsScreenState extends State<MyClientsScreen> {
   void initState() {
     super.initState();
     loadClients();
+  }
+
+  @override
+  void dispose() {
+    searchController.dispose();
+    super.dispose();
   }
 
   Future<void> loadClients() async {
@@ -272,10 +279,12 @@ class _MyClientsScreenState extends State<MyClientsScreen> {
           SafeArea(
             child: loading
                 ? const Center(
-                    child: CircularProgressIndicator(color: Colors.cyanAccent),
+                    child: CircularProgressIndicator(
+                      color: const Color(0xFF2454D3),
+                    ),
                   )
                 : RefreshIndicator(
-                    color: Colors.cyanAccent,
+                    color: const Color(0xFF2454D3),
                     backgroundColor: const Color(0xFFFFFFFF),
                     onRefresh: loadClients,
                     child: CustomScrollView(
@@ -356,7 +365,7 @@ class _MyClientsScreenState extends State<MyClientsScreen> {
               ),
               child: const Icon(
                 Icons.arrow_back_ios_new_rounded,
-                color: Colors.white,
+                color: Color(0xFF13244D),
                 size: 19,
               ),
             ),
@@ -387,7 +396,7 @@ class _MyClientsScreenState extends State<MyClientsScreen> {
             ],
           ),
         ),
-        _premiumIcon(Icons.people_alt_rounded, Colors.cyanAccent, 50),
+        _premiumIcon(Icons.people_alt_rounded, const Color(0xFF2454D3), 50),
       ],
     );
   }
@@ -430,12 +439,12 @@ class _MyClientsScreenState extends State<MyClientsScreen> {
         gradient: const LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [Color(0xFFFFFFFF), Color(0xFF071B3E), Color(0xFFF2FCFD)],
+          colors: [Color(0xFF172B58), Color(0xFF2454D3)],
         ),
-        border: Border.all(color: Colors.cyanAccent.withOpacity(0.28)),
+        border: Border.all(color: const Color(0xFF2454D3)),
         boxShadow: [
           BoxShadow(
-            color: Colors.blueAccent.withOpacity(0.20),
+            color: const Color(0xFF13244D).withOpacity(0.12),
             blurRadius: 35,
             offset: const Offset(0, 18),
           ),
@@ -449,7 +458,7 @@ class _MyClientsScreenState extends State<MyClientsScreen> {
             child: Icon(
               Icons.groups_rounded,
               size: 150,
-              color: Colors.cyanAccent.withOpacity(0.07),
+              color: Colors.white.withOpacity(0.10),
             ),
           ),
           Column(
@@ -458,7 +467,7 @@ class _MyClientsScreenState extends State<MyClientsScreen> {
               Text(
                 "CARTERA ACTIVA",
                 style: TextStyle(
-                  color: const Color(0xFF53627A),
+                  color: const Color(0xFFE1E9FC),
                   fontSize: 12,
                   fontWeight: FontWeight.w900,
                   letterSpacing: 0.8,
@@ -468,7 +477,7 @@ class _MyClientsScreenState extends State<MyClientsScreen> {
               Text(
                 "$totalFiltrado",
                 style: const TextStyle(
-                  color: const Color(0xFF071A3A),
+                  color: Colors.white,
                   fontSize: 54,
                   fontWeight: FontWeight.w900,
                   letterSpacing: -2,
@@ -480,7 +489,7 @@ class _MyClientsScreenState extends State<MyClientsScreen> {
                     ? "clientes registrados"
                     : "clientes según filtros",
                 style: TextStyle(
-                  color: const Color(0xFF53627A),
+                  color: const Color(0xFFE1E9FC),
                   fontSize: 14,
                   fontWeight: FontWeight.w700,
                 ),
@@ -491,7 +500,7 @@ class _MyClientsScreenState extends State<MyClientsScreen> {
                   _summaryChip(
                     Icons.filter_alt_rounded,
                     selectedYear == 'Todos' ? "Todos los años" : selectedYear,
-                    Colors.cyanAccent,
+                    Colors.white,
                   ),
                   const SizedBox(width: 8),
                   _summaryChip(
@@ -499,7 +508,7 @@ class _MyClientsScreenState extends State<MyClientsScreen> {
                     selectedMonth == 'Todos'
                         ? "Todos los meses"
                         : selectedMonth,
-                    Colors.purpleAccent,
+                    Colors.white,
                   ),
                 ],
               ),
@@ -515,9 +524,9 @@ class _MyClientsScreenState extends State<MyClientsScreen> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
         decoration: BoxDecoration(
-          color: color.withOpacity(0.13),
+          color: Colors.white.withOpacity(0.16),
           borderRadius: BorderRadius.circular(40),
-          border: Border.all(color: color.withOpacity(0.25)),
+          border: Border.all(color: Colors.white.withOpacity(0.28)),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -543,26 +552,25 @@ class _MyClientsScreenState extends State<MyClientsScreen> {
 
   Widget _searchBox() {
     return TextField(
+      controller: searchController,
       onChanged: (v) => setState(() => searchText = v),
       style: const TextStyle(
         color: const Color(0xFF071A3A),
         fontWeight: FontWeight.w700,
       ),
-      cursorColor: Colors.cyanAccent,
+      cursorColor: const Color(0xFF2454D3),
       decoration: InputDecoration(
         hintText: "Buscar por nombre, teléfono o email...",
         hintStyle: TextStyle(
           color: const Color(0xFF53627A),
           fontWeight: FontWeight.w600,
         ),
-        prefixIcon: Icon(
-          Icons.search_rounded,
-          color: Colors.white.withOpacity(0.70),
-        ),
+        prefixIcon: Icon(Icons.search_rounded, color: const Color(0xFF2454D3)),
         suffixIcon: searchText.isEmpty
             ? null
             : IconButton(
                 onPressed: () {
+                  searchController.clear();
                   setState(() => searchText = '');
                 },
                 icon: const Icon(
@@ -578,11 +586,11 @@ class _MyClientsScreenState extends State<MyClientsScreen> {
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(22),
-          borderSide: BorderSide(color: Colors.white),
+          borderSide: const BorderSide(color: Color(0xFFDCE5F2)),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(22),
-          borderSide: BorderSide(color: Colors.cyanAccent.withOpacity(0.45)),
+          borderSide: const BorderSide(color: Color(0xFF2454D3)),
         ),
       ),
     );
@@ -597,7 +605,7 @@ class _MyClientsScreenState extends State<MyClientsScreen> {
             value: selectedYear,
             items: years,
             icon: Icons.date_range_rounded,
-            color: Colors.cyanAccent,
+            color: const Color(0xFF2454D3),
             onChanged: (v) {
               if (v == null) return;
               setState(() => selectedYear = v);
@@ -611,7 +619,7 @@ class _MyClientsScreenState extends State<MyClientsScreen> {
             value: selectedMonth,
             items: months,
             icon: Icons.calendar_month_rounded,
-            color: Colors.purpleAccent,
+            color: const Color(0xFF2454D3),
             onChanged: (v) {
               if (v == null) return;
               setState(() => selectedMonth = v);
@@ -693,7 +701,7 @@ class _MyClientsScreenState extends State<MyClientsScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              _premiumIcon(icon, Colors.cyanAccent, 72),
+              _premiumIcon(icon, const Color(0xFF2454D3), 72),
               const SizedBox(height: 18),
               Text(
                 title,
@@ -760,7 +768,7 @@ class _MyClientsScreenState extends State<MyClientsScreen> {
             border: Border.all(color: Colors.white),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.16),
+                color: const Color(0xFF13244D).withOpacity(0.06),
                 blurRadius: 20,
                 offset: const Offset(0, 12),
               ),
@@ -789,15 +797,19 @@ class _MyClientsScreenState extends State<MyClientsScreen> {
                       _infoLine(
                         Icons.phone_rounded,
                         telefono,
-                        Colors.greenAccent,
+                        const Color(0xFF2454D3),
                       ),
                     if (email.isNotEmpty)
-                      _infoLine(Icons.mail_rounded, email, Colors.cyanAccent),
+                      _infoLine(
+                        Icons.mail_rounded,
+                        email,
+                        const Color(0xFF2454D3),
+                      ),
                     if (date != null)
                       _infoLine(
                         Icons.event_rounded,
                         "${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}",
-                        Colors.purpleAccent,
+                        const Color(0xFF2454D3),
                       ),
                   ],
                 ),
@@ -805,7 +817,7 @@ class _MyClientsScreenState extends State<MyClientsScreen> {
               const SizedBox(width: 10),
               Icon(
                 Icons.arrow_forward_ios_rounded,
-                color: Colors.white.withOpacity(0.35),
+                color: const Color(0xFF64748B),
                 size: 15,
               ),
             ],
@@ -902,17 +914,7 @@ class _MyClientsScreenState extends State<MyClientsScreen> {
     );
   }
 
-  Color _cardColor(int index) {
-    final colors = [
-      Colors.cyanAccent,
-      Colors.purpleAccent,
-      Colors.greenAccent,
-      Colors.orangeAccent,
-      Colors.blueAccent,
-    ];
-
-    return colors[index % colors.length];
-  }
+  Color _cardColor(int index) => const Color(0xFF2454D3);
 }
 
 class _ClientsPremiumBackground extends StatelessWidget {
@@ -934,21 +936,21 @@ class _ClientsPremiumBackground extends StatelessWidget {
         Positioned(
           top: -150,
           right: -100,
-          child: _glow(Colors.cyanAccent, 330, 0.15),
+          child: _glow(const Color(0xFF2454D3), 330, 0.15),
         ),
         Positioned(
           bottom: -170,
           left: -110,
-          child: _glow(Colors.blueAccent, 370, 0.14),
+          child: _glow(const Color(0xFF2454D3), 370, 0.14),
         ),
         Positioned(
           top: 310,
           left: -130,
-          child: _glow(Colors.purpleAccent, 250, 0.08),
+          child: _glow(const Color(0xFF2454D3), 250, 0.08),
         ),
         BackdropFilter(
           filter: ImageFilter.blur(sigmaX: 60, sigmaY: 60),
-          child: Container(color: Colors.black.withOpacity(0.05)),
+          child: Container(color: Colors.transparent),
         ),
       ],
     );

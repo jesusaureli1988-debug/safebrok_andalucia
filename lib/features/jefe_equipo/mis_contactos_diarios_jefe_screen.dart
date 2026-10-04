@@ -1,4 +1,3 @@
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'detalle_tarea_jefe_screen.dart';
@@ -194,7 +193,7 @@ class _MisContactosDiariosJefeScreenState
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF2FCFD),
+      backgroundColor: const Color(0xFFF4F6FB),
       body: Stack(
         children: [
           const _BackgroundGlow(),
@@ -202,11 +201,11 @@ class _MisContactosDiariosJefeScreenState
           SafeArea(
             child: loading
                 ? const Center(
-                    child: CircularProgressIndicator(color: Color(0xFF20C7C2)),
+                    child: CircularProgressIndicator(color: Color(0xFF2454D3)),
                   )
                 : RefreshIndicator(
-                    color: const Color(0xFF20C7C2),
-                    backgroundColor: const Color(0xFFEAF8F8),
+                    color: const Color(0xFF2454D3),
+                    backgroundColor: Colors.white,
                     onRefresh: cargarTareas,
                     child: CustomScrollView(
                       physics: const AlwaysScrollableScrollPhysics(),
@@ -277,19 +276,27 @@ class _MisContactosDiariosJefeScreenState
   Widget _topBar(BuildContext context) {
     return Row(
       children: [
-        GestureDetector(
+        InkWell(
           onTap: () => Navigator.pop(context),
+          borderRadius: BorderRadius.circular(14),
           child: Container(
-            height: 44,
-            width: 44,
+            height: 46,
+            width: 46,
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: Colors.white),
+              border: Border.all(color: const Color(0xFFDCE5F2)),
+              boxShadow: const [
+                BoxShadow(
+                  color: Color(0x14071A3A),
+                  blurRadius: 14,
+                  offset: Offset(0, 5),
+                ),
+              ],
             ),
             child: const Icon(
               Icons.arrow_back_ios_new_rounded,
-              color: Colors.white,
+              color: Color(0xFF13244D),
               size: 18,
             ),
           ),
@@ -300,36 +307,37 @@ class _MisContactosDiariosJefeScreenState
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                "Contactos diarios",
+                'Contactos diarios',
                 style: TextStyle(
-                  color: const Color(0xFF071A3A),
+                  color: Color(0xFF071A3A),
                   fontSize: 24,
                   fontWeight: FontWeight.w900,
                 ),
               ),
               SizedBox(height: 2),
               Text(
-                "Panel de seguimiento del jefe",
-                style: TextStyle(color: const Color(0xFF64748B), fontSize: 13),
+                'Panel de seguimiento del jefe',
+                style: TextStyle(color: Color(0xFF64748B), fontSize: 13),
               ),
             ],
           ),
         ),
-        GestureDetector(
+        InkWell(
           onTap: cargarTareas,
+          borderRadius: BorderRadius.circular(14),
           child: Container(
-            height: 44,
-            width: 44,
+            height: 46,
+            width: 46,
             decoration: BoxDecoration(
               gradient: const LinearGradient(
-                colors: [Color(0xFF20C7C2), Color(0xFF0A7F91)],
+                colors: [Color(0xFF2454D3), Color(0xFF3B6AE8)],
               ),
               borderRadius: BorderRadius.circular(14),
-              boxShadow: [
+              boxShadow: const [
                 BoxShadow(
-                  color: const Color(0xFF20C7C2).withOpacity(0.35),
-                  blurRadius: 20,
-                  offset: const Offset(0, 8),
+                  color: Color(0x332454D3),
+                  blurRadius: 18,
+                  offset: Offset(0, 7),
                 ),
               ],
             ),
@@ -341,23 +349,36 @@ class _MisContactosDiariosJefeScreenState
   }
 
   Widget _heroPanel() {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(30),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
-        child: Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(22),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(30),
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [Colors.white.withOpacity(0.16), Colors.white],
-            ),
-            border: Border.all(color: Colors.white),
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(30),
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF13244D), Color(0xFF2454D3)],
+        ),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x332454D3),
+            blurRadius: 28,
+            offset: Offset(0, 14),
           ),
-          child: Column(
+        ],
+      ),
+      child: Stack(
+        children: [
+          const Positioned(
+            right: -8,
+            top: -12,
+            child: Icon(
+              Icons.groups_rounded,
+              color: Color(0x1FFFFFFF),
+              size: 108,
+            ),
+          ),
+          Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
@@ -366,16 +387,9 @@ class _MisContactosDiariosJefeScreenState
                     height: 54,
                     width: 54,
                     decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.14),
                       shape: BoxShape.circle,
-                      gradient: const LinearGradient(
-                        colors: [Color(0xFF0AAEAE), Color(0xFF20C7C2)],
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: const Color(0xFF0AAEAE).withOpacity(0.35),
-                          blurRadius: 24,
-                        ),
-                      ],
+                      border: Border.all(color: Colors.white24),
                     ),
                     child: const Icon(
                       Icons.bolt_rounded,
@@ -389,18 +403,18 @@ class _MisContactosDiariosJefeScreenState
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const Text(
-                          "Ritmo comercial",
+                          'Ritmo comercial',
                           style: TextStyle(
-                            color: const Color(0xFF071A3A),
+                            color: Colors.white,
                             fontSize: 20,
                             fontWeight: FontWeight.w900,
                           ),
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          "$contactosTotales contactos acumulados",
-                          style: TextStyle(
-                            color: const Color(0xFF53627A),
+                          contactosTotales.toString() + ' contactos acumulados',
+                          style: const TextStyle(
+                            color: Color(0xFFE1E9FC),
                             fontSize: 13,
                           ),
                         ),
@@ -409,35 +423,35 @@ class _MisContactosDiariosJefeScreenState
                   ),
                 ],
               ),
-
               const SizedBox(height: 24),
-
               ClipRRect(
                 borderRadius: BorderRadius.circular(50),
                 child: LinearProgressIndicator(
                   value: porcentajeCompletado,
                   minHeight: 11,
-                  backgroundColor: Colors.white,
-                  color: const Color(0xFF0AAEAE),
+                  backgroundColor: Colors.white24,
+                  color: Colors.white,
                 ),
               ),
-
               const SizedBox(height: 12),
-
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    "${(porcentajeCompletado * 100).toStringAsFixed(0)}% completado",
+                    (porcentajeCompletado * 100).toStringAsFixed(0) +
+                        '% completado',
                     style: const TextStyle(
-                      color: const Color(0xFF071A3A),
+                      color: Colors.white,
                       fontWeight: FontWeight.w800,
                     ),
                   ),
                   Text(
-                    "$diasRealizados de $totalDias días",
-                    style: TextStyle(
-                      color: const Color(0xFF53627A),
+                    diasRealizados.toString() +
+                        ' de ' +
+                        totalDias.toString() +
+                        ' días',
+                    style: const TextStyle(
+                      color: Color(0xFFE1E9FC),
                       fontSize: 13,
                     ),
                   ),
@@ -445,7 +459,7 @@ class _MisContactosDiariosJefeScreenState
               ),
             ],
           ),
-        ),
+        ],
       ),
     );
   }
@@ -458,7 +472,7 @@ class _MisContactosDiariosJefeScreenState
             title: "Equipo",
             value: contactosEquipo.toString(),
             icon: Icons.groups_rounded,
-            color: const Color(0xFF20C7C2),
+            color: const Color(0xFF2454D3),
           ),
         ),
         const SizedBox(width: 10),
@@ -467,7 +481,7 @@ class _MisContactosDiariosJefeScreenState
             title: "Propios",
             value: contactosPropios.toString(),
             icon: Icons.person_pin_circle_rounded,
-            color: const Color(0xFFA78BFA),
+            color: const Color(0xFF2454D3),
           ),
         ),
         const SizedBox(width: 10),
@@ -476,7 +490,7 @@ class _MisContactosDiariosJefeScreenState
             title: "Pendientes",
             value: diasPendientes.toString(),
             icon: Icons.pending_actions_rounded,
-            color: const Color(0xFF0A7F91),
+            color: const Color(0xFF2454D3),
           ),
         ),
       ],
@@ -494,7 +508,7 @@ class _MisContactosDiariosJefeScreenState
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: Colors.white),
+        border: Border.all(color: const Color(0xFFDCE5F2)),
       ),
       child: Column(
         children: [
@@ -528,8 +542,8 @@ class _MisContactosDiariosJefeScreenState
     final total = tarea['total_contactos'] ?? 0;
 
     final Color estadoColor = realizada
-        ? const Color(0xFF0AAEAE)
-        : const Color(0xFF0A7F91);
+        ? const Color(0xFF198754)
+        : const Color(0xFF2454D3);
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
@@ -547,21 +561,15 @@ class _MisContactosDiariosJefeScreenState
           padding: const EdgeInsets.all(18),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(28),
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [estadoColor.withOpacity(0.18), Colors.white],
-            ),
+            color: Colors.white,
             border: Border.all(
-              color: esHoy
-                  ? const Color(0xFF20C7C2).withOpacity(0.65)
-                  : Colors.white,
+              color: esHoy ? const Color(0xFF2454D3) : const Color(0xFFDCE5F2),
             ),
             boxShadow: [
               BoxShadow(
-                color: estadoColor.withOpacity(0.12),
-                blurRadius: 24,
-                offset: const Offset(0, 12),
+                color: const Color(0x14071A3A),
+                blurRadius: 18,
+                offset: const Offset(0, 8),
               ),
             ],
           ),
@@ -610,13 +618,13 @@ class _MisContactosDiariosJefeScreenState
                               vertical: 3,
                             ),
                             decoration: BoxDecoration(
-                              color: const Color(0xFF20C7C2).withOpacity(0.18),
+                              color: const Color(0xFFEAF0FF),
                               borderRadius: BorderRadius.circular(30),
                             ),
                             child: const Text(
                               "HOY",
                               style: TextStyle(
-                                color: Color(0xFF20C7C2),
+                                color: Color(0xFF2454D3),
                                 fontSize: 10,
                                 fontWeight: FontWeight.w900,
                               ),
@@ -666,7 +674,7 @@ class _MisContactosDiariosJefeScreenState
                   const SizedBox(height: 10),
                   Icon(
                     Icons.arrow_forward_ios_rounded,
-                    color: Colors.white.withOpacity(0.35),
+                    color: Color(0xFF64748B),
                     size: 17,
                   ),
                 ],
@@ -682,9 +690,9 @@ class _MisContactosDiariosJefeScreenState
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
       decoration: BoxDecoration(
-        color: Colors.black.withOpacity(0.20),
+        color: const Color(0xFFF8FAFC),
         borderRadius: BorderRadius.circular(30),
-        border: Border.all(color: Colors.white),
+        border: Border.all(color: const Color(0xFFDCE5F2)),
       ),
       child: Text(
         "$label $value",
@@ -703,39 +711,15 @@ class _BackgroundGlow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Stack(
-      children: [
-        Positioned(
-          top: -90,
-          left: -80,
-          child: _glow(const Color(0xFF20C7C2), 230),
-        ),
-        Positioned(
-          top: 130,
-          right: -100,
-          child: _glow(const Color(0xFF0A7F91), 260),
-        ),
-        Positioned(
-          bottom: -120,
-          left: 40,
-          child: _glow(const Color(0xFF0AAEAE), 230),
-        ),
-      ],
-    );
-  }
-
-  Widget _glow(Color color, double size) {
-    return Container(
-      height: size,
-      width: size,
+    return const DecoratedBox(
       decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: color.withOpacity(0.24),
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [Color(0xFFF4F6FB), Color(0xFFEAF1FF)],
+        ),
       ),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 90, sigmaY: 90),
-        child: const SizedBox(),
-      ),
+      child: SizedBox.expand(),
     );
   }
 }

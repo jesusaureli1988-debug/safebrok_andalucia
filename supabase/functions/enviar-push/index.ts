@@ -498,14 +498,19 @@ Deno.serve(async (req: Request): Promise<Response> => {
     }
 
     const authHeader = req.headers.get('Authorization') ?? '';
+    const bearerToken = authHeader.replace(/^Bearer\s+/i, '').trim();
+    const llamadaInterna = bearerToken === serviceRoleKey;
     const userClient = createClient(
       supabaseUrl,
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
       {global: {headers: {Authorization: authHeader}}},
     );
-    const {data: {user}, error: authError} = await userClient.auth.getUser();
-    if (authError || !user) {
-      return respuestaJson({ok: false, error: 'No autorizado.'}, 401);
+
+    if (!llamadaInterna) {
+      const {data: {user}, error: authError} = await userClient.auth.getUser();
+      if (authError || !user) {
+        return respuestaJson({ok: false, error: 'No autorizado.'}, 401);
+      }
     }
 
     if (!projectId) {
@@ -533,18 +538,33 @@ Deno.serve(async (req: Request): Promise<Response> => {
       );
     }
 
+    // Las ventas se notifican desde el trigger de base de datos. Las versiones
+    // antiguas todavía intentan enviarlas desde el cliente: se ignoran aquí
+    // para evitar duplicados y llamadas perdidas al cerrar la pantalla.
+    if (
+      !llamadaInterna &&
+      solicitud.data?.tipo === 'nueva_venta'
+    ) {
+      return respuestaJson({
+        ok: true,
+        delegado_servidor: true,
+      });
+    }
+
     const authIdDestino =
       solicitud.auth_id_destino?.trim();
 
     if (!authIdDestino) {
       return respuestaJson({ok: false, error: 'Falta el destinatario.'}, 400);
     }
-    const {data: canAccess, error: accessError} = await userClient.rpc(
-      'app_can_access_auth_id',
-      {target_auth_id: authIdDestino},
-    );
-    if (accessError || canAccess !== true) {
-      return respuestaJson({ok: false, error: 'Sin permisos para el destinatario.'}, 403);
+    if (!llamadaInterna) {
+      const {data: canAccess, error: accessError} = await userClient.rpc(
+        'app_can_access_auth_id',
+        {target_auth_id: authIdDestino},
+      );
+      if (accessError || canAccess !== true) {
+        return respuestaJson({ok: false, error: 'Sin permisos para el destinatario.'}, 403);
+      }
     }
 
     const incluirSuperiores =

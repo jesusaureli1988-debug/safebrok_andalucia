@@ -26,6 +26,8 @@ class _DirectorNacionalKpisScreenState
   List<Map<String, dynamic>> usuariosPermitidosBase = [];
   List<Map<String, dynamic>> ventasPermitidasBase = [];
   List<Map<String, dynamic>> clientesPermitidosBase = [];
+  List<Map<String, dynamic>> usuariosRankingCompania = [];
+  List<Map<String, dynamic>> ventasRankingCompania = [];
 
   // Datos efectivos después de aplicar el filtro de estructura.
   List<Map<String, dynamic>> usuariosEstructura = [];
@@ -142,7 +144,30 @@ class _DirectorNacionalKpisScreenState
           );
 
       final todosUsuarios = List<Map<String, dynamic>>.from(usuariosData);
-
+      final rosterCompania = List<Map<String, dynamic>>.from(
+        await supabase.rpc('app_ranking_usuarios_activos'),
+      );
+      final idsCompania = rosterCompania
+          .map((u) => _idTexto(u['auth_id']))
+          .where((id) => id.isNotEmpty)
+          .toSet();
+      final ventasGlobales = <Map<String, dynamic>>[];
+      if (idsCompania.isNotEmpty) {
+        for (var desde = 0; ; desde += 1000) {
+          final pagina = await supabase
+              .from('ventas')
+              .select(
+                'id, agente_auth_id, producto, prima_anual_neta, fecha_efecto, created_at',
+              )
+              .inFilter('agente_auth_id', idsCompania.toList())
+              .order('id')
+              .range(desde, desde + 999);
+          ventasGlobales.addAll(List<Map<String, dynamic>>.from(pagina));
+          if (pagina.length < 1000) break;
+        }
+      }
+      usuariosRankingCompania = rosterCompania;
+      ventasRankingCompania = ventasGlobales;
       final estructura = _construirEstructuraValida(
         perfil: perfil,
         todosUsuarios: todosUsuarios,
@@ -688,13 +713,7 @@ class _DirectorNacionalKpisScreenState
   }
 
   double _primaNeta(Map<String, dynamic> venta) {
-    return _money(
-      venta['prima_anual_neta'] ??
-          venta['prima_neta'] ??
-          venta['PRIMA_ANUAL_NETA'] ??
-          venta['PRIMA NETA'] ??
-          0,
-    );
+    return PremiumWeighting.net(venta);
   }
 
   int _intValue(dynamic value) {
@@ -800,7 +819,7 @@ class _DirectorNacionalKpisScreenState
   }
 
   List<_AgenteRanking> get rankingAgentes {
-    final agentes = usuariosEstructura
+    final agentes = usuariosRankingCompania
         .where((u) => _normalizarRol(u['rol_usuario']) == 'agente')
         .toList();
 
@@ -815,7 +834,7 @@ class _DirectorNacionalKpisScreenState
       ventasPorAuth[authId] = 0;
     }
 
-    for (final venta in ventasFiltradas) {
+    for (final venta in ventasRankingCompania.where(_cumpleFiltroFecha)) {
       final authId = venta['agente_auth_id']?.toString();
       if (authId == null || !primasPorAuth.containsKey(authId)) continue;
 
@@ -1841,7 +1860,7 @@ class _DirectorNacionalKpisScreenState
             ),
             const SizedBox(height: 5),
             Text(
-              'Todos los agentes de tu estructura, ordenados por prima neta.',
+              'Todos los agentes activos de la compañía, ordenados por prima neta.',
               style: TextStyle(
                 color: const Color(0xFF475569),
                 fontSize: 12,
@@ -1851,7 +1870,7 @@ class _DirectorNacionalKpisScreenState
             const SizedBox(height: 14),
             if (ranking.isEmpty)
               Text(
-                'No hay agentes en la estructura del usuario conectado.',
+                'No hay agentes activos en la compañía.',
                 style: TextStyle(
                   color: const Color(0xFF475569),
                   fontWeight: FontWeight.w600,

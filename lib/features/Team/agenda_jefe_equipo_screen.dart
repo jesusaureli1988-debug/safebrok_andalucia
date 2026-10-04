@@ -97,7 +97,7 @@ class _AgendaJefeEquipoScreenState extends State<AgendaJefeEquipoScreen> {
           endTime: DateTime.parse(item['fecha_fin']),
           subject: item['titulo'] ?? 'Evento',
           notes: item['descripcion'] ?? '',
-          color: const Color(0xFF20C7C2),
+          color: const Color(0xFF2454D3),
           location: 'agenda|${item['id']}',
         ),
       );
@@ -249,7 +249,7 @@ class _AgendaJefeEquipoScreenState extends State<AgendaJefeEquipoScreen> {
       barrierColor: Colors.black.withOpacity(0.72),
       builder: (_) {
         return Dialog(
-          backgroundColor: Colors.transparent,
+          backgroundColor: Colors.white,
           insetPadding: const EdgeInsets.all(18),
           child: ClipRRect(
             borderRadius: BorderRadius.circular(28),
@@ -309,7 +309,7 @@ class _AgendaJefeEquipoScreenState extends State<AgendaJefeEquipoScreen> {
                       Icons.calendar_month_rounded,
                       'Fecha',
                       '${event.startTime.day}/${event.startTime.month}/${event.startTime.year}',
-                      const Color(0xFF20C7C2),
+                      const Color(0xFF2454D3),
                     ),
                     _detailLine(
                       Icons.access_time_rounded,
@@ -325,7 +325,7 @@ class _AgendaJefeEquipoScreenState extends State<AgendaJefeEquipoScreen> {
                         decoration: BoxDecoration(
                           color: Colors.white,
                           borderRadius: BorderRadius.circular(18),
-                          border: Border.all(color: Colors.white),
+                          border: Border.all(color: const Color(0xFFDCE5F2)),
                         ),
                         child: Text(
                           event.notes ?? '',
@@ -386,7 +386,7 @@ class _AgendaJefeEquipoScreenState extends State<AgendaJefeEquipoScreen> {
                               icon: const Icon(Icons.video_call_rounded),
                               label: const Text('Entrar'),
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFF20C7C2),
+                                backgroundColor: const Color(0xFF2454D3),
                                 foregroundColor: const Color(0xFFFFFFFF),
                                 padding: const EdgeInsets.symmetric(
                                   vertical: 14,
@@ -494,7 +494,7 @@ class _AgendaJefeEquipoScreenState extends State<AgendaJefeEquipoScreen> {
       backgroundColor: const Color(0xFFF2FCFD),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _openMeetingDialog(DateTime.now()),
-        backgroundColor: const Color(0xFF20C7C2),
+        backgroundColor: const Color(0xFF2454D3),
         foregroundColor: const Color(0xFFFFFFFF),
         icon: const Icon(Icons.add_rounded),
         label: const Text(
@@ -508,7 +508,7 @@ class _AgendaJefeEquipoScreenState extends State<AgendaJefeEquipoScreen> {
           SafeArea(
             child: loading
                 ? const Center(
-                    child: CircularProgressIndicator(color: Color(0xFF20C7C2)),
+                    child: CircularProgressIndicator(color: Color(0xFF2454D3)),
                   )
                 : error != null
                 ? Center(
@@ -543,7 +543,7 @@ class _AgendaJefeEquipoScreenState extends State<AgendaJefeEquipoScreen> {
                           decoration: BoxDecoration(
                             color: Colors.white,
                             borderRadius: BorderRadius.circular(26),
-                            border: Border.all(color: Colors.white),
+                            border: Border.all(color: const Color(0xFFDCE5F2)),
                           ),
                           child: ClipRRect(
                             borderRadius: BorderRadius.circular(26),
@@ -551,7 +551,7 @@ class _AgendaJefeEquipoScreenState extends State<AgendaJefeEquipoScreen> {
                               key: ValueKey(currentView),
                               view: currentView,
                               controller: calendarController,
-                              backgroundColor: Colors.transparent,
+                              backgroundColor: Colors.white,
                               initialDisplayDate:
                                   calendarController.displayDate ??
                                   DateTime.now(),
@@ -582,18 +582,18 @@ class _AgendaJefeEquipoScreenState extends State<AgendaJefeEquipoScreen> {
                                   _openMeetingDialog(selectedDate);
                                 }
                               },
-                              todayHighlightColor: const Color(0xFF20C7C2),
-                              cellBorderColor: Colors.white10,
+                              todayHighlightColor: const Color(0xFF2454D3),
+                              cellBorderColor: const Color(0xFFDCE5F2),
                               selectionDecoration: BoxDecoration(
                                 border: Border.all(
-                                  color: const Color(0xFF20C7C2),
+                                  color: const Color(0xFF2454D3),
                                   width: 2,
                                 ),
                                 borderRadius: BorderRadius.circular(10),
                               ),
                               headerHeight: 0,
                               viewHeaderStyle: const ViewHeaderStyle(
-                                backgroundColor: Color(0xFFFFFFFF),
+                                backgroundColor: Color(0xFFF8FAFC),
                                 dateTextStyle: TextStyle(
                                   color: const Color(0xFF071A3A),
                                   fontSize: 14,
@@ -624,7 +624,7 @@ class _AgendaJefeEquipoScreenState extends State<AgendaJefeEquipoScreen> {
                                     fontWeight: FontWeight.w700,
                                   ),
                                   dateTextStyle: TextStyle(
-                                    color: Color(0xFF20C7C2),
+                                    color: Color(0xFF2454D3),
                                     fontWeight: FontWeight.w900,
                                   ),
                                   dayTextStyle: TextStyle(
@@ -638,14 +638,14 @@ class _AgendaJefeEquipoScreenState extends State<AgendaJefeEquipoScreen> {
                                     fontWeight: FontWeight.w600,
                                   ),
                                   todayTextStyle: TextStyle(
-                                    color: Color(0xFF20C7C2),
+                                    color: Color(0xFF2454D3),
                                     fontWeight: FontWeight.w900,
                                   ),
                                   trailingDatesTextStyle: TextStyle(
-                                    color: const Color(0xFFB7D7DA),
+                                    color: const Color(0xFF94A3B8),
                                   ),
                                   leadingDatesTextStyle: TextStyle(
-                                    color: const Color(0xFFB7D7DA),
+                                    color: const Color(0xFF94A3B8),
                                   ),
                                 ),
                               ),
@@ -674,10 +674,13 @@ class _AgendaJefeEquipoScreenState extends State<AgendaJefeEquipoScreen> {
               color: Colors.white,
               borderRadius: BorderRadius.circular(18),
               border: Border.all(
-                color: const Color(0xFF20C7C2).withOpacity(0.45),
+                color: const Color(0xFF2454D3).withOpacity(0.45),
               ),
             ),
-            child: const Icon(Icons.arrow_back_rounded, color: Colors.white),
+            child: const Icon(
+              Icons.arrow_back_rounded,
+              color: Color(0xFF13244D),
+            ),
           ),
         ),
         const SizedBox(width: 14),
@@ -707,14 +710,14 @@ class _AgendaJefeEquipoScreenState extends State<AgendaJefeEquipoScreen> {
           width: 52,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            color: const Color(0xFF20C7C2).withOpacity(0.12),
+            color: const Color(0xFF2454D3).withOpacity(0.12),
             border: Border.all(
-              color: const Color(0xFF20C7C2).withOpacity(0.38),
+              color: const Color(0xFF2454D3).withOpacity(0.38),
             ),
           ),
           child: const Icon(
             Icons.calendar_month_rounded,
-            color: Color(0xFF20C7C2),
+            color: Color(0xFF2454D3),
           ),
         ),
       ],
@@ -729,7 +732,7 @@ class _AgendaJefeEquipoScreenState extends State<AgendaJefeEquipoScreen> {
             title: 'Eventos',
             value: appointments.length.toString(),
             icon: Icons.event_available_rounded,
-            color: const Color(0xFF20C7C2),
+            color: const Color(0xFF2454D3),
           ),
         ),
         const SizedBox(width: 10),
@@ -818,10 +821,10 @@ class _AgendaJefeEquipoScreenState extends State<AgendaJefeEquipoScreen> {
           margin: const EdgeInsets.symmetric(horizontal: 4),
           padding: const EdgeInsets.symmetric(vertical: 11),
           decoration: BoxDecoration(
-            color: selected ? const Color(0xFF20C7C2) : const Color(0xFFFFFFFF),
+            color: selected ? const Color(0xFF2454D3) : const Color(0xFFFFFFFF),
             borderRadius: BorderRadius.circular(30),
             border: Border.all(
-              color: selected ? const Color(0xFF20C7C2) : Colors.white,
+              color: selected ? const Color(0xFF2454D3) : Colors.white,
             ),
           ),
           child: Row(
@@ -829,14 +832,14 @@ class _AgendaJefeEquipoScreenState extends State<AgendaJefeEquipoScreen> {
             children: [
               Icon(
                 icon,
-                color: selected ? const Color(0xFFFFFFFF) : Colors.white,
+                color: selected ? Colors.white : const Color(0xFF13244D),
                 size: 17,
               ),
               const SizedBox(width: 7),
               Text(
                 label,
                 style: TextStyle(
-                  color: selected ? const Color(0xFFFFFFFF) : Colors.white,
+                  color: selected ? Colors.white : const Color(0xFF13244D),
                   fontWeight: FontWeight.w900,
                 ),
               ),
@@ -858,7 +861,7 @@ class _AgendaJefeEquipoScreenState extends State<AgendaJefeEquipoScreen> {
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: Colors.white),
+              border: Border.all(color: const Color(0xFFDCE5F2)),
             ),
             child: Text(
               _getHeaderTitle(),
@@ -887,9 +890,9 @@ class _AgendaJefeEquipoScreenState extends State<AgendaJefeEquipoScreen> {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: const Color(0xFF20C7C2).withOpacity(0.28)),
+          border: Border.all(color: const Color(0xFF2454D3).withOpacity(0.28)),
         ),
-        child: Icon(icon, color: Colors.white, size: 30),
+        child: Icon(icon, color: const Color(0xFF2454D3), size: 30),
       ),
     );
   }
@@ -1014,11 +1017,11 @@ class _MeetingCreateDialogJefeEquipoState
       lastDate: DateTime(2035),
       builder: (context, child) {
         return Theme(
-          data: ThemeData.dark().copyWith(
-            colorScheme: const ColorScheme.dark(
-              primary: Color(0xFF20C7C2),
+          data: ThemeData.light(useMaterial3: true).copyWith(
+            colorScheme: const ColorScheme.light(
+              primary: Color(0xFF2454D3),
               surface: Color(0xFFFFFFFF),
-              onSurface: Colors.white,
+              onSurface: const Color(0xFF071A3A),
             ),
             dialogBackgroundColor: const Color(0xFFFFFFFF),
           ),
@@ -1034,11 +1037,11 @@ class _MeetingCreateDialogJefeEquipoState
       initialTime: initial,
       builder: (context, child) {
         return Theme(
-          data: ThemeData.dark().copyWith(
-            colorScheme: const ColorScheme.dark(
-              primary: Color(0xFF20C7C2),
+          data: ThemeData.light(useMaterial3: true).copyWith(
+            colorScheme: const ColorScheme.light(
+              primary: Color(0xFF2454D3),
               surface: Color(0xFFFFFFFF),
-              onSurface: Colors.white,
+              onSurface: const Color(0xFF071A3A),
             ),
             dialogBackgroundColor: const Color(0xFFFFFFFF),
           ),
@@ -1130,7 +1133,7 @@ class _MeetingCreateDialogJefeEquipoState
     final editando = widget.editData != null;
 
     return Dialog(
-      backgroundColor: Colors.transparent,
+      backgroundColor: Colors.white,
       insetPadding: const EdgeInsets.all(18),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(30),
@@ -1143,7 +1146,7 @@ class _MeetingCreateDialogJefeEquipoState
               color: const Color(0xFFFFFFFF).withOpacity(0.97),
               borderRadius: BorderRadius.circular(30),
               border: Border.all(
-                color: const Color(0xFF20C7C2).withOpacity(0.32),
+                color: const Color(0xFF2454D3).withOpacity(0.32),
               ),
             ),
             child: SingleChildScrollView(
@@ -1157,16 +1160,16 @@ class _MeetingCreateDialogJefeEquipoState
                         height: 54,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          color: const Color(0xFF20C7C2).withOpacity(0.13),
+                          color: const Color(0xFF2454D3).withOpacity(0.13),
                           border: Border.all(
-                            color: const Color(0xFF20C7C2).withOpacity(0.38),
+                            color: const Color(0xFF2454D3).withOpacity(0.38),
                           ),
                         ),
                         child: Icon(
                           editando
                               ? Icons.edit_calendar_rounded
                               : Icons.video_call_rounded,
-                          color: const Color(0xFF20C7C2),
+                          color: const Color(0xFF2454D3),
                           size: 29,
                         ),
                       ),
@@ -1201,7 +1204,7 @@ class _MeetingCreateDialogJefeEquipoState
                     icon: Icons.calendar_month_rounded,
                     title: 'Fecha',
                     value: _dateText(),
-                    color: const Color(0xFF20C7C2),
+                    color: const Color(0xFF2454D3),
                     onTap: () async {
                       final picked = await _pickDate();
                       if (picked != null) {
@@ -1248,7 +1251,7 @@ class _MeetingCreateDialogJefeEquipoState
                     children: [
                       const Icon(
                         Icons.groups_rounded,
-                        color: Color(0xFF20C7C2),
+                        color: Color(0xFF2454D3),
                       ),
                       const SizedBox(width: 8),
                       const Expanded(
@@ -1264,7 +1267,7 @@ class _MeetingCreateDialogJefeEquipoState
                       Text(
                         '${invitados.length}',
                         style: const TextStyle(
-                          color: Color(0xFF20C7C2),
+                          color: Color(0xFF2454D3),
                           fontWeight: FontWeight.w900,
                         ),
                       ),
@@ -1276,7 +1279,7 @@ class _MeetingCreateDialogJefeEquipoState
                     decoration: BoxDecoration(
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: Colors.white),
+                      border: Border.all(color: const Color(0xFFDCE5F2)),
                     ),
                     child: usuarios.isEmpty
                         ? const Padding(
@@ -1303,7 +1306,7 @@ class _MeetingCreateDialogJefeEquipoState
 
                               return CheckboxListTile(
                                 value: selected,
-                                activeColor: const Color(0xFF20C7C2),
+                                activeColor: const Color(0xFF2454D3),
                                 checkColor: const Color(0xFFFFFFFF),
                                 title: Text(
                                   nombre.isEmpty ? 'Agente sin nombre' : nombre,
@@ -1371,7 +1374,7 @@ class _MeetingCreateDialogJefeEquipoState
                             style: const TextStyle(fontWeight: FontWeight.w900),
                           ),
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF20C7C2),
+                            backgroundColor: const Color(0xFF2454D3),
                             foregroundColor: const Color(0xFFFFFFFF),
                             padding: const EdgeInsets.symmetric(vertical: 15),
                             shape: RoundedRectangleBorder(
@@ -1404,7 +1407,7 @@ class _MeetingCreateDialogJefeEquipoState
       decoration: InputDecoration(
         labelText: label,
         labelStyle: const TextStyle(color: const Color(0xFF64748B)),
-        prefixIcon: Icon(icon, color: const Color(0xFF20C7C2)),
+        prefixIcon: Icon(icon, color: const Color(0xFF2454D3)),
         filled: true,
         fillColor: Colors.white,
         enabledBorder: OutlineInputBorder(
@@ -1414,7 +1417,7 @@ class _MeetingCreateDialogJefeEquipoState
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(18),
           borderSide: BorderSide(
-            color: const Color(0xFF20C7C2).withOpacity(0.65),
+            color: const Color(0xFF2454D3).withOpacity(0.65),
           ),
         ),
       ),
@@ -1492,7 +1495,7 @@ class _AgendaBackgroundJefeEquipo extends StatelessWidget {
         Positioned(
           top: -110,
           right: -90,
-          child: _glow(260, const Color(0xFF20C7C2)),
+          child: _glow(260, const Color(0xFF2454D3)),
         ),
         Positioned(
           bottom: 160,
@@ -1502,7 +1505,7 @@ class _AgendaBackgroundJefeEquipo extends StatelessWidget {
         Positioned(
           bottom: -120,
           right: -80,
-          child: _glow(240, const Color(0xFF0A7F91)),
+          child: _glow(240, const Color(0xFF2454D3)),
         ),
       ],
     );
