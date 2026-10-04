@@ -11,6 +11,9 @@ workflows:
       flutter: stable
       xcode: latest
       cocoapods: default
+      vars:
+        # App Store Connect ID de la ficha existente de SafeBrok.
+        APP_STORE_CONNECT_ALTOOL_ADDITIONAL_ARGUMENTS: "--apple-id '6787038104'"
       ios_signing:
         provisioning_profiles:
           - safebrok_appstore_push
