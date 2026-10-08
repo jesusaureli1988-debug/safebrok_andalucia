@@ -1,3 +1,4 @@
+import 'package:safebrok_andalucia/core/widgets/progressive_records.dart';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -323,7 +324,7 @@ class _DirectorNacionalUsuariosScreenState
                                   18,
                                   40,
                                 ),
-                                sliver: SliverList.builder(
+                                sliver: ProgressiveSliverList.builder(
                                   itemCount: usuariosOrdenados.length,
                                   itemBuilder: (context, index) {
                                     return _userCard(

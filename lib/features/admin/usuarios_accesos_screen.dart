@@ -1,3 +1,4 @@
+import 'package:safebrok_andalucia/core/widgets/progressive_records.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -470,7 +471,7 @@ class _State extends State<UsuariosAccesosScreen>
             ? const Center(child: CircularProgressIndicator())
             : rows.isEmpty
             ? const _Empty('No hay usuarios en esta sección.')
-            : ListView.separated(
+            : ProgressiveListView.separated(
                 controller: state ? activeScroll : blockedScroll,
                 itemCount:
                     rows.length +
@@ -528,7 +529,7 @@ class _State extends State<UsuariosAccesosScreen>
 
   Widget pendingList() => pending.isEmpty
       ? const _Empty('No hay incorporaciones listas para alta.')
-      : ListView.separated(
+      : ProgressiveListView.separated(
           itemCount: pending.length,
           separatorBuilder: (_, __) => const SizedBox(height: 8),
           itemBuilder: (_, i) {
@@ -556,7 +557,7 @@ class _State extends State<UsuariosAccesosScreen>
         );
   Widget auditList() => audit.isEmpty
       ? const _Empty('Todavía no hay movimientos registrados.')
-      : ListView.separated(
+      : ProgressiveListView.separated(
           itemCount: audit.length,
           separatorBuilder: (_, __) => const Divider(height: 1),
           itemBuilder: (_, i) {

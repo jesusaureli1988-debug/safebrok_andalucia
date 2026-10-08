@@ -1,3 +1,4 @@
+import 'package:safebrok_andalucia/core/widgets/progressive_records.dart';
 import 'package:flutter/material.dart';
 import 'package:safebrok_andalucia/utils/referencias_filter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -462,7 +463,7 @@ class _MisTareasScreenState extends State<MisTareasScreen> {
                   SliverToBoxAdapter(child: _heroCard()),
                   SliverPadding(
                     padding: const EdgeInsets.fromLTRB(18, 18, 18, 28),
-                    sliver: SliverList.separated(
+                    sliver: ProgressiveSliverList.separated(
                       itemCount: tareas.length,
                       separatorBuilder: (_, __) => const SizedBox(height: 14),
                       itemBuilder: (context, index) {

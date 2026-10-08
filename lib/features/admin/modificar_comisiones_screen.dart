@@ -1,4 +1,3 @@
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -14,6 +13,13 @@ class ModificarComisionesScreen extends StatefulWidget {
 
 class _ModificarComisionesScreenState extends State<ModificarComisionesScreen> {
   final supabase = Supabase.instance.client;
+
+  static const _primary = Color(0xFF0284C7);
+  static const _ink = Color(0xFF0F172A);
+  static const _muted = Color(0xFF64748B);
+  static const _border = Color(0xFFE2E8F0);
+  static const _surface = Color(0xFFFFFFFF);
+  static const _background = Color(0xFFF6F9FC);
 
   bool loading = true;
   bool saving = false;
@@ -247,13 +253,13 @@ class _ModificarComisionesScreenState extends State<ModificarComisionesScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFFFFFFF),
-      extendBodyBehindAppBar: true,
+      backgroundColor: _background,
       appBar: AppBar(
+        surfaceTintColor: Colors.transparent,
         leading: Padding(
           padding: const EdgeInsets.all(8),
           child: Material(
-            color: Colors.white.withOpacity(0.10),
+            color: const Color(0xFFF1F5F9),
             shape: const CircleBorder(),
             child: InkWell(
               customBorder: const CircleBorder(),
@@ -261,7 +267,7 @@ class _ModificarComisionesScreenState extends State<ModificarComisionesScreen> {
               child: const Center(
                 child: Icon(
                   Icons.arrow_back_ios_new_rounded,
-                  color: Colors.white,
+                  color: _ink,
                   size: 20,
                 ),
               ),
@@ -270,15 +276,18 @@ class _ModificarComisionesScreenState extends State<ModificarComisionesScreen> {
         ),
         title: const Text(
           'Comisiones e impuestos',
-          style: TextStyle(color: const Color(0xFF071A3A), fontWeight: FontWeight.w900),
+          style: TextStyle(color: _ink, fontWeight: FontWeight.w900),
         ),
-        backgroundColor: Colors.transparent,
+        backgroundColor: Colors.white,
         elevation: 0,
+        scrolledUnderElevation: 0,
         actions: [
           IconButton(
             onPressed: loading ? null : cargarComisiones,
-            icon: const Icon(Icons.refresh_rounded, color: Colors.white),
+            tooltip: 'Actualizar datos',
+            icon: const Icon(Icons.refresh_rounded, color: _primary),
           ),
+          const SizedBox(width: 8),
         ],
       ),
       body: Stack(
@@ -287,11 +296,11 @@ class _ModificarComisionesScreenState extends State<ModificarComisionesScreen> {
           SafeArea(
             child: loading
                 ? const Center(
-                    child: CircularProgressIndicator(color: Colors.cyanAccent),
+                    child: CircularProgressIndicator(color: _primary),
                   )
                 : RefreshIndicator(
-                    color: Colors.cyanAccent,
-                    backgroundColor: const Color(0xFF102331),
+                    color: _primary,
+                    backgroundColor: Colors.white,
                     onRefresh: cargarComisiones,
                     child: ListView(
                       padding: const EdgeInsets.fromLTRB(16, 12, 16, 110),
@@ -312,18 +321,16 @@ class _ModificarComisionesScreenState extends State<ModificarComisionesScreen> {
                         Container(
                           padding: const EdgeInsets.all(16),
                           decoration: BoxDecoration(
-                            color: Colors.amber.withOpacity(0.08),
+                            color: const Color(0xFFFFFBEB),
                             borderRadius: BorderRadius.circular(18),
-                            border: Border.all(
-                              color: Colors.amber.withOpacity(0.35),
-                            ),
+                            border: Border.all(color: const Color(0xFFFDE68A)),
                           ),
                           child: Row(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               const Icon(
                                 Icons.info_outline_rounded,
-                                color: Colors.amber,
+                                color: Color(0xFFD97706),
                                 size: 24,
                               ),
                               const SizedBox(width: 12),
@@ -337,7 +344,7 @@ class _ModificarComisionesScreenState extends State<ModificarComisionesScreen> {
                                             'Los cambios realizados en los impuestos se aplicarán únicamente a las ventas que se registren a partir de este momento.\n\n'
                                             'La prima anual neta se calculará descontando de la prima anual bruta el porcentaje de impuestos configurado para cada producto.',
                                   style: TextStyle(
-                                    color: Colors.white.withOpacity(0.90),
+                                    color: _ink,
                                     fontSize: 13,
                                     height: 1.5,
                                     fontWeight: FontWeight.w600,
@@ -362,9 +369,16 @@ class _ModificarComisionesScreenState extends State<ModificarComisionesScreen> {
     return Container(
       padding: const EdgeInsets.all(6),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.055),
+        color: _surface,
         borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: Colors.white.withOpacity(0.09)),
+        border: Border.all(color: _border),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x0D0F172A),
+            blurRadius: 20,
+            offset: Offset(0, 8),
+          ),
+        ],
       ),
       child: Row(
         children: [
@@ -373,7 +387,7 @@ class _ModificarComisionesScreenState extends State<ModificarComisionesScreen> {
               title: 'Comisiones',
               icon: Icons.percent_rounded,
               selected: tipoEdicion == TipoEdicionComision.comisiones,
-              color: Colors.greenAccent,
+              color: _primary,
               onTap: () {
                 setState(() {
                   tipoEdicion = TipoEdicionComision.comisiones;
@@ -387,7 +401,7 @@ class _ModificarComisionesScreenState extends State<ModificarComisionesScreen> {
               title: 'Impuestos',
               icon: Icons.receipt_long_rounded,
               selected: tipoEdicion == TipoEdicionComision.impuestos,
-              color: Colors.cyanAccent,
+              color: const Color(0xFF0F766E),
               onTap: () {
                 setState(() {
                   tipoEdicion = TipoEdicionComision.impuestos;
@@ -404,21 +418,21 @@ class _ModificarComisionesScreenState extends State<ModificarComisionesScreen> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.055),
+        color: _surface,
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: Colors.greenAccent.withOpacity(0.18)),
+        border: Border.all(color: _border),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Row(
             children: [
-              Icon(Icons.business_rounded, color: Colors.greenAccent, size: 22),
+              Icon(Icons.business_rounded, color: _primary, size: 22),
               SizedBox(width: 9),
               Text(
                 'Elige una compañía',
                 style: TextStyle(
-                  color: const Color(0xFF071A3A),
+                  color: _ink,
                   fontSize: 17,
                   fontWeight: FontWeight.w900,
                 ),
@@ -429,34 +443,28 @@ class _ModificarComisionesScreenState extends State<ModificarComisionesScreen> {
           Text(
             'Las comisiones mostradas pertenecen únicamente a esta compañía.',
             style: TextStyle(
-              color: Colors.white.withOpacity(0.52),
+              color: _muted,
               fontSize: 12,
               fontWeight: FontWeight.w600,
             ),
           ),
           const SizedBox(height: 14),
           DropdownButtonFormField<String>(
-            value: companiaSeleccionada,
-            dropdownColor: const Color(0xFF102331),
-            iconEnabledColor: Colors.greenAccent,
-            style: const TextStyle(
-              color: const Color(0xFF071A3A),
-              fontWeight: FontWeight.w800,
-            ),
+            initialValue: companiaSeleccionada,
+            dropdownColor: Colors.white,
+            iconEnabledColor: _primary,
+            style: const TextStyle(color: _ink, fontWeight: FontWeight.w800),
             decoration: InputDecoration(
               filled: true,
-              fillColor: Colors.black.withOpacity(0.22),
-              prefixIcon: const Icon(
-                Icons.apartment_rounded,
-                color: Colors.greenAccent,
-              ),
+              fillColor: const Color(0xFFF8FAFC),
+              prefixIcon: const Icon(Icons.apartment_rounded, color: _primary),
               enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(18),
-                borderSide: BorderSide(color: Colors.white.withOpacity(0.09)),
+                borderSide: const BorderSide(color: _border),
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(18),
-                borderSide: const BorderSide(color: Colors.greenAccent),
+                borderSide: const BorderSide(color: _primary, width: 1.5),
               ),
             ),
             items: companias.map((compania) {
@@ -495,7 +503,11 @@ class _ModificarComisionesScreenState extends State<ModificarComisionesScreen> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(icon, color: selected ? color : const Color(0xFF78909C), size: 20),
+              Icon(
+                icon,
+                color: selected ? color : const Color(0xFF78909C),
+                size: 20,
+              ),
               const SizedBox(width: 7),
               Flexible(
                 child: Text(
@@ -516,79 +528,72 @@ class _ModificarComisionesScreenState extends State<ModificarComisionesScreen> {
   }
 
   Widget _header() {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(30),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
-        child: Container(
-          padding: const EdgeInsets.all(22),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [
-                Colors.greenAccent.withOpacity(0.18),
-                Colors.white.withOpacity(0.045),
+    return Container(
+      padding: const EdgeInsets.all(22),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFFE0F2FE), Color(0xFFF0FDFA)],
+        ),
+        borderRadius: BorderRadius.circular(28),
+        border: Border.all(color: const Color(0xFFBAE6FD)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            height: 62,
+            width: 62,
+            decoration: BoxDecoration(
+              color: _primary,
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: const [
+                BoxShadow(
+                  color: Color(0x330284C7),
+                  blurRadius: 22,
+                  offset: Offset(0, 10),
+                ),
               ],
             ),
-            borderRadius: BorderRadius.circular(30),
-            border: Border.all(color: Colors.white.withOpacity(0.12)),
+            child: Icon(
+              tipoEdicion == TipoEdicionComision.comisiones
+                  ? Icons.percent_rounded
+                  : Icons.receipt_long_rounded,
+              color: Colors.white,
+              size: 32,
+            ),
           ),
-          child: Row(
-            children: [
-              Container(
-                height: 62,
-                width: 62,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: const LinearGradient(
-                    colors: [Colors.greenAccent, Colors.cyanAccent],
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  tipoEdicion == TipoEdicionComision.comisiones
+                      ? 'Configuración de comisiones'
+                      : 'Configuración de impuestos',
+                  style: const TextStyle(
+                    color: _ink,
+                    fontSize: 23,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: -0.5,
                   ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.greenAccent.withOpacity(0.22),
-                      blurRadius: 28,
-                      offset: const Offset(0, 12),
-                    ),
-                  ],
                 ),
-                child: const Icon(
-                  Icons.percent_rounded,
-                  color: Colors.black,
-                  size: 34,
+                const SizedBox(height: 5),
+                Text(
+                  tipoEdicion == TipoEdicionComision.comisiones
+                      ? 'Ajusta las condiciones de $companiaSeleccionada por producto.'
+                      : 'Define el porcentaje aplicado al cálculo de la prima neta.',
+                  style: const TextStyle(
+                    color: _muted,
+                    fontWeight: FontWeight.w600,
+                    height: 1.35,
+                  ),
                 ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      tipoEdicion == TipoEdicionComision.comisiones
-                          ? 'Panel de comisiones'
-                          : 'Panel de impuestos',
-                      style: const TextStyle(
-                        color: const Color(0xFF071A3A),
-                        fontSize: 23,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: -0.5,
-                      ),
-                    ),
-                    const SizedBox(height: 5),
-                    Text(
-                      tipoEdicion == TipoEdicionComision.comisiones
-                          ? 'Configura cada producto para $companiaSeleccionada con precisión de 0,05 puntos.'
-                          : 'Actualiza el porcentaje de impuestos que se descontará para calcular la prima anual neta.',
-                      style: const TextStyle(
-                        color: const Color(0xFF64748B),
-                        fontWeight: FontWeight.w600,
-                        height: 1.35,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
-        ),
+        ],
       ),
     );
   }
@@ -601,7 +606,7 @@ class _ModificarComisionesScreenState extends State<ModificarComisionesScreen> {
             'Productos',
             productos.length.toString(),
             Icons.inventory_2_rounded,
-            Colors.cyanAccent,
+            _primary,
           ),
         ),
         const SizedBox(width: 12),
@@ -617,8 +622,8 @@ class _ModificarComisionesScreenState extends State<ModificarComisionesScreen> {
                 ? Icons.query_stats_rounded
                 : Icons.receipt_long_rounded,
             tipoEdicion == TipoEdicionComision.comisiones
-                ? Colors.greenAccent
-                : Colors.cyanAccent,
+                ? _primary
+                : const Color(0xFF0F766E),
           ),
         ),
       ],
@@ -629,9 +634,9 @@ class _ModificarComisionesScreenState extends State<ModificarComisionesScreen> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.055),
+        color: _surface,
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: Colors.white.withOpacity(0.09)),
+        border: Border.all(color: _border),
       ),
       child: Row(
         children: [
@@ -662,7 +667,7 @@ class _ModificarComisionesScreenState extends State<ModificarComisionesScreen> {
                 Text(
                   title,
                   style: TextStyle(
-                    color: Colors.white.withOpacity(0.50),
+                    color: _muted,
                     fontWeight: FontWeight.w600,
                     fontSize: 12,
                   ),
@@ -699,8 +704,8 @@ class _ModificarComisionesScreenState extends State<ModificarComisionesScreen> {
         : porcentajeImpuestos;
 
     final colorPrincipal = editandoComisiones
-        ? Colors.greenAccent
-        : Colors.cyanAccent;
+        ? _primary
+        : const Color(0xFF0F766E);
 
     return TweenAnimationBuilder<double>(
       tween: Tween(begin: 0, end: 1),
@@ -718,17 +723,12 @@ class _ModificarComisionesScreenState extends State<ModificarComisionesScreen> {
         margin: const EdgeInsets.only(bottom: 14),
         padding: const EdgeInsets.all(18),
         decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [
-              Colors.white.withOpacity(0.10),
-              Colors.white.withOpacity(0.035),
-            ],
-          ),
+          color: _surface,
           borderRadius: BorderRadius.circular(28),
-          border: Border.all(color: colorPrincipal.withOpacity(0.16)),
+          border: Border.all(color: _border),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.24),
+              color: const Color(0x0D0F172A),
               blurRadius: 24,
               offset: const Offset(0, 12),
             ),
@@ -761,7 +761,7 @@ class _ModificarComisionesScreenState extends State<ModificarComisionesScreen> {
                       Text(
                         nombre,
                         style: const TextStyle(
-                          color: const Color(0xFF071A3A),
+                          color: _ink,
                           fontSize: 17,
                           fontWeight: FontWeight.w900,
                         ),
@@ -770,7 +770,7 @@ class _ModificarComisionesScreenState extends State<ModificarComisionesScreen> {
                       Text(
                         descripcion,
                         style: TextStyle(
-                          color: Colors.white.withOpacity(0.52),
+                          color: _muted,
                           fontWeight: FontWeight.w600,
                           fontSize: 12,
                         ),
@@ -789,9 +789,9 @@ class _ModificarComisionesScreenState extends State<ModificarComisionesScreen> {
               width: double.infinity,
               padding: const EdgeInsets.all(18),
               decoration: BoxDecoration(
-                color: Colors.black.withOpacity(0.20),
+                color: const Color(0xFFF8FAFC),
                 borderRadius: BorderRadius.circular(22),
-                border: Border.all(color: Colors.white.withOpacity(0.06)),
+                border: Border.all(color: _border),
               ),
               child: Column(
                 children: [
@@ -800,7 +800,7 @@ class _ModificarComisionesScreenState extends State<ModificarComisionesScreen> {
                         ? 'Comisión actual'
                         : 'Impuestos actuales',
                     style: TextStyle(
-                      color: Colors.white.withOpacity(0.55),
+                      color: _muted,
                       fontWeight: FontWeight.w700,
                     ),
                   ),
@@ -859,7 +859,7 @@ class _ModificarComisionesScreenState extends State<ModificarComisionesScreen> {
                     child: _infoLine(
                       'Prima neta ejemplo',
                       '${primaNetaEjemplo.toStringAsFixed(2)} €',
-                      Colors.cyanAccent,
+                      _primary,
                     ),
                   ),
                   const SizedBox(width: 10),
@@ -867,7 +867,7 @@ class _ModificarComisionesScreenState extends State<ModificarComisionesScreen> {
                     child: _infoLine(
                       'Comisión generada',
                       '${comisionEjemplo.toStringAsFixed(2)} €',
-                      Colors.greenAccent,
+                      const Color(0xFF16A34A),
                     ),
                   ),
                 ],
@@ -887,7 +887,7 @@ class _ModificarComisionesScreenState extends State<ModificarComisionesScreen> {
                     child: _infoLine(
                       'Prima anual neta',
                       '${primaNetaEjemplo.toStringAsFixed(2)} €',
-                      Colors.cyanAccent,
+                      _primary,
                     ),
                   ),
                 ],
@@ -897,9 +897,9 @@ class _ModificarComisionesScreenState extends State<ModificarComisionesScreen> {
               width: double.infinity,
               padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 11),
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.045),
+                color: const Color(0xFFF8FAFC),
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: Colors.white.withOpacity(0.06)),
+                border: Border.all(color: _border),
               ),
               child: Row(
                 children: [
@@ -908,7 +908,7 @@ class _ModificarComisionesScreenState extends State<ModificarComisionesScreen> {
                       'Comisión: ${porcentajeComision.toStringAsFixed(2)} %',
                       textAlign: TextAlign.center,
                       style: const TextStyle(
-                        color: Colors.greenAccent,
+                        color: Color(0xFF16A34A),
                         fontWeight: FontWeight.w800,
                         fontSize: 12,
                       ),
@@ -920,7 +920,7 @@ class _ModificarComisionesScreenState extends State<ModificarComisionesScreen> {
                       'Impuestos: ${porcentajeImpuestos.toStringAsFixed(2)} %',
                       textAlign: TextAlign.center,
                       style: const TextStyle(
-                        color: Colors.cyanAccent,
+                        color: _primary,
                         fontWeight: FontWeight.w800,
                         fontSize: 12,
                       ),
@@ -936,7 +936,7 @@ class _ModificarComisionesScreenState extends State<ModificarComisionesScreen> {
                 child: Text(
                   'Última modificación: ${_fechaSimple(actualizado)}',
                   style: TextStyle(
-                    color: Colors.white.withOpacity(0.42),
+                    color: _muted,
                     fontSize: 11,
                     fontWeight: FontWeight.w600,
                   ),
@@ -1001,7 +1001,7 @@ class _ModificarComisionesScreenState extends State<ModificarComisionesScreen> {
             title,
             textAlign: TextAlign.center,
             style: TextStyle(
-              color: Colors.white.withOpacity(0.48),
+              color: _muted,
               fontWeight: FontWeight.w600,
               fontSize: 11,
             ),
@@ -1054,13 +1054,13 @@ class _ModificarComisionesScreenState extends State<ModificarComisionesScreen> {
         ),
         style: ElevatedButton.styleFrom(
           backgroundColor: tipoEdicion == TipoEdicionComision.comisiones
-              ? Colors.greenAccent
-              : Colors.cyanAccent,
-          foregroundColor: Colors.black,
+              ? _primary
+              : const Color(0xFF0F766E),
+          foregroundColor: Colors.white,
           disabledBackgroundColor:
               (tipoEdicion == TipoEdicionComision.comisiones
-                      ? Colors.greenAccent
-                      : Colors.cyanAccent)
+                      ? _primary
+                      : const Color(0xFF0F766E))
                   .withOpacity(0.45),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(18),
@@ -1087,12 +1087,12 @@ class _PremiumBackground extends StatelessWidget {
   Widget build(BuildContext context) {
     return Stack(
       children: [
-        Container(color: const Color(0xFFFFFFFF)),
+        Container(color: const Color(0xFFF6F9FC)),
         Positioned(
           top: -120,
           right: -90,
           child: _blurCircle(
-            color: Colors.greenAccent.withOpacity(0.18),
+            color: const Color(0xFFBAE6FD).withOpacity(0.52),
             size: 270,
           ),
         ),
@@ -1100,7 +1100,7 @@ class _PremiumBackground extends StatelessWidget {
           top: 260,
           left: -130,
           child: _blurCircle(
-            color: Colors.cyanAccent.withOpacity(0.16),
+            color: const Color(0xFFCCFBF1).withOpacity(0.48),
             size: 290,
           ),
         ),
@@ -1108,7 +1108,7 @@ class _PremiumBackground extends StatelessWidget {
           bottom: -130,
           right: -100,
           child: _blurCircle(
-            color: const Color(0xFF2D7DFF).withOpacity(0.14),
+            color: const Color(0xFFDBEAFE).withOpacity(0.48),
             size: 320,
           ),
         ),

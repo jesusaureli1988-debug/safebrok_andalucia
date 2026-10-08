@@ -1,3 +1,4 @@
+import 'package:safebrok_andalucia/core/widgets/progressive_records.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -213,7 +214,7 @@ class _IncorporacionesScreenState extends State<IncorporacionesScreen> {
     final values = <String>['TRABAJO', 'TODOS', ...states];
     return SizedBox(
       height: 52,
-      child: ListView.separated(
+      child: ProgressiveListView.separated(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
         scrollDirection: Axis.horizontal,
         itemCount: values.length,
@@ -274,7 +275,7 @@ class _IncorporacionesScreenState extends State<IncorporacionesScreen> {
                               : 'No hay expedientes en este estado',
                         ),
                       )
-                    : ListView.builder(
+                    : ProgressiveListView.builder(
                         padding: const EdgeInsets.fromLTRB(16, 8, 16, 90),
                         itemCount: filteredRows.length,
                         itemBuilder: (context, index) {

@@ -1,4 +1,5 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:safebrok_andalucia/core/production/policy_sales_query.dart';
 import 'package:safebrok_andalucia/core/production/premium_weighting.dart';
 import 'package:safebrok_andalucia/core/payroll/role_compensation.dart';
 import 'package:safebrok_andalucia/core/production/production_period_service.dart';
@@ -34,18 +35,21 @@ class PayrollService {
     final fin = period.endExclusive;
 
     // 2️⃣ OBTENER TODAS LAS VENTAS DEL PERIODO (FECHA EFECTO 24-24)
-    final ventas = await supabase
-        .from('ventas')
-        .select('''
+    final listaIds = await _getEstructura(authId);
+    final ventas = await PolicySalesQuery.load(
+      supabase,
+      authIds: listaIds,
+      start: inicio,
+      endExclusive: fin,
+      select: '''
       prima_anual_bruta,
       prima_anual_neta,
       comision,
       producto,
       fecha_efecto,
       agente_auth_id
-    ''')
-        .gte('fecha_efecto', inicio.toIso8601String())
-        .lt('fecha_efecto', fin.toIso8601String());
+    ''',
+    );
 
     print("VENTAS PAYROLL:");
     print(ventas.length);
@@ -55,7 +59,6 @@ class PayrollService {
     }
 
     // 3️⃣ FILTRAR POR JERARQUÍA (IMPORTANTE)
-    final listaIds = await _getEstructura(authId);
 
     final ventasFiltradas = ventas.where((v) {
       final id = v['agente_auth_id']?.toString();

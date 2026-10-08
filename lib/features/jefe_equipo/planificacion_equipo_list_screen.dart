@@ -1,3 +1,4 @@
+import 'package:safebrok_andalucia/core/widgets/progressive_records.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'planificacion_semana_detalle_screen.dart';
@@ -239,7 +240,7 @@ class _PlanificacionEquipoListScreenState
                       child: _emptyState(),
                     )
                   else
-                    SliverList.builder(
+                    ProgressiveSliverList.builder(
                       itemCount: planificaciones.length,
                       itemBuilder: (context, i) {
                         final p = planificaciones[i];

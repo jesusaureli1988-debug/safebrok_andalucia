@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'package:safebrok_andalucia/core/production/production_period_service.dart';
 import 'package:safebrok_andalucia/core/auth/app_role.dart';
 import 'package:safebrok_andalucia/core/production/premium_weighting.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -22,6 +23,7 @@ class _PrevisionesScreenState extends State<PrevisionesScreen>
   final forecasts = <String, _Forecast>{};
   final actuals = <String, _Actual>{};
   List<_MemberProgress> members = const [];
+  final expandedMemberIds = <String>{};
   _Actual loadedTeamActual = const _Actual();
   String? currentUserId;
   bool get isAgent => role == AppRole.agente.value;
@@ -42,7 +44,15 @@ class _PrevisionesScreenState extends State<PrevisionesScreen>
 
   Future<void> load() async {
     final auth = db.auth.currentUser;
-    if (auth == null) return;
+    if (auth == null) {
+      if (mounted) {
+        setState(() {
+          loading = false;
+          error = 'No se pudo recuperar la sesión. Vuelve a iniciar sesión.';
+        });
+      }
+      return;
+    }
     setState(() {
       loading = true;
       error = null;
@@ -161,7 +171,7 @@ class _PrevisionesScreenState extends State<PrevisionesScreen>
       'ventas',
       'agente_auth_id',
       ids,
-      'created_at',
+      'fecha_efecto',
       end,
       selectColumns:
           'agente_auth_id,producto,precio,prima_anual,prima_anual_neta,'
@@ -221,16 +231,25 @@ class _PrevisionesScreenState extends State<PrevisionesScreen>
       if (parent != null) children.putIfAbsent(parent, () => []).add(user);
     }
 
-    _Actual aggregateBelow(String userId, Set<String> seen) {
-      if (!seen.add(userId)) return const _Actual();
+    // El director nacional puede tener cientos de descendientes. Memorizamos
+    // cada subtotal para no recorrer la estructura completa por cada usuario.
+    final aggregateCache = <String, _Actual>{};
+    _Actual aggregateBelow(String userId, Set<String> path) {
+      final cached = aggregateCache[userId];
+      if (cached != null) return cached;
+      if (!path.add(userId)) return const _Actual();
       var total = const _Actual();
       for (final child in children[userId] ?? const <Map<String, dynamic>>[]) {
         final auth = child['auth_id']?.toString();
         final childId = child['id']?.toString();
-        if (auth != null)
+        if (auth != null) {
           total = total.plus(ownActual[auth] ?? const _Actual());
-        if (childId != null) total = total.plus(aggregateBelow(childId, seen));
+        }
+        if (childId != null) {
+          total = total.plus(aggregateBelow(childId, {...path}));
+        }
       }
+      aggregateCache[userId] = total;
       return total;
     }
 
@@ -287,7 +306,7 @@ class _PrevisionesScreenState extends State<PrevisionesScreen>
       'ventas',
       'agente_auth_id',
       ids,
-      'created_at',
+      'fecha_efecto',
       end,
       selectColumns:
           'agente_auth_id,producto,precio,prima_anual,prima_anual_neta,'
@@ -323,6 +342,14 @@ class _PrevisionesScreenState extends State<PrevisionesScreen>
     String selectColumns = '*',
   }) async {
     final result = <Map<String, dynamic>>[], all = ids.toList();
+    final productionPeriod = table == 'ventas' && dateColumn == 'fecha_efecto'
+        ? await ProductionPeriodService.instance.forMonth(
+            year: period.year,
+            month: period.month,
+          )
+        : null;
+    final rangeStart = productionPeriod?.start ?? period;
+    final rangeEnd = productionPeriod?.endExclusive ?? end;
     for (var i = 0; i < all.length; i += 80) {
       final block = all.sublist(i, math.min(i + 80, all.length));
       var from = 0;
@@ -331,8 +358,18 @@ class _PrevisionesScreenState extends State<PrevisionesScreen>
             .from(table)
             .select(selectColumns)
             .inFilter(column, block)
-            .gte(dateColumn, period.toUtc().toIso8601String())
-            .lt(dateColumn, end.toUtc().toIso8601String());
+            .gte(
+              dateColumn,
+              productionPeriod == null
+                  ? rangeStart.toUtc().toIso8601String()
+                  : rangeStart.toIso8601String(),
+            )
+            .lt(
+              dateColumn,
+              productionPeriod == null
+                  ? rangeEnd.toUtc().toIso8601String()
+                  : rangeEnd.toIso8601String(),
+            );
         if (completed) query = query.eq('estado', 'ALTA_COMPLETADA');
         final page = List<Map<String, dynamic>>.from(
           await query.range(from, from + 999),
@@ -494,7 +531,15 @@ class _PrevisionesScreenState extends State<PrevisionesScreen>
 
   Future<void> save(String scope, _Forecast data) async {
     final auth = db.auth.currentUser;
-    if (auth == null) return;
+    if (auth == null) {
+      if (mounted) {
+        setState(() {
+          loading = false;
+          error = 'No se pudo recuperar la sesión. Vuelve a iniciar sesión.';
+        });
+      }
+      return;
+    }
     setState(() => saving = true);
     try {
       await db.from('previsiones_mensuales').upsert({
@@ -726,6 +771,7 @@ class _PrevisionesScreenState extends State<PrevisionesScreen>
   Widget memberCard(_MemberProgress member, int depth) {
     final children = childrenOf(member);
     final body = memberBody(member);
+    final expanded = expandedMemberIds.contains(member.id);
     if (children.isEmpty) {
       return Padding(
         padding: const EdgeInsets.only(bottom: 10),
@@ -749,15 +795,26 @@ class _PrevisionesScreenState extends State<PrevisionesScreen>
             ),
           ),
           child: ExpansionTile(
-            initiallyExpanded: depth == 0,
+            key: PageStorageKey('prevision-member-' + member.id),
+            initiallyExpanded: expanded,
+            onExpansionChanged: (value) {
+              setState(() {
+                if (value) {
+                  expandedMemberIds.add(member.id);
+                } else {
+                  expandedMemberIds.remove(member.id);
+                }
+              });
+            },
             tilePadding: EdgeInsets.zero,
             childrenPadding: const EdgeInsets.fromLTRB(12, 0, 8, 8),
             iconColor: const Color(0xFF20C7C2),
             collapsedIconColor: const Color(0xFF20C7C2),
             title: body,
-            children: children
-                .map((child) => memberCard(child, depth + 1))
-                .toList(),
+            // Las ramas se crean únicamente cuando el usuario las abre.
+            children: expanded
+                ? children.map((child) => memberCard(child, depth + 1)).toList()
+                : const <Widget>[],
           ),
         ),
       ),

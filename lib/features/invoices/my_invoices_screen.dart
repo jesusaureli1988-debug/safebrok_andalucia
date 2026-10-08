@@ -1,5 +1,8 @@
+import 'package:safebrok_andalucia/core/widgets/progressive_records.dart';
 import 'dart:typed_data';
 
+import 'package:safebrok_andalucia/core/production/policy_effect_date.dart';
+import 'package:safebrok_andalucia/core/production/policy_sales_query.dart';
 import 'package:flutter/material.dart';
 import 'package:safebrok_andalucia/core/production/premium_weighting.dart';
 import 'package:safebrok_andalucia/core/payroll/role_compensation.dart';
@@ -176,10 +179,7 @@ class _MyInvoicesScreenState extends State<MyInvoicesScreen> {
         .toList();
     if (authIds.isEmpty) return [];
 
-    final salesData = await _supabase
-        .from('ventas')
-        .select()
-        .inFilter('agente_auth_id', authIds);
+    final salesData = await PolicySalesQuery.load(_supabase, authIds: authIds);
     final sales = (salesData as List)
         .map((item) => Map<String, dynamic>.from(item))
         .toList();
@@ -190,12 +190,14 @@ class _MyInvoicesScreenState extends State<MyInvoicesScreen> {
       if (effectDate == null) continue;
       final period = _periodForDate(effectDate, closures);
       final end = period.$2;
-      final key = _periodKey(end.year, end.month);
+      final cargo =
+          PolicyEffectDate.configuredMonth(effectDate, closures) ?? end;
+      final key = _periodKey(cargo.year, cargo.month);
       final group = grouped.putIfAbsent(
         key,
         () => {
-          'mes': end.month,
-          'anio': end.year,
+          'mes': cargo.month,
+          'anio': cargo.year,
           'usuario_auth_id': authId,
           'usuario_nombre':
               (_text(profile['nombre']) + ' ' + _text(profile['apellidos']))
@@ -343,17 +345,8 @@ class _MyInvoicesScreenState extends State<MyInvoicesScreen> {
     return result;
   }
 
-  DateTime? _effectDate(Map<String, dynamic> sale) {
-    for (final value in [
-      sale['fecha_efecto'],
-      sale['fecha'],
-      sale['created_at'],
-    ]) {
-      final date = DateTime.tryParse(_text(value));
-      if (date != null) return date;
-    }
-    return null;
-  }
+  DateTime? _effectDate(Map<String, dynamic> sale) =>
+      PolicyEffectDate.read(sale);
 
   (DateTime, DateTime) _periodForDate(
     DateTime date,
@@ -1094,8 +1087,9 @@ class _MyInvoicesScreenState extends State<MyInvoicesScreen> {
                     else
                       SliverPadding(
                         padding: const EdgeInsets.fromLTRB(18, 0, 18, 34),
-                        sliver: SliverList.separated(
+                        sliver: ProgressiveSliverList.separated(
                           itemCount: _filtered.length,
+                          resetKey: progressiveRecordKey(_filtered),
                           separatorBuilder: (_, __) =>
                               const SizedBox(height: 12),
                           itemBuilder: (_, index) =>

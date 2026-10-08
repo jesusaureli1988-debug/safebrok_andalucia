@@ -2,6 +2,7 @@ import 'dart:math' as math;
 import 'package:safebrok_andalucia/core/production/premium_weighting.dart';
 import 'dart:ui';
 
+import 'package:safebrok_andalucia/core/production/policy_effect_date.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -679,24 +680,7 @@ class _DirectorNacionalKpisScreenState
     }
   }
 
-  DateTime? _parseDate(Map<String, dynamic> row) {
-    final posibles = [
-      row['fecha'],
-      row['FECHA'],
-      row['fecha_efecto'],
-      row['created_at'],
-      row['fecha_registro'],
-      row['FECHA REGISTRO'],
-    ];
-
-    for (final value in posibles) {
-      if (value == null) continue;
-      final parsed = DateTime.tryParse(value.toString());
-      if (parsed != null) return parsed;
-    }
-
-    return null;
-  }
+  DateTime? _parseDate(Map<String, dynamic> row) => PolicyEffectDate.read(row);
 
   double _money(dynamic value) {
     if (value == null) return 0;

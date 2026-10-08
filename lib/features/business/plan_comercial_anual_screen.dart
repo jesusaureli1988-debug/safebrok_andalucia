@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:safebrok_andalucia/core/production/premium_weighting.dart';
+import 'package:safebrok_andalucia/core/production/policy_sales_query.dart';
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -265,13 +266,13 @@ class _PlanComercialAnualScreenState extends State<PlanComercialAnualScreen>
 
     try {
       final results = await Future.wait([
-        _supabase
-            .from('ventas')
-            .select(
+        PolicySalesQuery.load(
+          _supabase,
+          authIds: authIds,
+          select:
               'id, agente_auth_id, producto, fecha_efecto, prima_anual_neta, '
               'numero_asegurados, estado_poliza',
-            )
-            .inFilter('agente_auth_id', authIds),
+        ),
         _supabase
             .from('anulaciones_polizas')
             .select('id, venta_id, fecha_anulacion, prima_extornada, estado')

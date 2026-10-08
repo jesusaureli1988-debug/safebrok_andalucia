@@ -1,3 +1,4 @@
+import 'package:safebrok_andalucia/core/widgets/progressive_records.dart';
 // VERSIÓN SAFECLOUD PRO
 // Incluye: Mi unidad, Compartido conmigo, compartir con compañeros,
 // carpetas dentro de carpetas, mover, renombrar, borrar, subir varios archivos.
@@ -348,7 +349,7 @@ class _SafeCloudScreenState extends State<SafeCloudScreen> {
                 ),
                 const SizedBox(height: 12),
                 Flexible(
-                  child: ListView.builder(
+                  child: ProgressiveListView.builder(
                     shrinkWrap: true,
                     itemCount: usuarios.length,
                     itemBuilder: (_, index) {
@@ -880,9 +881,10 @@ class _SafeCloudScreenState extends State<SafeCloudScreen> {
   }
 
   Widget _grid(List<Map<String, dynamic>> data) {
-    return GridView.builder(
+    return ProgressiveGridView.builder(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 110),
       itemCount: data.length,
+      resetKey: progressiveRecordKey(data),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 2,
         crossAxisSpacing: 14,
@@ -894,7 +896,7 @@ class _SafeCloudScreenState extends State<SafeCloudScreen> {
   }
 
   Widget _list(List<Map<String, dynamic>> data) {
-    return ListView.builder(
+    return ProgressiveListView.builder(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 110),
       itemCount: data.length,
       itemBuilder: (_, index) => _listTile(data[index]),

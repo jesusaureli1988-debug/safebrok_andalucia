@@ -1,3 +1,4 @@
+import 'package:safebrok_andalucia/core/widgets/progressive_records.dart';
 import 'dart:io';
 import 'dart:typed_data';
 import 'dart:ui';
@@ -1012,7 +1013,7 @@ class _MisGestionesScreenState extends State<MisGestionesScreen> {
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(26),
-        child: ListView.builder(
+        child: ProgressiveListView.builder(
           itemCount: lista.length,
           itemBuilder: (context, index) => _gestionCard(lista[index]),
         ),

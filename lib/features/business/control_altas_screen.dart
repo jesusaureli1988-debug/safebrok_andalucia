@@ -1,3 +1,4 @@
+import 'package:safebrok_andalucia/core/widgets/progressive_records.dart';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -2638,7 +2639,7 @@ class _ControlAltasScreenState extends State<ControlAltasScreen> {
                     ),
                   ),
                   Expanded(
-                    child: ListView.builder(
+                    child: ProgressiveListView.builder(
                       itemCount: lista.length,
                       itemBuilder: (context, index) {
                         final c = lista[index];

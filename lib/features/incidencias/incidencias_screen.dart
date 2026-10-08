@@ -1,3 +1,4 @@
+import 'package:safebrok_andalucia/core/widgets/progressive_records.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -88,7 +89,7 @@ class _IncidenciasScreenState extends State<IncidenciasScreen> {
 
       body: loading
           ? const Center(child: CircularProgressIndicator())
-          : ListView.builder(
+          : ProgressiveListView.builder(
               padding: const EdgeInsets.all(16),
               itemCount: incidencias.length,
               itemBuilder: (context, i) {

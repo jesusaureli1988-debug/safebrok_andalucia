@@ -1,5 +1,8 @@
+import 'package:safebrok_andalucia/core/widgets/progressive_records.dart';
 import 'dart:ui';
 import 'package:safebrok_andalucia/core/production/premium_weighting.dart';
+import 'package:safebrok_andalucia/core/production/policy_effect_date.dart';
+import 'package:safebrok_andalucia/core/production/policy_sales_query.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -276,9 +279,10 @@ class _MySalesScreenState extends State<MySalesScreen> {
       List<Map<String, dynamic>> ventasEncontradas = [];
 
       if (authIds.isNotEmpty) {
-        final response = await supabase
-            .from('ventas')
-            .select('''
+        final response = await PolicySalesQuery.load(
+          supabase,
+          authIds: authIds,
+          select: '''
             id,
             created_at,
             agente_auth_id,
@@ -295,11 +299,15 @@ class _MySalesScreenState extends State<MySalesScreen> {
               apellidos,
               telefono
             )
-          ''')
-            .inFilter('agente_auth_id', authIds)
-            .order('created_at', ascending: false);
+          ''',
+        );
 
         ventasEncontradas = List<Map<String, dynamic>>.from(response);
+        ventasEncontradas.sort(
+          (a, b) => (_fechaVenta(b) ?? DateTime(1900)).compareTo(
+            _fechaVenta(a) ?? DateTime(1900),
+          ),
+        );
       }
 
       usuariosPermitidos = estructura;
@@ -534,9 +542,8 @@ class _MySalesScreenState extends State<MySalesScreen> {
     return authIds;
   }
 
-  DateTime? _fechaVenta(Map<String, dynamic> venta) {
-    return DateTime.tryParse(venta['created_at']?.toString() ?? '');
-  }
+  DateTime? _fechaVenta(Map<String, dynamic> venta) =>
+      PolicyEffectDate.read(venta);
 
   List<Map<String, dynamic>> get filteredVentas {
     Set<String>? authIdsPermitidosFiltro;
@@ -800,8 +807,9 @@ class _MySalesScreenState extends State<MySalesScreen> {
                   SliverToBoxAdapter(child: _filters()),
                   SliverPadding(
                     padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-                    sliver: SliverList.builder(
+                    sliver: ProgressiveSliverList.builder(
                       itemCount: filteredVentas.length,
+                      resetKey: progressiveRecordKey(filteredVentas),
                       itemBuilder: (context, index) {
                         return _saleCard(filteredVentas[index]);
                       },
@@ -966,7 +974,7 @@ class _MySalesScreenState extends State<MySalesScreen> {
               children: [
                 Expanded(
                   child: _dateFilter(
-                    label: 'Desde',
+                    label: 'Efecto desde',
                     value: _fechaTexto(selectedDateFrom),
                     icon: Icons.first_page_rounded,
                     onTap: _seleccionarFechaDesde,
@@ -982,7 +990,7 @@ class _MySalesScreenState extends State<MySalesScreen> {
                 const SizedBox(width: 10),
                 Expanded(
                   child: _dateFilter(
-                    label: 'Hasta',
+                    label: 'Efecto hasta',
                     value: _fechaTexto(selectedDateTo),
                     icon: Icons.last_page_rounded,
                     onTap: _seleccionarFechaHasta,
@@ -1272,7 +1280,7 @@ class _MySalesScreenState extends State<MySalesScreen> {
         ? '${cliente['nombre'] ?? ''} ${cliente['apellidos'] ?? ''}'.trim()
         : 'Cliente sin vincular';
 
-    final fecha = DateTime.tryParse(venta['created_at']?.toString() ?? '');
+    final fecha = _fechaVenta(venta);
     final fechaTexto = fecha == null
         ? 'Sin fecha'
         : '${fecha.day.toString().padLeft(2, '0')}/${fecha.month.toString().padLeft(2, '0')}/${fecha.year}';
@@ -1500,6 +1508,7 @@ class _MySalesScreenState extends State<MySalesScreen> {
                     primaAnual = precio * 2;
                     break;
                   case 'anual':
+                  case 'no informada':
                     primaAnual = precio;
                     break;
                   default:

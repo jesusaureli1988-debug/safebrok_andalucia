@@ -1,3 +1,4 @@
+import 'package:safebrok_andalucia/core/widgets/progressive_records.dart';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -254,7 +255,7 @@ class _SeguimientoClientesScreenState extends State<SeguimientoClientesScreen> {
                   else
                     SliverPadding(
                       padding: const EdgeInsets.fromLTRB(18, 18, 18, 28),
-                      sliver: SliverList.separated(
+                      sliver: ProgressiveSliverList.separated(
                         itemCount: llamadas.length,
                         separatorBuilder: (_, __) => const SizedBox(height: 14),
                         itemBuilder: (context, index) {
@@ -634,7 +635,11 @@ class _SeguimientoClientesScreenState extends State<SeguimientoClientesScreen> {
           const Text(
             "No tienes seguimientos pendientes para hoy.",
             textAlign: TextAlign.center,
-            style: TextStyle(color: const Color(0xFF53627A), fontSize: 16, height: 1.4),
+            style: TextStyle(
+              color: const Color(0xFF53627A),
+              fontSize: 16,
+              height: 1.4,
+            ),
           ),
         ],
       ),

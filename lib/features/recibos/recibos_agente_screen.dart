@@ -1,3 +1,4 @@
+import 'package:safebrok_andalucia/core/widgets/progressive_records.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -17,7 +18,7 @@ class _RecibosAgenteScreenState extends State<RecibosAgenteScreen> {
   String searchText = '';
   final TextEditingController buscadorController = TextEditingController();
   String orden = 'Prioridad';
-  int limiteVisible = 25;
+  int limiteVisible = 10;
 
   List<Map<String, dynamic>> recibos = [];
 
@@ -753,38 +754,11 @@ class _RecibosAgenteScreenState extends State<RecibosAgenteScreen> {
                   else
                     SliverPadding(
                       padding: const EdgeInsets.fromLTRB(16, 0, 16, 110),
-                      sliver: SliverList.separated(
-                        itemCount: recibosOrdenados.length > limiteVisible
-                            ? limiteVisible + 1
-                            : recibosOrdenados.length,
+                      sliver: ProgressiveSliverList.separated(
+                        itemCount: recibosOrdenados.length,
+                        resetKey: progressiveRecordKey(recibosOrdenados),
                         separatorBuilder: (_, __) => const SizedBox(height: 12),
                         itemBuilder: (_, index) {
-                          if (index == limiteVisible) {
-                            return SizedBox(
-                              height: 52,
-                              child: OutlinedButton.icon(
-                                onPressed: () =>
-                                    setState(() => limiteVisible += 25),
-                                icon: const Icon(Icons.expand_more_rounded),
-                                label: Text(
-                                  'CARGAR MÁS · ${recibosOrdenados.length - limiteVisible} RESTANTES',
-                                  style: const TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w900,
-                                  ),
-                                ),
-                                style: OutlinedButton.styleFrom(
-                                  foregroundColor: const Color(0xFF2454D3),
-                                  side: const BorderSide(
-                                    color: Color(0xFFCBD5E1),
-                                  ),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(16),
-                                  ),
-                                ),
-                              ),
-                            );
-                          }
                           return _reciboCard(recibosOrdenados[index]);
                         },
                       ),
@@ -822,7 +796,7 @@ class _RecibosAgenteScreenState extends State<RecibosAgenteScreen> {
               ),
               const SizedBox(height: 2),
               Text(
-                '${recibosOrdenados.length} resultados · mostrando ${recibosOrdenados.length.clamp(0, limiteVisible)}',
+                '${recibosOrdenados.length} resultados · carga progresiva de 10 en 10',
                 style: const TextStyle(
                   color: Color(0xFF64748B),
                   fontSize: 10,
@@ -837,7 +811,7 @@ class _RecibosAgenteScreenState extends State<RecibosAgenteScreen> {
           initialValue: orden,
           onSelected: (value) => setState(() {
             orden = value;
-            limiteVisible = 25;
+            limiteVisible = 10;
           }),
           itemBuilder: (_) => opciones
               .map(
@@ -1229,7 +1203,7 @@ class _RecibosAgenteScreenState extends State<RecibosAgenteScreen> {
           ),
           onChanged: (v) => setState(() {
             searchText = v;
-            limiteVisible = 25;
+            limiteVisible = 10;
           }),
           decoration: InputDecoration(
             hintText: 'Cliente, nº de recibo, póliza, compañía o motivo',
@@ -1246,7 +1220,7 @@ class _RecibosAgenteScreenState extends State<RecibosAgenteScreen> {
                       buscadorController.clear();
                       setState(() {
                         searchText = '';
-                        limiteVisible = 25;
+                        limiteVisible = 10;
                       });
                     },
                     icon: const Icon(
@@ -1710,7 +1684,7 @@ class _RecibosAgenteScreenState extends State<RecibosAgenteScreen> {
 
     return SizedBox(
       height: 41,
-      child: ListView.separated(
+      child: ProgressiveListView.separated(
         scrollDirection: Axis.horizontal,
         itemCount: filtros.length,
         separatorBuilder: (_, __) => const SizedBox(width: 8),
@@ -1722,7 +1696,7 @@ class _RecibosAgenteScreenState extends State<RecibosAgenteScreen> {
             borderRadius: BorderRadius.circular(30),
             onTap: () => setState(() {
               filtro = item;
-              limiteVisible = 25;
+              limiteVisible = 10;
             }),
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 180),

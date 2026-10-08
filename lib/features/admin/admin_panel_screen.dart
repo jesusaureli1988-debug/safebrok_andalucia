@@ -1,5 +1,10 @@
+import 'package:safebrok_andalucia/core/widgets/progressive_records.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:safebrok_andalucia/core/production/premium_weighting.dart';
+import 'package:safebrok_andalucia/core/production/policy_sales_query.dart';
+import 'package:safebrok_andalucia/core/import_excel_text.dart';
+import 'package:safebrok_andalucia/core/import_policy_defaults.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:excel/excel.dart' as excel;
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -7,10 +12,12 @@ import 'dart:io';
 import 'package:path_provider/path_provider.dart';
 import 'dart:typed_data';
 import 'dart:convert';
+import 'dart:async';
 import 'package:intl/intl.dart';
 import 'package:open_filex/open_filex.dart';
 import 'package:safebrok_andalucia/features/incorporaciones/incorporaciones_screen.dart';
 import 'package:safebrok_andalucia/features/admin/usuarios_accesos_screen.dart';
+import 'package:safebrok_andalucia/features/admin/ventas_sin_agentes_screen.dart';
 
 class AdminPanelScreen extends StatefulWidget {
   const AdminPanelScreen({super.key});
@@ -21,6 +28,8 @@ class AdminPanelScreen extends StatefulWidget {
 
 class _AdminPanelScreenState extends State<AdminPanelScreen> {
   final supabase = Supabase.instance.client;
+  final _polizasPreviewHorizontal = ScrollController();
+  final _polizasPreviewVertical = ScrollController();
 
   @override
   void initState() {
@@ -31,6 +40,8 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
 
   @override
   void dispose() {
+    _polizasPreviewHorizontal.dispose();
+    _polizasPreviewVertical.dispose();
     _buscarAgentesController.dispose();
     _agentesScrollController.dispose();
     super.dispose();
@@ -82,10 +93,22 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
   int polizasImportProgress = 0;
   int polizasImportTotal = 0;
   bool importingPolizas = false;
+  bool validandoPolizas = false;
+  String? resultadoCargaPolizas;
+  String? informeCargaPolizasPath;
+  int polizasGuardadasCarga = 0;
+  List<Map<String, dynamic>> erroresCargaPolizas = [];
+  List<Map<String, dynamic>> polizasNuevasValidadas = [];
+  List<Map<String, dynamic>> polizasSinAgente = [];
+  List<Map<String, dynamic>> polizasPendientesAsignacion = [];
+  List<Map<String, dynamic>> polizasExistentesValidadas = [];
 
   final List<String> camposCargaPolizas = [
     "cliente.nombre",
     "cliente.apellidos",
+    "aux.apellido_1",
+    "aux.apellido_2",
+    "aux.movil",
     "cliente.telefono",
     "cliente.email",
     "cliente.codigo_postal",
@@ -96,6 +119,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
     "cliente.dni",
 
     "venta.agente_auth_id",
+    "aux.colaborador_id",
     "aux.colaborador_nombre",
     "venta.producto",
     "venta.compania",
@@ -867,6 +891,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
 
   dynamic cleanExcelValue(dynamic value) {
     if (value == null) return null;
+    if (value is excel.TextCellValue) return importExcelText(value);
 
     // 🧠 SI YA ES STRING / NUMERO
     if (value is String || value is num || value is bool) {
@@ -886,7 +911,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
       }
 
       if (type.contains('TextCellValue')) {
-        return value.value;
+        return value.value.toString();
       }
 
       if (type.contains('DateCellValue')) {
@@ -1067,6 +1092,10 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
     polizasRows.clear();
     polizasPreview.clear();
     polizasColumnMapping.clear();
+    polizasNuevasValidadas.clear();
+    polizasSinAgente.clear();
+    polizasPendientesAsignacion.clear();
+    polizasExistentesValidadas.clear();
 
     final extension = file.extension?.toLowerCase();
 
@@ -1081,14 +1110,17 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
 
       final separator = lines.first.contains(';') ? ';' : ',';
 
-      polizasHeaders = _parsearLineaCsv(
-        lines.first,
-        separator,
-      ).map((e) => e.trim().toUpperCase()).toList();
-
-      polizasRows = lines
-          .skip(1)
+      final filasCsv = lines
           .map((line) => _parsearLineaCsv(line, separator))
+          .toList();
+      final indiceCabecera = _indiceCabeceraPolizas(filasCsv);
+
+      polizasHeaders = filasCsv[indiceCabecera]
+          .map((e) => e.toString().trim())
+          .toList();
+
+      polizasRows = filasCsv
+          .skip(indiceCabecera + 1)
           .where(_filaReciboConDatos)
           .toList();
     } else {
@@ -1098,13 +1130,17 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
 
       if (rows.isEmpty) return;
 
-      polizasHeaders = rows.first
-          .map((e) => e?.value.toString().trim().toUpperCase() ?? '')
+      final filasExcel = rows
+          .map((row) => row.map((e) => e?.value ?? '').toList())
+          .toList();
+      final indiceCabecera = _indiceCabeceraPolizas(filasExcel);
+
+      polizasHeaders = filasExcel[indiceCabecera]
+          .map((e) => e.toString().trim())
           .toList();
 
-      polizasRows = rows
-          .skip(1)
-          .map((row) => row.map((e) => e?.value ?? '').toList())
+      polizasRows = filasExcel
+          .skip(indiceCabecera + 1)
           .where(_filaReciboConDatos)
           .toList();
     }
@@ -1146,12 +1182,99 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
     return resultado;
   }
 
+  String _normalizarCabeceraPoliza(dynamic value) {
+    var texto = value
+        .toString()
+        .replaceAll('\uFEFF', '')
+        .replaceAll('\u00A0', ' ')
+        .trim()
+        .toUpperCase();
+
+    const reemplazos = <String, String>{
+      'Á': 'A',
+      'É': 'E',
+      'Í': 'I',
+      'Ó': 'O',
+      'Ú': 'U',
+      'Ü': 'U',
+      'Ñ': 'N',
+      'º': ' ',
+      '°': ' ',
+      'ª': ' ',
+      '№': 'N ',
+    };
+    reemplazos.forEach((origen, destino) {
+      texto = texto.replaceAll(origen, destino);
+    });
+
+    texto = texto
+        .replaceAll(RegExp(r'[_./\\\-]+'), ' ')
+        .replaceAll(RegExp(r'[^A-Z0-9 ]'), ' ')
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .trim();
+
+    if (RegExp(r'^(N|NO|NUMERO)( DE)? POLIZA$').hasMatch(texto)) {
+      return 'NUMERO POLIZA';
+    }
+    return texto;
+  }
+
+  int _indiceCabeceraPolizas(List<List<dynamic>> filas) {
+    const nombresReconocidos = <String>{
+      'NUMERO POLIZA',
+      'POLIZA',
+      'NIF',
+      'APELLIDO 1',
+      'APELLIDO 2',
+      'TOMADOR',
+      'ESTADO',
+      'DIRECCION',
+      'C POSTAL',
+      'CODIGO POSTAL',
+      'LOCALIDAD',
+      'MOVIL',
+      'TELEFONO',
+      'EMAIL',
+      'RAMO',
+      'COMPANIA',
+      'PRIMA NETA',
+      'PRIMA TOTAL',
+      'FECHA EFECTO',
+      'COLABORADOR 1 ID',
+      'COLABORADOR 1',
+    };
+
+    var mejorIndice = 0;
+    var mejorPuntuacion = -1;
+    final limite = filas.length < 30 ? filas.length : 30;
+
+    for (var i = 0; i < limite; i++) {
+      final puntuacion = filas[i]
+          .map(_normalizarCabeceraPoliza)
+          .where(nombresReconocidos.contains)
+          .length;
+      if (puntuacion > mejorPuntuacion) {
+        mejorPuntuacion = puntuacion;
+        mejorIndice = i;
+      }
+    }
+
+    return mejorIndice;
+  }
+
   void autoMapearPolizas() {
     final Map<String, String> auto = {
       "Nº PÓLIZA": "venta.numero_poliza",
       "Nº POLIZA": "venta.numero_poliza",
 
       "NIF": "cliente.dni",
+
+      "APELLIDO 1": "aux.apellido_1",
+      "APELLIDO1": "aux.apellido_1",
+      "PRIMER APELLIDO": "aux.apellido_1",
+      "APELLIDO 2": "aux.apellido_2",
+      "APELLIDO2": "aux.apellido_2",
+      "SEGUNDO APELLIDO": "aux.apellido_2",
 
       "TOMADOR": "cliente.nombre",
 
@@ -1162,11 +1285,13 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
 
       "CÓDIGO POSTAL": "cliente.codigo_postal",
       "CODIGO POSTAL": "cliente.codigo_postal",
+      "C. POSTAL": "cliente.codigo_postal",
+      "C.POSTAL": "cliente.codigo_postal",
 
       "LOCALIDAD": "cliente.poblacion",
 
-      "MOVIL": "cliente.telefono",
-      "MÓVIL": "cliente.telefono",
+      "MOVIL": "aux.movil",
+      "MÓVIL": "aux.movil",
       "TELEFONO": "cliente.telefono",
       "TELÉFONO": "cliente.telefono",
 
@@ -1180,16 +1305,20 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
 
       "P. NETA": "venta.prima_anual_neta",
       "P.NETA": "venta.prima_anual_neta",
+      "PRIMA NETA": "venta.prima_anual_neta",
 
       "P. TOTAL": "venta.prima_anual_bruta",
       "P.TOTAL": "venta.prima_anual_bruta",
+      "PRIMA TOTAL": "venta.prima_anual_bruta",
 
       "F. EFECTO": "venta.fecha_efecto",
       "F.EFECTO": "venta.fecha_efecto",
+      "FECHA EFECTO": "venta.fecha_efecto",
 
       "AGENTE AUTH ID": "venta.agente_auth_id",
       "AGENTE_AUTH_ID": "venta.agente_auth_id",
       "AUTH ID AGENTE": "venta.agente_auth_id",
+      "COLABORADOR 1 ID": "aux.colaborador_id",
       "COLABORADOR 1": "aux.colaborador_nombre",
 
       "NOMBRE": "cliente.nombre",
@@ -1257,7 +1386,6 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
       "NUMERO ASEGURADOS": "venta.numero_asegurados",
       "Nº ASEGURADOS": "venta.numero_asegurados",
 
-      "FECHA EFECTO": "venta.fecha_efecto",
       "FECHA_EFECTO": "venta.fecha_efecto",
       "EFECTO": "venta.fecha_efecto",
 
@@ -1272,7 +1400,6 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
       "PRIMA ANUAL BRUTA": "venta.prima_anual_bruta",
       "PRIMA_ANUAL_BRUTA": "venta.prima_anual_bruta",
 
-      "PRIMA NETA": "venta.prima_anual_neta",
       "PRIMA ANUAL NETA": "venta.prima_anual_neta",
       "PRIMA_ANUAL_NETA": "venta.prima_anual_neta",
       "NETA": "venta.prima_anual_neta",
@@ -1288,12 +1415,16 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
       "ESTADO PÓLIZA": "venta.estado_poliza",
     };
 
+    final autoNormalizado = <String, String>{
+      for (final entrada in auto.entries)
+        _normalizarCabeceraPoliza(entrada.key): entrada.value,
+    };
     final destinosUsados = <String>{};
 
     for (final h in polizasHeaders) {
-      final key = h.trim().toUpperCase();
-      if (auto.containsKey(key)) {
-        final destino = auto[key]!;
+      final key = _normalizarCabeceraPoliza(h);
+      if (autoNormalizado.containsKey(key)) {
+        final destino = autoNormalizado[key]!;
         if (destinosUsados.add(destino)) {
           polizasColumnMapping[key] = destino;
         }
@@ -1303,7 +1434,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
 
   dynamic valorPolizaMapeado(List<dynamic> row, String campo) {
     for (int i = 0; i < polizasHeaders.length; i++) {
-      final header = polizasHeaders[i].trim().toUpperCase();
+      final header = _normalizarCabeceraPoliza(polizasHeaders[i]);
       final mapped = polizasColumnMapping[header];
 
       if (mapped == campo && i < row.length) {
@@ -1640,54 +1771,107 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
     return agenteAuthId.trim();
   }
 
-  Future<void> importarPolizasMasivasASupabase() async {
-    if (polizasRows.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Primero selecciona un archivo')),
+  String _normalizarImportacion(String value) {
+    return value
+        .toLowerCase()
+        .replaceAll('á', 'a')
+        .replaceAll('é', 'e')
+        .replaceAll('í', 'i')
+        .replaceAll('ó', 'o')
+        .replaceAll('ú', 'u')
+        .replaceAll('ü', 'u')
+        .replaceAll('ñ', 'n')
+        .replaceAll(RegExp(r'[^a-z0-9]+'), ' ')
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .trim();
+  }
+
+  bool _usuarioImportacionActivo(dynamic estado) {
+    return !{
+      'baja',
+      'inactivo',
+      'inactiva',
+      'bloqueado',
+      'bloqueada',
+      'desactivado',
+      'desactivada',
+      'suspendido',
+      'suspendida',
+    }.contains(_normalizarImportacion(estado?.toString() ?? 'activo'));
+  }
+
+  Map<String, dynamic>? _buscarUsuarioImportacion(
+    String colaborador,
+    List<Map<String, dynamic>> usuarios,
+  ) {
+    final buscado = _normalizarImportacion(colaborador);
+    if (buscado.isEmpty) return null;
+
+    final exactos = usuarios.where((u) {
+      final nombre = _normalizarImportacion(u['nombre']?.toString() ?? '');
+      final apellidos = _normalizarImportacion(
+        u['apellidos']?.toString() ?? '',
       );
-      return;
-    }
+      return _normalizarImportacion('$nombre $apellidos') == buscado ||
+          _normalizarImportacion('$apellidos $nombre') == buscado;
+    }).toList();
+    if (exactos.length == 1) return exactos.single;
+
+    final tokensBuscados = buscado
+        .split(' ')
+        .where((e) => e.isNotEmpty)
+        .toSet();
+    final contenidos = usuarios.where((u) {
+      final completo = _normalizarImportacion(
+        '${u['nombre'] ?? ''} ${u['apellidos'] ?? ''}',
+      );
+      final tokensUsuario = completo
+          .split(' ')
+          .where((e) => e.isNotEmpty)
+          .toSet();
+      return tokensUsuario.isNotEmpty &&
+          tokensUsuario.every(tokensBuscados.contains);
+    }).toList();
+    return contenidos.length == 1 ? contenidos.single : null;
+  }
+
+  Future<void> validarImportacionPolizas() async {
+    if (polizasRows.isEmpty || validandoPolizas || importingPolizas) return;
 
     final destinos = polizasColumnMapping.values.toSet();
-    final faltantes = <String>[];
-
-    for (final requerido in [
-      'cliente.nombre',
-      'venta.numero_poliza',
-      'venta.producto',
-      'venta.compania',
-      'venta.fecha_efecto',
-      'venta.prima_anual_neta',
-      'venta.comision',
-    ]) {
-      if (!destinos.contains(requerido)) faltantes.add(requerido);
-    }
-
-    if (!destinos.contains('venta.agente_auth_id') &&
-        !destinos.contains('aux.colaborador_nombre')) {
-      faltantes.add('aux.colaborador_nombre o venta.agente_auth_id');
-    }
-    final cabecerasNormalizadas = polizasHeaders
-        .map((h) => h.trim().toUpperCase())
+    final requeridos = <String, String>{
+      'cliente.nombre': 'Tomador',
+      'venta.numero_poliza': 'Nº póliza',
+      'venta.producto': 'Ramo',
+      'venta.compania': 'Compañía',
+      'venta.fecha_efecto': 'Fecha efecto',
+      'venta.prima_anual_neta': 'Prima neta',
+      'venta.prima_anual_bruta': 'Prima total',
+      'aux.colaborador_nombre': 'Colaborador 1',
+    };
+    final faltantes = requeridos.entries
+        .where((e) => !destinos.contains(e.key))
+        .map((e) => e.value)
+        .toList();
+    final cabeceras = polizasHeaders
+        .map(_normalizarCabeceraPoliza)
         .where((h) => h.isNotEmpty)
         .toList();
-    if (cabecerasNormalizadas.toSet().length != cabecerasNormalizadas.length) {
+
+    if (cabeceras.toSet().length != cabeceras.length) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text(
-            'El archivo contiene columnas repetidas. Renómbralas antes de importar.',
-          ),
+          content: Text('El Excel contiene columnas repetidas.'),
           backgroundColor: Colors.red,
         ),
       );
       return;
     }
-
     if (faltantes.isNotEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            'Faltan columnas obligatorias: ${faltantes.join(', ')}',
+            'No se reconocen estas columnas: ${faltantes.join(', ')}',
           ),
           backgroundColor: Colors.red,
         ),
@@ -1696,41 +1880,432 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
     }
 
     setState(() {
+      validandoPolizas = true;
+      polizasNuevasValidadas = [];
+      polizasSinAgente = [];
+      polizasPendientesAsignacion = [];
+      polizasExistentesValidadas = [];
+    });
+
+    try {
+      final usuarios = <Map<String, dynamic>>[];
+      var desde = 0;
+      const pagina = 1000;
+      while (true) {
+        final bloque = List<Map<String, dynamic>>.from(
+          await supabase
+              .from('usuarios')
+              .select('id, auth_id, nombre, apellidos, email, estado')
+              .range(desde, desde + pagina - 1),
+        );
+        usuarios.addAll(
+          bloque.where(
+            (u) =>
+                (u['auth_id']?.toString().trim().isNotEmpty ?? false) &&
+                _usuarioImportacionActivo(u['estado']),
+          ),
+        );
+        if (bloque.length < pagina) break;
+        desde += pagina;
+      }
+
+      final numeros = polizasRows
+          .map(
+            (row) => valorPolizaMapeado(
+              row,
+              'venta.numero_poliza',
+            )?.toString().trim().toUpperCase(),
+          )
+          .whereType<String>()
+          .where((e) => e.isNotEmpty)
+          .toSet()
+          .toList();
+      final existentes = <String, Map<String, dynamic>>{};
+      for (var i = 0; i < numeros.length; i += 100) {
+        final fin = (i + 100 < numeros.length) ? i + 100 : numeros.length;
+        final bloque = List<Map<String, dynamic>>.from(
+          await supabase
+              .from('ventas')
+              .select('id, numero_poliza, cliente_id, agente_auth_id')
+              .inFilter('numero_poliza', numeros.sublist(i, fin)),
+        );
+        for (final venta in bloque) {
+          final numero = venta['numero_poliza']
+              ?.toString()
+              .trim()
+              .toUpperCase();
+          if (numero != null && numero.isNotEmpty) existentes[numero] = venta;
+        }
+        final pendientesYaGuardadas = await supabase.rpc(
+          'app_polizas_ya_importadas',
+          params: {'p_numeros': numeros.sublist(i, fin)},
+        );
+        for (final fila in List<Map<String, dynamic>>.from(
+          pendientesYaGuardadas,
+        )) {
+          final numero = fila['numero_poliza'].toString().trim().toUpperCase();
+          existentes.putIfAbsent(numero, () => fila);
+        }
+      }
+
+      final nuevas = <Map<String, dynamic>>[];
+      final sinAgente = <Map<String, dynamic>>[];
+      final pendientesAsignacion = <Map<String, dynamic>>[];
+      final repetidas = <Map<String, dynamic>>[];
+      final vistosExcel = <String>{};
+
+      for (var index = 0; index < polizasRows.length; index++) {
+        final row = polizasRows[index];
+        final numero =
+            valorPolizaMapeado(
+              row,
+              'venta.numero_poliza',
+            )?.toString().trim().toUpperCase() ??
+            '';
+        final colaborador =
+            valorPolizaMapeado(
+              row,
+              'aux.colaborador_nombre',
+            )?.toString().trim() ??
+            '';
+        final usuario = _buscarUsuarioImportacion(colaborador, usuarios);
+        final tomador =
+            valorPolizaMapeado(row, 'cliente.nombre')?.toString().trim() ?? '';
+        final producto =
+            valorPolizaMapeado(row, 'venta.producto')?.toString().trim() ?? '';
+        final compania =
+            valorPolizaMapeado(row, 'venta.compania')?.toString().trim() ?? '';
+        final primaNeta = toDoublePoliza(
+          valorPolizaMapeado(row, 'venta.prima_anual_neta'),
+        );
+        final primaTotal = toDoublePoliza(
+          valorPolizaMapeado(row, 'venta.prima_anual_bruta'),
+        );
+        final fechaEfecto = toFechaSupabase(
+          valorPolizaMapeado(row, 'venta.fecha_efecto'),
+        );
+        final base = <String, dynamic>{
+          'fila': index + 2,
+          'row': row,
+          'numero_poliza': numero,
+          'colaborador': colaborador,
+          'nif': valorPolizaMapeado(row, 'cliente.dni')?.toString() ?? '',
+          'tomador': tomador,
+        };
+
+        if (numero.isEmpty) {
+          sinAgente.add({...base, 'motivo': 'Falta el número de póliza'});
+          continue;
+        }
+        if (!vistosExcel.add(numero)) {
+          sinAgente.add({
+            ...base,
+            'motivo': 'Póliza repetida dentro del Excel',
+          });
+          continue;
+        }
+        // Las existentes se omiten incluso si el Excel cambia el agente
+        // o contiene datos que no pasarían la validación de una póliza nueva.
+        if (existentes.containsKey(numero)) {
+          repetidas.add({
+            ...base,
+            'motivo': 'Ya registrada: se omite sin modificar',
+          });
+          continue;
+        }
+        final erroresFila = <String>[];
+        if (tomador.isEmpty) erroresFila.add('falta Tomador');
+        if (producto.isEmpty) erroresFila.add('falta Ramo');
+        if (compania.isEmpty) erroresFila.add('falta Compañía');
+        if (primaNeta == null || primaNeta < 0) {
+          erroresFila.add('Prima neta no válida');
+        }
+        if (primaTotal == null || primaTotal < 0) {
+          erroresFila.add('Prima total no válida');
+        }
+        if (fechaEfecto == null) erroresFila.add('Fecha efecto no válida');
+        if (erroresFila.isNotEmpty) {
+          sinAgente.add({...base, 'motivo': erroresFila.join(' · ')});
+          continue;
+        }
+        if (usuario == null) {
+          if (colaborador.isEmpty) {
+            sinAgente.add({
+              ...base,
+              'motivo': 'Falta el nombre del agente en Colaborador 1',
+            });
+            continue;
+          }
+          pendientesAsignacion.add({
+            ...base,
+            'agente_auth_id': null,
+            'agente_nombre': colaborador,
+            'motivo':
+                'Se guardará pendiente de asignación con el agente del Excel',
+          });
+          continue;
+        }
+
+        final agenteNombre =
+            '${usuario['nombre'] ?? ''} ${usuario['apellidos'] ?? ''}'
+                .replaceAll(RegExp(r'\s+'), ' ')
+                .trim();
+        final validada = <String, dynamic>{
+          ...base,
+          'agente_auth_id': usuario['auth_id'].toString(),
+          'agente_nombre': agenteNombre,
+        };
+        final existente = existentes[numero];
+        if (existente == null) {
+          nuevas.add(validada);
+        } else {
+          repetidas.add({
+            ...validada,
+            'venta_id': existente['id'].toString(),
+            'cliente_id_existente': existente['cliente_id']?.toString(),
+            'agente_anterior': existente['agente_auth_id']?.toString(),
+          });
+        }
+      }
+
+      if (!mounted) return;
+      setState(() {
+        polizasNuevasValidadas = nuevas;
+        polizasSinAgente = sinAgente;
+        polizasPendientesAsignacion = pendientesAsignacion;
+        polizasExistentesValidadas = repetidas;
+      });
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('No se pudo analizar el Excel: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => validandoPolizas = false);
+    }
+  }
+
+  Future<void> exportarListadoPolizas(
+    List<Map<String, dynamic>> listado,
+    String nombre,
+  ) async {
+    final libro = excel.Excel.createExcel();
+    final hoja = libro['Pólizas'];
+    libro.delete('Sheet1');
+    hoja.appendRow([
+      excel.TextCellValue('Fila'),
+      excel.TextCellValue('Nº póliza'),
+      excel.TextCellValue('NIF'),
+      excel.TextCellValue('Tomador'),
+      excel.TextCellValue('Colaborador 1'),
+      excel.TextCellValue('Agente identificado'),
+      excel.TextCellValue('Motivo / acción'),
+    ]);
+    for (final item in listado) {
+      hoja.appendRow([
+        excel.TextCellValue(item['fila']?.toString() ?? ''),
+        excel.TextCellValue(item['numero_poliza']?.toString() ?? ''),
+        excel.TextCellValue(item['nif']?.toString() ?? ''),
+        excel.TextCellValue(item['tomador']?.toString() ?? ''),
+        excel.TextCellValue(item['colaborador']?.toString() ?? ''),
+        excel.TextCellValue(item['agente_nombre']?.toString() ?? ''),
+        excel.TextCellValue(
+          item['motivo']?.toString() ??
+              'Se actualizará con los datos del Excel',
+        ),
+      ]);
+    }
+    final bytes = libro.encode();
+    if (bytes == null) return;
+    final dir = await getTemporaryDirectory();
+    final file = File('${dir.path}/$nombre.xlsx');
+    await file.writeAsBytes(bytes, flush: true);
+    await OpenFilex.open(file.path);
+  }
+
+  bool _falloGlobalImportacion(Object error) {
+    if (error is TimeoutException ||
+        error is SocketException ||
+        error is AuthException)
+      return true;
+    if (error is PostgrestException) {
+      return {
+        '42501',
+        'PGRST202',
+        'PGRST204',
+        'PGRST205',
+        'PGRST301',
+        'PGRST302',
+        '42P01',
+        '42883',
+      }.contains(error.code);
+    }
+    return false;
+  }
+
+  String _detalleErrorImportacion(Object error) {
+    if (error is PostgrestException) {
+      final detalle =
+          '${error.message}\nCodigo: ${error.code ?? '-'}'
+          '${error.details == null ? '' : '\nDetalle: ${error.details}'}'
+          '${error.hint == null ? '' : '\nAyuda: ${error.hint}'}';
+      if ({
+        'PGRST202',
+        'PGRST204',
+        'PGRST205',
+        '42P01',
+        '42883',
+      }.contains(error.code)) {
+        return 'Falta una tabla, columna o funcion necesaria en Supabase. Comprueba que la migracion de pendientes se ha ejecutado completa.\n$detalle';
+      }
+      if (error.code == '42501') {
+        return 'Supabase ha rechazado el acceso por permisos del usuario conectado.\n$detalle';
+      }
+      return detalle;
+    }
+    return error.toString();
+  }
+
+  Future<void> importarPolizasMasivasASupabase() async {
+    if (importingPolizas) return;
+    final pendientes = [
+      ...polizasNuevasValidadas,
+      ...polizasPendientesAsignacion,
+    ];
+    if (pendientes.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Analiza primero el Excel y comprueba los listados.'),
+        ),
+      );
+      return;
+    }
+
+    setState(() => importingPolizas = true);
+    // Verificar configuracion y sesion antes de crear ningun cliente.
+    try {
+      if (supabase.auth.currentSession == null) {
+        throw const AuthException(
+          'La sesion ha caducado. Vuelve a iniciar sesion.',
+        );
+      }
+      await supabase
+          .rpc('app_polizas_ya_importadas', params: {'p_numeros': <String>[]})
+          .timeout(const Duration(seconds: 45));
+      if (polizasPendientesAsignacion.isNotEmpty) {
+        await supabase
+            .from('polizas_pendientes_asignacion')
+            .select('id')
+            .limit(1)
+            .timeout(const Duration(seconds: 45));
+      }
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        importingPolizas = false;
+        resultadoCargaPolizas =
+            'La carga no se ha iniciado.\n${_detalleErrorImportacion(error)}';
+      });
+      return;
+    }
+    Directory? directorio;
+    try {
+      if (!kIsWeb) {
+        directorio = await getApplicationSupportDirectory();
+        await directorio.create(recursive: true);
+      }
+    } catch (error) {
+      // El informe local es opcional. Un plugin de archivos no disponible
+      // nunca debe impedir el guardado de pólizas en Supabase.
+      directorio = null;
+      debugPrint(
+        'Informe local no disponible; se conserva el resumen en pantalla: $error',
+      );
+    }
+    if (!mounted) return;
+    setState(() {
       importingPolizas = true;
       polizasImportProgress = 0;
-      polizasImportTotal = polizasRows.length;
+      polizasImportTotal = pendientes.length;
+      resultadoCargaPolizas = null;
+      erroresCargaPolizas = [];
+      polizasGuardadasCarga = 0;
     });
 
     var ventasInsertadas = 0;
-    var duplicadas = 0;
+    var ventasPendientesGuardadas = 0;
+    var ventasOmitidas = 0;
     final erroresDetalle = <String>[];
+    final completadas = <int>{};
+    final resultados = <Map<String, dynamic>>[];
+    String? motivoInterrupcion;
+    final informe = directorio == null
+        ? null
+        : File(
+            '${directorio.path}/importacion_polizas_${DateTime.now().millisecondsSinceEpoch}.json',
+          );
+    informeCargaPolizasPath = informe?.path;
 
-    for (var rowIndex = 0; rowIndex < polizasRows.length; rowIndex++) {
-      final row = polizasRows[rowIndex];
+    Future<void> guardarInforme() async {
+      if (informe == null) return;
+      try {
+        await informe.writeAsString(
+          jsonEncode({
+            'fecha': DateTime.now().toIso8601String(),
+            'total': pendientes.length,
+            'nuevas': ventasInsertadas,
+            'pendientes_asignacion_guardadas': ventasPendientesGuardadas,
+            'omitidas': ventasOmitidas,
+            'errores': erroresDetalle,
+            'resultados': resultados,
+            'pendientes': pendientes
+                .where((item) => !completadas.contains(item['fila']))
+                .map((item) => item['numero_poliza'])
+                .toList(),
+          }),
+          flush: true,
+        );
+      } catch (error) {
+        debugPrint('No se pudo guardar el informe de importación: $error');
+      }
+    }
+
+    for (final item in pendientes) {
+      if (!mounted) break;
+      final row = List<dynamic>.from(item['row'] as List);
+      final filaExcel = item['fila'] as int;
       String? clienteCreadoId;
+      String operacionImportacion = 'Comprobar si la poliza ya existe';
 
       try {
-        final agenteAuthId = await _resolverAgenteImportacion(row);
-
-        final numeroPoliza = valorPolizaMapeado(
-          row,
-          'venta.numero_poliza',
-        )?.toString().trim().toUpperCase();
-
-        if (numeroPoliza == null || numeroPoliza.isEmpty) {
-          throw Exception('Falta el número de póliza.');
-        }
-
-        final ventaExistente = await supabase
-            .from('ventas')
-            .select('id')
-            .ilike('numero_poliza', numeroPoliza)
-            .limit(1);
-
-        if ((ventaExistente as List).isNotEmpty) {
-          duplicadas++;
+        // Reconsultar antes de escribir permite reanudar una carga parcial
+        // sin usar el listado de existentes que pudo quedar desactualizado.
+        final existenteAhora = await supabase
+            .rpc(
+              'app_polizas_ya_importadas',
+              params: {
+                'p_numeros': [item['numero_poliza'].toString()],
+              },
+            )
+            .timeout(const Duration(seconds: 45));
+        if ((existenteAhora as List).isNotEmpty) {
+          ventasOmitidas++;
+          completadas.add(filaExcel);
+          resultados.add({
+            'fila': filaExcel,
+            'numero_poliza': item['numero_poliza'],
+            'resultado': 'omitida: ya registrada',
+          });
+          if (mounted) setState(() => polizasImportProgress++);
           continue;
         }
+        final agenteAuthId = item['agente_auth_id']?.toString();
+        final numeroPoliza = item['numero_poliza'].toString();
+        operacionImportacion = 'Preparar y convertir los datos del Excel';
 
         final tomadorCompleto =
             valorPolizaMapeado(row, 'cliente.nombre')?.toString().trim() ?? '';
@@ -1739,13 +2314,16 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
           throw Exception('Falta el nombre del tomador.');
         }
 
-        final apellidosSeparados = valorPolizaMapeado(
-          row,
-          'cliente.apellidos',
-        )?.toString().trim();
+        final apellido1 =
+            valorPolizaMapeado(row, 'aux.apellido_1')?.toString().trim() ?? '';
+        final apellido2 =
+            valorPolizaMapeado(row, 'aux.apellido_2')?.toString().trim() ?? '';
+        final apellidosSeparados = [
+          apellido1,
+          apellido2,
+        ].where((e) => e.isNotEmpty).join(' ').trim();
 
-        final datosTomador =
-            apellidosSeparados != null && apellidosSeparados.isNotEmpty
+        final datosTomador = apellidosSeparados.isNotEmpty
             ? {'nombre': tomadorCompleto, 'apellidos': apellidosSeparados}
             : separarNombreApellidos(tomadorCompleto);
 
@@ -1753,13 +2331,8 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
           row,
           'venta.producto',
         )?.toString().trim();
-        final formaPago = valorPolizaMapeado(
-          row,
-          'venta.forma_pago',
-        )?.toString().trim();
-        final precio = toDoublePoliza(valorPolizaMapeado(row, 'venta.precio'));
-        final primaAnualExcel = toDoublePoliza(
-          valorPolizaMapeado(row, 'venta.prima_anual'),
+        final formaPago = importPaymentFrequency(
+          valorPolizaMapeado(row, 'venta.forma_pago'),
         );
         final primaBrutaExcel = toDoublePoliza(
           valorPolizaMapeado(row, 'venta.prima_anual_bruta'),
@@ -1767,26 +2340,15 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
         final primaNeta = toDoublePoliza(
           valorPolizaMapeado(row, 'venta.prima_anual_neta'),
         );
-        final comision = toDoublePoliza(
-          valorPolizaMapeado(row, 'venta.comision'),
-        );
 
         if (primaNeta == null) {
           throw Exception('Falta o no es válida la prima anual neta.');
         }
-
-        if (comision == null) {
-          throw Exception('Falta o no es válida la comisión.');
+        if (primaBrutaExcel == null) {
+          throw Exception('Falta o no es válida la prima total.');
         }
 
-        final primaAnual =
-            primaAnualExcel ??
-            (precio == null
-                ? null
-                : calcularPrimaAnualMasiva(
-                    precio: precio,
-                    formaPago: formaPago,
-                  ));
+        final primaAnual = primaBrutaExcel;
 
         final fechaEfecto = toFechaSupabase(
           valorPolizaMapeado(row, 'venta.fecha_efecto'),
@@ -1802,14 +2364,11 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
         if (primaNeta < 0) {
           throw Exception('La prima anual neta no puede ser negativa.');
         }
-        if (primaBrutaExcel != null && primaBrutaExcel < 0) {
+        if (primaBrutaExcel < 0) {
           throw Exception('La prima anual bruta no puede ser negativa.');
         }
-        if (primaAnual != null && primaAnual < 0) {
+        if (primaAnual < 0) {
           throw Exception('La prima anual no puede ser negativa.');
-        }
-        if (comision < 0) {
-          throw Exception('La comisión no puede ser negativa.');
         }
 
         final dni = valorPolizaMapeado(
@@ -1823,108 +2382,233 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
 
         Map<String, dynamic>? clienteExistente;
 
-        if (dni != null && dni.isNotEmpty) {
+        if (agenteAuthId != null && dni != null && dni.isNotEmpty) {
+          operacionImportacion = 'Buscar cliente por NIF en clientes';
           clienteExistente = await supabase
               .from('clientes')
               .select('id')
               .eq('auth_id', agenteAuthId)
               .eq('dni', dni)
               .limit(1)
-              .maybeSingle();
-        } else if (email != null && email.isNotEmpty) {
+              .maybeSingle()
+              .timeout(const Duration(seconds: 45));
+        } else if (agenteAuthId != null && email != null && email.isNotEmpty) {
+          operacionImportacion = 'Buscar cliente por email en clientes';
           clienteExistente = await supabase
               .from('clientes')
               .select('id')
               .eq('auth_id', agenteAuthId)
               .eq('email', email)
               .limit(1)
-              .maybeSingle();
+              .maybeSingle()
+              .timeout(const Duration(seconds: 45));
         }
 
-        late String clienteId;
+        if (clienteExistente == null &&
+            item['cliente_id_existente'] != null &&
+            item['agente_anterior']?.toString() == agenteAuthId) {
+          clienteExistente = {'id': item['cliente_id_existente']};
+        }
 
-        if (clienteExistente != null) {
-          clienteId = clienteExistente['id'].toString();
-        } else {
-          final clienteData = limpiarNulls({
-            'auth_id': agenteAuthId,
-            'nombre': datosTomador['nombre'],
-            'apellidos': datosTomador['apellidos'],
-            'telefono': valorPolizaMapeado(row, 'cliente.telefono'),
-            'email': email,
-            'codigo_postal': valorPolizaMapeado(row, 'cliente.codigo_postal'),
-            'provincia': valorPolizaMapeado(row, 'cliente.provincia'),
-            'poblacion': valorPolizaMapeado(row, 'cliente.poblacion'),
-            'direccion': valorPolizaMapeado(row, 'cliente.direccion'),
-            'numero': valorPolizaMapeado(row, 'cliente.numero'),
-            'dni': dni,
-          });
-
-          final clienteResponse = await supabase
-              .from('clientes')
-              .insert(clienteData)
-              .select('id')
-              .single();
-
-          clienteId = clienteResponse['id'].toString();
-          clienteCreadoId = clienteId;
+        final telefono =
+            valorPolizaMapeado(row, 'aux.movil') ??
+            valorPolizaMapeado(row, 'cliente.telefono');
+        final clienteData = limpiarNulls({
+          'auth_id': agenteAuthId,
+          'nombre': datosTomador['nombre'],
+          'apellidos': datosTomador['apellidos'],
+          'telefono': telefono?.toString(),
+          'email': email,
+          'codigo_postal': importPostalCode(
+            valorPolizaMapeado(row, 'cliente.codigo_postal'),
+          ),
+          'provincia': importProvince(
+            valorPolizaMapeado(row, 'cliente.provincia'),
+            valorPolizaMapeado(row, 'cliente.codigo_postal'),
+          ),
+          'poblacion': valorPolizaMapeado(row, 'cliente.poblacion'),
+          'direccion': valorPolizaMapeado(row, 'cliente.direccion'),
+          'numero': importAddressNumber(
+            valorPolizaMapeado(row, 'cliente.numero'),
+          ),
+          'dni': dni,
+        });
+        if (clienteExistente == null) {
+          clienteData.addAll(importNewClientContacts(clienteData));
         }
 
         final ventaData = limpiarNulls({
-          'cliente_id': clienteId,
           'agente_auth_id': agenteAuthId,
           'producto': producto,
           'compania': valorPolizaMapeado(row, 'venta.compania'),
           'forma_pago': formaPago,
-          'precio': precio,
+          'precio': primaBrutaExcel,
           'numero_asegurados': toIntPoliza(
             valorPolizaMapeado(row, 'venta.numero_asegurados'),
           ),
           'fecha_efecto': fechaEfecto,
           'prima_anual': primaAnual,
-          'prima_anual_bruta': primaBrutaExcel ?? primaAnual,
+          'prima_anual_bruta': primaBrutaExcel,
           'prima_anual_neta': primaNeta,
-          'comision': comision,
+          'comision':
+              toDoublePoliza(valorPolizaMapeado(row, 'venta.comision')) ?? 0,
           'categoria_producto':
               valorPolizaMapeado(row, 'venta.categoria_producto') ?? producto,
           'numero_poliza': numeroPoliza,
           'estado_poliza':
               valorPolizaMapeado(row, 'venta.estado_poliza') ?? 'ACTIVA',
         });
-
-        await supabase.from('ventas').insert(ventaData);
+        if (agenteAuthId == null) {
+          operacionImportacion =
+              'Guardar en polizas_pendientes_asignacion mediante app_importar_poliza_pendiente';
+          final pendienteId = await supabase
+              .rpc(
+                'app_importar_poliza_pendiente',
+                params: {
+                  'p_numero_poliza': numeroPoliza,
+                  'p_agente_nombre': item['colaborador'].toString(),
+                  'p_cliente_datos': clienteData,
+                  'p_venta_datos': ventaData,
+                },
+              )
+              .timeout(const Duration(seconds: 45));
+          if (pendienteId == null) {
+            ventasOmitidas++;
+          } else {
+            ventasPendientesGuardadas++;
+          }
+        } else {
+          late String clienteId;
+          if (clienteExistente != null) {
+            operacionImportacion = 'Actualizar cliente existente en clientes';
+            clienteId = clienteExistente['id'].toString();
+            await supabase
+                .from('clientes')
+                .update(clienteData)
+                .eq('id', clienteId)
+                .select('id')
+                .single()
+                .timeout(const Duration(seconds: 45));
+          } else {
+            operacionImportacion = 'Crear cliente en clientes';
+            final clienteResponse = await supabase
+                .from('clientes')
+                .insert(clienteData)
+                .select('id')
+                .single()
+                .timeout(const Duration(seconds: 45));
+            clienteId = clienteResponse['id'].toString();
+            clienteCreadoId = clienteId;
+          }
+          ventaData['cliente_id'] = clienteId;
+          operacionImportacion = 'Insertar poliza en ventas';
+          await supabase
+              .from('ventas')
+              .insert(ventaData)
+              .select('id')
+              .single()
+              .timeout(const Duration(seconds: 45));
+          ventasInsertadas++;
+        }
         clienteCreadoId = null;
-        ventasInsertadas++;
-      } catch (e) {
-        if (clienteCreadoId != null) {
+        completadas.add(filaExcel);
+        resultados.add({
+          'fila': filaExcel,
+          'numero_poliza': numeroPoliza,
+          'resultado': agenteAuthId == null
+              ? 'nueva pendiente de asignación'
+              : 'nueva',
+        });
+      } catch (e, stackTrace) {
+        // Un timeout no prueba que el servidor no haya guardado la venta.
+        // Conservar el cliente permite reconciliarla en el siguiente intento.
+        if (clienteCreadoId != null &&
+            e is! TimeoutException &&
+            e is! SocketException) {
           try {
-            await supabase.from('clientes').delete().eq('id', clienteCreadoId);
+            await supabase
+                .from('clientes')
+                .delete()
+                .eq('id', clienteCreadoId)
+                .timeout(const Duration(seconds: 45));
           } catch (rollbackError) {
             debugPrint(
-              'ERROR LIMPIANDO CLIENTE DE FILA ${rowIndex + 2}: '
+              'ERROR LIMPIANDO CLIENTE DE FILA $filaExcel: '
               '$rollbackError',
             );
           }
         }
 
-        final detalle = 'Fila ${rowIndex + 2}: $e';
+        final motivo = _detalleErrorImportacion(e);
+        // Registro explicito solicitado para ver el motivo en consola,
+        // tanto en Flutter como en las herramientas del navegador.
+        print(
+          '[IMPORTACION POLIZAS] ERROR #${erroresDetalle.length + 1} '
+          '| fila Excel: $filaExcel | poliza: ${item['numero_poliza']} '
+          '| operacion: $operacionImportacion | tipo: ${e.runtimeType}',
+        );
+        print('[IMPORTACION POLIZAS] MOTIVO COMPLETO:\n$motivo');
+        print('[IMPORTACION POLIZAS] STACK TRACE:\n$stackTrace');
+        final detalle = 'Fila $filaExcel: $motivo';
         erroresDetalle.add(detalle);
+        erroresCargaPolizas.add({...item, 'motivo': motivo});
+        resultados.add({
+          'fila': filaExcel,
+          'numero_poliza': item['numero_poliza'],
+          'resultado': 'error',
+          'motivo': motivo,
+        });
+        if (_falloGlobalImportacion(e)) motivoInterrupcion = motivo;
         debugPrint('ERROR FILA CARGA PÓLIZA: $detalle');
       }
 
       if (mounted) {
-        setState(() => polizasImportProgress++);
+        setState(() {
+          polizasImportProgress++;
+          polizasGuardadasCarga = ventasInsertadas + ventasPendientesGuardadas;
+        });
+        if (resultados.isNotEmpty && resultados.last['resultado'] == 'error') {
+          print(
+            '[IMPORTACION POLIZAS] CONTADOR '
+            'Procesadas: $polizasImportProgress/$polizasImportTotal '
+            '| Guardadas: $polizasGuardadasCarga '
+            '| Errores: ${erroresCargaPolizas.length}',
+          );
+        }
       }
+      if (resultados.length % 20 == 0 || motivoInterrupcion != null) {
+        await guardarInforme();
+      }
+      // Un error de datos afecta solo a su fila. Una averia global debe
+      // detenerse con un motivo visible y conservar todas las pendientes.
+      if (motivoInterrupcion != null) break;
     }
 
+    await guardarInforme();
     if (!mounted) return;
 
-    setState(() => importingPolizas = false);
+    setState(() {
+      importingPolizas = false;
+      polizasNuevasValidadas.removeWhere(
+        (item) => completadas.contains(item['fila']),
+      );
+      polizasExistentesValidadas.removeWhere(
+        (item) => completadas.contains(item['fila']),
+      );
+      polizasPendientesAsignacion.removeWhere(
+        (item) => completadas.contains(item['fila']),
+      );
+      resultadoCargaPolizas =
+          'Resultado: $ventasInsertadas nuevas asignadas · $ventasPendientesGuardadas guardadas sin asignar · $ventasOmitidas omitidas por existir · '
+          '${erroresDetalle.length} errores · '
+          '${pendientes.length - completadas.length} pendientes de guardar'
+          '${motivoInterrupcion == null ? '' : '\nCarga interrumpida: $motivoInterrupcion'}';
+    });
 
     final errores = erroresDetalle.length;
     final resumen =
-        'Carga finalizada: $ventasInsertadas importadas · '
-        '$duplicadas duplicadas omitidas · $errores errores';
+        'Carga finalizada: $ventasInsertadas nuevas · '
+        '$ventasPendientesGuardadas guardadas sin asignar · $ventasOmitidas omitidas · $errores errores';
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -2146,6 +2830,82 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
     });
   }
 
+  Widget _buildListadoValidacionPolizas({
+    required String titulo,
+    required String descripcion,
+    required Color color,
+    required IconData icono,
+    required List<Map<String, dynamic>> datos,
+    VoidCallback? onDescargar,
+  }) {
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: color.withOpacity(0.35)),
+      ),
+      child: ExpansionTile(
+        leading: CircleAvatar(
+          backgroundColor: color.withOpacity(0.12),
+          foregroundColor: color,
+          child: Icon(icono),
+        ),
+        title: Text(
+          '$titulo (${datos.length})',
+          style: const TextStyle(fontWeight: FontWeight.bold),
+        ),
+        subtitle: Text(descripcion),
+        trailing: onDescargar == null
+            ? null
+            : OutlinedButton.icon(
+                onPressed: onDescargar,
+                icon: const Icon(Icons.download_rounded, size: 18),
+                label: const Text('Descargar Excel'),
+              ),
+        children: [
+          if (datos.isEmpty)
+            const Padding(
+              padding: EdgeInsets.fromLTRB(20, 0, 20, 18),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Text('No hay pólizas en este listado.'),
+              ),
+            )
+          else
+            Container(
+              constraints: const BoxConstraints(maxHeight: 300),
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+              child: ProgressiveListView.separated(
+                shrinkWrap: true,
+                itemCount: datos.length,
+                separatorBuilder: (_, __) => const Divider(height: 1),
+                itemBuilder: (context, index) {
+                  final item = datos[index];
+                  final detalle =
+                      item['motivo']?.toString() ??
+                      item['agente_nombre']?.toString() ??
+                      '';
+                  return ListTile(
+                    dense: true,
+                    contentPadding: EdgeInsets.zero,
+                    title: Text(
+                      '${item['numero_poliza'] ?? 'Sin número'} · ${item['tomador'] ?? ''}',
+                      style: const TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                    subtitle: Text(
+                      'Fila ${item['fila']} · ${item['colaborador'] ?? ''}'
+                      '${detalle.isEmpty ? '' : ' · $detalle'}',
+                    ),
+                  );
+                },
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
   Widget buildCargaMasivaPolizas() {
     return SingleChildScrollView(
       child: Column(
@@ -2241,11 +3001,145 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
 
           const SizedBox(height: 20),
 
+          if (resultadoCargaPolizas != null) ...[
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(18),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    SelectableText(
+                      resultadoCargaPolizas!,
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'Las pendientes se conservan. Puedes volver a guardar para continuar la carga.',
+                    ),
+                    if (informeCargaPolizasPath != null)
+                      TextButton.icon(
+                        onPressed: () =>
+                            OpenFilex.open(informeCargaPolizasPath!),
+                        icon: const Icon(Icons.description_outlined),
+                        label: const Text('Abrir informe de la carga'),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+            if (erroresCargaPolizas.isNotEmpty)
+              _buildListadoValidacionPolizas(
+                titulo: 'Errores al guardar en Supabase',
+                descripcion:
+                    'Estas pólizas siguen pendientes. El motivo real aparece en cada fila.',
+                color: Colors.red,
+                icono: Icons.error_outline,
+                datos: erroresCargaPolizas,
+                onDescargar: () => exportarListadoPolizas(
+                  erroresCargaPolizas,
+                  'errores_ultima_carga_polizas',
+                ),
+              ),
+          ],
           if (polizasHeaders.isNotEmpty) buildMapeoPolizas(),
 
           const SizedBox(height: 20),
 
           if (polizasPreview.isNotEmpty) buildPreviewPolizas(),
+
+          const SizedBox(height: 20),
+
+          if (polizasRows.isNotEmpty)
+            SizedBox(
+              width: double.infinity,
+              height: 52,
+              child: ElevatedButton.icon(
+                onPressed: validandoPolizas || importingPolizas
+                    ? null
+                    : validarImportacionPolizas,
+                icon: validandoPolizas
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                          color: Colors.white,
+                          strokeWidth: 2,
+                        ),
+                      )
+                    : const Icon(Icons.fact_check_rounded),
+                label: Text(
+                  validandoPolizas
+                      ? 'Analizando pólizas y agentes...'
+                      : 'Analizar antes de guardar',
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.indigo.shade700,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                ),
+              ),
+            ),
+
+          if (polizasNuevasValidadas.isNotEmpty ||
+              polizasPendientesAsignacion.isNotEmpty ||
+              polizasSinAgente.isNotEmpty ||
+              polizasExistentesValidadas.isNotEmpty) ...[
+            const SizedBox(height: 20),
+            _buildListadoValidacionPolizas(
+              titulo: '1. Nuevas con agente identificado',
+              descripcion: 'Se crearán en clientes y ventas al guardar.',
+              color: Colors.green,
+              icono: Icons.verified_rounded,
+              datos: polizasNuevasValidadas,
+            ),
+            const SizedBox(height: 12),
+            _buildListadoValidacionPolizas(
+              titulo: 'Filas inválidas / repetidas en el Excel',
+              descripcion:
+                  'Datos inválidos o filas repetidas: no se enviarán a Supabase.',
+              color: Colors.red,
+              icono: Icons.person_off_rounded,
+              datos: polizasSinAgente,
+              onDescargar: polizasSinAgente.isEmpty
+                  ? null
+                  : () => exportarListadoPolizas(
+                      polizasSinAgente,
+                      'polizas_no_importadas',
+                    ),
+            ),
+            const SizedBox(height: 12),
+            _buildListadoValidacionPolizas(
+              titulo: '2. Nuevas pendientes de asignación',
+              descripcion:
+                  'Se guardarán en Supabase con los datos y el nombre completo del agente del Excel.',
+              color: Colors.blue,
+              icono: Icons.person_search_rounded,
+              datos: polizasPendientesAsignacion,
+              onDescargar: polizasPendientesAsignacion.isEmpty
+                  ? null
+                  : () => exportarListadoPolizas(
+                      polizasPendientesAsignacion,
+                      'polizas_pendientes_asignacion',
+                    ),
+            ),
+            const SizedBox(height: 12),
+            _buildListadoValidacionPolizas(
+              titulo: '3. Pólizas ya registradas',
+              descripcion:
+                  'Se omiten. No se guardan ni se modifican sus datos.',
+              color: Colors.orange,
+              icono: Icons.sync_rounded,
+              datos: polizasExistentesValidadas,
+              onDescargar: polizasExistentesValidadas.isEmpty
+                  ? null
+                  : () => exportarListadoPolizas(
+                      polizasExistentesValidadas,
+                      'polizas_existentes_omitidas',
+                    ),
+            ),
+          ],
 
           const SizedBox(height: 20),
 
@@ -2284,7 +3178,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
 
                   if (importingPolizas)
                     Text(
-                      "Importando: $polizasImportProgress / $polizasImportTotal",
+                      "Procesadas: $polizasImportProgress / $polizasImportTotal · Guardadas: $polizasGuardadasCarga · Errores: ${erroresCargaPolizas.length}",
                       style: const TextStyle(fontWeight: FontWeight.w600),
                     ),
 
@@ -2294,7 +3188,11 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                     width: double.infinity,
                     height: 52,
                     child: ElevatedButton.icon(
-                      onPressed: importingPolizas
+                      onPressed:
+                          importingPolizas ||
+                              validandoPolizas ||
+                              (polizasNuevasValidadas.isEmpty &&
+                                  polizasPendientesAsignacion.isEmpty)
                           ? null
                           : importarPolizasMasivasASupabase,
                       icon: importingPolizas
@@ -2310,7 +3208,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                       label: Text(
                         importingPolizas
                             ? "Subiendo pólizas..."
-                            : "Guardar en Supabase",
+                            : "Guardar validadas en Supabase",
                       ),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.green.shade700,
@@ -2352,7 +3250,12 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
               OutlinedButton.icon(
                 onPressed: () {
                   autoMapearPolizas();
-                  setState(() {});
+                  setState(() {
+                    polizasNuevasValidadas = [];
+                    polizasSinAgente = [];
+                    polizasPendientesAsignacion = [];
+                    polizasExistentesValidadas = [];
+                  });
                 },
                 icon: const Icon(Icons.auto_fix_high_rounded),
                 label: const Text("Auto-mapear"),
@@ -2363,7 +3266,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
           const SizedBox(height: 14),
 
           ...polizasHeaders.map((header) {
-            final key = header.trim().toUpperCase();
+            final key = _normalizarCabeceraPoliza(header);
 
             return Padding(
               padding: const EdgeInsets.only(bottom: 10),
@@ -2372,7 +3275,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                   Expanded(
                     flex: 2,
                     child: Text(
-                      key,
+                      header.trim(),
                       style: const TextStyle(fontWeight: FontWeight.bold),
                     ),
                   ),
@@ -2408,6 +3311,10 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                       ],
                       onChanged: (value) {
                         setState(() {
+                          polizasNuevasValidadas = [];
+                          polizasSinAgente = [];
+                          polizasPendientesAsignacion = [];
+                          polizasExistentesValidadas = [];
                           if (value == null) {
                             polizasColumnMapping.remove(key);
                           } else {
@@ -2452,35 +3359,51 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
 
           Expanded(
             child: Scrollbar(
+              controller: _polizasPreviewHorizontal,
+              notificationPredicate: (notification) =>
+                  notification.metrics.axis == Axis.horizontal,
               thumbVisibility: true,
               child: SingleChildScrollView(
+                controller: _polizasPreviewHorizontal,
                 scrollDirection: Axis.horizontal,
                 child: SingleChildScrollView(
-                  child: DataTable(
-                    headingRowColor: WidgetStateProperty.all(
-                      Colors.grey.shade100,
+                  controller: _polizasPreviewVertical,
+                  primary: false,
+                  child: ProgressiveRecords(
+                    count: (polizasPreview.length - 1).clamp(
+                      0,
+                      polizasPreview.length,
                     ),
-                    columns: polizasPreview.first.map((e) {
-                      return DataColumn(
-                        label: Text(
-                          e.toString(),
-                          style: const TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                      );
-                    }).toList(),
-                    rows: polizasPreview.skip(1).map((row) {
-                      return DataRow(
-                        cells: row.map((cell) {
-                          return DataCell(
-                            Text(
-                              cell.toString(),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          );
-                        }).toList(),
-                      );
-                    }).toList(),
+                    resetKey: progressiveRecordKey(polizasPreview),
+                    showFooter: true,
+                    builder: (context, _visibleRows) => DataTable(
+                      headingRowColor: WidgetStateProperty.all(
+                        Colors.grey.shade100,
+                      ),
+                      columns: polizasPreview.first.map((e) {
+                        return DataColumn(
+                          label: Text(
+                            e.toString(),
+                            style: const TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                        );
+                      }).toList(),
+                      rows: polizasPreview.skip(1).take(_visibleRows).map((
+                        row,
+                      ) {
+                        return DataRow(
+                          cells: row.map((cell) {
+                            return DataCell(
+                              Text(
+                                cell.toString(),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            );
+                          }).toList(),
+                        );
+                      }).toList(),
+                    ),
                   ),
                 ),
               ),
@@ -2896,6 +3819,13 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                       ),
 
                       _menuItem("Ventas", "ventas", Icons.euro_rounded),
+                      if (_normalizarRolERP(usuarioActualERP?['rol_usuario']) ==
+                          'director_nacional')
+                        _menuItem(
+                          'Ventas sin agentes',
+                          'ventas_sin_agentes',
+                          Icons.person_search_rounded,
+                        ),
 
                       _menuItem(
                         "Clientes",
@@ -3489,7 +4419,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                             ],
                           ),
                         )
-                      : ListView.builder(
+                      : ProgressiveListView.builder(
                           itemCount: notificaciones.length,
                           itemBuilder: (context, index) {
                             final n = Map<String, dynamic>.from(
@@ -3791,6 +4721,15 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
       );
     }
 
+    if (selectedMenu == 'ventas_sin_agentes') {
+      if (_normalizarRolERP(usuarioActualERP?['rol_usuario']) !=
+          'director_nacional') {
+        return const Center(
+          child: Text('Acceso exclusivo del director nacional.'),
+        );
+      }
+      return const VentasSinAgentesScreen();
+    }
     // VENTAS
     if (selectedMenu == 'ventas') {
       return Column(
@@ -6470,134 +7409,139 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                       constraints: BoxConstraints(
                         minWidth: MediaQuery.of(context).size.width - 330,
                       ),
-                      child: DataTable(
-                        headingRowColor: WidgetStateProperty.all(
-                          Colors.grey.shade100,
-                        ),
-                        dataRowMinHeight: 62,
-                        dataRowMaxHeight: 76,
-                        headingRowHeight: 58,
-                        columnSpacing: 28,
-                        horizontalMargin: 14,
-                        border: TableBorder(
-                          horizontalInside: BorderSide(
-                            color: Colors.grey.shade200,
+                      child: ProgressiveRecords(
+                        count: recibos.length,
+                        resetKey: progressiveRecordKey(recibos),
+                        showFooter: true,
+                        builder: (context, _visibleRows) => DataTable(
+                          headingRowColor: WidgetStateProperty.all(
+                            Colors.grey.shade100,
                           ),
-                        ),
-                        columns: const [
-                          DataColumn(label: Text("Estado")),
-                          DataColumn(label: Text("Fecha")),
-                          DataColumn(label: Text("Compañía")),
-                          DataColumn(label: Text("Póliza")),
-                          DataColumn(label: Text("Cliente")),
-                          DataColumn(label: Text("Agente")),
-                          DataColumn(label: Text("Importe")),
-                          DataColumn(label: Text("Motivo")),
-                          DataColumn(label: Text("Acciones")),
-                        ],
-                        rows: recibos.map((r) {
-                          final estado = r['estado']?.toString() ?? '';
+                          dataRowMinHeight: 62,
+                          dataRowMaxHeight: 76,
+                          headingRowHeight: 58,
+                          columnSpacing: 28,
+                          horizontalMargin: 14,
+                          border: TableBorder(
+                            horizontalInside: BorderSide(
+                              color: Colors.grey.shade200,
+                            ),
+                          ),
+                          columns: const [
+                            DataColumn(label: Text("Estado")),
+                            DataColumn(label: Text("Fecha")),
+                            DataColumn(label: Text("Compañía")),
+                            DataColumn(label: Text("Póliza")),
+                            DataColumn(label: Text("Cliente")),
+                            DataColumn(label: Text("Agente")),
+                            DataColumn(label: Text("Importe")),
+                            DataColumn(label: Text("Motivo")),
+                            DataColumn(label: Text("Acciones")),
+                          ],
+                          rows: recibos.take(_visibleRows).map((r) {
+                            final estado = r['estado']?.toString() ?? '';
 
-                          return DataRow(
-                            color: WidgetStateProperty.resolveWith<Color?>((
-                              states,
-                            ) {
-                              if (estado.toUpperCase() == "DEVUELTO") {
-                                return Colors.red.shade50;
-                              }
-                              if (estado.toUpperCase() == "PENDIENTE") {
-                                return Colors.orange.shade50;
-                              }
-                              return null;
-                            }),
-                            cells: [
-                              DataCell(_chipEstadoReciboERP(estado)),
-                              DataCell(_textoReciboTabla(r['fecha'])),
-                              DataCell(_textoReciboTabla(r['compania'])),
-                              DataCell(
-                                Text(
-                                  r['poliza']?.toString() ?? '',
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.bold,
+                            return DataRow(
+                              color: WidgetStateProperty.resolveWith<Color?>((
+                                states,
+                              ) {
+                                if (estado.toUpperCase() == "DEVUELTO") {
+                                  return Colors.red.shade50;
+                                }
+                                if (estado.toUpperCase() == "PENDIENTE") {
+                                  return Colors.orange.shade50;
+                                }
+                                return null;
+                              }),
+                              cells: [
+                                DataCell(_chipEstadoReciboERP(estado)),
+                                DataCell(_textoReciboTabla(r['fecha'])),
+                                DataCell(_textoReciboTabla(r['compania'])),
+                                DataCell(
+                                  Text(
+                                    r['poliza']?.toString() ?? '',
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                    ),
                                   ),
                                 ),
-                              ),
-                              DataCell(_textoReciboTabla(r['cliente'])),
-                              DataCell(_textoReciboTabla(r['agente'])),
-                              DataCell(
-                                Text(
-                                  _formatoEuroKpi(r['importe']),
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.bold,
+                                DataCell(_textoReciboTabla(r['cliente'])),
+                                DataCell(_textoReciboTabla(r['agente'])),
+                                DataCell(
+                                  Text(
+                                    _formatoEuroKpi(r['importe']),
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                    ),
                                   ),
                                 ),
-                              ),
-                              DataCell(_textoReciboTabla(r['motivo'])),
-                              DataCell(
-                                PopupMenuButton<String>(
-                                  icon: const Icon(Icons.more_vert),
-                                  tooltip: "Acciones del recibo",
-                                  itemBuilder: (context) => const [
-                                    PopupMenuItem(
-                                      value: "ver",
-                                      child: ListTile(
-                                        leading: Icon(
-                                          Icons.visibility_outlined,
+                                DataCell(_textoReciboTabla(r['motivo'])),
+                                DataCell(
+                                  PopupMenuButton<String>(
+                                    icon: const Icon(Icons.more_vert),
+                                    tooltip: "Acciones del recibo",
+                                    itemBuilder: (context) => const [
+                                      PopupMenuItem(
+                                        value: "ver",
+                                        child: ListTile(
+                                          leading: Icon(
+                                            Icons.visibility_outlined,
+                                          ),
+                                          title: Text("Ver detalle"),
                                         ),
-                                        title: Text("Ver detalle"),
                                       ),
-                                    ),
-                                    PopupMenuItem(
-                                      value: "editar",
-                                      child: ListTile(
-                                        leading: Icon(Icons.edit_outlined),
-                                        title: Text("Editar"),
-                                      ),
-                                    ),
-                                    PopupMenuItem(
-                                      value: "gestionar",
-                                      child: ListTile(
-                                        leading: Icon(
-                                          Icons.manage_accounts_outlined,
+                                      PopupMenuItem(
+                                        value: "editar",
+                                        child: ListTile(
+                                          leading: Icon(Icons.edit_outlined),
+                                          title: Text("Editar"),
                                         ),
-                                        title: Text("Gestionar"),
                                       ),
-                                    ),
-                                    PopupMenuItem(
-                                      value: "comentario",
-                                      child: ListTile(
-                                        leading: Icon(Icons.comment_outlined),
-                                        title: Text("Añadir comentario"),
-                                      ),
-                                    ),
-                                    PopupMenuItem(
-                                      value: "notificar",
-                                      child: ListTile(
-                                        leading: Icon(
-                                          Icons.notifications_active_outlined,
+                                      PopupMenuItem(
+                                        value: "gestionar",
+                                        child: ListTile(
+                                          leading: Icon(
+                                            Icons.manage_accounts_outlined,
+                                          ),
+                                          title: Text("Gestionar"),
                                         ),
-                                        title: Text("Notificar"),
                                       ),
-                                    ),
-                                  ],
-                                  onSelected: (value) {
-                                    if (value == "ver") {
-                                      mostrarDetalleRecibo(r);
-                                    } else if (value == "editar") {
-                                      mostrarEditarRecibo(r);
-                                    } else if (value == "gestionar") {
-                                      mostrarGestionRecibo(r);
-                                    } else if (value == "comentario") {
-                                      mostrarComentarioRecibo(r);
-                                    } else if (value == "notificar") {
-                                      abrirPantallaNotificacion(context, r);
-                                    }
-                                  },
+                                      PopupMenuItem(
+                                        value: "comentario",
+                                        child: ListTile(
+                                          leading: Icon(Icons.comment_outlined),
+                                          title: Text("Añadir comentario"),
+                                        ),
+                                      ),
+                                      PopupMenuItem(
+                                        value: "notificar",
+                                        child: ListTile(
+                                          leading: Icon(
+                                            Icons.notifications_active_outlined,
+                                          ),
+                                          title: Text("Notificar"),
+                                        ),
+                                      ),
+                                    ],
+                                    onSelected: (value) {
+                                      if (value == "ver") {
+                                        mostrarDetalleRecibo(r);
+                                      } else if (value == "editar") {
+                                        mostrarEditarRecibo(r);
+                                      } else if (value == "gestionar") {
+                                        mostrarGestionRecibo(r);
+                                      } else if (value == "comentario") {
+                                        mostrarComentarioRecibo(r);
+                                      } else if (value == "notificar") {
+                                        abrirPantallaNotificacion(context, r);
+                                      }
+                                    },
+                                  ),
                                 ),
-                              ),
-                            ],
-                          );
-                        }).toList(),
+                              ],
+                            );
+                          }).toList(),
+                        ),
                       ),
                     ),
                   ),
@@ -6984,7 +7928,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
 
               const SizedBox(height: 14),
 
-              ListView.separated(
+              ProgressiveListView.separated(
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
                 itemCount: data.length,
@@ -7350,27 +8294,36 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                   )
                 : SingleChildScrollView(
                     scrollDirection: Axis.horizontal,
-                    child: DataTable(
-                      columns: excelPreview.first
-                          .map((e) => DataColumn(label: Text(e.toString())))
-                          .toList(),
-                      rows: excelPreview
-                          .skip(1)
-                          .map(
-                            (row) => DataRow(
-                              cells: List.generate(
-                                excelPreview.first.length,
-                                (index) => DataCell(
-                                  Text(
-                                    index < row.length
-                                        ? row[index].toString()
-                                        : '',
+                    child: ProgressiveRecords(
+                      count: (excelPreview.length - 1).clamp(
+                        0,
+                        excelPreview.length,
+                      ),
+                      resetKey: progressiveRecordKey(excelPreview),
+                      showFooter: true,
+                      builder: (context, _visibleRows) => DataTable(
+                        columns: excelPreview.first
+                            .map((e) => DataColumn(label: Text(e.toString())))
+                            .toList(),
+                        rows: excelPreview
+                            .skip(1)
+                            .take(_visibleRows)
+                            .map(
+                              (row) => DataRow(
+                                cells: List.generate(
+                                  excelPreview.first.length,
+                                  (index) => DataCell(
+                                    Text(
+                                      index < row.length
+                                          ? row[index].toString()
+                                          : '',
+                                    ),
                                   ),
                                 ),
                               ),
-                            ),
-                          )
-                          .toList(),
+                            )
+                            .toList(),
+                      ),
                     ),
                   ),
           ),
@@ -9496,255 +10449,260 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                       )
                     else
                       TablaConScrollHorizontalERP(
-                        child: DataTable(
-                          columnSpacing: 22,
-                          horizontalMargin: 12,
-                          dataRowMinHeight: 64,
-                          dataRowMaxHeight: 72,
-                          headingRowHeight: 58,
-                          headingRowColor: WidgetStateProperty.all(
-                            Colors.grey.shade100,
+                        child: ProgressiveRecords(
+                          count: clientes.length,
+                          resetKey: progressiveRecordKey(clientes),
+                          showFooter: true,
+                          builder: (context, _visibleRows) => DataTable(
+                            columnSpacing: 22,
+                            horizontalMargin: 12,
+                            dataRowMinHeight: 64,
+                            dataRowMaxHeight: 72,
+                            headingRowHeight: 58,
+                            headingRowColor: WidgetStateProperty.all(
+                              Colors.grey.shade100,
+                            ),
+                            columns: const [
+                              DataColumn(label: Text("Cliente")),
+                              DataColumn(label: Text("Contacto")),
+                              DataColumn(label: Text("Ubicación")),
+                              DataColumn(label: Text("Agente")),
+                              DataColumn(label: Text("Jefe")),
+                              DataColumn(label: Text("Compañía")),
+                              DataColumn(label: Text("Fecha")),
+                              DataColumn(label: Text("Acciones")),
+                            ],
+                            rows: clientes.take(_visibleRows).map((c) {
+                              final nombreCompleto =
+                                  "${c['nombre'] ?? ''} ${c['apellidos'] ?? ''}"
+                                      .trim();
+
+                              return DataRow(
+                                cells: [
+                                  DataCell(
+                                    Row(
+                                      children: [
+                                        CircleAvatar(
+                                          radius: 18,
+                                          backgroundColor: Colors.blue.shade50,
+                                          child: Icon(
+                                            Icons.person_outline,
+                                            color: Colors.blue.shade700,
+                                            size: 20,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 10),
+                                        SizedBox(
+                                          width: 210,
+                                          child: Column(
+                                            mainAxisAlignment:
+                                                MainAxisAlignment.center,
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                nombreCompleto.isEmpty
+                                                    ? "Cliente sin nombre"
+                                                    : nombreCompleto,
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                                style: const TextStyle(
+                                                  fontWeight: FontWeight.bold,
+                                                ),
+                                              ),
+                                              Text(
+                                                c['dni']?.toString() ?? '',
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                                style: TextStyle(
+                                                  color: Colors.grey.shade600,
+                                                  fontSize: 12,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+
+                                  DataCell(
+                                    SizedBox(
+                                      width: 190,
+                                      child: Column(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.center,
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            c['telefono']?.toString() ?? '—',
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                          Text(
+                                            c['email']?.toString() ?? '—',
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: TextStyle(
+                                              color: Colors.grey.shade600,
+                                              fontSize: 12,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+
+                                  DataCell(
+                                    SizedBox(
+                                      width: 220,
+                                      child: Column(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.center,
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            c['poblacion']?.toString() ?? '—',
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                          Text(
+                                            "${c['provincia'] ?? ''} ${c['codigo_postal'] ?? ''}"
+                                                .trim(),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: TextStyle(
+                                              color: Colors.grey.shade600,
+                                              fontSize: 12,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+
+                                  DataCell(
+                                    SizedBox(
+                                      width: 180,
+                                      child: Text(
+                                        c['agente_nombre']?.toString() ?? '—',
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                  ),
+
+                                  DataCell(
+                                    SizedBox(
+                                      width: 180,
+                                      child: Text(
+                                        c['jefe_nombre']?.toString() ?? '—',
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                  ),
+
+                                  DataCell(
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 10,
+                                        vertical: 6,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: Colors.indigo.shade50,
+                                        borderRadius: BorderRadius.circular(20),
+                                      ),
+                                      child: Text(
+                                        c['compania']?.toString() ?? '—',
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: TextStyle(
+                                          color: Colors.indigo.shade700,
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+
+                                  DataCell(
+                                    SizedBox(
+                                      width: 130,
+                                      child: Text(
+                                        c['created_at']
+                                                ?.toString()
+                                                .split('T')
+                                                .first ??
+                                            '—',
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                  ),
+
+                                  DataCell(
+                                    PopupMenuButton<String>(
+                                      icon: const Icon(Icons.more_vert),
+                                      onSelected: (value) {
+                                        if (value == 'detalle') {
+                                          mostrarDetalleCliente(c);
+                                        }
+
+                                        if (value == 'editar') {
+                                          editarCliente(c);
+                                        }
+
+                                        if (value == 'polizas') {
+                                          verPolizasCliente(c);
+                                        }
+
+                                        if (value == 'recibos') {
+                                          mostrarRecibosCliente(c);
+                                        }
+
+                                        if (value == 'gestion') {
+                                          registrarGestionCliente(c);
+                                        }
+
+                                        if (value == 'anular') {
+                                          anularCliente(c);
+                                        }
+                                      },
+                                      itemBuilder: (context) => const [
+                                        PopupMenuItem(
+                                          value: 'detalle',
+                                          child: Text('👁 Ver detalle'),
+                                        ),
+                                        PopupMenuItem(
+                                          value: 'editar',
+                                          child: Text('✏️ Editar cliente'),
+                                        ),
+                                        PopupMenuItem(
+                                          value: 'polizas',
+                                          child: Text('📄 Ver pólizas'),
+                                        ),
+                                        PopupMenuItem(
+                                          value: 'recibos',
+                                          child: Text('💰 Ver recibos'),
+                                        ),
+                                        PopupMenuItem(
+                                          value: 'gestion',
+                                          child: Text('📞 Registrar gestión'),
+                                        ),
+                                        PopupMenuItem(
+                                          value: 'anular',
+                                          child: Text('🚫 Anular cliente'),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              );
+                            }).toList(),
                           ),
-                          columns: const [
-                            DataColumn(label: Text("Cliente")),
-                            DataColumn(label: Text("Contacto")),
-                            DataColumn(label: Text("Ubicación")),
-                            DataColumn(label: Text("Agente")),
-                            DataColumn(label: Text("Jefe")),
-                            DataColumn(label: Text("Compañía")),
-                            DataColumn(label: Text("Fecha")),
-                            DataColumn(label: Text("Acciones")),
-                          ],
-                          rows: clientes.map((c) {
-                            final nombreCompleto =
-                                "${c['nombre'] ?? ''} ${c['apellidos'] ?? ''}"
-                                    .trim();
-
-                            return DataRow(
-                              cells: [
-                                DataCell(
-                                  Row(
-                                    children: [
-                                      CircleAvatar(
-                                        radius: 18,
-                                        backgroundColor: Colors.blue.shade50,
-                                        child: Icon(
-                                          Icons.person_outline,
-                                          color: Colors.blue.shade700,
-                                          size: 20,
-                                        ),
-                                      ),
-                                      const SizedBox(width: 10),
-                                      SizedBox(
-                                        width: 210,
-                                        child: Column(
-                                          mainAxisAlignment:
-                                              MainAxisAlignment.center,
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: [
-                                            Text(
-                                              nombreCompleto.isEmpty
-                                                  ? "Cliente sin nombre"
-                                                  : nombreCompleto,
-                                              maxLines: 1,
-                                              overflow: TextOverflow.ellipsis,
-                                              style: const TextStyle(
-                                                fontWeight: FontWeight.bold,
-                                              ),
-                                            ),
-                                            Text(
-                                              c['dni']?.toString() ?? '',
-                                              maxLines: 1,
-                                              overflow: TextOverflow.ellipsis,
-                                              style: TextStyle(
-                                                color: Colors.grey.shade600,
-                                                fontSize: 12,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-
-                                DataCell(
-                                  SizedBox(
-                                    width: 190,
-                                    child: Column(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.center,
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          c['telefono']?.toString() ?? '—',
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                        Text(
-                                          c['email']?.toString() ?? '—',
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: TextStyle(
-                                            color: Colors.grey.shade600,
-                                            fontSize: 12,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-
-                                DataCell(
-                                  SizedBox(
-                                    width: 220,
-                                    child: Column(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.center,
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          c['poblacion']?.toString() ?? '—',
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                        Text(
-                                          "${c['provincia'] ?? ''} ${c['codigo_postal'] ?? ''}"
-                                              .trim(),
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: TextStyle(
-                                            color: Colors.grey.shade600,
-                                            fontSize: 12,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-
-                                DataCell(
-                                  SizedBox(
-                                    width: 180,
-                                    child: Text(
-                                      c['agente_nombre']?.toString() ?? '—',
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ),
-                                ),
-
-                                DataCell(
-                                  SizedBox(
-                                    width: 180,
-                                    child: Text(
-                                      c['jefe_nombre']?.toString() ?? '—',
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ),
-                                ),
-
-                                DataCell(
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 10,
-                                      vertical: 6,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: Colors.indigo.shade50,
-                                      borderRadius: BorderRadius.circular(20),
-                                    ),
-                                    child: Text(
-                                      c['compania']?.toString() ?? '—',
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: TextStyle(
-                                        color: Colors.indigo.shade700,
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 12,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-
-                                DataCell(
-                                  SizedBox(
-                                    width: 130,
-                                    child: Text(
-                                      c['created_at']
-                                              ?.toString()
-                                              .split('T')
-                                              .first ??
-                                          '—',
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ),
-                                ),
-
-                                DataCell(
-                                  PopupMenuButton<String>(
-                                    icon: const Icon(Icons.more_vert),
-                                    onSelected: (value) {
-                                      if (value == 'detalle') {
-                                        mostrarDetalleCliente(c);
-                                      }
-
-                                      if (value == 'editar') {
-                                        editarCliente(c);
-                                      }
-
-                                      if (value == 'polizas') {
-                                        verPolizasCliente(c);
-                                      }
-
-                                      if (value == 'recibos') {
-                                        mostrarRecibosCliente(c);
-                                      }
-
-                                      if (value == 'gestion') {
-                                        registrarGestionCliente(c);
-                                      }
-
-                                      if (value == 'anular') {
-                                        anularCliente(c);
-                                      }
-                                    },
-                                    itemBuilder: (context) => const [
-                                      PopupMenuItem(
-                                        value: 'detalle',
-                                        child: Text('👁 Ver detalle'),
-                                      ),
-                                      PopupMenuItem(
-                                        value: 'editar',
-                                        child: Text('✏️ Editar cliente'),
-                                      ),
-                                      PopupMenuItem(
-                                        value: 'polizas',
-                                        child: Text('📄 Ver pólizas'),
-                                      ),
-                                      PopupMenuItem(
-                                        value: 'recibos',
-                                        child: Text('💰 Ver recibos'),
-                                      ),
-                                      PopupMenuItem(
-                                        value: 'gestion',
-                                        child: Text('📞 Registrar gestión'),
-                                      ),
-                                      PopupMenuItem(
-                                        value: 'anular',
-                                        child: Text('🚫 Anular cliente'),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            );
-                          }).toList(),
                         ),
                       ),
                   ],
@@ -9850,47 +10808,52 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                   height: 300,
 
                   child: SingleChildScrollView(
-                    child: DataTable(
-                      columns: const [
-                        DataColumn(label: Text("Producto")),
+                    child: ProgressiveRecords(
+                      count: ventas.length,
+                      resetKey: progressiveRecordKey(ventas),
+                      showFooter: true,
+                      builder: (context, _visibleRows) => DataTable(
+                        columns: const [
+                          DataColumn(label: Text("Producto")),
 
-                        DataColumn(label: Text("Compañía")),
+                          DataColumn(label: Text("Compañía")),
 
-                        DataColumn(label: Text("Prima")),
+                          DataColumn(label: Text("Prima")),
 
-                        DataColumn(label: Text("Comisión")),
+                          DataColumn(label: Text("Comisión")),
 
-                        DataColumn(label: Text("Póliza")),
-                      ],
+                          DataColumn(label: Text("Póliza")),
+                        ],
 
-                      rows: ventas.map((v) {
-                        return DataRow(
-                          cells: [
-                            DataCell(Text(v['producto']?.toString() ?? '')),
+                        rows: ventas.take(_visibleRows).map((v) {
+                          return DataRow(
+                            cells: [
+                              DataCell(Text(v['producto']?.toString() ?? '')),
 
-                            DataCell(Text(v['compania']?.toString() ?? '')),
+                              DataCell(Text(v['compania']?.toString() ?? '')),
 
-                            DataCell(Text("${v['prima_anual'] ?? 0}€")),
+                              DataCell(Text("${v['prima_anual'] ?? 0}€")),
 
-                            DataCell(Text("${v['comision'] ?? 0}€")),
+                              DataCell(Text("${v['comision'] ?? 0}€")),
 
-                            DataCell(
-                              InkWell(
-                                onTap: () {
-                                  mostrarDetallePoliza(v);
-                                },
-                                child: Text(
-                                  v['numero_poliza']?.toString() ?? '',
-                                  style: const TextStyle(
-                                    color: Colors.blue,
-                                    fontWeight: FontWeight.bold,
+                              DataCell(
+                                InkWell(
+                                  onTap: () {
+                                    mostrarDetallePoliza(v);
+                                  },
+                                  child: Text(
+                                    v['numero_poliza']?.toString() ?? '',
+                                    style: const TextStyle(
+                                      color: Colors.blue,
+                                      fontWeight: FontWeight.bold,
+                                    ),
                                   ),
                                 ),
                               ),
-                            ),
-                          ],
-                        );
-                      }).toList(),
+                            ],
+                          );
+                        }).toList(),
+                      ),
                     ),
                   ),
                 ),
@@ -10215,44 +11178,51 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                   child: SingleChildScrollView(
                     scrollDirection: Axis.horizontal,
 
-                    child: DataTable(
-                      columns: const [
-                        DataColumn(label: Text("Póliza")),
+                    child: ProgressiveRecords(
+                      count: ventas.length,
+                      resetKey: progressiveRecordKey(ventas),
+                      showFooter: true,
+                      builder: (context, _visibleRows) => DataTable(
+                        columns: const [
+                          DataColumn(label: Text("Póliza")),
 
-                        DataColumn(label: Text("Producto")),
+                          DataColumn(label: Text("Producto")),
 
-                        DataColumn(label: Text("Compañía")),
+                          DataColumn(label: Text("Compañía")),
 
-                        DataColumn(label: Text("Prima")),
+                          DataColumn(label: Text("Prima")),
 
-                        DataColumn(label: Text("Comisión")),
+                          DataColumn(label: Text("Comisión")),
 
-                        DataColumn(label: Text("Asegurados")),
+                          DataColumn(label: Text("Asegurados")),
 
-                        DataColumn(label: Text("Fecha efecto")),
-                      ],
+                          DataColumn(label: Text("Fecha efecto")),
+                        ],
 
-                      rows: ventas.map((v) {
-                        return DataRow(
-                          cells: [
-                            DataCell(
-                              Text(v['numero_poliza']?.toString() ?? ''),
-                            ),
+                        rows: ventas.take(_visibleRows).map((v) {
+                          return DataRow(
+                            cells: [
+                              DataCell(
+                                Text(v['numero_poliza']?.toString() ?? ''),
+                              ),
 
-                            DataCell(Text(v['producto']?.toString() ?? '')),
+                              DataCell(Text(v['producto']?.toString() ?? '')),
 
-                            DataCell(Text(v['compania']?.toString() ?? '')),
+                              DataCell(Text(v['compania']?.toString() ?? '')),
 
-                            DataCell(Text("${v['prima_anual'] ?? 0}€")),
+                              DataCell(Text("${v['prima_anual'] ?? 0}€")),
 
-                            DataCell(Text("${v['comision'] ?? 0}€")),
+                              DataCell(Text("${v['comision'] ?? 0}€")),
 
-                            DataCell(Text("${v['numero_asegurados'] ?? 0}")),
+                              DataCell(Text("${v['numero_asegurados'] ?? 0}")),
 
-                            DataCell(Text(v['fecha_efecto']?.toString() ?? '')),
-                          ],
-                        );
-                      }).toList(),
+                              DataCell(
+                                Text(v['fecha_efecto']?.toString() ?? ''),
+                              ),
+                            ],
+                          );
+                        }).toList(),
+                      ),
                     ),
                   ),
                 ),
@@ -10407,52 +11377,57 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                   SizedBox(
                     height: 250,
                     child: SingleChildScrollView(
-                      child: DataTable(
-                        columns: const [
-                          DataColumn(label: Text("Estado")),
+                      child: ProgressiveRecords(
+                        count: recibos.length,
+                        resetKey: progressiveRecordKey(recibos),
+                        showFooter: true,
+                        builder: (context, _visibleRows) => DataTable(
+                          columns: const [
+                            DataColumn(label: Text("Estado")),
 
-                          DataColumn(label: Text("Importe")),
+                            DataColumn(label: Text("Importe")),
 
-                          DataColumn(label: Text("Fecha")),
-                        ],
+                            DataColumn(label: Text("Fecha")),
+                          ],
 
-                        rows: recibos.map<DataRow>((r) {
-                          return DataRow(
-                            cells: [
-                              DataCell(
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 10,
-                                    vertical: 4,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: r['estado'] == 'COBRADO'
-                                        ? Colors.green.shade100
-                                        : r['estado'] == 'DEVUELTO'
-                                        ? Colors.red.shade100
-                                        : Colors.orange.shade100,
-                                    borderRadius: BorderRadius.circular(20),
-                                  ),
-                                  child: Text(
-                                    r['estado'] ?? '',
-                                    style: TextStyle(
+                          rows: recibos.take(_visibleRows).map<DataRow>((r) {
+                            return DataRow(
+                              cells: [
+                                DataCell(
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 10,
+                                      vertical: 4,
+                                    ),
+                                    decoration: BoxDecoration(
                                       color: r['estado'] == 'COBRADO'
-                                          ? Colors.green
+                                          ? Colors.green.shade100
                                           : r['estado'] == 'DEVUELTO'
-                                          ? Colors.red
-                                          : Colors.orange,
-                                      fontWeight: FontWeight.bold,
+                                          ? Colors.red.shade100
+                                          : Colors.orange.shade100,
+                                      borderRadius: BorderRadius.circular(20),
+                                    ),
+                                    child: Text(
+                                      r['estado'] ?? '',
+                                      style: TextStyle(
+                                        color: r['estado'] == 'COBRADO'
+                                            ? Colors.green
+                                            : r['estado'] == 'DEVUELTO'
+                                            ? Colors.red
+                                            : Colors.orange,
+                                        fontWeight: FontWeight.bold,
+                                      ),
                                     ),
                                   ),
                                 ),
-                              ),
 
-                              DataCell(Text(r['importe']?.toString() ?? '')),
+                                DataCell(Text(r['importe']?.toString() ?? '')),
 
-                              DataCell(Text(r['fecha']?.toString() ?? '')),
-                            ],
-                          );
-                        }).toList(),
+                                DataCell(Text(r['fecha']?.toString() ?? '')),
+                              ],
+                            );
+                          }).toList(),
+                        ),
                       ),
                     ),
                   ),
@@ -10518,32 +11493,37 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
 
                 Expanded(
                   child: SingleChildScrollView(
-                    child: DataTable(
-                      columns: const [
-                        DataColumn(label: Text("Póliza")),
+                    child: ProgressiveRecords(
+                      count: recibos.length,
+                      resetKey: progressiveRecordKey(recibos),
+                      showFooter: true,
+                      builder: (context, _visibleRows) => DataTable(
+                        columns: const [
+                          DataColumn(label: Text("Póliza")),
 
-                        DataColumn(label: Text("Estado")),
+                          DataColumn(label: Text("Estado")),
 
-                        DataColumn(label: Text("Importe")),
+                          DataColumn(label: Text("Importe")),
 
-                        DataColumn(label: Text("Fecha")),
-                      ],
+                          DataColumn(label: Text("Fecha")),
+                        ],
 
-                      rows: recibos.map((r) {
-                        return DataRow(
-                          cells: [
-                            DataCell(
-                              Text(r['numero_poliza']?.toString() ?? ''),
-                            ),
+                        rows: recibos.take(_visibleRows).map((r) {
+                          return DataRow(
+                            cells: [
+                              DataCell(
+                                Text(r['numero_poliza']?.toString() ?? ''),
+                              ),
 
-                            DataCell(Text(r['estado']?.toString() ?? '')),
+                              DataCell(Text(r['estado']?.toString() ?? '')),
 
-                            DataCell(Text(r['importe']?.toString() ?? '')),
+                              DataCell(Text(r['importe']?.toString() ?? '')),
 
-                            DataCell(Text(r['fecha']?.toString() ?? '')),
-                          ],
-                        );
-                      }).toList(),
+                              DataCell(Text(r['fecha']?.toString() ?? '')),
+                            ],
+                          );
+                        }).toList(),
+                      ),
                     ),
                   ),
                 ),
@@ -10703,7 +11683,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
       excel.TextCellValue('Precio'),
       excel.TextCellValue('Prima Anual'),
       excel.TextCellValue('Comision'),
-      excel.TextCellValue('Fecha'),
+      excel.TextCellValue('Fecha de efecto'),
     ]);
 
     for (final v in ventas) {
@@ -10720,7 +11700,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
 
         excel.TextCellValue(v['comision']?.toString() ?? ''),
 
-        excel.TextCellValue(v['created_at']?.toString() ?? ''),
+        excel.TextCellValue(v['fecha_efecto']?.toString() ?? ''),
       ]);
     }
 
@@ -11090,192 +12070,209 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                       child: SingleChildScrollView(
                         scrollDirection: Axis.vertical,
                         child: TablaConScrollHorizontalERP(
-                          child: DataTable(
-                            headingRowColor: WidgetStateProperty.all(
-                              Colors.grey.shade100,
-                            ),
-                            dataRowMinHeight: 62,
-                            dataRowMaxHeight: 76,
-                            columnSpacing: 28,
-                            border: TableBorder(
-                              horizontalInside: BorderSide(
-                                color: Colors.grey.shade200,
+                          child: ProgressiveRecords(
+                            count: ventas.length,
+                            resetKey: progressiveRecordKey(ventas),
+                            showFooter: true,
+                            builder: (context, _visibleRows) => DataTable(
+                              headingRowColor: WidgetStateProperty.all(
+                                Colors.grey.shade100,
                               ),
-                            ),
-                            columns: const [
-                              DataColumn(label: Text("Estado")),
-                              DataColumn(label: Text("Póliza")),
-                              DataColumn(label: Text("Producto")),
-                              DataColumn(label: Text("Compañía")),
-                              DataColumn(label: Text("Forma pago")),
-                              DataColumn(label: Text("Precio")),
-                              DataColumn(label: Text("Prima anual")),
-                              DataColumn(label: Text("Comisión")),
-                              DataColumn(label: Text("Fecha efecto")),
-                              DataColumn(label: Text("Agente")),
-                              DataColumn(label: Text("Acciones")),
-                            ],
+                              dataRowMinHeight: 62,
+                              dataRowMaxHeight: 76,
+                              columnSpacing: 28,
+                              border: TableBorder(
+                                horizontalInside: BorderSide(
+                                  color: Colors.grey.shade200,
+                                ),
+                              ),
+                              columns: const [
+                                DataColumn(label: Text("Estado")),
+                                DataColumn(label: Text("Póliza")),
+                                DataColumn(label: Text("Producto")),
+                                DataColumn(label: Text("Compañía")),
+                                DataColumn(label: Text("Forma pago")),
+                                DataColumn(label: Text("Precio")),
+                                DataColumn(label: Text("Prima anual")),
+                                DataColumn(label: Text("Comisión")),
+                                DataColumn(label: Text("Fecha efecto")),
+                                DataColumn(label: Text("Agente")),
+                                DataColumn(label: Text("Acciones")),
+                              ],
 
-                            rows: ventas.map((v) {
-                              final estado =
-                                  v['estado_poliza']?.toString() ?? 'ACTIVA';
+                              rows: ventas.take(_visibleRows).map((v) {
+                                final estado =
+                                    v['estado_poliza']?.toString() ?? 'ACTIVA';
 
-                              return DataRow(
-                                color: WidgetStateProperty.resolveWith<Color?>((
-                                  states,
-                                ) {
-                                  if (estado.toUpperCase() == 'ANULADA') {
-                                    return Colors.red.shade50;
-                                  }
-                                  return null;
-                                }),
-                                cells: [
-                                  DataCell(_chipEstadoPolizaERP(estado)),
-
-                                  DataCell(
-                                    Text(
-                                      v['numero_poliza']?.toString().isEmpty ??
-                                              true
-                                          ? 'Sin póliza'
-                                          : v['numero_poliza'].toString(),
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                  ),
-
-                                  DataCell(_textoTablaVenta(v['producto'])),
-                                  DataCell(
-                                    _textoTablaVenta(
-                                      v['compañia'] ?? v['compania'],
-                                    ),
-                                  ),
-                                  DataCell(_textoTablaVenta(v['forma_pago'])),
-
-                                  DataCell(
-                                    Text(
-                                      _formatoEuroDesdeDynamic(v['precio']),
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                  ),
-
-                                  DataCell(
-                                    Text(
-                                      _formatoEuroDesdeDynamic(
-                                        v['prima_anual'],
-                                      ),
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                  ),
-
-                                  DataCell(
-                                    Text(
-                                      _formatoEuroDesdeDynamic(
-                                        v['comision'] ?? v['comison'],
-                                      ),
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                  ),
-
-                                  DataCell(_textoTablaVenta(v['fecha_efecto'])),
-                                  DataCell(
-                                    _textoTablaVenta(v['agente_nombre']),
-                                  ),
-
-                                  DataCell(
-                                    PopupMenuButton<String>(
-                                      icon: const Icon(Icons.more_vert),
-                                      tooltip: "Acciones de póliza",
-                                      onSelected: (value) async {
-                                        print("ACCION VENTAS PULSADA: $value");
-                                        print("POLIZA: ${v['numero_poliza']}");
-                                        print("VENTA COMPLETA:");
-                                        print(v);
-
-                                        if (value == 'detalle') {
-                                          await mostrarDetalleVentaERP(v);
+                                return DataRow(
+                                  color:
+                                      WidgetStateProperty.resolveWith<Color?>((
+                                        states,
+                                      ) {
+                                        if (estado.toUpperCase() == 'ANULADA') {
+                                          return Colors.red.shade50;
                                         }
+                                        return null;
+                                      }),
+                                  cells: [
+                                    DataCell(_chipEstadoPolizaERP(estado)),
 
-                                        if (value == 'editar') {
-                                          await editarPolizaDialog(v);
-                                        }
-
-                                        if (value == 'recibos') {
-                                          await consultarRecibosDialog(v);
-                                        }
-
-                                        if (value == 'gestionar') {
-                                          await gestionarPolizaDialog(v);
-                                        }
-
-                                        if (value == 'anular') {
-                                          await anularPolizaDialog(v);
-                                        }
-                                      },
-                                      itemBuilder: (context) => [
-                                        const PopupMenuItem(
-                                          value: 'detalle',
-                                          child: ListTile(
-                                            leading: Icon(
-                                              Icons.visibility_outlined,
-                                            ),
-                                            title: Text('Ver detalle'),
-                                          ),
+                                    DataCell(
+                                      Text(
+                                        v['numero_poliza']
+                                                    ?.toString()
+                                                    .isEmpty ??
+                                                true
+                                            ? 'Sin póliza'
+                                            : v['numero_poliza'].toString(),
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.bold,
                                         ),
-                                        const PopupMenuItem(
-                                          value: 'editar',
-                                          child: ListTile(
-                                            leading: Icon(Icons.edit_outlined),
-                                            title: Text('Editar póliza'),
-                                          ),
+                                      ),
+                                    ),
+
+                                    DataCell(_textoTablaVenta(v['producto'])),
+                                    DataCell(
+                                      _textoTablaVenta(
+                                        v['compañia'] ?? v['compania'],
+                                      ),
+                                    ),
+                                    DataCell(_textoTablaVenta(v['forma_pago'])),
+
+                                    DataCell(
+                                      Text(
+                                        _formatoEuroDesdeDynamic(v['precio']),
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.w600,
                                         ),
-                                        const PopupMenuItem(
-                                          value: 'recibos',
-                                          child: ListTile(
-                                            leading: Icon(
-                                              Icons.receipt_long_outlined,
-                                            ),
-                                            title: Text('Consultar recibos'),
-                                          ),
+                                      ),
+                                    ),
+
+                                    DataCell(
+                                      Text(
+                                        _formatoEuroDesdeDynamic(
+                                          v['prima_anual'],
                                         ),
-                                        const PopupMenuItem(
-                                          value: 'gestionar',
-                                          child: ListTile(
-                                            leading: Icon(
-                                              Icons.manage_accounts_outlined,
-                                            ),
-                                            title: Text('Gestionar'),
-                                          ),
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.w600,
                                         ),
-                                        PopupMenuItem(
-                                          value: 'anular',
-                                          enabled:
-                                              estado.toUpperCase() != 'ANULADA',
-                                          child: const ListTile(
-                                            leading: Icon(
-                                              Icons.cancel_outlined,
-                                              color: Colors.red,
+                                      ),
+                                    ),
+
+                                    DataCell(
+                                      Text(
+                                        _formatoEuroDesdeDynamic(
+                                          v['comision'] ?? v['comison'],
+                                        ),
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ),
+
+                                    DataCell(
+                                      _textoTablaVenta(v['fecha_efecto']),
+                                    ),
+                                    DataCell(
+                                      _textoTablaVenta(v['agente_nombre']),
+                                    ),
+
+                                    DataCell(
+                                      PopupMenuButton<String>(
+                                        icon: const Icon(Icons.more_vert),
+                                        tooltip: "Acciones de póliza",
+                                        onSelected: (value) async {
+                                          print(
+                                            "ACCION VENTAS PULSADA: $value",
+                                          );
+                                          print(
+                                            "POLIZA: ${v['numero_poliza']}",
+                                          );
+                                          print("VENTA COMPLETA:");
+                                          print(v);
+
+                                          if (value == 'detalle') {
+                                            await mostrarDetalleVentaERP(v);
+                                          }
+
+                                          if (value == 'editar') {
+                                            await editarPolizaDialog(v);
+                                          }
+
+                                          if (value == 'recibos') {
+                                            await consultarRecibosDialog(v);
+                                          }
+
+                                          if (value == 'gestionar') {
+                                            await gestionarPolizaDialog(v);
+                                          }
+
+                                          if (value == 'anular') {
+                                            await anularPolizaDialog(v);
+                                          }
+                                        },
+                                        itemBuilder: (context) => [
+                                          const PopupMenuItem(
+                                            value: 'detalle',
+                                            child: ListTile(
+                                              leading: Icon(
+                                                Icons.visibility_outlined,
+                                              ),
+                                              title: Text('Ver detalle'),
                                             ),
-                                            title: Text(
-                                              'Anular póliza',
-                                              style: TextStyle(
+                                          ),
+                                          const PopupMenuItem(
+                                            value: 'editar',
+                                            child: ListTile(
+                                              leading: Icon(
+                                                Icons.edit_outlined,
+                                              ),
+                                              title: Text('Editar póliza'),
+                                            ),
+                                          ),
+                                          const PopupMenuItem(
+                                            value: 'recibos',
+                                            child: ListTile(
+                                              leading: Icon(
+                                                Icons.receipt_long_outlined,
+                                              ),
+                                              title: Text('Consultar recibos'),
+                                            ),
+                                          ),
+                                          const PopupMenuItem(
+                                            value: 'gestionar',
+                                            child: ListTile(
+                                              leading: Icon(
+                                                Icons.manage_accounts_outlined,
+                                              ),
+                                              title: Text('Gestionar'),
+                                            ),
+                                          ),
+                                          PopupMenuItem(
+                                            value: 'anular',
+                                            enabled:
+                                                estado.toUpperCase() !=
+                                                'ANULADA',
+                                            child: const ListTile(
+                                              leading: Icon(
+                                                Icons.cancel_outlined,
                                                 color: Colors.red,
+                                              ),
+                                              title: Text(
+                                                'Anular póliza',
+                                                style: TextStyle(
+                                                  color: Colors.red,
+                                                ),
                                               ),
                                             ),
                                           ),
-                                        ),
-                                      ],
+                                        ],
+                                      ),
                                     ),
-                                  ),
-                                ],
-                              );
-                            }).toList(),
+                                  ],
+                                );
+                              }).toList(),
+                            ),
                           ),
                         ),
                       ),
@@ -11818,15 +12815,11 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
     try {
       final supabase = Supabase.instance.client;
 
-      dynamic query = supabase.from('ventas').select();
-
-      if (!veTodoERP) {
-        if (authIdsPermitidosERP.isEmpty) return [];
-
-        query = query.inFilter('agente_auth_id', authIdsPermitidosERP);
-      }
-
-      final ventasResponse = await query;
+      if (!veTodoERP && authIdsPermitidosERP.isEmpty) return [];
+      final ventasResponse = await PolicySalesQuery.load(
+        supabase,
+        authIds: veTodoERP ? null : authIdsPermitidosERP,
+      );
 
       dynamic usuariosQuery = supabase
           .from('usuarios')
@@ -11862,12 +12855,10 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
 
       ventas.sort((a, b) {
         final fa =
-            DateTime.tryParse(a['created_at']?.toString() ?? '') ??
             DateTime.tryParse(a['fecha_efecto']?.toString() ?? '') ??
             DateTime(1900);
 
         final fb =
-            DateTime.tryParse(b['created_at']?.toString() ?? '') ??
             DateTime.tryParse(b['fecha_efecto']?.toString() ?? '') ??
             DateTime(1900);
 
@@ -12100,23 +13091,30 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                       scrollDirection: Axis.vertical,
                       child: SingleChildScrollView(
                         scrollDirection: Axis.horizontal,
-                        child: DataTable(
-                          columns: const [
-                            DataColumn(label: Text("Fecha")),
-                            DataColumn(label: Text("Importe")),
-                            DataColumn(label: Text("Estado")),
-                            DataColumn(label: Text("Motivo")),
-                          ],
-                          rows: recibos.map<DataRow>((r) {
-                            return DataRow(
-                              cells: [
-                                DataCell(Text(r['fecha']?.toString() ?? '')),
-                                DataCell(Text(r['importe']?.toString() ?? '')),
-                                DataCell(Text(r['estado']?.toString() ?? '')),
-                                DataCell(Text(r['motivo']?.toString() ?? '')),
-                              ],
-                            );
-                          }).toList(),
+                        child: ProgressiveRecords(
+                          count: recibos.length,
+                          resetKey: progressiveRecordKey(recibos),
+                          showFooter: true,
+                          builder: (context, _visibleRows) => DataTable(
+                            columns: const [
+                              DataColumn(label: Text("Fecha")),
+                              DataColumn(label: Text("Importe")),
+                              DataColumn(label: Text("Estado")),
+                              DataColumn(label: Text("Motivo")),
+                            ],
+                            rows: recibos.take(_visibleRows).map<DataRow>((r) {
+                              return DataRow(
+                                cells: [
+                                  DataCell(Text(r['fecha']?.toString() ?? '')),
+                                  DataCell(
+                                    Text(r['importe']?.toString() ?? ''),
+                                  ),
+                                  DataCell(Text(r['estado']?.toString() ?? '')),
+                                  DataCell(Text(r['motivo']?.toString() ?? '')),
+                                ],
+                              );
+                            }).toList(),
+                          ),
                         ),
                       ),
                     ),
@@ -12614,7 +13612,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
       mesesSalto = 3;
     } else if (fp.contains('semes')) {
       mesesSalto = 6;
-    } else if (fp.contains('anual')) {
+    } else if (fp.contains('anual') || fp.trim() == 'no informada') {
       mesesSalto = 12;
     } else {
       mesesSalto = 1;

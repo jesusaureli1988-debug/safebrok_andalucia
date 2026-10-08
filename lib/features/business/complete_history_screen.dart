@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'package:safebrok_andalucia/core/production/policy_effect_date.dart';
 
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
@@ -259,7 +260,7 @@ class _CompleteHistoryScreenState extends State<CompleteHistoryScreen> {
   List<_HistoryEvent> get _allEvents {
     final events = <_HistoryEvent>[];
     for (final sale in _sales) {
-      final date = _date(sale['fecha_efecto'] ?? sale['created_at']);
+      final date = PolicyEffectDate.read(sale);
       if (date == null) continue;
       final user = _userByAuth(sale['agente_auth_id']);
       events.add(
@@ -435,7 +436,7 @@ class _CompleteHistoryScreenState extends State<CompleteHistoryScreen> {
   }
 
   List<Map<String, dynamic>> get _salesInRange => _sales.where((sale) {
-    final date = _date(sale['fecha_efecto'] ?? sale['created_at']);
+    final date = PolicyEffectDate.read(sale);
     return date != null && _inRange(date);
   }).toList();
 
@@ -462,7 +463,7 @@ class _CompleteHistoryScreenState extends State<CompleteHistoryScreen> {
     final previousStart = previousEnd.subtract(Duration(days: days - 1));
     return _sales
         .where((sale) {
-          final date = _date(sale['fecha_efecto'] ?? sale['created_at']);
+          final date = PolicyEffectDate.read(sale);
           return date != null &&
               !date.isBefore(previousStart) &&
               !date.isAfter(
@@ -495,7 +496,7 @@ class _CompleteHistoryScreenState extends State<CompleteHistoryScreen> {
       final end = DateTime(cursor.year, cursor.month + 1);
       final value = _sales
           .where((sale) {
-            final date = _date(sale['fecha_efecto'] ?? sale['created_at']);
+            final date = PolicyEffectDate.read(sale);
             return date != null && !date.isBefore(cursor) && date.isBefore(end);
           })
           .fold(0.0, (sum, sale) => sum + PremiumWeighting.net(sale));

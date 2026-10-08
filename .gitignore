@@ -81,3 +81,7 @@ firebase-secrets.env
 /nulecho
 /tmp_usuarios_schema.sql
 /titularidad raquel.pdf
+
+# Artefactos locales de las nuevas versiones (no son codigo fuente)
+/build_windows_*/
+/releases/

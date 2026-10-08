@@ -1,3 +1,4 @@
+import 'package:safebrok_andalucia/core/widgets/progressive_records.dart';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -444,7 +445,7 @@ class _ReasignarJefeEquipoScreenState extends State<ReasignarJefeEquipoScreen> {
           Expanded(
             child: jefesEquipoFiltrados.isEmpty
                 ? _empty('No hay jefes de equipo en tu estructura')
-                : ListView.builder(
+                : ProgressiveListView.builder(
                     itemCount: jefesEquipoFiltrados.length,
                     itemBuilder: (context, index) {
                       final j = jefesEquipoFiltrados[index];
@@ -485,7 +486,7 @@ class _ReasignarJefeEquipoScreenState extends State<ReasignarJefeEquipoScreen> {
           Expanded(
             child: jefesVentas.isEmpty
                 ? _empty('No hay jefes de ventas disponibles')
-                : ListView.builder(
+                : ProgressiveListView.builder(
                     itemCount: jefesVentas.length,
                     itemBuilder: (context, index) {
                       final j = jefesVentas[index];

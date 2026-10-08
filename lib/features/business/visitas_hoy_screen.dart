@@ -1,3 +1,4 @@
+import 'package:safebrok_andalucia/core/widgets/progressive_records.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'detalle_visita_screen.dart';
@@ -49,7 +50,7 @@ class _VisitasHoyScreenState extends State<VisitasHoyScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFFF2FCFD),
       appBar: AppBar(title: const Text("Visitas de hoy")),
-      body: ListView.builder(
+      body: ProgressiveListView.builder(
         padding: const EdgeInsets.all(16),
         itemCount: visitas.length,
         itemBuilder: (context, index) {

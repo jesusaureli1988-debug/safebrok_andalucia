@@ -1,3 +1,4 @@
+import 'package:safebrok_andalucia/core/widgets/progressive_records.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'detalle_tarea_jefe_screen.dart';
@@ -256,7 +257,7 @@ class _MisContactosDiariosJefeScreenState
                             ),
                           )
                         else
-                          SliverList.builder(
+                          ProgressiveSliverList.builder(
                             itemCount: tareas.length,
                             itemBuilder: (context, index) {
                               return _tareaCard(tareas[index], index);

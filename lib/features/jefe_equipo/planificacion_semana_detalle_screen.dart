@@ -1,3 +1,4 @@
+import 'package:safebrok_andalucia/core/widgets/progressive_records.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -190,7 +191,7 @@ class _PlanificacionSemanaDetalleScreenState
                       child: _emptyState(),
                     )
                   else
-                    SliverList.builder(
+                    ProgressiveSliverList.builder(
                       itemCount: agentes.length,
                       itemBuilder: (context, i) {
                         final agente = agentes[i];

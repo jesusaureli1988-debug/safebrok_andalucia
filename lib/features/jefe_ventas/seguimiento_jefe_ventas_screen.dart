@@ -184,6 +184,7 @@ class _SeguimientoJefeVentasScreenState
       case 'semestral':
         return PremiumWeighting.amount(s, price * 2);
       case 'anual':
+      case 'no informada':
         return PremiumWeighting.amount(s, price);
       default:
         return PremiumWeighting.amount(s, price);

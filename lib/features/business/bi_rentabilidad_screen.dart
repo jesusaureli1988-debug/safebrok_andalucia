@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:safebrok_andalucia/core/production/premium_weighting.dart';
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -16,6 +15,13 @@ class _BiRentabilidadScreenState extends State<BiRentabilidadScreen>
     with SingleTickerProviderStateMixin {
   final _supabase = Supabase.instance.client;
   late final TabController _tabs;
+
+  static const _primary = Color(0xFF0284C7);
+  static const _primaryDark = Color(0xFF075985);
+  static const _ink = Color(0xFF0F172A);
+  static const _muted = Color(0xFF64748B);
+  static const _border = Color(0xFFE2E8F0);
+  static const _background = Color(0xFFF6F9FC);
 
   static const _companies = <String>[
     'Ocaso',
@@ -190,12 +196,19 @@ class _BiRentabilidadScreenState extends State<BiRentabilidadScreen>
         salesQuery = salesQuery.eq('producto', _product);
       }
 
-      final salesData = await salesQuery;
+      final salesData = <Map<String, dynamic>>[];
+      for (var offset = 0; ; offset += 1000) {
+        final page = List<Map<String, dynamic>>.from(
+          await salesQuery.order('id').range(offset, offset + 999) as List,
+        );
+        salesData.addAll(page);
+        if (page.length < 1000) break;
+      }
       final results = await Future.wait<dynamic>([
         _supabase.from('nominas_facturas').select(),
         _supabase.from('nominas_facturas_lineas').select(),
       ]);
-      var sales = List<Map<String, dynamic>>.from(salesData as List);
+      var sales = List<Map<String, dynamic>>.from(salesData);
       var invoices = List<Map<String, dynamic>>.from(results[0] as List);
       final allLines = List<Map<String, dynamic>>.from(results[1] as List);
 
@@ -513,19 +526,23 @@ class _BiRentabilidadScreenState extends State<BiRentabilidadScreen>
       );
     }
     return Scaffold(
-      backgroundColor: const Color(0xFFF3F6FA),
+      backgroundColor: _background,
       appBar: AppBar(
-        backgroundColor: const Color(0xFFF2FCFD),
-        foregroundColor: Colors.white,
+        backgroundColor: Colors.white,
+        foregroundColor: _ink,
+        surfaceTintColor: Colors.transparent,
+        elevation: 0,
+        scrolledUnderElevation: 0,
         title: const Text(
           'BI de Rentabilidad',
           style: TextStyle(fontWeight: FontWeight.w800),
         ),
         bottom: TabBar(
           controller: _tabs,
-          indicatorColor: const Color(0xFF39D2C0),
-          labelColor: Colors.white,
-          unselectedLabelColor: const Color(0xFF64748B),
+          indicatorColor: _primary,
+          indicatorWeight: 3,
+          labelColor: _primaryDark,
+          unselectedLabelColor: _muted,
           tabs: const [
             Tab(
               icon: Icon(Icons.analytics_rounded),
@@ -609,26 +626,60 @@ class _BiRentabilidadScreenState extends State<BiRentabilidadScreen>
     padding: const EdgeInsets.all(24),
     decoration: BoxDecoration(
       gradient: const LinearGradient(
-        colors: [Color(0xFFF2FCFD), Color(0xFF123B57)],
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [Color(0xFFE0F2FE), Color(0xFFF0FDFA)],
       ),
-      borderRadius: BorderRadius.circular(24),
+      borderRadius: BorderRadius.circular(28),
+      border: Border.all(color: const Color(0xFFBAE6FD)),
     ),
-    child: const Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    child: Row(
       children: [
-        Text(
-          'Inteligencia financiera de SafeBrok',
-          style: TextStyle(
-            color: const Color(0xFF071A3A),
-            fontSize: 24,
-            fontWeight: FontWeight.w900,
+        Container(
+          width: 62,
+          height: 62,
+          decoration: BoxDecoration(
+            color: _primary,
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x330284C7),
+                blurRadius: 22,
+                offset: Offset(0, 10),
+              ),
+            ],
+          ),
+          child: const Icon(
+            Icons.query_stats_rounded,
+            color: Colors.white,
+            size: 32,
           ),
         ),
-        SizedBox(height: 8),
-        Text(
-          'Ingresos de aseguradoras, coste real de la red comercial y '
-          'margen neto operativo en una única cuenta de resultados.',
-          style: TextStyle(color: const Color(0xFF53627A), height: 1.4),
+        const SizedBox(width: 16),
+        const Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Inteligencia financiera de SafeBrok',
+                style: TextStyle(
+                  color: _ink,
+                  fontSize: 24,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: -0.5,
+                ),
+              ),
+              SizedBox(height: 7),
+              Text(
+                'Ingresos, costes comerciales y margen operativo en una única visión ejecutiva.',
+                style: TextStyle(
+                  color: _muted,
+                  fontWeight: FontWeight.w600,
+                  height: 1.4,
+                ),
+              ),
+            ],
+          ),
         ),
       ],
     ),
@@ -636,6 +687,11 @@ class _BiRentabilidadScreenState extends State<BiRentabilidadScreen>
 
   Widget _filters() => Card(
     elevation: 0,
+    color: Colors.white,
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(22),
+      side: const BorderSide(color: _border),
+    ),
     child: Padding(
       padding: const EdgeInsets.all(16),
       child: Wrap(
@@ -665,6 +721,10 @@ class _BiRentabilidadScreenState extends State<BiRentabilidadScreen>
             onPressed: _loadAnalysis,
             icon: const Icon(Icons.refresh_rounded),
             label: const Text('Actualizar'),
+            style: FilledButton.styleFrom(
+              backgroundColor: _primary,
+              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+            ),
           ),
         ],
       ),
@@ -700,7 +760,20 @@ class _BiRentabilidadScreenState extends State<BiRentabilidadScreen>
       decoration: InputDecoration(
         labelText: label,
         isDense: true,
-        border: const OutlineInputBorder(),
+        filled: true,
+        fillColor: const Color(0xFFF8FAFC),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: _border),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: _border),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: _primary, width: 1.5),
+        ),
       ),
       items: items
           .map((item) => DropdownMenuItem(value: item, child: Text(item)))
@@ -716,6 +789,11 @@ class _BiRentabilidadScreenState extends State<BiRentabilidadScreen>
         width: 265,
         child: Card(
           elevation: 0,
+          color: Colors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(22),
+            side: const BorderSide(color: _border),
+          ),
           child: Padding(
             padding: const EdgeInsets.all(18),
             child: Row(
@@ -773,6 +851,11 @@ class _BiRentabilidadScreenState extends State<BiRentabilidadScreen>
 
   Widget _profitAndLoss() => Card(
     elevation: 0,
+    color: Colors.white,
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(22),
+      side: const BorderSide(color: _border),
+    ),
     child: Padding(
       padding: const EdgeInsets.all(20),
       child: Column(
@@ -843,6 +926,11 @@ class _BiRentabilidadScreenState extends State<BiRentabilidadScreen>
 
   Widget _rankingSection(String title, List<_ProfitRow> rows) => Card(
     elevation: 0,
+    color: Colors.white,
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(22),
+      side: const BorderSide(color: _border),
+    ),
     child: Padding(
       padding: const EdgeInsets.all(20),
       child: Column(
@@ -924,36 +1012,41 @@ class _BiRentabilidadScreenState extends State<BiRentabilidadScreen>
         const SizedBox(height: 16),
         Card(
           elevation: 0,
+          color: Colors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(22),
+            side: const BorderSide(color: _border),
+          ),
           child: Padding(
             padding: const EdgeInsets.all(18),
-            child: Row(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Comisiones recibidas de aseguradoras',
-                        style: TextStyle(
-                          fontSize: 19,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                      SizedBox(height: 5),
-                      Text(
-                        'Son ingresos de SafeBrok y no modifican las comisiones '
-                        'que se pagan a los comerciales.',
-                      ),
-                    ],
+                const Text(
+                  'Comisiones recibidas de aseguradoras',
+                  style: TextStyle(
+                    color: _ink,
+                    fontSize: 19,
+                    fontWeight: FontWeight.w900,
                   ),
                 ),
+                const SizedBox(height: 5),
+                const Text(
+                  'Son ingresos de SafeBrok y no modifican las comisiones que se pagan a los comerciales.',
+                  style: TextStyle(color: _muted, height: 1.4),
+                ),
+                const SizedBox(height: 16),
                 SizedBox(
-                  width: 230,
+                  width: double.infinity,
                   child: DropdownButtonFormField<String>(
                     initialValue: selectedCompany,
-                    decoration: const InputDecoration(
+                    decoration: InputDecoration(
                       labelText: 'Aseguradora',
-                      border: OutlineInputBorder(),
+                      filled: true,
+                      fillColor: const Color(0xFFF8FAFC),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
                     ),
                     items: _companies
                         .map(
@@ -981,10 +1074,15 @@ class _BiRentabilidadScreenState extends State<BiRentabilidadScreen>
               : 'Prima neta';
           return Card(
             elevation: 0,
+            color: Colors.white,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+              side: const BorderSide(color: _border),
+            ),
             child: ListTile(
               leading: CircleAvatar(
-                backgroundColor: const Color(0xFFF2FCFD),
-                foregroundColor: Colors.white,
+                backgroundColor: const Color(0xFFE0F2FE),
+                foregroundColor: _primary,
                 child: const Icon(Icons.shield_outlined),
               ),
               title: Text(

@@ -1,3 +1,4 @@
+import 'package:safebrok_andalucia/core/widgets/progressive_records.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -205,7 +206,7 @@ class _CambiosRolPanelState extends State<CambiosRolPanel> {
       return const Center(child: Text('No hay cambios de figura en curso.'));
     return RefreshIndicator(
       onRefresh: load,
-      child: ListView.separated(
+      child: ProgressiveListView.separated(
         padding: const EdgeInsets.all(8),
         itemCount: rows.length,
         separatorBuilder: (_, __) => const SizedBox(height: 8),

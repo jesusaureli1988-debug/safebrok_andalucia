@@ -1,3 +1,4 @@
+import 'package:safebrok_andalucia/core/widgets/progressive_records.dart';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -192,7 +193,7 @@ class _ContactosDiariosScreenState extends State<ContactosDiariosScreen> {
                                   16,
                                   100,
                                 ),
-                                sliver: SliverList.builder(
+                                sliver: ProgressiveSliverList.builder(
                                   itemCount: registrosFiltrados.length,
                                   itemBuilder: (context, index) {
                                     final r = registrosFiltrados[index];
@@ -399,7 +400,7 @@ class _ContactosDiariosScreenState extends State<ContactosDiariosScreen> {
 
     return SizedBox(
       height: 48,
-      child: ListView.separated(
+      child: ProgressiveListView.separated(
         padding: const EdgeInsets.symmetric(horizontal: 16),
         scrollDirection: Axis.horizontal,
         itemCount: filtros.length,

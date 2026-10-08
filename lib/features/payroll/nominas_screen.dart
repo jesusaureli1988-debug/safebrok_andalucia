@@ -1,6 +1,9 @@
+import 'package:safebrok_andalucia/core/widgets/progressive_records.dart';
 import 'dart:ui';
 import 'package:safebrok_andalucia/core/production/premium_weighting.dart';
 import 'package:safebrok_andalucia/core/payroll/role_compensation.dart';
+import 'package:safebrok_andalucia/core/production/policy_effect_date.dart';
+import 'package:safebrok_andalucia/core/production/policy_sales_query.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:safebrok_andalucia/core/production/production_period_service.dart';
@@ -69,17 +72,8 @@ class _NominasScreenState extends State<NominasScreen> {
         p.contains('prima única');
   }
 
-  DateTime? _fechaEfecto(Map<String, dynamic> venta) {
-    for (final v in [
-      venta['fecha_efecto'],
-      venta['fecha'],
-      venta['created_at'],
-    ]) {
-      final f = DateTime.tryParse((v ?? '').toString());
-      if (f != null) return f;
-    }
-    return null;
-  }
+  DateTime? _fechaEfecto(Map<String, dynamic> venta) =>
+      PolicyEffectDate.read(venta);
 
   Map<String, DateTime> _periodoDeFecha(DateTime fecha) {
     final date = DateTime(fecha.year, fecha.month, fecha.day);
@@ -92,7 +86,13 @@ class _NominasScreenState extends State<NominasScreen> {
       final start = DateTime(from.year, from.month, from.day);
       final lastDay = DateTime(to.year, to.month, to.day);
       if (!date.isBefore(start) && !date.isAfter(lastDay)) {
-        return {'inicio': start, 'fin': lastDay.add(const Duration(days: 1))};
+        return {
+          'inicio': start,
+          'fin': lastDay.add(const Duration(days: 1)),
+          'cargo':
+              PolicyEffectDate.configuredMonth(fecha, _configuredClosures) ??
+              lastDay,
+        };
       }
     }
 
@@ -102,12 +102,13 @@ class _NominasScreenState extends State<NominasScreen> {
     return {
       'inicio': inicio,
       'fin': DateTime(inicio.year, inicio.month + 1, 24),
+      'cargo': DateTime(inicio.year, inicio.month + 1),
     };
   }
 
   String _keyPeriodo(DateTime fecha) {
     final p = _periodoDeFecha(fecha);
-    final fin = p['fin']!;
+    final fin = p['cargo']!;
     return '${fin.year}-${fin.month.toString().padLeft(2, '0')}';
   }
 
@@ -232,12 +233,12 @@ class _NominasScreenState extends State<NominasScreen> {
       final grouped = <String, Map<String, dynamic>>{};
 
       if (authIds.isNotEmpty) {
-        final ventasData = await supabase
-            .from('ventas')
-            .select(
-              'id, agente_auth_id, fecha_efecto, created_at, prima_anual_neta, comision, producto',
-            )
-            .inFilter('agente_auth_id', authIds);
+        final ventasData = await PolicySalesQuery.load(
+          supabase,
+          authIds: authIds,
+          select:
+              'id, agente_auth_id, fecha_efecto, prima_anual_neta, comision, producto',
+        );
 
         for (final raw in List<Map<String, dynamic>>.from(ventasData)) {
           final fecha = _fechaEfecto(raw);
@@ -249,8 +250,8 @@ class _NominasScreenState extends State<NominasScreen> {
           grouped.putIfAbsent(
             key,
             () => {
-              'mes': fin.month,
-              'anio': fin.year,
+              'mes': periodo['cargo']!.month,
+              'anio': periodo['cargo']!.year,
               'inicio_periodo': periodo['inicio']!.toIso8601String(),
               'fin_periodo': fin.toIso8601String(),
               'prima_neta_total': 0.0,
@@ -315,8 +316,8 @@ class _NominasScreenState extends State<NominasScreen> {
             grouped.putIfAbsent(
               key,
               () => {
-                'mes': fin.month,
-                'anio': fin.year,
+                'mes': periodo['cargo']!.month,
+                'anio': periodo['cargo']!.year,
                 'inicio_periodo': periodo['inicio']!.toIso8601String(),
                 'fin_periodo': fin.toIso8601String(),
                 'prima_neta_total': 0.0,
@@ -407,7 +408,7 @@ class _NominasScreenState extends State<NominasScreen> {
 
   Map<String, dynamic>? get nominaActual {
     final p = _periodoDeFecha(DateTime.now());
-    final fin = p['fin']!;
+    final fin = p['cargo']!;
     for (final n in nominas) {
       if (_money(n['mes']).toInt() == fin.month &&
           _money(n['anio']).toInt() == fin.year) {
@@ -491,7 +492,7 @@ class _NominasScreenState extends State<NominasScreen> {
                                   16,
                                   110,
                                 ),
-                                sliver: SliverList.builder(
+                                sliver: ProgressiveSliverList.builder(
                                   itemCount: nominas.length,
                                   itemBuilder: (context, index) {
                                     final n = nominas[index];
@@ -1055,25 +1056,8 @@ class _NominaDetailScreenState extends State<NominaDetailScreen> {
     return meses[m];
   }
 
-  DateTime? _fechaEfecto(Map<String, dynamic> venta) {
-    final posibles = [
-      venta['fecha_efecto'],
-      venta['FECHA_EFECTO'],
-      venta['fecha efecto'],
-      venta['FECHA EFECTO'],
-      venta['fecha'],
-      venta['FECHA'],
-      venta['created_at'],
-    ];
-
-    for (final value in posibles) {
-      if (value == null) continue;
-      final parsed = DateTime.tryParse(value.toString());
-      if (parsed != null) return parsed;
-    }
-
-    return null;
-  }
+  DateTime? _fechaEfecto(Map<String, dynamic> venta) =>
+      PolicyEffectDate.read(venta);
 
   String _nombreUsuario(Map<String, dynamic> u) {
     final nombre = u['nombre']?.toString().trim() ?? '';
@@ -1285,10 +1269,12 @@ class _NominaDetailScreenState extends State<NominaDetailScreen> {
 
       final ventas = authIds.isEmpty
           ? []
-          : await supabase
-                .from('ventas')
-                .select()
-                .inFilter('agente_auth_id', authIds);
+          : await PolicySalesQuery.load(
+              supabase,
+              authIds: authIds,
+              start: inicio,
+              endExclusive: fin,
+            );
 
       final ventasMes = <Map<String, dynamic>>[];
 
@@ -2052,7 +2038,17 @@ class _NominaDetailScreenState extends State<NominaDetailScreen> {
                         if (estructura.isEmpty)
                           _emptyEstructura()
                         else
-                          ...estructura.map((n) => _nodeCard(n, 0)),
+                          ProgressiveRecords(
+                            count: estructura.length,
+                            resetKey: progressiveRecordKey(estructura),
+                            showFooter: true,
+                            builder: (_, visible) => Column(
+                              children: estructura
+                                  .take(visible)
+                                  .map((n) => _nodeCard(n, 0))
+                                  .toList(),
+                            ),
+                          ),
                       ],
                     ),
                   ),
@@ -2214,7 +2210,17 @@ class _NominaDetailScreenState extends State<NominaDetailScreen> {
             else if (!puedeVerPolizas)
               _bloqueSinPermiso()
             else
-              ...polizasPropias.map(_polizaItem),
+              ProgressiveRecords(
+                count: polizasPropias.length,
+                resetKey: progressiveRecordKey(polizasPropias),
+                showFooter: true,
+                builder: (_, visible) => Column(
+                  children: polizasPropias
+                      .take(visible)
+                      .map(_polizaItem)
+                      .toList(),
+                ),
+              ),
 
             if (hijos.isNotEmpty) ...[
               const SizedBox(height: 6),
@@ -2224,7 +2230,17 @@ class _NominaDetailScreenState extends State<NominaDetailScreen> {
                 subtitle: '${hijos.length} personas asignadas directamente',
                 color: const Color(0xFF2563EB),
               ),
-              ...hijos.map((h) => _nodeCard(h, level + 1)),
+              ProgressiveRecords(
+                count: hijos.length,
+                resetKey: progressiveRecordKey(hijos),
+                showFooter: true,
+                builder: (_, visible) => Column(
+                  children: hijos
+                      .take(visible)
+                      .map((h) => _nodeCard(h, level + 1))
+                      .toList(),
+                ),
+              ),
             ] else if (node.rol != 'agente') ...[
               const SizedBox(height: 6),
               _tituloSeccionArbol(

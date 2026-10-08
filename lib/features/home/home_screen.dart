@@ -1,4 +1,6 @@
 import 'dart:ui';
+import 'package:flutter/foundation.dart'
+    show kIsWeb, defaultTargetPlatform, TargetPlatform;
 import 'package:safebrok_andalucia/core/production/premium_weighting.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -175,10 +177,10 @@ class _HomeScreenState extends State<HomeScreen> {
   int totalVentas = 0;
   int totalTareas = 0;
 
-  double primasSemana = 0.0;
-  double primasMixSemana = 0.0;
-  double objetivoSemana = 1250.0;
-  int rachaSemanas = 0;
+  double primasMes = 0.0;
+  double primasMixMes = 0.0;
+  double objetivoMes = 4000.0;
+  int rachaMeses = 0;
 
   int rankingPosicion = 0;
   int rankingTotal = 0;
@@ -995,22 +997,22 @@ class _HomeScreenState extends State<HomeScreen> {
     return producto.contains('deceso') || producto.contains('vida');
   }
 
-  double _objetivoPrimasSemanalPorRol(String role) {
+  double _objetivoPrimasMensualPorRol(String role) {
     switch (role.trim().toLowerCase()) {
       case 'agente':
-        return 1250.0;
+        return 4000.0;
       case 'jefe_equipo':
-        return 3125.0;
+        return 10000.0;
       case 'jefe_ventas':
-        return 5208.0;
+        return 15000.0;
       case 'director_zona':
-        return 10416.0;
+        return 25000.0;
       case 'director_nacional':
-        return 25000.0;
+        return 50000.0;
       case 'administracion':
-        return 25000.0;
+        return 50000.0;
       default:
-        return 1250.0;
+        return 4000.0;
     }
   }
 
@@ -1039,39 +1041,7 @@ class _HomeScreenState extends State<HomeScreen> {
     return '$signo${buffer.toString()} €';
   }
 
-  Future<List<Map<String, dynamic>>> _cargarFilasSemana({
-    required String tabla,
-    required DateTime inicio,
-    required DateTime finExclusivo,
-  }) async {
-    const tamanoPagina = 1000;
-    int desde = 0;
-
-    final resultado = <Map<String, dynamic>>[];
-
-    while (true) {
-      final data = await supabase
-          .from(tabla)
-          .select()
-          .gte('created_at', inicio.toUtc().toIso8601String())
-          .lt('created_at', finExclusivo.toUtc().toIso8601String())
-          .order('created_at', ascending: true)
-          .range(desde, desde + tamanoPagina - 1);
-
-      final pagina = List<Map<String, dynamic>>.from(data);
-      resultado.addAll(pagina);
-
-      if (pagina.length < tamanoPagina) {
-        break;
-      }
-
-      desde += tamanoPagina;
-    }
-
-    return resultado;
-  }
-
-  Future<List<Map<String, dynamic>>> _cargarFilasSemanaPorEstructura({
+  Future<List<Map<String, dynamic>>> _cargarVentasPeriodoPorEstructura({
     required String tabla,
     required String columnaAuthId,
     required List<String> authIds,
@@ -1100,9 +1070,9 @@ class _HomeScreenState extends State<HomeScreen> {
             .from(tabla)
             .select()
             .inFilter(columnaAuthId, bloque)
-            .gte('created_at', inicio.toUtc().toIso8601String())
-            .lt('created_at', finExclusivo.toUtc().toIso8601String())
-            .order('created_at', ascending: true)
+            .gte('fecha_efecto', inicio.toIso8601String())
+            .lt('fecha_efecto', finExclusivo.toIso8601String())
+            .order('fecha_efecto', ascending: true)
             .range(desde, desde + tamanoPagina - 1);
 
         final pagina = List<Map<String, dynamic>>.from(data);
@@ -1110,7 +1080,7 @@ class _HomeScreenState extends State<HomeScreen> {
         for (final fila in pagina) {
           final clave =
               (fila['id'] ??
-                      '${fila[columnaAuthId]}_${fila['created_at']}_${resultadoPorClave.length}')
+                      '${fila[columnaAuthId]}_${fila['fecha_efecto']}_${resultadoPorClave.length}')
                   .toString();
 
           resultadoPorClave[clave] = fila;
@@ -1167,19 +1137,15 @@ class _HomeScreenState extends State<HomeScreen> {
       final authIds = authIdsSet.toList();
 
       /*
-        SEMANA COMPLETA:
-        desde el lunes a las 00:00 hasta el lunes siguiente
-        (límite final exclusivo).
-
-        La consulta se realiza directamente en Supabase por:
-        - agente_auth_id perteneciente a toda la estructura descendente;
-        - created_at dentro de la semana actual.
-
-        De esta forma no se descargan primero todas las ventas y no se
-        pierden registros por el límite de filas de Supabase.
+        CARGO MENSUAL CONFIGURADO:
+        se respetan fecha_desde y fecha_hasta de cierres_produccion.
+        La producción se asigna exclusivamente por fecha_efecto.
       */
-      final inicioSemana = inicioSemanaActual;
-      final finSemanaExclusivo = inicioSemana.add(const Duration(days: 7));
+      final periodoProduccion = await ProductionPeriodService.instance.current(
+        forceRefresh: true,
+      );
+      final inicioMes = periodoProduccion.start;
+      final finMesExclusivo = periodoProduccion.endExclusive;
 
       /*
         VENTAS:
@@ -1188,32 +1154,32 @@ class _HomeScreenState extends State<HomeScreen> {
         Se consulta directamente por todos los auth_id de la estructura.
         No se descargan ventas ajenas para filtrarlas después.
       */
-      final ventasSemanaData = await _cargarFilasSemanaPorEstructura(
+      final ventasMesData = await _cargarVentasPeriodoPorEstructura(
         tabla: 'ventas',
         columnaAuthId: 'agente_auth_id',
         authIds: authIds,
-        inicio: inicioSemana,
-        finExclusivo: finSemanaExclusivo,
+        inicio: inicioMes,
+        finExclusivo: finMesExclusivo,
       );
 
-      final ventasProductivasSemana = ventasSemanaData
+      final ventasProductivasMes = ventasMesData
           .where(_esVentaProductiva)
           .toList();
 
-      final primasNetasSemana = ventasProductivasSemana.fold<double>(
+      final primasNetasMes = ventasProductivasMes.fold<double>(
         0.0,
         (total, venta) => total + _primaNetaVenta(venta),
       );
 
-      final primasDecesosVidaSemana = ventasProductivasSemana
+      final primasDecesosVidaMes = ventasProductivasMes
           .where(_esDecesosOVida)
           .fold<double>(0.0, (total, venta) => total + _primaNetaVenta(venta));
 
-      final objetivoPrimasSemana = _objetivoPrimasSemanalPorRol(rolReal);
+      final objetivoPrimasMes = _objetivoPrimasMensualPorRol(rolReal);
 
       /*
         Las tareas se mantienen con el filtrado por estructura porque
-        no forman parte del cálculo semanal de primas.
+        no forman parte del cálculo mensual de primas.
       */
       List<Map<String, dynamic>> tareas = [];
 
@@ -1310,40 +1276,40 @@ class _HomeScreenState extends State<HomeScreen> {
 
       final primero = rankingOrdenado.isEmpty ? 0 : rankingOrdenado.first.value;
 
-      final racha = await calcularRachaSemanal(authIds, objetivoPrimasSemana);
+      final racha = await calcularRachaMensual(authIds, objetivoPrimasMes);
 
-      debugPrint("========== HOME KPI CREATED_AT ==========");
+      debugPrint("========== HOME KPI FECHA_EFECTO ==========");
       debugPrint("ROL REAL: $rolReal");
       debugPrint("IDS INTERNOS ESTRUCTURA: ${idsInternosSet.length}");
       debugPrint("AUTH IDS ESTRUCTURA: ${authIds.length}");
       debugPrint(
-        "VENTAS SEMANA CONSULTADAS POR agente_auth_id: ${ventasSemanaData.length}",
+        "VENTAS MES CONSULTADAS POR agente_auth_id: ${ventasMesData.length}",
       );
-      debugPrint("VENTAS SEMANA ESTRUCTURA: ${ventasSemanaData.length}");
+      debugPrint("VENTAS MES ESTRUCTURA: ${ventasMesData.length}");
       debugPrint(
-        "VENTAS PRODUCTIVAS SEMANA CREATED_AT: "
-        "${ventasProductivasSemana.length}",
+        "VENTAS PRODUCTIVAS MES POR FECHA EFECTO: "
+        "${ventasProductivasMes.length}",
       );
-      debugPrint("PRIMAS SEMANA CREATED_AT: $primasNetasSemana");
+      debugPrint("PRIMAS MES FECHA EFECTO: $primasNetasMes");
       debugPrint("=========================================");
 
       if (!mounted) return;
 
       setState(() {
-        totalVentas = ventasProductivasSemana.length;
+        totalVentas = ventasProductivasMes.length;
         totalTareas = tareasPendientes.length;
 
         rolUsuarioLogueado = rolReal;
-        objetivoSemana = objetivoPrimasSemana;
-        primasSemana = primasNetasSemana;
-        primasMixSemana = primasDecesosVidaSemana;
+        objetivoMes = objetivoPrimasMes;
+        primasMes = primasNetasMes;
+        primasMixMes = primasDecesosVidaMes;
 
         rankingPosicion = posicion;
         rankingTotal = rankingOrdenado.length;
         rankingPrimero = primero;
         misPolizasTotales = misPolizas;
 
-        rachaSemanas = racha;
+        rachaMeses = racha;
         loadingKpis = false;
       });
     } catch (e, stackTrace) {
@@ -1356,10 +1322,10 @@ class _HomeScreenState extends State<HomeScreen> {
         totalVentas = 0;
         totalTareas = 0;
 
-        primasSemana = 0.0;
-        primasMixSemana = 0.0;
-        rachaSemanas = 0;
-        objetivoSemana = _objetivoPrimasSemanalPorRol(
+        primasMes = 0.0;
+        primasMixMes = 0.0;
+        rachaMeses = 0;
+        objetivoMes = _objetivoPrimasMensualPorRol(
           rolUsuarioLogueado.isNotEmpty ? rolUsuarioLogueado : widget.role,
         );
 
@@ -1373,7 +1339,7 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  Future<int> calcularRachaSemanal(
+  Future<int> calcularRachaMensual(
     List<String> authIds,
     double objetivoPrimas,
   ) async {
@@ -1389,31 +1355,34 @@ class _HomeScreenState extends State<HomeScreen> {
           .toList();
 
       int racha = 0;
-      DateTime inicio = inicioSemanaActual;
+      var periodo = await ProductionPeriodService.instance.current();
 
       while (true) {
-        final finExclusivo = inicio.add(const Duration(days: 7));
-
-        double primasSemanaCheck = 0.0;
+        double primasMesCheck = 0.0;
 
         for (final venta in ventas) {
-          final fecha = _fechaCreatedAt(venta);
+          final fecha = _fechaEfecto(venta);
 
           if (fecha == null) continue;
 
           final limpia = DateTime(fecha.year, fecha.month, fecha.day);
 
-          final perteneceSemana =
-              !limpia.isBefore(inicio) && limpia.isBefore(finExclusivo);
+          final perteneceMes =
+              !limpia.isBefore(periodo.start) &&
+              limpia.isBefore(periodo.endExclusive);
 
-          if (perteneceSemana) {
-            primasSemanaCheck += _primaNetaVenta(venta);
+          if (perteneceMes) {
+            primasMesCheck += _primaNetaVenta(venta);
           }
         }
 
-        if (primasSemanaCheck >= objetivoPrimas) {
+        if (primasMesCheck >= objetivoPrimas) {
           racha++;
-          inicio = inicio.subtract(const Duration(days: 7));
+          final mesAnterior = DateTime(periodo.year, periodo.month - 1, 1);
+          periodo = await ProductionPeriodService.instance.forMonth(
+            year: mesAnterior.year,
+            month: mesAnterior.month,
+          );
         } else {
           break;
         }
@@ -1421,7 +1390,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
       return racha;
     } catch (e) {
-      debugPrint('ERROR RACHA SEMANAL POR CREATED_AT: $e');
+      debugPrint('ERROR RACHA MENSUAL POR FECHA_EFECTO: $e');
       return 0;
     }
   }
@@ -1436,7 +1405,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
       if (update == null) return;
 
-      final remoteVersion = update['version']?.toString().trim() ?? '';
+      final remoteVersion = UpdateService.getPlatformUpdateVersion(update);
 
       final url = UpdateService.getPlatformUpdateUrl(update);
 
@@ -1459,6 +1428,8 @@ class _HomeScreenState extends State<HomeScreen> {
       if (!hasUpdate || _updateDialogShown) return;
 
       _updateDialogShown = true;
+      final isWindows =
+          !kIsWeb && defaultTargetPlatform == TargetPlatform.windows;
 
       await showDialog<void>(
         context: context,
@@ -1514,9 +1485,13 @@ class _HomeScreenState extends State<HomeScreen> {
                   children: [
                     Text(
                       openingInstaller
-                          ? 'Descarga completada. Abriendo el instalador de Android…'
+                          ? isWindows
+                                ? 'Descarga completada. Aplicando la actualización de Windows…'
+                                : 'Descarga completada. Abriendo el instalador de Android…'
                           : downloading
-                          ? progressPercent == null
+                          ? isWindows && progressPercent == 100
+                                ? 'Preparando la actualización. Acepta el permiso de Windows si aparece.'
+                                : progressPercent == null
                                 ? 'Preparando la descarga segura…'
                                 : 'Descargando SafeBrok… ' +
                                       progressPercent.toString() +
@@ -1543,7 +1518,9 @@ class _HomeScreenState extends State<HomeScreen> {
                       const SizedBox(height: 10),
                       Text(
                         openingInstaller
-                            ? 'APK verificada correctamente'
+                            ? isWindows
+                                  ? 'Instalador de Windows verificado'
+                                  : 'APK verificada correctamente'
                             : 'No cierres SafeBrok durante la descarga',
                         style: const TextStyle(
                           color: Color(0xFF64748B),
@@ -1684,9 +1661,9 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   double get produccionPorcentaje {
-    if (objetivoSemana == 0) return 0;
+    if (objetivoMes == 0) return 0;
 
-    final value = primasSemana / objetivoSemana;
+    final value = primasMes / objetivoMes;
 
     if (value.isNaN || value.isInfinite) return 0;
 
@@ -1697,18 +1674,8 @@ class _HomeScreenState extends State<HomeScreen> {
     return (produccionPorcentaje * 100).round();
   }
 
-  DateTime get inicioSemanaActual {
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    return today.subtract(Duration(days: today.weekday - 1));
-  }
-
-  DateTime get finSemanaActual {
-    return inicioSemanaActual.add(const Duration(days: 7));
-  }
-
-  DateTime? _fechaCreatedAt(Map<String, dynamic> row) {
-    final value = row['created_at'];
+  DateTime? _fechaEfecto(Map<String, dynamic> row) {
+    final value = row['fecha_efecto'];
 
     if (value == null) return null;
 
@@ -1719,17 +1686,6 @@ class _HomeScreenState extends State<HomeScreen> {
     final parsed = DateTime.tryParse(value.toString());
 
     return parsed?.toLocal();
-  }
-
-  bool _creadoEstaSemana(Map<String, dynamic> row) {
-    final fecha = _fechaCreatedAt(row);
-
-    if (fecha == null) return false;
-
-    final limpia = DateTime(fecha.year, fecha.month, fecha.day);
-
-    return !limpia.isBefore(inicioSemanaActual) &&
-        limpia.isBefore(finSemanaActual);
   }
 
   bool _esVentaProductiva(Map<String, dynamic> venta) {
@@ -1839,7 +1795,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     _hero(),
                     const SizedBox(height: 24),
                     _sectionTitle(
-                      "Tu rendimiento esta semana",
+                      "Tu rendimiento en el cargo actual",
                       Icons.trending_up_rounded,
                     ),
                     const SizedBox(height: 14),
@@ -2170,17 +2126,17 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _kpiGrid(bool isWide) {
     final cards = [
       _metricCard(
-        title: "Primas semana",
-        value: _formatearEuros(primasSemana),
-        subtitle: "creadas esta semana",
+        title: "Primas del mes",
+        value: _formatearEuros(primasMes),
+        subtitle: "por fecha de efecto del cargo",
         icon: Icons.euro_rounded,
         color: const Color(0xFF0A7F91),
       ),
       _metricCard(
-        title: "Mix semana",
-        value: _formatearEuros(primasMixSemana),
+        title: "Mix del mes",
+        value: _formatearEuros(primasMixMes),
         subtitle:
-            "Decesos + Vida · ${primasSemana > 0 ? ((primasMixSemana / primasSemana) * 100).toStringAsFixed(1) : '0.0'}% del total",
+            "Decesos + Vida · ${primasMes > 0 ? ((primasMixMes / primasMes) * 100).toStringAsFixed(1) : '0.0'}% del total",
         icon: Icons.pie_chart_rounded,
         color: const Color(0xFF10AAA6),
       ),
@@ -2260,55 +2216,36 @@ class _HomeScreenState extends State<HomeScreen> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: _premiumCard(const Color(0xFF10AAA6)),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _iconBubble(
-                  Icons.track_changes_rounded,
-                  const Color(0xFF10AAA6),
-                ),
-                const Spacer(),
-                const Text(
-                  "Producción",
-                  style: TextStyle(
-                    color: Color(0xFF071A3A),
-                    fontSize: 16,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  "$produccionTexto%",
-                  style: const TextStyle(
-                    color: Color(0xFF071A3A),
-                    fontSize: 38,
-                    fontWeight: FontWeight.w900,
-                    height: 1,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                const Text(
-                  "del objetivo",
-                  style: TextStyle(
-                    color: Color(0xFF64748B),
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ],
+          _iconBubble(Icons.track_changes_rounded, const Color(0xFF10AAA6)),
+          const Spacer(),
+          const Text(
+            "Producción",
+            style: TextStyle(
+              color: Color(0xFF071A3A),
+              fontSize: 16,
+              fontWeight: FontWeight.w800,
             ),
           ),
-          SizedBox(
-            width: 54,
-            height: 54,
-            child: CircularProgressIndicator(
-              value: produccionPorcentaje,
-              strokeWidth: 7,
-              backgroundColor: const Color(0xFFE2E8F0),
-              color: const Color(0xFF0A7F91),
+          const SizedBox(height: 8),
+          Text(
+            "$produccionTexto%",
+            style: const TextStyle(
+              color: Color(0xFF071A3A),
+              fontSize: 38,
+              fontWeight: FontWeight.w900,
+              height: 1,
+            ),
+          ),
+          const SizedBox(height: 6),
+          const Text(
+            "del objetivo mensual",
+            style: TextStyle(
+              color: Color(0xFF64748B),
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
             ),
           ),
         ],
@@ -2343,15 +2280,13 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _dailyGoalCard() {
-    final conseguido = primasSemana > objetivoSemana
-        ? objetivoSemana
-        : primasSemana;
+    final conseguido = primasMes > objetivoMes ? objetivoMes : primasMes;
 
-    final quedan = (objetivoSemana - conseguido)
-        .clamp(0.0, objetivoSemana)
+    final quedan = (objetivoMes - conseguido)
+        .clamp(0.0, objetivoMes)
         .toDouble();
 
-    final progreso = objetivoSemana == 0 ? 0.0 : conseguido / objetivoSemana;
+    final progreso = objetivoMes == 0 ? 0.0 : conseguido / objetivoMes;
 
     return Container(
       height: 230,
@@ -2365,7 +2300,7 @@ class _HomeScreenState extends State<HomeScreen> {
               Icon(Icons.track_changes_rounded, color: Color(0xFF0AAEAE)),
               SizedBox(width: 8),
               Text(
-                "OBJETIVO DE LA SEMANA",
+                "OBJETIVO DEL MES",
                 style: TextStyle(
                   color: Color(0xFF087F86),
                   fontWeight: FontWeight.w900,
@@ -2376,7 +2311,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           const Spacer(),
           Text(
-            _formatearEuros(objetivoSemana),
+            _formatearEuros(objetivoMes),
             style: const TextStyle(
               color: Color(0xFF071A3A),
               fontSize: 28,
@@ -2398,7 +2333,7 @@ class _HomeScreenState extends State<HomeScreen> {
             children: [
               _goalMini(
                 "Has conseguido",
-                _formatearEuros(primasSemana),
+                _formatearEuros(primasMes),
                 const Color(0xFF0AAEAE),
               ),
               Container(width: 1, height: 30, color: const Color(0xFFE2E8F0)),
@@ -2441,7 +2376,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _streakCard() {
-    final textoSemana = rachaSemanas == 1 ? "semana" : "semanas";
+    final textoMes = rachaMeses == 1 ? "mes" : "meses";
 
     return Container(
       height: 230,
@@ -2469,7 +2404,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           const Spacer(),
           Text(
-            "$rachaSemanas $textoSemana",
+            "$rachaMeses $textoMes",
             style: const TextStyle(
               color: Color(0xFF071A3A),
               fontSize: 36,
@@ -2487,9 +2422,9 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           const SizedBox(height: 12),
           Text(
-            rachaSemanas == 0
+            rachaMeses == 0
                 ? "🔥"
-                : List.filled(rachaSemanas.clamp(1, 6), "🔥").join(" "),
+                : List.filled(rachaMeses.clamp(1, 6), "🔥").join(" "),
             style: const TextStyle(fontSize: 20),
           ),
         ],

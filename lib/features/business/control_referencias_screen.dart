@@ -1,3 +1,4 @@
+import 'package:safebrok_andalucia/core/widgets/progressive_records.dart';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -1608,7 +1609,7 @@ class _ControlReferenciasScreenState extends State<ControlReferenciasScreen> {
                 height: 44,
                 child: Scrollbar(
                   thumbVisibility: true,
-                  child: ListView.separated(
+                  child: ProgressiveListView.separated(
                     scrollDirection: Axis.horizontal,
                     itemCount: columnasActivas.length,
                     separatorBuilder: (_, __) => const SizedBox(width: 8),
@@ -1732,7 +1733,7 @@ class _ControlReferenciasScreenState extends State<ControlReferenciasScreen> {
                     ),
                   ),
                   Expanded(
-                    child: ListView.builder(
+                    child: ProgressiveListView.builder(
                       itemCount: lista.length,
                       itemBuilder: (context, index) {
                         final r = lista[index];

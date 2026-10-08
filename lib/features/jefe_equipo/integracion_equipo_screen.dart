@@ -1,3 +1,4 @@
+import 'package:safebrok_andalucia/core/widgets/progressive_records.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'integracion_agente_detalle_screen.dart';
@@ -460,7 +461,7 @@ class _IntegracionEquipoScreenState extends State<IntegracionEquipoScreen> {
                       child: _estadoVacio(),
                     )
                   else
-                    SliverList.builder(
+                    ProgressiveSliverList.builder(
                       itemCount: filtrados.length,
                       itemBuilder: (context, i) {
                         final agente = filtrados[i];

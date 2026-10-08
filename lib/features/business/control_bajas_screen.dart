@@ -1,3 +1,4 @@
+import 'package:safebrok_andalucia/core/widgets/progressive_records.dart';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -1790,7 +1791,7 @@ class _ControlBajasScreenState extends State<ControlBajasScreen> {
       emptyText: 'No hay datos para estos filtros.',
       child: rows.isEmpty
           ? null
-          : ListView.builder(
+          : ProgressiveListView.builder(
               itemCount: rows.length,
               itemBuilder: (context, index) {
                 final r = rows[index];
@@ -1870,7 +1871,7 @@ class _ControlBajasScreenState extends State<ControlBajasScreen> {
       emptyText: 'No hay motivos de baja para estos filtros.',
       child: rows.isEmpty
           ? null
-          : ListView.builder(
+          : ProgressiveListView.builder(
               itemCount: rows.length,
               itemBuilder: (context, index) {
                 final r = rows[index];
@@ -1952,7 +1953,7 @@ class _ControlBajasScreenState extends State<ControlBajasScreen> {
                   ),
                 ),
                 Expanded(
-                  child: ListView.builder(
+                  child: ProgressiveListView.builder(
                     itemCount: rows.length,
                     itemBuilder: (context, index) {
                       final u = rows[index];

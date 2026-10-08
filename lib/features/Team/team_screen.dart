@@ -1,3 +1,4 @@
+import 'package:safebrok_andalucia/core/widgets/progressive_records.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -166,7 +167,7 @@ class _TeamScreenState extends State<TeamScreen> {
         ),
       ),
 
-      body: ListView.builder(
+      body: ProgressiveListView.builder(
         padding: const EdgeInsets.all(20),
         itemCount: users.length,
         itemBuilder: (context, index) {

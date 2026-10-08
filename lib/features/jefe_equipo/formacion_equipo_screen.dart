@@ -1,3 +1,4 @@
+import 'package:safebrok_andalucia/core/widgets/progressive_records.dart';
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
@@ -523,7 +524,7 @@ class _FormacionEquipoScreenState extends State<FormacionEquipoScreen> {
                         else
                           SliverPadding(
                             padding: const EdgeInsets.fromLTRB(18, 0, 18, 32),
-                            sliver: SliverList.builder(
+                            sliver: ProgressiveSliverList.builder(
                               itemCount: filtrados.length,
                               itemBuilder: (context, index) {
                                 final agente = filtrados[index];

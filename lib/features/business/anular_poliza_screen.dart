@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:safebrok_andalucia/core/widgets/progressive_records.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class AnularPolizaScreen extends StatefulWidget {
@@ -999,88 +1000,93 @@ class _AnularPolizaScreenState extends State<AnularPolizaScreen> {
         ),
         child: SingleChildScrollView(
           scrollDirection: Axis.horizontal,
-          child: DataTable(
-            headingRowColor: WidgetStateProperty.all(const Color(0xFFF8FAFC)),
-            columns: const [
-              DataColumn(label: Text('Recibo')),
-              DataColumn(label: Text('Vencimiento')),
-              DataColumn(label: Text('Importe')),
-              DataColumn(label: Text('Estado')),
-              DataColumn(label: Text('Acción')),
-            ],
-            rows: recibos.map((r) {
-              final estado = _text(r['estado_recibo'] ?? r['estado']);
-              final anulado =
-                  estado.toUpperCase() == 'ANULADO' ||
-                  estado.toUpperCase() == 'ANULADA';
+          child: ProgressiveRecords(
+            count: recibos.length,
+            resetKey: progressiveRecordKey(recibos),
+            showFooter: true,
+            builder: (context, visible) => DataTable(
+              headingRowColor: WidgetStateProperty.all(const Color(0xFFF8FAFC)),
+              columns: const [
+                DataColumn(label: Text('Recibo')),
+                DataColumn(label: Text('Vencimiento')),
+                DataColumn(label: Text('Importe')),
+                DataColumn(label: Text('Estado')),
+                DataColumn(label: Text('Acción')),
+              ],
+              rows: recibos.take(visible).map((r) {
+                final estado = _text(r['estado_recibo'] ?? r['estado']);
+                final anulado =
+                    estado.toUpperCase() == 'ANULADO' ||
+                    estado.toUpperCase() == 'ANULADA';
 
-              return DataRow(
-                cells: [
-                  DataCell(Text(_text(r['numero_recibo'] ?? r['id']))),
-                  DataCell(
-                    Text(
-                      _text(
-                        r['fecha_vencimiento'] ??
-                            r['vencimiento'] ??
-                            r['fecha'] ??
-                            '-',
-                      ).split('T').first,
-                    ),
-                  ),
-                  DataCell(
-                    Text(
-                      '${_money(r['importe'] ?? r['prima'] ?? r['total']).toStringAsFixed(2)} €',
-                    ),
-                  ),
-                  DataCell(
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 6,
+                return DataRow(
+                  cells: [
+                    DataCell(Text(_text(r['numero_recibo'] ?? r['id']))),
+                    DataCell(
+                      Text(
+                        _text(
+                          r['fecha_vencimiento'] ??
+                              r['vencimiento'] ??
+                              r['fecha'] ??
+                              '-',
+                        ).split('T').first,
                       ),
-                      decoration: BoxDecoration(
-                        color: anulado
-                            ? const Color(0xFFDCFCE7)
-                            : const Color(0xFFFFEDD5),
-                        borderRadius: BorderRadius.circular(30),
+                    ),
+                    DataCell(
+                      Text(
+                        '${_money(r['importe'] ?? r['prima'] ?? r['total']).toStringAsFixed(2)} €',
                       ),
-                      child: Text(
-                        estado,
-                        style: TextStyle(
+                    ),
+                    DataCell(
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 6,
+                        ),
+                        decoration: BoxDecoration(
                           color: anulado
-                              ? const Color(0xFF166534)
-                              : const Color(0xFF9A3412),
-                          fontWeight: FontWeight.w900,
-                          fontSize: 12,
+                              ? const Color(0xFFDCFCE7)
+                              : const Color(0xFFFFEDD5),
+                          borderRadius: BorderRadius.circular(30),
+                        ),
+                        child: Text(
+                          estado,
+                          style: TextStyle(
+                            color: anulado
+                                ? const Color(0xFF166534)
+                                : const Color(0xFF9A3412),
+                            fontWeight: FontWeight.w900,
+                            fontSize: 12,
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                  DataCell(
-                    anulado
-                        ? const Icon(
-                            Icons.lock_rounded,
-                            color: Color(0xFF94A3B8),
-                          )
-                        : ElevatedButton.icon(
-                            onPressed: anulandoRecibos
-                                ? null
-                                : () => anularUnRecibo(r),
-                            icon: const Icon(Icons.block_rounded, size: 16),
-                            label: const Text('Anular'),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFFDC2626),
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 12,
-                                vertical: 10,
+                    DataCell(
+                      anulado
+                          ? const Icon(
+                              Icons.lock_rounded,
+                              color: Color(0xFF94A3B8),
+                            )
+                          : ElevatedButton.icon(
+                              onPressed: anulandoRecibos
+                                  ? null
+                                  : () => anularUnRecibo(r),
+                              icon: const Icon(Icons.block_rounded, size: 16),
+                              label: const Text('Anular'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFFDC2626),
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 10,
+                                ),
                               ),
                             ),
-                          ),
-                  ),
-                ],
-              );
-            }).toList(),
+                    ),
+                  ],
+                );
+              }).toList(),
+            ),
           ),
         ),
       ),

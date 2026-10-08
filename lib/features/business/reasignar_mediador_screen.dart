@@ -1,3 +1,4 @@
+import 'package:safebrok_andalucia/core/widgets/progressive_records.dart';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -392,7 +393,7 @@ class _ReasignarMediadorScreenState extends State<ReasignarMediadorScreen> {
           Expanded(
             child: mediadoresFiltrados.isEmpty
                 ? _empty('No hay mediadores en tu estructura')
-                : ListView.builder(
+                : ProgressiveListView.builder(
                     itemCount: mediadoresFiltrados.length,
                     itemBuilder: (context, index) {
                       final m = mediadoresFiltrados[index];
@@ -432,7 +433,7 @@ class _ReasignarMediadorScreenState extends State<ReasignarMediadorScreen> {
           Expanded(
             child: jefesEquipo.isEmpty
                 ? _empty('No hay jefes de equipo disponibles')
-                : ListView.builder(
+                : ProgressiveListView.builder(
                     itemCount: jefesEquipo.length,
                     itemBuilder: (context, index) {
                       final j = jefesEquipo[index];

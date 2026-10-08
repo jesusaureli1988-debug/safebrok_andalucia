@@ -1,4 +1,6 @@
 import 'dart:math' as math;
+import 'package:safebrok_andalucia/core/production/policy_effect_date.dart';
+import 'package:safebrok_andalucia/core/production/policy_sales_query.dart';
 
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
@@ -131,11 +133,7 @@ class _AdvancedStatisticsScreenState extends State<AdvancedStatisticsScreen> {
       if (ids.isEmpty) throw Exception('No hay usuarios en el ámbito actual.');
 
       final commercial = await Future.wait<dynamic>([
-        _supabase
-            .from('ventas')
-            .select()
-            .inFilter('agente_auth_id', ids)
-            .order('fecha_efecto', ascending: true),
+        PolicySalesQuery.load(_supabase, authIds: ids),
         _supabase
             .from('anulaciones_polizas')
             .select('id,venta_id,fecha_anulacion,prima_extornada,estado')
@@ -233,7 +231,7 @@ class _AdvancedStatisticsScreenState extends State<AdvancedStatisticsScreen> {
   List<Map<String, dynamic>> get _periodSales {
     final ids = _scopeAuthIds().toSet();
     return _sales.where((sale) {
-      final date = _date(sale['fecha_efecto'] ?? sale['created_at']);
+      final date = PolicyEffectDate.read(sale);
       return date != null &&
           ids.contains(_text(sale['agente_auth_id'])) &&
           !date.isBefore(_rangeStart) &&
@@ -247,7 +245,7 @@ class _AdvancedStatisticsScreenState extends State<AdvancedStatisticsScreen> {
     final previousStart = _rangeStart.subtract(duration);
     final ids = _scopeAuthIds().toSet();
     return _sales.where((sale) {
-      final date = _date(sale['fecha_efecto'] ?? sale['created_at']);
+      final date = PolicyEffectDate.read(sale);
       return date != null &&
           ids.contains(_text(sale['agente_auth_id'])) &&
           !date.isBefore(previousStart) &&
@@ -329,7 +327,7 @@ class _AdvancedStatisticsScreenState extends State<AdvancedStatisticsScreen> {
       final end = DateTime(date.year, date.month + 1, 1);
       final value = _sales
           .where((sale) {
-            final saleDate = _date(sale['fecha_efecto'] ?? sale['created_at']);
+            final saleDate = PolicyEffectDate.read(sale);
             return saleDate != null &&
                 ids.contains(_text(sale['agente_auth_id'])) &&
                 !saleDate.isBefore(date) &&

@@ -1,6 +1,8 @@
 import 'dart:ui';
 import 'package:safebrok_andalucia/core/production/premium_weighting.dart';
 import 'package:safebrok_andalucia/core/payroll/role_compensation.dart';
+import 'package:safebrok_andalucia/core/production/policy_effect_date.dart';
+import 'package:safebrok_andalucia/core/production/policy_sales_query.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:safebrok_andalucia/core/production/production_period_service.dart';
@@ -110,26 +112,8 @@ class _BusinessScreenState extends State<BusinessScreen> {
     return double.tryParse(normalizado) ?? 0;
   }
 
-  DateTime? _fechaVenta(Map<String, dynamic> venta) {
-    final valores = [
-      venta['fecha_efecto'],
-      venta['fecha'],
-      venta['created_at'],
-      venta['fecha_registro'],
-    ];
-
-    for (final valor in valores) {
-      if (valor == null) continue;
-
-      final fecha = DateTime.tryParse(valor.toString());
-
-      if (fecha != null) {
-        return fecha;
-      }
-    }
-
-    return null;
-  }
+  DateTime? _fechaVenta(Map<String, dynamic> venta) =>
+      PolicyEffectDate.read(venta);
 
   int _nivelRol(dynamic rol) {
     switch (_normalizarRol(rol)) {
@@ -266,33 +250,34 @@ class _BusinessScreenState extends State<BusinessScreen> {
       final inicioActual = productionPeriod.start;
       final finActual = productionPeriod.endExclusive;
 
-      final inicioAnterior = DateTime(
-        inicioActual.year,
-        inicioActual.month - 1,
-        24,
+      final previousMonth = DateTime(
+        productionPeriod.year,
+        productionPeriod.month - 1,
+      );
+      final previousPeriod = await ProductionPeriodService.instance.forMonth(
+        year: previousMonth.year,
+        month: previousMonth.month,
+      );
+      final inicioAnterior = previousPeriod.start;
+      final finAnterior = previousPeriod.endExclusive;
+
+      final ventasActualData = await PolicySalesQuery.load(
+        supabase,
+        authIds: authIdsEstructura,
+        start: inicioActual,
+        endExclusive: finActual,
+        select:
+            'id, agente_auth_id, prima_anual_neta, comision, producto, precio, cliente_id, fecha_efecto',
       );
 
-      final finAnterior = inicioActual;
-
-      final ventasActualData = await supabase
-          .from('ventas')
-          .select(
-            'id, agente_auth_id, prima_anual_neta, comision, producto, '
-            'precio, cliente_id, fecha_efecto, created_at',
-          )
-          .inFilter('agente_auth_id', authIdsEstructura)
-          .gte('fecha_efecto', inicioActual.toIso8601String())
-          .lt('fecha_efecto', finActual.toIso8601String());
-
-      final ventasAnteriorData = await supabase
-          .from('ventas')
-          .select(
-            'id, agente_auth_id, prima_anual_neta, comision, producto, '
-            'fecha_efecto, created_at',
-          )
-          .inFilter('agente_auth_id', authIdsEstructura)
-          .gte('fecha_efecto', inicioAnterior.toIso8601String())
-          .lt('fecha_efecto', finAnterior.toIso8601String());
+      final ventasAnteriorData = await PolicySalesQuery.load(
+        supabase,
+        authIds: authIdsEstructura,
+        start: inicioAnterior,
+        endExclusive: finAnterior,
+        select:
+            'id, agente_auth_id, prima_anual_neta, comision, producto, fecha_efecto',
+      );
 
       final ventasActuales = List<Map<String, dynamic>>.from(ventasActualData)
           .where((venta) {

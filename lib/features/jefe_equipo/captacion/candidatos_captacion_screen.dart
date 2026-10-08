@@ -1,3 +1,4 @@
+import 'package:safebrok_andalucia/core/widgets/progressive_records.dart';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -894,7 +895,7 @@ class _CandidatosCaptacionScreenState extends State<CandidatosCaptacionScreen> {
 
     return SizedBox(
       height: 42,
-      child: ListView.separated(
+      child: ProgressiveListView.separated(
         scrollDirection: Axis.horizontal,
         itemCount: filtros.length,
         separatorBuilder: (_, __) => const SizedBox(width: 8),

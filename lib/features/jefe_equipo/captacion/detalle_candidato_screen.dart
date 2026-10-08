@@ -1,3 +1,4 @@
+import 'package:safebrok_andalucia/core/widgets/progressive_records.dart';
 import 'dart:async';
 import 'dart:ui';
 import 'package:flutter/material.dart';
@@ -337,7 +338,7 @@ class _DetalleCandidatoScreenState extends State<DetalleCandidatoScreen> {
                     ),
                     const SizedBox(height: 18),
                     Expanded(
-                      child: ListView.separated(
+                      child: ProgressiveListView.separated(
                         controller: scrollController,
                         itemCount: responsablesDisponibles.length,
                         separatorBuilder: (_, __) => const SizedBox(height: 9),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:safebrok_andalucia/core/widgets/progressive_records.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class ExtornosScreen extends StatefulWidget {
@@ -330,21 +331,36 @@ class _ExtornosScreenState extends State<ExtornosScreen> {
           ? _errorView()
           : RefreshIndicator(
               onRefresh: _cargar,
-              child: ListView(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
-                children: [
-                  _hero(),
-                  const SizedBox(height: 16),
-                  _resumen(),
-                  const SizedBox(height: 16),
-                  _filtros(),
-                  const SizedBox(height: 16),
-                  _cabeceraResultados(),
-                  const SizedBox(height: 10),
+              child: CustomScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                slivers: [
+                  SliverPadding(
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                    sliver: SliverList(
+                      delegate: SliverChildListDelegate([
+                        _hero(),
+                        const SizedBox(height: 16),
+                        _resumen(),
+                        const SizedBox(height: 16),
+                        _filtros(),
+                        const SizedBox(height: 16),
+                        _cabeceraResultados(),
+                        const SizedBox(height: 10),
+                      ]),
+                    ),
+                  ),
                   if (_filtrados.isEmpty)
-                    _vacio()
+                    SliverToBoxAdapter(child: _vacio())
                   else
-                    ..._filtrados.map(_tarjetaExtorno),
+                    SliverPadding(
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
+                      sliver: ProgressiveSliverList.builder(
+                        itemCount: _filtrados.length,
+                        resetKey: progressiveRecordKey(_filtrados),
+                        itemBuilder: (_, index) =>
+                            _tarjetaExtorno(_filtrados[index]),
+                      ),
+                    ),
                 ],
               ),
             ),

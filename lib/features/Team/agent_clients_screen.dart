@@ -1,3 +1,4 @@
+import 'package:safebrok_andalucia/core/widgets/progressive_records.dart';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -220,7 +221,7 @@ class _AgentClientsScreenState extends State<AgentClientsScreen> {
                         else
                           SliverPadding(
                             padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
-                            sliver: SliverList.separated(
+                            sliver: ProgressiveSliverList.separated(
                               itemCount: filteredClients.length,
                               separatorBuilder: (_, __) =>
                                   const SizedBox(height: 14),

@@ -1,3 +1,4 @@
+import 'package:safebrok_andalucia/core/widgets/progressive_records.dart';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -331,8 +332,9 @@ class _MyClientsScreenState extends State<MyClientsScreen> {
                         else
                           SliverPadding(
                             padding: const EdgeInsets.fromLTRB(20, 10, 20, 28),
-                            sliver: SliverList.builder(
+                            sliver: ProgressiveSliverList.builder(
                               itemCount: filtered.length,
+                              resetKey: progressiveRecordKey(filtered),
                               itemBuilder: (context, index) {
                                 return _clientCard(filtered[index], index);
                               },

@@ -8,10 +8,11 @@ workflows:
       app_store_connect: "Codemagic Safebrok"
 
     environment:
-      flutter: stable
+      flutter: 3.41.9
       xcode: latest
       cocoapods: default
       vars:
+        APP_STORE_APPLE_ID: "6787038104"
         # App Store Connect ID de la ficha existente de SafeBrok.
         APP_STORE_CONNECT_ALTOOL_ADDITIONAL_ARGUMENTS: "--apple-id '6787038104'"
       ios_signing:
@@ -25,10 +26,10 @@ workflows:
         script: flutter pub get
 
       - name: Validate Dart code
-        script: flutter analyze --no-fatal-infos --no-fatal-warnings
+        script: flutter analyze --no-fatal-infos --no-fatal-warnings lib test
 
-      - name: Test App Review roles
-        script: flutter test test/app_role_test.dart
+      - name: Test release regressions and App Review roles
+        script: flutter test
 
       - name: Install pods
         script: |
@@ -42,8 +43,21 @@ workflows:
 
       - name: Build IPA
         script: |
+          set -euo pipefail
+          APP_VERSION=$(sed -n 's/^version: *//p' pubspec.yaml | tr -d '\r')
+          BASE_BUILD=${APP_VERSION##*+}
+          LATEST_BUILD=$(app-store-connect get-latest-build-number "$APP_STORE_APPLE_ID")
+          if ! [[ "$BASE_BUILD" =~ ^[0-9]+$ && "$LATEST_BUILD" =~ ^[0-9]+$ ]]; then
+            echo "No se pudo validar el numero de compilacion de Apple."
+            exit 1
+          fi
+          NEXT_BUILD=$((LATEST_BUILD + 1))
+          if (( NEXT_BUILD < BASE_BUILD )); then NEXT_BUILD=$BASE_BUILD; fi
+          echo "Compilando SafeBrok ${APP_VERSION%%+*} ($NEXT_BUILD)"
           flutter build ipa --release \
             -t lib/main.dart \
+            --build-name="${APP_VERSION%%+*}" \
+            --build-number="$NEXT_BUILD" \
             --export-options-plist=/Users/builder/export_options.plist
           echo "BUSCANDO IPA..."
           find build -name "*.ipa" -print
@@ -56,3 +70,5 @@ workflows:
     publishing:
       app_store_connect:
         auth: integration
+        submit_to_testflight: false
+        submit_to_app_store: false

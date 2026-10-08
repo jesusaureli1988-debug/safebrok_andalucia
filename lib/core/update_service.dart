@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:dio/dio.dart';
@@ -6,6 +7,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'windows_update_installer.dart';
 
 class UpdateService {
   static final supabase = Supabase.instance.client;
@@ -74,6 +76,17 @@ class UpdateService {
     return null;
   }
 
+  static String getPlatformUpdateVersion(Map<String, dynamic> update) {
+    final globalVersion = update['version']?.toString().trim() ?? '';
+    if (Platform.isWindows) {
+      return WindowsUpdateInstaller.remoteVersion(
+        globalVersion,
+        update['windows_url']?.toString().trim() ?? '',
+      );
+    }
+    return globalVersion;
+  }
+
   static Future<void> openUpdateExternally(String url) async {
     final uri = _validatedHttpsUri(url);
     final opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
@@ -89,7 +102,7 @@ class UpdateService {
     final cleanUrl = _validatedHttpsUri(url).toString();
 
     if (Platform.isWindows) {
-      await _downloadAndInstallWindows(cleanUrl);
+      await _downloadAndInstallWindows(cleanUrl, onProgress: onProgress);
       return;
     }
 
@@ -104,18 +117,31 @@ class UpdateService {
     );
   }
 
-  static Future<void> _downloadAndInstallWindows(String url) async {
+  static Future<void> _downloadAndInstallWindows(
+    String url, {
+    void Function(int received, int total)? onProgress,
+  }) async {
     final tempDir = await getTemporaryDirectory();
+    final staging = await tempDir.createTemp('SafeBrokUpdate-');
+    final installerPath = '${staging.path}\\SafeBrokUpdate.exe';
+    final response =
+        await Dio(
+          BaseOptions(
+            followRedirects: true,
+            maxRedirects: 8,
+            connectTimeout: const Duration(seconds: 30),
+            receiveTimeout: const Duration(minutes: 10),
+          ),
+        ).download(
+          url,
+          installerPath,
+          deleteOnError: true,
+          onReceiveProgress: onProgress,
+        );
 
-    final installerPath = '${tempDir.path}\\SafeBrokUpdate.exe';
-
-    final response = await Dio().download(
-      url,
-      installerPath,
-      deleteOnError: true,
-    );
-
-    if (response.statusCode != null && response.statusCode! >= 400) {
+    if (response.statusCode == null ||
+        response.statusCode! < 200 ||
+        response.statusCode! >= 300) {
       throw Exception(
         'Error descargando el instalador '
         '(${response.statusCode}).',
@@ -130,29 +156,72 @@ class UpdateService {
 
     final size = await installer.length();
 
-    if (size <= 0) {
-      throw Exception('El instalador descargado está vacío.');
+    final header = await installer
+        .openRead(0, size < 8192 ? size : 8192)
+        .fold<List<int>>([], (bytes, chunk) => bytes..addAll(chunk));
+    if (size < 1024 * 1024 || !WindowsUpdateInstaller.isExecutable(header)) {
+      throw Exception(
+        'El enlace no ha descargado un instalador válido de Windows. '
+        'Debe apuntar al archivo SafeBrokSetup, no a una página web.',
+      );
     }
-
-    await Process.start(
-      installerPath,
-      const [
-        '/SP-',
-        '/VERYSILENT',
-        '/SUPPRESSMSGBOXES',
-        '/NORESTART',
-        '/CLOSEAPPLICATIONS',
-        '/RESTARTAPPLICATIONS',
-      ],
-      mode: ProcessStartMode.detached,
-      runInShell: true,
+    final appDir = File(Platform.resolvedExecutable).parent;
+    final installed = await File('${appDir.path}\\unins000.exe').exists();
+    final args = WindowsUpdateInstaller.arguments(
+      installDirectory: installed ? appDir.path : null,
+      logPath: '${staging.path}\\installation.log',
     );
-
-    // Damos tiempo a Windows para iniciar el instalador.
-    await Future<void>.delayed(const Duration(seconds: 3));
-
-    // Cerramos SafeBrok para que el instalador pueda
-    // sustituir los archivos.
+    final acknowledgement = File('${staging.path}\\started.txt');
+    final script = WindowsUpdateInstaller.launchScript(
+      installerPath,
+      args,
+      acknowledgementPath: acknowledgement.path,
+      applicationPath: Platform.resolvedExecutable,
+    );
+    final encoded = base64Encode(
+      script.codeUnits
+          .expand((unit) => [unit & 0xff, (unit >> 8) & 0xff])
+          .toList(),
+    );
+    final helper = await Process.start('powershell.exe', [
+      '-NoProfile',
+      '-NonInteractive',
+      '-WindowStyle',
+      'Hidden',
+      '-EncodedCommand',
+      encoded,
+    ], mode: ProcessStartMode.detached);
+    final deadline = DateTime.now().add(const Duration(minutes: 5));
+    var launchState = '';
+    while (launchState != 'STARTED' && launchState != 'FAILED') {
+      if (await acknowledgement.exists()) {
+        try {
+          launchState = (await acknowledgement.readAsString()).trim();
+        } on FileSystemException {
+          // El helper puede estar terminando de escribir la confirmación.
+        }
+      }
+      if (launchState == 'STARTED' || launchState == 'FAILED') break;
+      if (DateTime.now().isAfter(deadline)) {
+        Process.killPid(
+          helper.pid,
+        ); // Solo el helper iniciado por esta actualización.
+        throw Exception(
+          'Windows no ha confirmado el inicio de la actualización. '
+          'Cancela cualquier permiso pendiente y vuelve a intentarlo.',
+        );
+      }
+      await Future<void>.delayed(const Duration(milliseconds: 150));
+    }
+    if (launchState != 'STARTED') {
+      throw Exception(
+        'Windows no ha autorizado el inicio de la actualización. '
+        'Acepta el permiso de administrador cuando aparezca. '
+        'SafeBrok no se ha cerrado y puedes reintentarlo.',
+      );
+    }
+    // Solo cerramos la app después de que Windows acepte y lance el instalador.
+    // El helper espera a que termine el instalador y reabre la app sin elevarla.
     exit(0);
   }
 

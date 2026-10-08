@@ -1,6 +1,9 @@
 import 'dart:math' as math;
+import 'package:safebrok_andalucia/core/production/policy_effect_date.dart';
+import 'package:safebrok_andalucia/core/production/policy_sales_query.dart';
 
 import 'package:flutter/material.dart';
+import 'package:safebrok_andalucia/core/widgets/progressive_records.dart';
 import 'package:intl/intl.dart';
 import 'package:safebrok_andalucia/core/production/premium_weighting.dart';
 import 'package:safebrok_andalucia/core/production/production_period_service.dart';
@@ -141,13 +144,12 @@ class _TeamHierarchyScreenState extends State<TeamHierarchyScreen> {
           .toList();
       _sales = ids.isEmpty
           ? []
-          : (await _supabase
-                        .from('ventas')
-                        .select(
-                          'id,agente_auth_id,producto,fecha_efecto,created_at,prima_anual_neta,comision',
-                        )
-                        .inFilter('agente_auth_id', ids)
-                        .order('fecha_efecto', ascending: true)
+          : (await PolicySalesQuery.load(
+                      _supabase,
+                      authIds: ids,
+                      select:
+                          'id,agente_auth_id,producto,fecha_efecto,prima_anual_neta,comision',
+                    )
                     as List)
                 .map((item) => Map<String, dynamic>.from(item))
                 .toList();
@@ -219,7 +221,7 @@ class _TeamHierarchyScreenState extends State<TeamHierarchyScreen> {
   }
 
   List<Map<String, dynamic>> get _periodSales => _sales.where((sale) {
-    final date = _date(sale['fecha_efecto'] ?? sale['created_at']);
+    final date = PolicyEffectDate.read(sale);
     return date != null && !date.isBefore(_start) && date.isBefore(_end);
   }).toList();
 
@@ -850,10 +852,11 @@ class _TeamHierarchyScreenState extends State<TeamHierarchyScreen> {
             'Producción computable, mix y composición del periodo seleccionado',
           ),
           const SizedBox(height: 20),
-          GridView.builder(
+          ProgressiveGridView.builder(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
             itemCount: branches.length,
+            resetKey: progressiveRecordKey(branches),
             gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: wide ? 2 : 1,
               childAspectRatio: wide ? 2.05 : 1.55,

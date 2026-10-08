@@ -1,3 +1,4 @@
+import 'package:safebrok_andalucia/core/widgets/progressive_records.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'dart:io';
@@ -2099,7 +2100,7 @@ class _TramitarFacturasScreenState extends State<TramitarFacturasScreen> {
                       ),
                     ),
                   )
-                : ListView.builder(
+                : ProgressiveListView.builder(
                     itemCount: lista.length,
                     itemBuilder: (_, i) => _facturaRow(lista[i]),
                   ),

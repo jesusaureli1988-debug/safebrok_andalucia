@@ -1,3 +1,4 @@
+import 'package:safebrok_andalucia/core/widgets/progressive_records.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -58,7 +59,7 @@ class _SolicitudesEliminacionScreenState
           ? const Center(child: Text('No hay solicitudes'))
           : RefreshIndicator(
               onRefresh: loadRequests,
-              child: ListView.separated(
+              child: ProgressiveListView.separated(
                 padding: const EdgeInsets.all(16),
                 itemCount: requests.length,
                 separatorBuilder: (_, _) => const SizedBox(height: 10),
