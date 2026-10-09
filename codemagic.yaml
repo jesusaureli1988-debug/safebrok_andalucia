@@ -62,6 +62,12 @@ workflows:
           echo "BUSCANDO IPA..."
           find build -name "*.ipa" -print
 
+      - name: Verify package_info_plus privacy manifest in IPA
+        script: |
+          set -e
+          python3 -m unittest discover -s tools -p test_ios_privacy_manifest.py
+          python3 tools/check_ios_privacy_manifest.py
+
     artifacts:
       - build/ios/ipa/*.ipa
       - build/ios/archive/*.xcarchive
