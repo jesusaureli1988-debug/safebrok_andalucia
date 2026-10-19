@@ -3,8 +3,11 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'incorporacion_repository.dart';
+import 'incorporacion_estado.dart';
 
 const _labels = {
+  'PENDIENTE_CONFIRMACION': 'Pendiente confirmación',
+  'DESCARTADO': 'Descartados',
   'agente': 'Agente',
   'jefe_equipo': 'Jefe de equipo',
   'jefe_ventas': 'Jefe de ventas',
@@ -32,7 +35,7 @@ String _visibleState(Map<String, dynamic> expediente) {
   if (expediente['estado'] == 'BORRADOR' && _requiredComplete(expediente)) {
     return 'LISTO PARA REVISIÓN';
   }
-  return _label(expediente['estado']);
+  return _label(incorporacionEstadoVisible(expediente));
 }
 
 class IncorporacionesScreen extends StatefulWidget {
@@ -58,8 +61,10 @@ class _IncorporacionesScreenState extends State<IncorporacionesScreen> {
     'DOCUMENTACION_VALIDADA',
     'CONTRATO_DISPONIBLE',
     'PENDIENTE_FIRMA',
+    'PENDIENTE_CONFIRMACION',
     'CONTRATO_FIRMADO',
     'ALTA_COMPLETADA',
+    'DESCARTADO',
   ];
 
   @override
@@ -164,14 +169,14 @@ class _IncorporacionesScreenState extends State<IncorporacionesScreen> {
         ? rows
         : filter == 'TRABAJO'
         ? rows.where(_needsWork).toList()
-        : rows.where((e) => e['estado'] == filter).toList();
+        : rows.where((e) => incorporacionEstadoVisible(e) == filter).toList();
     return byStatus.where(_matchesSearch).toList();
   }
 
   int _count(String value) {
     if (value == 'TODOS') return rows.length;
     if (value == 'TRABAJO') return rows.where(_needsWork).length;
-    return rows.where((e) => e['estado'] == value).length;
+    return rows.where((e) => incorporacionEstadoVisible(e) == value).length;
   }
 
   Widget _searchBox() => Padding(
@@ -612,20 +617,23 @@ class IncorporacionDetail extends StatefulWidget {
     super.key,
     required this.expediente,
     required this.admin,
+    this.repository,
   });
   final Map<String, dynamic> expediente;
   final bool admin;
+  final IncorporacionRepository? repository;
   @override
   State<IncorporacionDetail> createState() => _IncorporacionDetailState();
 }
 
 class _IncorporacionDetailState extends State<IncorporacionDetail> {
-  final repo = IncorporacionRepository();
+  late final IncorporacionRepository repo;
   late Map<String, dynamic> e;
   bool busy = false;
   @override
   void initState() {
     super.initState();
+    repo = widget.repository ?? IncorporacionRepository();
     e = widget.expediente;
   }
 
@@ -695,6 +703,75 @@ class _IncorporacionDetailState extends State<IncorporacionDetail> {
     );
     if (ok == true && c.text.trim().isNotEmpty)
       await state('CORRECCION_REQUERIDA', notes: c.text.trim());
+  }
+
+  Future<void> decline() async {
+    var draftReason = '';
+    final formKey = GlobalKey<FormState>();
+    final reason = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Declinar incorporación'),
+        content: Form(
+          key: formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                'El expediente y el candidato pasarán a Descartados para su '
+                'responsable y superiores. Dejarán de aparecer como pendientes. '
+                'Se conservarán sus datos y documentos.',
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                onChanged: (value) => draftReason = value,
+                maxLines: 4,
+                decoration: const InputDecoration(
+                  labelText: 'Motivo del descarte',
+                ),
+                validator: (value) => value == null || value.trim().isEmpty
+                    ? 'Indica el motivo del descarte'
+                    : null,
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () {
+              if (formKey.currentState!.validate()) {
+                Navigator.pop(dialogContext, draftReason.trim());
+              }
+            },
+            child: const Text('Confirmar descarte'),
+          ),
+        ],
+      ),
+    );
+    if (!mounted || reason == null) return;
+    setState(() => busy = true);
+    try {
+      await repo.decline(e['id'].toString(), reason);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Incorporación trasladada a Descartados')),
+      );
+      Navigator.pop(context, true);
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('No se pudo declinar la incorporación: $error'),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => busy = false);
+    }
   }
 
   Future<void> rejectSignedContract() async {
@@ -769,6 +846,10 @@ class _IncorporacionDetailState extends State<IncorporacionDetail> {
                         Text(
                           'Incorporación prevista: ${e['fecha_prevista_incorporacion']}',
                         ),
+                        if (e['estado'] == 'DESCARTADO')
+                          Text(
+                            'Motivo del descarte: ${e['motivo_descarte'] ?? ''}',
+                          ),
                         if (e['observaciones_correccion'] != null)
                           Text(
                             'Corrección: ${e['observaciones_correccion']}',
@@ -796,6 +877,7 @@ class _IncorporacionDetailState extends State<IncorporacionDetail> {
                       onTap: () => openDoc(d),
                       trailing:
                           widget.admin &&
+                              e['estado'] != 'DESCARTADO' &&
                               IncorporacionRepository.requiredTypes.contains(
                                 d['tipo'],
                               )
@@ -855,16 +937,24 @@ class _IncorporacionDetailState extends State<IncorporacionDetail> {
                   ),
                 ),
                 const SizedBox(height: 16),
-                if (widget.admin)
-                  ...adminActions()
-                else
-                  ...responsibleActions(),
+                if (e['estado'] != 'DESCARTADO') ...[
+                  if (widget.admin)
+                    ...adminActions()
+                  else
+                    ...responsibleActions(),
+                ],
               ],
             ),
     );
   }
 
   List<Widget> adminActions() => [
+    if (e['estado'] != 'ALTA_COMPLETADA' && e['usuario_creado_id'] == null)
+      OutlinedButton.icon(
+        onPressed: busy ? null : decline,
+        icon: const Icon(Icons.person_off_outlined),
+        label: const Text('Declinar incorporación'),
+      ),
     Wrap(
       spacing: 8,
       runSpacing: 8,
@@ -900,7 +990,8 @@ class _IncorporacionDetailState extends State<IncorporacionDetail> {
             onPressed: () => state('CONTRATO_DISPONIBLE'),
             child: const Text('Publicar contrato'),
           ),
-        if (e['estado'] == 'CONTRATO_DISPONIBLE')
+        if (e['estado'] == 'CONTRATO_DISPONIBLE' &&
+            incorporacionEstadoVisible(e) != 'PENDIENTE_CONFIRMACION')
           FilledButton(
             onPressed: () => state('PENDIENTE_FIRMA'),
             child: const Text('Marcar pendiente de firma'),

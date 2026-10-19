@@ -1,5 +1,6 @@
 import 'package:safebrok_andalucia/core/widgets/progressive_records.dart';
 import 'package:flutter/material.dart';
+import 'pending_policy_assignment.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class VentasSinAgentesScreen extends StatefulWidget {
@@ -245,14 +246,14 @@ class _VentasSinAgentesScreenState extends State<VentasSinAgentesScreen> {
       for (var i = 0; i < ids.length; i += 50) {
         final fin = i + 50 < ids.length ? i + 50 : ids.length;
         final lote = ids.sublist(i, fin);
-        final cantidad = await _db.rpc(
-          'app_asignar_polizas_pendientes',
-          params: {'p_ids': lote, 'p_agente_auth_id': agente['auth_id']},
-        );
-        guardadas += (cantidad as num).toInt();
+        final cantidad = await PendingPolicyAssignment(
+          _db,
+        ).assign(lote, agente['auth_id'].toString());
+        guardadas += cantidad;
         if (!mounted) return;
         setState(() {
           _seleccion.removeAll(lote);
+          _polizas.removeWhere((p) => lote.contains(p['id'].toString()));
           _resultado = '$guardadas pólizas asignadas a $nombre';
         });
       }

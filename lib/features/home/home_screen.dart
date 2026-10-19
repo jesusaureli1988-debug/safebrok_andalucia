@@ -1,4 +1,8 @@
 import 'dart:ui';
+import '../cotizaciones/cotizaciones_screen.dart';
+import '../cotizaciones/avant2_access.dart';
+import 'package:safebrok_andalucia/features/incorporaciones/incorporaciones_screen.dart';
+import 'package:safebrok_andalucia/features/incorporaciones/incorporacion_repository.dart';
 import 'package:flutter/foundation.dart'
     show kIsWeb, defaultTargetPlatform, TargetPlatform;
 import 'package:safebrok_andalucia/core/production/premium_weighting.dart';
@@ -13,6 +17,7 @@ import 'package:safebrok_andalucia/utils/team_tracking_screen.dart';
 import 'package:safebrok_andalucia/features/tareas/mis_tareas_screen.dart';
 import 'package:safebrok_andalucia/core/update_service.dart';
 import 'package:safebrok_andalucia/core/production/production_period_service.dart';
+import 'package:safebrok_andalucia/core/production/home_ranking_service.dart';
 import 'package:safebrok_andalucia/features/tareas/jefe_equipo_tareas_screen.dart';
 import 'package:safebrok_andalucia/features/agenda/agenda_screen.dart';
 import 'package:safebrok_andalucia/features/team/mis_equipos_jefe_ventas_screen.dart';
@@ -190,6 +195,8 @@ class _HomeScreenState extends State<HomeScreen> {
   String rolUsuarioLogueado = '';
 
   bool loadingKpis = true;
+  bool _kpiLoadFailed = false;
+  String _cargoDescription = 'por fecha de efecto del cargo';
   bool _checkingUpdate = false;
   bool _updateDialogShown = false;
 
@@ -616,7 +623,30 @@ class _HomeScreenState extends State<HomeScreen> {
                                   final archivoUrl = alerta['archivo_url']
                                       ?.toString();
 
-                                  if (archivoUrl != null &&
+                                  if (alerta['entidad_tipo'] ==
+                                          'incorporacion' &&
+                                      alerta['entidad_id'] != null) {
+                                    final repo = IncorporacionRepository();
+                                    final expediente = await repo.byId(
+                                      alerta['entidad_id'].toString(),
+                                    );
+                                    final profile = await repo.myProfile();
+                                    if (!mounted) return;
+                                    final role = repo.normalRole(
+                                      profile['rol_usuario'],
+                                    );
+                                    await Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) => IncorporacionDetail(
+                                          expediente: expediente,
+                                          admin:
+                                              role == 'administracion' ||
+                                              role == 'director_nacional',
+                                        ),
+                                      ),
+                                    );
+                                  } else if (archivoUrl != null &&
                                       archivoUrl.isNotEmpty) {
                                     await _abrirArchivoNotificacion(archivoUrl);
                                   } else if (alerta['pantalla_destino'] ==
@@ -1073,6 +1103,7 @@ class _HomeScreenState extends State<HomeScreen> {
             .gte('fecha_efecto', inicio.toIso8601String())
             .lt('fecha_efecto', finExclusivo.toIso8601String())
             .order('fecha_efecto', ascending: true)
+            .order('id', ascending: true)
             .range(desde, desde + tamanoPagina - 1);
 
         final pagina = List<Map<String, dynamic>>.from(data);
@@ -1101,6 +1132,8 @@ class _HomeScreenState extends State<HomeScreen> {
     final user = supabase.auth.currentUser;
 
     if (user == null) return;
+
+    var productionLoaded = false;
 
     try {
       if (mounted) {
@@ -1177,6 +1210,27 @@ class _HomeScreenState extends State<HomeScreen> {
 
       final objetivoPrimasMes = _objetivoPrimasMensualPorRol(rolReal);
 
+      // Mostrar la producción sin esperar al ranking ni a la racha histórica.
+      if (!mounted) return;
+      setState(() {
+        totalVentas = ventasProductivasMes.length;
+        rolUsuarioLogueado = rolReal;
+        objetivoMes = objetivoPrimasMes;
+        primasMes = primasNetasMes;
+        primasMixMes = primasDecesosVidaMes;
+        _kpiLoadFailed = false;
+        _cargoDescription =
+            'Efecto: ${inicioMes.day}/${inicioMes.month}/${inicioMes.year}'
+            ' – ${periodoProduccion.to.day}/${periodoProduccion.to.month}/${periodoProduccion.to.year}';
+        loadingKpis = false;
+      });
+      productionLoaded = true;
+      debugPrint(
+        'HOME CARGO ${periodoProduccion.key}: $inicioMes hasta $finMesExclusivo (exclusivo), '
+        'configurado=${periodoProduccion.configured}, polizas=${ventasMesData.length}, '
+        'productivas=${ventasProductivasMes.length}, primas=$primasNetasMes',
+      );
+
       /*
         Las tareas se mantienen con el filtrado por estructura porque
         no forman parte del cálculo mensual de primas.
@@ -1209,72 +1263,12 @@ class _HomeScreenState extends State<HomeScreen> {
           .where(_tareaPendiente)
           .toList();
 
-      final usuariosRanking = await supabase.rpc(
-        'app_ranking_usuarios_activos',
+      final ranking = await HomeRankingService.load(
+        supabase,
+        user.id,
+        onError: (error) =>
+            debugPrint('AVISO RANKING HOME (primas conservadas): $error'),
       );
-
-      final todasLasVentas = <Map<String, dynamic>>[];
-      for (var desde = 0; ; desde += 1000) {
-        final pagina = await supabase
-            .from('ventas')
-            .select('id, agente_auth_id')
-            .order('id')
-            .range(desde, desde + 999);
-        todasLasVentas.addAll(List<Map<String, dynamic>>.from(pagina));
-        if (pagina.length < 1000) break;
-      }
-
-      final Map<String, int> polizasPorAuthId = {};
-
-      for (final usuario in usuariosRanking) {
-        final authId = usuario['auth_id']?.toString();
-
-        if (authId == null ||
-            authId.isEmpty ||
-            authId.toLowerCase() == 'null') {
-          continue;
-        }
-
-        polizasPorAuthId[authId] = 0;
-      }
-
-      for (final venta in todasLasVentas) {
-        final authId = venta['agente_auth_id']?.toString();
-
-        if (authId == null ||
-            authId.isEmpty ||
-            !polizasPorAuthId.containsKey(authId)) {
-          continue;
-        }
-
-        polizasPorAuthId[authId] = (polizasPorAuthId[authId] ?? 0) + 1;
-      }
-
-      final rankingOrdenado = polizasPorAuthId.entries.toList()
-        ..sort((a, b) {
-          final comparePolizas = b.value.compareTo(a.value);
-
-          if (comparePolizas != 0) {
-            return comparePolizas;
-          }
-
-          return a.key.compareTo(b.key);
-        });
-
-      int posicion = 0;
-      int misPolizas = 0;
-
-      for (int i = 0; i < rankingOrdenado.length; i++) {
-        final entry = rankingOrdenado[i];
-
-        if (entry.key == user.id) {
-          posicion = i + 1;
-          misPolizas = entry.value;
-          break;
-        }
-      }
-
-      final primero = rankingOrdenado.isEmpty ? 0 : rankingOrdenado.first.value;
 
       final racha = await calcularRachaMensual(authIds, objetivoPrimasMes);
 
@@ -1304,10 +1298,10 @@ class _HomeScreenState extends State<HomeScreen> {
         primasMes = primasNetasMes;
         primasMixMes = primasDecesosVidaMes;
 
-        rankingPosicion = posicion;
-        rankingTotal = rankingOrdenado.length;
-        rankingPrimero = primero;
-        misPolizasTotales = misPolizas;
+        rankingPosicion = ranking.position;
+        rankingTotal = ranking.total;
+        rankingPrimero = ranking.first;
+        misPolizasTotales = ranking.ownPolicies;
 
         rachaMeses = racha;
         loadingKpis = false;
@@ -1319,6 +1313,11 @@ class _HomeScreenState extends State<HomeScreen> {
       if (!mounted) return;
 
       setState(() {
+        if (productionLoaded) {
+          loadingKpis = false;
+          return;
+        }
+        _kpiLoadFailed = true;
         totalVentas = 0;
         totalTareas = 0;
 
@@ -2124,11 +2123,25 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _kpiGrid(bool isWide) {
+    if (_kpiLoadFailed) {
+      return Column(
+        children: [
+          const Text(
+            'No se ha podido cargar la producción del cargo. No es un importe de 0 €.',
+          ),
+          TextButton.icon(
+            onPressed: loadingKpis ? null : loadKpis,
+            icon: const Icon(Icons.refresh),
+            label: const Text('Reintentar'),
+          ),
+        ],
+      );
+    }
     final cards = [
       _metricCard(
         title: "Primas del mes",
         value: _formatearEuros(primasMes),
-        subtitle: "por fecha de efecto del cargo",
+        subtitle: _cargoDescription,
         icon: Icons.euro_rounded,
         color: const Color(0xFF0A7F91),
       ),
@@ -2565,6 +2578,23 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _moduleGrid(List<DashboardItem> items, bool isWide) {
     final allItems = [
+      DashboardItem(
+        title: 'Avant2',
+        icon: Icons.open_in_browser_rounded,
+        subtitle: 'Acceso al portal Avant2',
+        color: const Color(0xFF087F86),
+        onTap: () => openAvant2(context),
+      ),
+      DashboardItem(
+        title: 'Cotizaciones',
+        icon: Icons.calculate_outlined,
+        subtitle: 'Compañías, portales y ejecutivos',
+        color: const Color(0xFF087F86),
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute<void>(builder: (_) => const CotizacionesScreen()),
+        ),
+      ),
       DashboardItem(
         title: "Nueva venta",
         icon: Icons.add_rounded,

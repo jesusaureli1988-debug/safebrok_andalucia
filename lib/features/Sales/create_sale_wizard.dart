@@ -1,4 +1,6 @@
 import 'dart:async';
+import '../../core/catalogs/insurance_companies.dart';
+import 'package:safebrok_andalucia/core/contact/phone_number.dart';
 
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -88,26 +90,7 @@ class _CreateSaleWizardState extends State<CreateSaleWizard> {
     'Transportes',
   ];
 
-  final companies = [
-    'Ocaso',
-    'Santalucía',
-    'DKV',
-    'Adeslas',
-    'Mapfre',
-    'Generali',
-    'Helvetia',
-    'Axa',
-    'Allianz',
-    'Zurich',
-    'Active',
-    'Aura',
-    'Occident',
-    'Fiact',
-    'Asisa',
-    'Pelayo',
-    'Reale Seguros',
-    'Sanitas',
-  ];
+  final companies = insuranceCompanies;
 
   final payments = ['Mensual', 'Trimestral', 'Semestral', 'Anual'];
 
@@ -286,6 +269,9 @@ class _CreateSaleWizardState extends State<CreateSaleWizard> {
               "Teléfono",
               icon: Icons.phone_rounded,
               keyboard: TextInputType.phone,
+              validator: validatePhoneNumber,
+              helperText:
+                  'España o extranjero. Ej.: 612345678, +44 7700 900123 o 0049 15123456789',
             ),
             _input(
               email,
@@ -575,6 +561,7 @@ class _CreateSaleWizardState extends State<CreateSaleWizard> {
     TextInputType keyboard = TextInputType.text,
     TextCapitalization textCapitalization = TextCapitalization.none,
     String? Function(String?)? validator,
+    String? helperText,
     Future<void> Function()? onChangedExtra,
   }) {
     return Padding(
@@ -601,7 +588,10 @@ class _CreateSaleWizardState extends State<CreateSaleWizard> {
               }
               return null;
             },
-        decoration: _decoration(hint, icon),
+        decoration: _decoration(
+          hint,
+          icon,
+        ).copyWith(helperText: helperText, helperMaxLines: 3),
       ),
     );
   }
@@ -1115,7 +1105,7 @@ class _CreateSaleWizardState extends State<CreateSaleWizard> {
               'dni': dni.text.trim(),
               'nombre': nombre.text.trim(),
               'apellidos': apellidos.text.trim(),
-              'telefono': telefono.text.trim(),
+              'telefono': normalizePhoneNumber(telefono.text),
               'email': email.text.trim(),
               'codigo_postal': cp.text.trim(),
               'provincia': provincia.text.trim(),
@@ -1132,7 +1122,7 @@ class _CreateSaleWizardState extends State<CreateSaleWizard> {
               'nombre': nombre.text.trim(),
               'apellidos': apellidos.text.trim(),
               'dni': dni.text.trim(),
-              'telefono': telefono.text.trim(),
+              'telefono': normalizePhoneNumber(telefono.text),
               'email': email.text.trim(),
               'codigo_postal': cp.text.trim(),
               'provincia': provincia.text.trim(),
@@ -1262,7 +1252,7 @@ class _CreateSaleWizardState extends State<CreateSaleWizard> {
           'cliente_id': finalClientId,
           'auth_id': user.id,
           'nombre': nombre.text.trim(),
-          'telefono': telefono.text.trim(),
+          'telefono': normalizePhoneNumber(telefono.text),
           'producto': selectedProduct,
           'fecha_efecto': fechaEfecto!.toIso8601String(),
           'tipo_llamada': s['tipo'],

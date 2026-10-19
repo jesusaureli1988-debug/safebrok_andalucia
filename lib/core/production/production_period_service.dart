@@ -27,12 +27,9 @@ class ProductionPeriod {
       DateTime(to.year, to.month, to.day, 23, 59, 59, 999);
 
   DateTime get endExclusive {
-    final dayAfter = DateTime(
-      to.year,
-      to.month,
-      to.day,
-    ).add(const Duration(days: 1));
-    return DateTime(dayAfter.year, dayAfter.month, dayAfter.day);
+    // Avanzar un dia de calendario, no 24 horas: el cambio horario puede
+    // dejar una suma de 24 horas en el mismo dia o desplazarla una hora.
+    return DateTime(to.year, to.month, to.day + 1);
   }
 
   String get key => '$year-${month.toString().padLeft(2, '0')}';

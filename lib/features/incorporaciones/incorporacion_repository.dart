@@ -151,6 +151,18 @@ class IncorporacionRepository {
         )
         .order('updated_at', ascending: false),
   );
+  Future<Map<String, dynamic>> byId(
+    String id,
+  ) async => Map<String, dynamic>.from(
+    await db
+        .from('incorporaciones')
+        .select(
+          '*, responsable:usuarios!incorporaciones_responsable_id_fkey(id,nombre,apellidos,rol_usuario), documentos:incorporacion_documentos(*)',
+        )
+        .eq('id', id)
+        .single(),
+  );
+
   Future<List<Map<String, dynamic>>> history(String id) async =>
       List<Map<String, dynamic>>.from(
         await db
@@ -220,6 +232,11 @@ class IncorporacionRepository {
         'revisado_at': DateTime.now().toIso8601String(),
       })
       .eq('id', id);
+  Future<void> decline(String id, String reason) => db.rpc(
+    'incorporacion_declinar',
+    params: {'p_id': id, 'p_motivo': reason},
+  );
+
   Future<void> rejectSignedContract(String id, String observations) => db.rpc(
     'incorporacion_rechazar_contrato_firmado',
     params: {'p_id': id, 'p_observaciones': observations},

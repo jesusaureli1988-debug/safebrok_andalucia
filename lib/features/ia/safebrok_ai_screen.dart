@@ -1,5 +1,8 @@
 import 'dart:convert';
-import 'dart:ui';
+import 'dart:math';
+import 'package:file_picker/file_picker.dart';
+import 'ia_agent_panel.dart';
+import 'ia_workspaces.dart';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -18,7 +21,6 @@ class SafebrokAiScreen extends StatefulWidget {
 class _SafebrokAiScreenState extends State<SafebrokAiScreen> {
   static const _bg = Color(0xFFF4F6FB);
   static const _panel = Color(0xFF0D1924);
-  static const _panelSoft = Color(0xFF122331);
   static const _cyan = Color(0xFF14B8A6);
 
   final _supabase = Supabase.instance.client;
@@ -29,7 +31,11 @@ class _SafebrokAiScreenState extends State<SafebrokAiScreen> {
   final List<Map<String, dynamic>> _conversaciones = [];
   final List<Map<String, dynamic>> _mensajes = [];
 
+  final List<PlatformFile> _adjuntos = [];
   String? _conversacionActualId;
+  String _espacio = 'general';
+  String _historyQuery = '';
+  bool _showBots = false;
   bool _enviando = false;
   bool _cargandoConversaciones = true;
   bool _cargandoMensajes = false;
@@ -44,14 +50,7 @@ class _SafebrokAiScreenState extends State<SafebrokAiScreen> {
     await _cargarConversaciones();
     if (!mounted) return;
 
-    if (_conversaciones.isNotEmpty) {
-      await _abrirConversacion(
-        _conversaciones.first['id'].toString(),
-        cerrarDrawer: false,
-      );
-    } else {
-      _nuevaConversacion();
-    }
+    _nuevaConversacion();
   }
 
   Future<void> _cargarConversaciones() async {
@@ -86,17 +85,19 @@ class _SafebrokAiScreenState extends State<SafebrokAiScreen> {
     }
   }
 
-  void _nuevaConversacion() {
-    if (!mounted) return;
+  void _nuevaConversacion({String espacio = 'general'}) {
+    if (!mounted || _enviando || _cargandoMensajes) return;
 
     setState(() {
+      _espacio = espacio;
+      _showBots = false;
       _conversacionActualId = null;
       _mensajes
         ..clear()
         ..add({
           'role': 'assistant',
           'text':
-              'Hola, soy Safebrok IA. Pregúntame sobre ventas, clientes, pólizas, recibos, objetivos o cualquier proceso de Safebrok.',
+              'Trabajaremos en ${iaWorkspace(_espacio).title.toLowerCase()}, con los datos y permisos de tu perfil. ¿Qué necesitas hacer?',
           'local': true,
         });
     });
@@ -109,7 +110,7 @@ class _SafebrokAiScreenState extends State<SafebrokAiScreen> {
   }
 
   Future<void> _abrirConversacion(String id, {bool cerrarDrawer = true}) async {
-    if (id.isEmpty || _cargandoMensajes) return;
+    if (id.isEmpty || _cargandoMensajes || _enviando) return;
 
     if (cerrarDrawer && (_scaffoldKey.currentState?.isDrawerOpen ?? false)) {
       Navigator.of(context).pop();
@@ -117,6 +118,7 @@ class _SafebrokAiScreenState extends State<SafebrokAiScreen> {
 
     setState(() {
       _conversacionActualId = id;
+      _showBots = false;
       _cargandoMensajes = true;
       _mensajes.clear();
     });
@@ -124,13 +126,24 @@ class _SafebrokAiScreenState extends State<SafebrokAiScreen> {
     try {
       final data = await _supabase
           .from('ia_mensajes')
-          .select('id, role, contenido, created_at')
+          .select('id, role, contenido, created_at, metadata')
           .eq('conversacion_id', id)
           .order('created_at', ascending: true);
 
       if (!mounted || _conversacionActualId != id) return;
 
       setState(() {
+        final espacios = data.where(
+          (m) =>
+              m['role'] == 'user' &&
+              m['metadata'] is Map &&
+              (m['metadata'] as Map)['espacio_ia'] != null,
+        );
+        _espacio = espacios.isEmpty
+            ? 'general'
+            : iaWorkspace(
+                (espacios.first['metadata'] as Map)['espacio_ia'].toString(),
+              ).id;
         _mensajes
           ..clear()
           ..addAll(
@@ -140,6 +153,14 @@ class _SafebrokAiScreenState extends State<SafebrokAiScreen> {
                 'role': e['role'],
                 'text': e['contenido'],
                 'created_at': e['created_at'],
+                'pasos': (e['metadata'] as Map?)?['pasos'],
+                'archivos':
+                    (e['metadata'] as Map?)?['archivos'] ??
+                    (e['metadata'] as Map?)?['adjuntos'],
+                'pdf_url':
+                    ((e['metadata'] as Map?)?['documento'] as Map?)?['url'],
+                'pdf_nombre':
+                    ((e['metadata'] as Map?)?['documento'] as Map?)?['nombre'],
               },
             ),
           );
@@ -179,10 +200,143 @@ class _SafebrokAiScreenState extends State<SafebrokAiScreen> {
     return conversacion['id'].toString();
   }
 
+  Future<void> _seleccionarAdjuntos() async {
+    final result = await FilePicker.platform.pickFiles(
+      allowMultiple: true,
+      withData: true,
+      type: FileType.custom,
+      allowedExtensions: [
+        'pdf',
+        'docx',
+        'xlsx',
+        'pptx',
+        'csv',
+        'txt',
+        'md',
+        'json',
+        'html',
+        'png',
+        'jpg',
+        'jpeg',
+        'webp',
+        'xml',
+        'dart',
+        'js',
+        'ts',
+        'py',
+        'sql',
+        'css',
+        'yaml',
+        'yml',
+      ],
+    );
+    if (result == null || !mounted) return;
+    final files = [..._adjuntos, ...result.files];
+    if (files.length > 3 ||
+        files.any((f) => f.size > 8000000 || f.bytes == null) ||
+        files.fold<int>(0, (s, f) => s + f.size) > 16000000) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Máximo 3 archivos, 8 MB por archivo y 16 MB en total.',
+          ),
+        ),
+      );
+      return;
+    }
+    setState(() {
+      _adjuntos.clear();
+      _adjuntos.addAll(files);
+    });
+  }
+
+  Future<List<Map<String, dynamic>>> _subirAdjuntos(
+    List<PlatformFile> files,
+    String userId,
+  ) async {
+    final uploaded = <Map<String, dynamic>>[];
+    const mimes = {
+      'pdf': 'application/pdf',
+      'png': 'image/png',
+      'jpg': 'image/jpeg',
+      'jpeg': 'image/jpeg',
+      'webp': 'image/webp',
+      'docx':
+          'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'xlsx':
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'pptx':
+          'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+      'txt': 'text/plain',
+      'csv': 'text/csv',
+      'md': 'text/markdown',
+      'json': 'application/json',
+      'html': 'text/html',
+    };
+    try {
+      for (final file in files) {
+        final rng = Random.secure();
+        final bytes = List<int>.generate(16, (_) => rng.nextInt(256));
+        bytes[6] = (bytes[6] & 15) | 64;
+        bytes[8] = (bytes[8] & 63) | 128;
+        final hex = bytes
+            .map((v) => v.toRadixString(16).padLeft(2, '0'))
+            .join();
+        final id =
+            '${hex.substring(0, 8)}-${hex.substring(8, 12)}-${hex.substring(12, 16)}-${hex.substring(16, 20)}-${hex.substring(20)}';
+        final name = file.name.replaceAll(RegExp(r'[/\\]'), '_');
+        final path = '$userId/ia_adjuntos/$id/$name';
+        final type = name.split('.').last.toLowerCase();
+        final mime = mimes[type] ?? 'text/plain';
+        await _supabase.storage
+            .from('safecloud')
+            .uploadBinary(
+              path,
+              file.bytes!,
+              fileOptions: FileOptions(contentType: mime),
+            );
+        try {
+          await _supabase.from('safecloud_items').insert({
+            'id': id,
+            'owner_auth_id': userId,
+            'parent_id': null,
+            'nombre': name,
+            'tipo': 'archivo',
+            'storage_path': path,
+            'mime_type': mime,
+            'size_bytes': file.size,
+          });
+        } catch (_) {
+          await _supabase.storage.from('safecloud').remove([path]);
+          rethrow;
+        }
+        uploaded.add({
+          'id': id,
+          'nombre': name,
+          'tipo': type,
+          'storage_path': path,
+          'size_bytes': file.size,
+        });
+      }
+      return uploaded;
+    } catch (_) {
+      for (final f in uploaded) {
+        await _supabase.from('safecloud_items').delete().eq('id', f['id']);
+        await _supabase.storage.from('safecloud').remove([
+          f['storage_path'] as String,
+        ]);
+      }
+      rethrow;
+    }
+  }
+
   Future<void> enviarPregunta() async {
-    final pregunta = _controller.text.trim();
+    final pregunta = _controller.text.trim().isEmpty && _adjuntos.isNotEmpty
+        ? 'Analiza los archivos adjuntos.'
+        : _controller.text.trim();
     if (pregunta.isEmpty || _enviando || _cargandoMensajes) return;
 
+    final adjuntos = List<PlatformFile>.from(_adjuntos);
     FocusScope.of(context).unfocus();
 
     final historial = _mensajes
@@ -213,30 +367,43 @@ class _SafebrokAiScreenState extends State<SafebrokAiScreen> {
 
       final userId = _supabase.auth.currentUser!.id;
 
+      final archivosAdjuntos = await _subirAdjuntos(adjuntos, userId);
+      if (mounted)
+        setState(() {
+          _adjuntos.clear();
+          _mensajes.lastWhere((m) => m['role'] == 'user')['archivos'] =
+              archivosAdjuntos;
+        });
       await _supabase.from('ia_mensajes').insert({
         'conversacion_id': conversacionId,
         'auth_id': userId,
         'role': 'user',
         'contenido': pregunta,
+        'metadata': {'espacio_ia': _espacio, 'adjuntos': archivosAdjuntos},
       });
 
       final session = _supabase.auth.currentSession;
       final inicio = historial.length > 12 ? historial.length - 12 : 0;
 
-      final response = await http.post(
-        Uri.parse(
-          'https://ytmxjavihwylrswphczc.supabase.co/functions/v1/safebrok-ia',
-        ),
-        headers: {
-          'Content-Type': 'application/json',
-          if (session != null) 'Authorization': 'Bearer ${session.accessToken}',
-        },
-        body: jsonEncode({
-          'pregunta': pregunta,
-          'historial': historial.skip(inicio).toList(),
-          'conversacion_id': conversacionId,
-        }),
-      );
+      final response = await http
+          .post(
+            Uri.parse(
+              'https://ytmxjavihwylrswphczc.supabase.co/functions/v1/safebrok-ia',
+            ),
+            headers: {
+              'Content-Type': 'application/json',
+              if (session != null)
+                'Authorization': 'Bearer ${session.accessToken}',
+            },
+            body: jsonEncode({
+              'pregunta': pregunta,
+              'modo_agente': true,
+              'espacio_ia': _espacio,
+              'historial': historial.skip(inicio).toList(),
+              'conversacion_id': conversacionId,
+            }),
+          )
+          .timeout(const Duration(seconds: 120));
 
       final dynamic decoded = jsonDecode(utf8.decode(response.bodyBytes));
       final data = decoded is Map<String, dynamic>
@@ -280,6 +447,11 @@ class _SafebrokAiScreenState extends State<SafebrokAiScreen> {
             'auth_id': userId,
             'role': 'assistant',
             'contenido': respuesta,
+            'metadata': {
+              'pasos': data['pasos'] ?? [],
+              'documento': documento,
+              'archivos': data['archivos'] ?? [],
+            },
           })
           .select('id, created_at')
           .single();
@@ -300,6 +472,8 @@ class _SafebrokAiScreenState extends State<SafebrokAiScreen> {
           'id': mensajeIa['id'],
           'role': 'assistant',
           'text': respuesta,
+          'pasos': data['pasos'],
+          'archivos': data['archivos'],
           'created_at': mensajeIa['created_at'],
           if (tienePdf) 'pdf_url': pdfUrl,
           if (tienePdf) 'pdf_nombre': pdfNombre,
@@ -452,6 +626,10 @@ class _SafebrokAiScreenState extends State<SafebrokAiScreen> {
   void _scrollDown() {
     Future.delayed(const Duration(milliseconds: 180), () {
       if (!_scrollController.hasClients) return;
+      if (_isWelcome) {
+        _scrollController.jumpTo(0);
+        return;
+      }
       _scrollController.animateTo(
         _scrollController.position.maxScrollExtent,
         duration: const Duration(milliseconds: 320),
@@ -487,7 +665,7 @@ class _SafebrokAiScreenState extends State<SafebrokAiScreen> {
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final escritorio = constraints.maxWidth >= 900;
+        final escritorio = constraints.maxWidth >= 780;
 
         return Scaffold(
           key: _scaffoldKey,
@@ -510,24 +688,49 @@ class _SafebrokAiScreenState extends State<SafebrokAiScreen> {
                     onPressed: () => _scaffoldKey.currentState?.openDrawer(),
                     icon: const Icon(Icons.menu_rounded),
                   ),
-            title: const Row(
-              mainAxisSize: MainAxisSize.min,
+            title: Row(
               children: [
-                Icon(Icons.auto_awesome, color: _cyan, size: 20),
-                SizedBox(width: 9),
-                Text(
-                  'SafeBrok IA',
-                  style: TextStyle(
-                    color: Color(0xFF0F2747),
-                    fontWeight: FontWeight.w900,
+                const Icon(Icons.auto_awesome, color: _cyan, size: 20),
+                const SizedBox(width: 9),
+                Expanded(
+                  child: Text(
+                    iaWorkspace(_espacio).title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: Color(0xFF0F2747),
+                      fontWeight: FontWeight.w800,
+                      fontSize: 17,
+                    ),
                   ),
                 ),
               ],
             ),
             actions: [
+              if (escritorio)
+                const Padding(
+                  padding: EdgeInsets.only(right: 16),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.shield_outlined,
+                        size: 16,
+                        color: Color(0xFF64748B),
+                      ),
+                      SizedBox(width: 6),
+                      Text(
+                        'Acceso según tu perfil',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Color(0xFF64748B),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               IconButton(
                 tooltip: 'Nueva conversación',
-                onPressed: _nuevaConversacion,
+                onPressed: _enviando ? null : _nuevaConversacion,
                 icon: const Icon(Icons.edit_square, color: Color(0xFF0F2747)),
               ),
               const SizedBox(width: 6),
@@ -535,10 +738,10 @@ class _SafebrokAiScreenState extends State<SafebrokAiScreen> {
           ),
           body: Row(
             children: [
-              if (escritorio) SizedBox(width: 300, child: _sidebar()),
+              if (escritorio) SizedBox(width: 272, child: _sidebar()),
               if (escritorio)
                 VerticalDivider(width: 1, color: Color(0xFFDCE6F2)),
-              Expanded(child: _chat()),
+              Expanded(child: _showBots ? _botsWorkspace() : _chat()),
             ],
           ),
         );
@@ -546,172 +749,267 @@ class _SafebrokAiScreenState extends State<SafebrokAiScreen> {
     );
   }
 
+  void _selectWorkspace(String id) {
+    if (_enviando || _cargandoMensajes) return;
+    if (id == 'bots') {
+      setState(() {
+        _espacio = id;
+        _showBots = true;
+      });
+      if (_scaffoldKey.currentState?.isDrawerOpen ?? false)
+        Navigator.pop(context);
+    } else {
+      _nuevaConversacion(espacio: id);
+    }
+  }
+
   Widget _sidebar() {
-    return Container(
+    final history = _conversaciones
+        .where(
+          (c) => (c['titulo'] ?? '').toString().toLowerCase().contains(
+            _historyQuery.toLowerCase(),
+          ),
+        )
+        .take(40)
+        .toList();
+    return Material(
       color: _panel,
       child: Column(
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(14, 14, 14, 10),
-            child: InkWell(
-              onTap: _nuevaConversacion,
-              borderRadius: BorderRadius.circular(14),
-              child: Container(
-                height: 48,
-                padding: const EdgeInsets.symmetric(horizontal: 15),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: Colors.white.withOpacity(.16)),
-                  color: Colors.white.withOpacity(.04),
-                ),
-                child: const Row(
-                  children: [
-                    Icon(Icons.add_rounded, color: Colors.white),
-                    SizedBox(width: 10),
-                    Text(
-                      'Nueva conversación',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(17, 8, 17, 8),
+            padding: const EdgeInsets.fromLTRB(20, 22, 18, 18),
             child: Row(
               children: [
-                Text(
-                  'CONVERSACIONES',
-                  style: TextStyle(
-                    color: Colors.white.withOpacity(.42),
-                    fontSize: 11,
-                    letterSpacing: 1.2,
-                    fontWeight: FontWeight.w900,
+                Container(
+                  width: 38,
+                  height: 38,
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(11),
+                  ),
+                  child: Image.asset(
+                    'assets/images/safebrok_mark.png',
+                    fit: BoxFit.contain,
+                  ),
+                ),
+                const SizedBox(width: 11),
+                const Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'SafeBrok IA',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w800,
+                          fontSize: 18,
+                        ),
+                      ),
+                      Text(
+                        'Tu espacio de trabajo',
+                        style: TextStyle(
+                          color: Color(0xFF94A3B8),
+                          fontSize: 11,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],
             ),
           ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14),
+            child: SizedBox(
+              width: double.infinity,
+              height: 44,
+              child: FilledButton.icon(
+                onPressed: _enviando ? null : _nuevaConversacion,
+                style: FilledButton.styleFrom(
+                  backgroundColor: const Color(0xFFCCFBF1),
+                  foregroundColor: const Color(0xFF115E59),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(11),
+                  ),
+                  alignment: Alignment.centerLeft,
+                ),
+                icon: const Icon(Icons.add, size: 19),
+                label: const Text(
+                  'Nueva conversación',
+                  style: TextStyle(fontWeight: FontWeight.w700),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
           Expanded(
-            child: _cargandoConversaciones
-                ? const Center(child: CircularProgressIndicator(color: _cyan))
-                : _conversaciones.isEmpty
-                ? const Center(
-                    child: Padding(
-                      padding: EdgeInsets.all(24),
-                      child: Text(
-                        'Todavía no hay conversaciones guardadas.',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(color: Colors.white38),
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(10, 0, 10, 16),
+              children: [
+                const Padding(
+                  padding: EdgeInsets.fromLTRB(12, 8, 12, 9),
+                  child: Text(
+                    'ESPACIOS DE TRABAJO',
+                    style: TextStyle(
+                      fontSize: 10,
+                      letterSpacing: 1.3,
+                      color: Color(0xFF8090A5),
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+                for (final workspace in iaWorkspaces)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 3),
+                    child: ListTile(
+                      key: ValueKey('ia-space-${workspace.id}'),
+                      dense: true,
+                      minVerticalPadding: 1,
+                      selected: workspace.id == _espacio,
+                      selectedTileColor: const Color(0xFF183F40),
+                      selectedColor: const Color(0xFF99F6E4),
+                      iconColor: const Color(0xFF94A3B8),
+                      textColor: const Color(0xFFCBD5E1),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      leading: Icon(workspace.icon, size: 19),
+                      title: Text(
+                        workspace.title,
+                        style: const TextStyle(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      onTap: _enviando
+                          ? null
+                          : () => _selectWorkspace(workspace.id),
+                    ),
+                  ),
+                const Padding(
+                  padding: EdgeInsets.fromLTRB(12, 22, 12, 10),
+                  child: Text(
+                    'CONVERSACIONES',
+                    style: TextStyle(
+                      fontSize: 10,
+                      letterSpacing: 1.3,
+                      color: Color(0xFF8090A5),
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                  child: TextField(
+                    onChanged: (value) => setState(() => _historyQuery = value),
+                    style: const TextStyle(color: Colors.white, fontSize: 12),
+                    decoration: InputDecoration(
+                      hintText: 'Buscar conversación',
+                      hintStyle: const TextStyle(
+                        color: Color(0xFF8090A5),
+                        fontSize: 12,
+                      ),
+                      prefixIcon: const Icon(
+                        Icons.search,
+                        size: 17,
+                        color: Color(0xFF8090A5),
+                      ),
+                      isDense: true,
+                      filled: true,
+                      fillColor: const Color(0xFF142332),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(9),
+                        borderSide: BorderSide.none,
                       ),
                     ),
-                  )
-                : ListView.builder(
-                    padding: const EdgeInsets.fromLTRB(8, 0, 8, 12),
-                    itemCount: _conversaciones.length,
-                    itemBuilder: (context, index) {
-                      final c = _conversaciones[index];
-                      final id = c['id'].toString();
-                      final seleccionada = id == _conversacionActualId;
-
-                      return Container(
-                        margin: const EdgeInsets.only(bottom: 3),
-                        decoration: BoxDecoration(
-                          color: seleccionada
-                              ? Colors.white.withOpacity(.09)
-                              : Colors.transparent,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: ListTile(
-                          dense: true,
-                          contentPadding: const EdgeInsets.only(
-                            left: 12,
-                            right: 4,
-                          ),
-                          onTap: () => _abrirConversacion(id),
-                          leading: Icon(
-                            Icons.chat_bubble_outline_rounded,
-                            color: seleccionada ? _cyan : Colors.white54,
-                            size: 19,
-                          ),
-                          title: Text(
-                            c['titulo']?.toString() ?? 'Nueva conversación',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              color: seleccionada
-                                  ? Colors.white
-                                  : Colors.white70,
-                              fontWeight: seleccionada
-                                  ? FontWeight.w800
-                                  : FontWeight.w600,
-                              fontSize: 13.5,
-                            ),
-                          ),
-                          trailing: PopupMenuButton<String>(
-                            color: _panelSoft,
-                            icon: const Icon(
-                              Icons.more_horiz_rounded,
-                              color: const Color(0xFF64748B),
-                              size: 19,
-                            ),
-                            onSelected: (value) {
-                              if (value == 'rename') _renombrar(c);
-                              if (value == 'delete') _eliminar(c);
-                            },
-                            itemBuilder: (_) => const [
-                              PopupMenuItem(
-                                value: 'rename',
-                                child: Text(
-                                  'Renombrar',
-                                  style: TextStyle(
-                                    color: Color(0xFF0F172A),
-                                    fontWeight: FontWeight.w900,
-                                  ),
-                                ),
-                              ),
-                              PopupMenuItem(
-                                value: 'delete',
-                                child: Text(
-                                  'Eliminar',
-                                  style: TextStyle(color: Color(0xFFF87171)),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      );
-                    },
                   ),
+                ),
+                const SizedBox(height: 8),
+                if (_cargandoConversaciones)
+                  const LinearProgressIndicator(color: _cyan),
+                if (!_cargandoConversaciones && history.isEmpty)
+                  const Padding(
+                    padding: EdgeInsets.all(12),
+                    child: Text(
+                      'Tus conversaciones aparecerán aquí.',
+                      style: TextStyle(color: Color(0xFF8090A5), fontSize: 12),
+                    ),
+                  ),
+                for (final c in history)
+                  ListTile(
+                    dense: true,
+                    contentPadding: const EdgeInsets.only(left: 12, right: 0),
+                    selected:
+                        c['id'].toString() == _conversacionActualId &&
+                        !_showBots,
+                    selectedTileColor: const Color(0xFF1B3041),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    leading: const Icon(
+                      Icons.chat_bubble_outline,
+                      size: 16,
+                      color: Color(0xFF8090A5),
+                    ),
+                    title: Text(
+                      c['titulo']?.toString() ?? 'Conversación',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Color(0xFFCBD5E1),
+                        fontSize: 12,
+                      ),
+                    ),
+                    onTap: _enviando
+                        ? null
+                        : () => _abrirConversacion(c['id'].toString()),
+                    trailing: PopupMenuButton<String>(
+                      enabled: !_enviando,
+                      icon: const Icon(
+                        Icons.more_horiz,
+                        size: 18,
+                        color: Color(0xFF8090A5),
+                      ),
+                      onSelected: (value) {
+                        if (value == 'rename') _renombrar(c);
+                        if (value == 'delete') _eliminar(c);
+                      },
+                      itemBuilder: (_) => const [
+                        PopupMenuItem(
+                          value: 'rename',
+                          child: Text('Renombrar'),
+                        ),
+                        PopupMenuItem(value: 'delete', child: Text('Eliminar')),
+                      ],
+                    ),
+                  ),
+              ],
+            ),
           ),
-          Divider(height: 1, color: Colors.white.withOpacity(.08)),
+          const Divider(height: 1, color: Color(0xFF243544)),
           Padding(
-            padding: const EdgeInsets.all(14),
+            padding: const EdgeInsets.all(16),
             child: Row(
               children: [
-                CircleAvatar(
-                  radius: 17,
-                  backgroundColor: _cyan.withOpacity(.14),
-                  child: const Icon(
-                    Icons.person_outline_rounded,
-                    color: _cyan,
-                    size: 19,
+                const CircleAvatar(
+                  radius: 15,
+                  backgroundColor: Color(0xFF183F40),
+                  child: Icon(
+                    Icons.person_outline,
+                    size: 17,
+                    color: Color(0xFF99F6E4),
                   ),
                 ),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
-                    _supabase.auth.currentUser?.email ?? 'Usuario Safebrok',
+                    _supabase.auth.currentUser?.email ?? 'Mi cuenta',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
-                      color: Color(0xFF475569),
-                      fontWeight: FontWeight.w700,
-                      fontSize: 12.5,
+                      fontSize: 11,
+                      color: Color(0xFF94A3B8),
                     ),
                   ),
                 ),
@@ -723,21 +1021,70 @@ class _SafebrokAiScreenState extends State<SafebrokAiScreen> {
     );
   }
 
+  Widget _botsWorkspace() => Column(
+    children: [
+      Container(
+        padding: const EdgeInsets.all(22),
+        color: Colors.white,
+        child: Row(
+          children: [
+            const Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Tu trabajo, en automático',
+                    style: TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF0F2747),
+                    ),
+                  ),
+                  SizedBox(height: 5),
+                  Text(
+                    'Crea, pausa y revisa tus bots desde un mismo lugar.',
+                    style: TextStyle(color: Color(0xFF64748B)),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 12),
+            FilledButton.icon(
+              onPressed: () => _nuevaConversacion(espacio: 'bots'),
+              icon: const Icon(Icons.add, size: 18),
+              label: const Text('Crear con IA'),
+              style: FilledButton.styleFrom(
+                backgroundColor: const Color(0xFF0F766E),
+              ),
+            ),
+          ],
+        ),
+      ),
+      const Expanded(child: IaBotsScreen(embedded: true)),
+    ],
+  );
+
+  bool get _isWelcome =>
+      _mensajes.isEmpty ||
+      (_mensajes.length == 1 && _mensajes.first['local'] == true);
+
   Widget _chat() {
     return Stack(
       children: [
-        const _AiBackground(),
+        const Positioned.fill(child: ColoredBox(color: Color(0xFFF7F9FC))),
         Column(
           children: [
-            if (_mensajes.length <= 1 && !_cargandoMensajes) _welcome(),
             Expanded(
               child: _cargandoMensajes
                   ? const Center(child: CircularProgressIndicator(color: _cyan))
                   : ListView.builder(
                       controller: _scrollController,
                       padding: const EdgeInsets.fromLTRB(18, 10, 18, 18),
-                      itemCount: _mensajes.length + (_enviando ? 1 : 0),
+                      itemCount: _isWelcome && !_enviando
+                          ? 1
+                          : _mensajes.length + (_enviando ? 1 : 0),
                       itemBuilder: (context, index) {
+                        if (_isWelcome && !_enviando) return _welcome();
                         if (_enviando && index == _mensajes.length) {
                           return const _TypingBubble();
                         }
@@ -745,7 +1092,13 @@ class _SafebrokAiScreenState extends State<SafebrokAiScreen> {
                         return _MessageBubble(
                           isUser: m['role'] == 'user',
                           text: m['text']?.toString() ?? '',
+                          pasos: m['pasos'] is List
+                              ? List<dynamic>.from(m['pasos'])
+                              : const [],
                           pdfUrl: m['pdf_url']?.toString(),
+                          archivos: List<Map<String, dynamic>>.from(
+                            m['archivos'] ?? [],
+                          ),
                           pdfNombre: m['pdf_nombre']?.toString(),
                           visualizacion: m['visualizacion'] is Map
                               ? Map<String, dynamic>.from(
@@ -756,6 +1109,10 @@ class _SafebrokAiScreenState extends State<SafebrokAiScreen> {
                       },
                     ),
             ),
+            IaAgentActions(
+              conversationId: _conversacionActualId,
+              revision: _mensajes.length + (_enviando ? 1 : 0),
+            ),
             _inputBar(),
           ],
         ),
@@ -764,145 +1121,139 @@ class _SafebrokAiScreenState extends State<SafebrokAiScreen> {
   }
 
   Widget _welcome() {
-    final acciones = [
-      (
-        Icons.insights_rounded,
-        'Resumen de ventas',
-        'Hazme un resumen de las ventas de mi estructura',
-      ),
-      (
-        Icons.emoji_events_rounded,
-        'Ranking del equipo',
-        'Hazme un ranking de mi equipo por prima neta',
-      ),
-      (
-        Icons.track_changes_rounded,
-        'Objetivo actual',
-        '¿Cómo vamos respecto al objetivo actual?',
-      ),
-      (
-        Icons.receipt_long_rounded,
-        'Recibos pendientes',
-        '¿Qué recibos pendientes tiene mi estructura?',
-      ),
-    ];
-
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(18, 18, 18, 8),
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.fromLTRB(24, 24, 24, 22),
-        decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [Color(0xFF0F2747), Color(0xFF1D3F91), Color(0xFF2554D9)],
-          ),
-          borderRadius: BorderRadius.circular(28),
-          boxShadow: const [
-            BoxShadow(
-              color: Color(0x261D4ED8),
-              blurRadius: 34,
-              offset: Offset(0, 16),
-            ),
-          ],
-        ),
-        child: Column(
-          children: [
-            Container(
-              width: 66,
-              height: 66,
-              padding: const EdgeInsets.all(15),
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(.12),
-                borderRadius: BorderRadius.circular(22),
-                border: Border.all(color: Colors.white.withOpacity(.18)),
-              ),
-              child: Image.asset(
-                'assets/images/safebrok_mark.png',
-                fit: BoxFit.contain,
-              ),
-            ),
-            const SizedBox(height: 16),
-            const Text(
-              'Tu inteligencia comercial',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 27,
-                fontWeight: FontWeight.w900,
-                letterSpacing: -.6,
-              ),
-            ),
-            const SizedBox(height: 7),
-            Text(
-              'Pregunta, analiza y toma decisiones con la información de SafeBrok.',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: Colors.white.withOpacity(.76),
-                height: 1.45,
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-            const SizedBox(height: 20),
-            Wrap(
-              spacing: 10,
-              runSpacing: 10,
-              alignment: WrapAlignment.center,
-              children: acciones.map((a) {
-                return InkWell(
-                  onTap: () => enviarSugerencia(a.$3),
+    final workspace = iaWorkspace(_espacio);
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 780),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 42, horizontal: 12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 52,
+                height: 52,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE4F4F0),
                   borderRadius: BorderRadius.circular(16),
-                  child: Container(
-                    width: 220,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 13,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(.10),
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: Colors.white.withOpacity(.15)),
-                    ),
-                    child: Row(
-                      children: [
-                        Container(
-                          width: 34,
-                          height: 34,
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF14B8A6).withOpacity(.20),
-                            borderRadius: BorderRadius.circular(11),
-                          ),
-                          child: Icon(
-                            a.$1,
-                            color: const Color(0xFF67E8F9),
-                            size: 18,
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Text(
-                            a.$2,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w800,
-                              fontSize: 13,
+                ),
+                child: Icon(
+                  workspace.icon,
+                  color: const Color(0xFF0F766E),
+                  size: 27,
+                ),
+              ),
+              const SizedBox(height: 24),
+              Text(
+                _espacio == 'general' ? '¿Qué hacemos hoy?' : workspace.title,
+                style: const TextStyle(
+                  fontSize: 34,
+                  height: 1.15,
+                  fontWeight: FontWeight.w800,
+                  color: Color(0xFF102A43),
+                  letterSpacing: -1.1,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                workspace.subtitle,
+                style: const TextStyle(
+                  fontSize: 16,
+                  height: 1.6,
+                  color: Color(0xFF64748B),
+                ),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'Datos de tu ámbito · acciones revisables · resultados verificables',
+                style: TextStyle(fontSize: 12, color: Color(0xFF7B8A9B)),
+              ),
+              const SizedBox(height: 30),
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final twoColumns = constraints.maxWidth >= 440;
+                  final width = twoColumns
+                      ? (constraints.maxWidth - 14) / 2
+                      : constraints.maxWidth;
+                  return Wrap(
+                    spacing: 14,
+                    runSpacing: 14,
+                    children: [
+                      for (var i = 0; i < workspace.prompts.length; i++)
+                        SizedBox(
+                          width: width,
+                          child: Material(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(15),
+                            child: InkWell(
+                              onTap: () {
+                                _controller.text = workspace.prompts[i].$2;
+                              },
+                              borderRadius: BorderRadius.circular(15),
+                              child: Container(
+                                constraints: const BoxConstraints(
+                                  minHeight: 126,
+                                ),
+                                padding: const EdgeInsets.all(19),
+                                decoration: BoxDecoration(
+                                  border: Border.all(
+                                    color: const Color(0xFFE2E8F0),
+                                  ),
+                                  borderRadius: BorderRadius.circular(15),
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Text(
+                                          '0${i + 1}',
+                                          style: const TextStyle(
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.w700,
+                                            color: Color(0xFF0F766E),
+                                          ),
+                                        ),
+                                        const Spacer(),
+                                        const Icon(
+                                          Icons.north_east,
+                                          size: 16,
+                                          color: Color(0xFF94A3B8),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 14),
+                                    Text(
+                                      workspace.prompts[i].$1,
+                                      style: const TextStyle(
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.w700,
+                                        color: Color(0xFF16324F),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 7),
+                                    Text(
+                                      workspace.prompts[i].$2,
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        fontSize: 12,
+                                        height: 1.5,
+                                        color: Color(0xFF64748B),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
                             ),
                           ),
                         ),
-                        const Icon(
-                          Icons.arrow_outward_rounded,
-                          color: Colors.white70,
-                          size: 17,
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              }).toList(),
-            ),
-          ],
+                    ],
+                  );
+                },
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -941,62 +1292,95 @@ class _SafebrokAiScreenState extends State<SafebrokAiScreen> {
                   ),
                 ],
               ),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.end,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(
-                    child: TextField(
-                      controller: _controller,
-                      minLines: 1,
-                      maxLines: 5,
-                      style: const TextStyle(
-                        color: Color(0xFF111827),
-                        fontSize: 15,
-                        height: 1.35,
-                      ),
-                      textInputAction: TextInputAction.send,
-                      onSubmitted: (_) => enviarPregunta(),
-                      decoration: const InputDecoration(
-                        hintText: 'Pregunta a Safebrok IA',
-                        hintStyle: TextStyle(color: Color(0xFF738198)),
-                        border: InputBorder.none,
-                        contentPadding: EdgeInsets.symmetric(vertical: 11),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  InkWell(
-                    onTap: _enviando ? null : enviarPregunta,
-                    borderRadius: BorderRadius.circular(18),
-                    child: Container(
-                      width: 42,
-                      height: 42,
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(18),
-                        gradient: _enviando
-                            ? null
-                            : const LinearGradient(
-                                colors: [
-                                  Color(0xFF0F2747),
-                                  Color(0xFF1D4ED8),
-                                  _cyan,
-                                ],
+                  if (_adjuntos.isNotEmpty)
+                    Wrap(
+                      spacing: 6,
+                      children: _adjuntos
+                          .map(
+                            (f) => InputChip(
+                              label: Text(
+                                f.name,
+                                overflow: TextOverflow.ellipsis,
                               ),
-                        color: _enviando ? const Color(0xFFCBD5E1) : null,
-                      ),
-                      child: _enviando
-                          ? const Padding(
-                              padding: EdgeInsets.all(11),
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2.2,
-                                color: Colors.white,
-                              ),
-                            )
-                          : const Icon(
-                              Icons.arrow_upward_rounded,
-                              color: Colors.white,
+                              onDeleted: _enviando
+                                  ? null
+                                  : () => setState(() => _adjuntos.remove(f)),
                             ),
+                          )
+                          .toList(),
                     ),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      IconButton(
+                        tooltip: 'Adjuntar PDF, documento o imagen',
+                        onPressed: _enviando ? null : _seleccionarAdjuntos,
+                        icon: const Icon(
+                          Icons.attach_file_rounded,
+                          color: _cyan,
+                        ),
+                      ),
+                      Expanded(
+                        child: TextField(
+                          controller: _controller,
+                          minLines: 1,
+                          maxLines: 5,
+                          style: const TextStyle(
+                            color: Color(0xFF111827),
+                            fontSize: 15,
+                            height: 1.35,
+                          ),
+                          textInputAction: TextInputAction.send,
+                          onSubmitted: (_) => enviarPregunta(),
+                          decoration: InputDecoration(
+                            hintText: _espacio == 'general'
+                                ? 'Describe qué quieres consultar o hacer…'
+                                : 'Trabajar en ${iaWorkspace(_espacio).title.toLowerCase()}…',
+                            hintStyle: TextStyle(color: Color(0xFF738198)),
+                            border: InputBorder.none,
+                            contentPadding: EdgeInsets.symmetric(vertical: 11),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      InkWell(
+                        onTap: _enviando ? null : enviarPregunta,
+                        borderRadius: BorderRadius.circular(18),
+                        child: Container(
+                          width: 42,
+                          height: 42,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(18),
+                            gradient: _enviando
+                                ? null
+                                : const LinearGradient(
+                                    colors: [
+                                      Color(0xFF0F2747),
+                                      Color(0xFF1D4ED8),
+                                      _cyan,
+                                    ],
+                                  ),
+                            color: _enviando ? const Color(0xFFCBD5E1) : null,
+                          ),
+                          child: _enviando
+                              ? const Padding(
+                                  padding: EdgeInsets.all(11),
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2.2,
+                                    color: Colors.white,
+                                  ),
+                                )
+                              : const Icon(
+                                  Icons.arrow_upward_rounded,
+                                  color: Colors.white,
+                                ),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -1011,6 +1395,8 @@ class _SafebrokAiScreenState extends State<SafebrokAiScreen> {
 class _MessageBubble extends StatelessWidget {
   final bool isUser;
   final String text;
+  final List<dynamic> pasos;
+  final List<Map<String, dynamic>> archivos;
   final String? pdfUrl;
   final String? pdfNombre;
   final Map<String, dynamic>? visualizacion;
@@ -1018,7 +1404,9 @@ class _MessageBubble extends StatelessWidget {
   const _MessageBubble({
     required this.isUser,
     required this.text,
+    this.pasos = const [],
     this.pdfUrl,
+    this.archivos = const [],
     this.pdfNombre,
     this.visualizacion,
   });
@@ -1181,11 +1569,39 @@ class _MessageBubble extends StatelessWidget {
                                 ),
                               ),
                             ),
+                            if (pasos.isNotEmpty) ...[
+                              const SizedBox(height: 12),
+                              Wrap(
+                                spacing: 6,
+                                runSpacing: 6,
+                                children: [
+                                  for (final paso in pasos)
+                                    Chip(
+                                      avatar: Icon(
+                                        paso['estado'] == 'correcto'
+                                            ? Icons.check_circle_outline
+                                            : Icons.error_outline,
+                                        size: 16,
+                                      ),
+                                      label: Text(
+                                        (paso['modulo'] ?? paso['herramienta'])
+                                            .toString(),
+                                        style: const TextStyle(fontSize: 11),
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            ],
                             if (visualizacion != null) ...[
                               const SizedBox(height: 16),
                               _DashboardVisual(data: visualizacion!),
                             ],
-                            if ((pdfUrl ?? '').trim().isNotEmpty) ...[
+                            if (archivos.isNotEmpty) ...[
+                              const SizedBox(height: 14),
+                              IaArtifactList(files: archivos),
+                            ],
+                            if (archivos.isEmpty &&
+                                (pdfUrl ?? '').trim().isNotEmpty) ...[
                               const SizedBox(height: 14),
                               FilledButton.icon(
                                 onPressed: () => _abrirEnlace(context, pdfUrl),
@@ -1206,7 +1622,7 @@ class _MessageBubble extends StatelessWidget {
                                 ),
                                 label: Text(
                                   (pdfNombre ?? '').trim().isEmpty
-                                      ? 'Descargar informe PDF'
+                                      ? 'Descargar archivo'
                                       : 'Descargar ${pdfNombre!.trim()}',
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
@@ -1781,52 +2197,6 @@ class _TypingBubble extends StatelessWidget {
             ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-class _AiBackground extends StatelessWidget {
-  const _AiBackground();
-
-  @override
-  Widget build(BuildContext context) {
-    return IgnorePointer(
-      child: Stack(
-        children: [
-          Positioned(
-            top: -140,
-            right: -100,
-            child: _Glow(
-              color: const Color(0xFF14B8A6).withOpacity(.13),
-              size: 300,
-            ),
-          ),
-          Positioned(
-            bottom: -130,
-            left: -100,
-            child: _Glow(color: Colors.blueAccent.withOpacity(.11), size: 280),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _Glow extends StatelessWidget {
-  final Color color;
-  final double size;
-
-  const _Glow({required this.color, required this.size});
-
-  @override
-  Widget build(BuildContext context) {
-    return ImageFiltered(
-      imageFilter: ImageFilter.blur(sigmaX: 70, sigmaY: 70),
-      child: Container(
-        width: size,
-        height: size,
-        decoration: BoxDecoration(shape: BoxShape.circle, color: color),
       ),
     );
   }

@@ -8,7 +8,7 @@ workflows:
       app_store_connect: "Codemagic Safebrok"
 
     environment:
-      flutter: 3.41.9
+      flutter: 3.47.7
       xcode: latest
       cocoapods: default
       vars:
@@ -22,6 +22,9 @@ workflows:
           - safebrok_distribution
 
     scripts:
+      - name: Prepare iOS engine
+        script: flutter precache --ios
+
       - name: Get Flutter packages
         script: flutter pub get
 
@@ -30,6 +33,9 @@ workflows:
 
       - name: Test release regressions and App Review roles
         script: flutter test
+
+      - name: Prepare iOS project
+        script: flutter build ios --release --config-only --no-codesign
 
       - name: Install pods
         script: |
