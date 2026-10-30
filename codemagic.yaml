@@ -8,7 +8,7 @@ workflows:
       app_store_connect: "Codemagic Safebrok"
 
     environment:
-      flutter: 3.41.9
+      flutter: 3.47.7
       xcode: latest
       cocoapods: default
       vars:
@@ -22,6 +22,15 @@ workflows:
           - safebrok_distribution
 
     scripts:
+      - name: Restore verified iOS 1.2.4 source snapshot
+        script: |
+          set -euo pipefail
+          echo "ed20885b834e8c43148c978f7e9245734571bfd9976f9a9561bf014fb2d3880d  SafeBrok_iOS_1.2.4_source.tar.gz" | shasum -a 256 -c -
+          tar -xzf SafeBrok_iOS_1.2.4_source.tar.gz
+          grep '^version: 1.2.4+16$' pubspec.yaml
+      - name: Prepare iOS engine
+        script: flutter precache --ios
+
       - name: Get Flutter packages
         script: flutter pub get
 
@@ -30,6 +39,9 @@ workflows:
 
       - name: Test release regressions and App Review roles
         script: flutter test
+
+      - name: Prepare iOS project
+        script: flutter build ios --release --config-only --no-codesign
 
       - name: Install pods
         script: |
@@ -54,7 +66,7 @@ workflows:
           NEXT_BUILD=$((LATEST_BUILD + 1))
           if (( NEXT_BUILD < BASE_BUILD )); then NEXT_BUILD=$BASE_BUILD; fi
           echo "Compilando SafeBrok ${APP_VERSION%%+*} ($NEXT_BUILD)"
-          flutter build ipa --release \
+          flutter build ipa --release --no-tree-shake-icons \
             -t lib/main.dart \
             --build-name="${APP_VERSION%%+*}" \
             --build-number="$NEXT_BUILD" \
